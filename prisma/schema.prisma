@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SALES_USER
+  KNOWLEDGE_ADMIN
+}
+
+enum ApprovalStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+  RESTRICTED
+  ARCHIVED
+  REJECTED
+}
+
+enum KnowledgeType {
+  PRODUCT_TRUTH
+  ICP
+  PERSONA
+  MESSAGE_EXAMPLE
+  PROSPECT_QUESTION
+  OBJECTION
+  COMPETITOR
+  COMPETITOR_CLAIM
+  CASE_STUDY
+  SEQUENCE
+  SOURCE_DOCUMENT
+  CLAIM
+  KNOWLEDGE_SUBMISSION
+  REVIEW_DECISION
+  INTERACTION_OUTCOME
+}
+
+enum SourceType {
+  INTERNAL_DOCUMENT
+  CUSTOMER_CONVERSATION
+  SALES_CALL
+  EMAIL_THREAD
+  WEBSITE
+  RESEARCH_NOTE
+  OTHER
+}
+
+enum Channel {
+  EMAIL
+  LINKEDIN
+  CALL
+  INTERNAL
+}
+
+enum ReviewDecisionType {
+  SUBMITTED
+  APPROVED
+  RESTRICTED
+  REJECTED
+  ARCHIVED
+  RETURNED_TO_DRAFT
+  EDITED
+}
+
+enum InteractionOutcomeType {
+  POSITIVE_REPLY
+  OBJECTION
+  MEETING_BOOKED
+  NOT_A_FIT
+  NO_RESPONSE
+  OTHER
+}
+
+enum MetricDirection {
+  INCREASE
+  DECREASE
+  NEUTRAL
+  UNKNOWN
+}
+
+model User {
+  id                    String                @id @default(cuid())
+  email                 String                @unique
+  name                  String?
+  role                  UserRole              @default(SALES_USER)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  submissions           KnowledgeSubmission[] @relation("SubmissionAuthor")
+  reviewDecisions       ReviewDecision[]      @relation("ReviewDecisionActor")
+  ownedClaims           Claim[]               @relation("ClaimReviewOwner")
+  interactionOutcomes   InteractionOutcome[]
+  generatedDrafts       GeneratedDraft[]
+}
+
+model KnowledgeItem {
+  id                String                @id @default(cuid())
+  type              KnowledgeType
+  title             String
+  summary           String?
+  body              String?
+  approvalStatus    ApprovalStatus        @default(DRAFT)
+  productScope      String                @default("Signal")
+  usageRestrictions String?
+  internalNotes     String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  industries        Industry[]            @relation("KnowledgeItemIndustries")
+  personas          Persona[]             @relation("KnowledgeItemPersonas")
+  claims            Claim[]               @relation("KnowledgeItemClaims")
+  sources           SourceDocument[]      @relation("KnowledgeItemSources")
+  submissions       KnowledgeSubmission[]
+  reviewHistory     ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([type])
+  @@index([productScope])
+}
+
+model Industry {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  createdAt      DateTime        @default(now())
+  knowledgeItems KnowledgeItem[] @relation("KnowledgeItemIndustries")
+  claims         Claim[]         @relation("ClaimIndustries")
+  caseStudies    CaseStudy[]     @relation("CaseStudyIndustries")
+}
+
+model Persona {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  createdAt      DateTime        @default(now())
+  knowledgeItems KnowledgeItem[] @relation("KnowledgeItemPersonas")
+  claims         Claim[]         @relation("ClaimPersonas")
+  caseStudies    CaseStudy[]     @relation("CaseStudyPersonas")
+}
+
+model SourceDocument {
+  id                String          @id @default(cuid())
+  title             String
+  sourceType        SourceType
+  externalUrl       String?
+  fileReference     String?
+  sourceDate        DateTime?
+  description       String?
+  internalNotes     String?
+  approvalStatus    ApprovalStatus @default(NEEDS_REVIEW)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  claims            Claim[]         @relation("ClaimSources")
+  knowledgeItems    KnowledgeItem[] @relation("KnowledgeItemSources")
+  caseStudies       CaseStudy[]     @relation("CaseStudySources")
+}
+
+model Claim {
+  id                String          @id @default(cuid())
+  exactText         String
+  approvedWording   String?
+  approvalStatus    ApprovalStatus @default(DRAFT)
+  sourceDate        DateTime?
+  allowedChannels   Channel[]
+  usageRestrictions String?
+  reviewOwnerId     String?
+  lastReviewedAt    DateTime?
+  internalNotes     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  reviewOwner       User?           @relation("ClaimReviewOwner", fields: [reviewOwnerId], references: [id])
+  sources           SourceDocument[] @relation("ClaimSources")
+  industries        Industry[]      @relation("ClaimIndustries")
+  personas          Persona[]       @relation("ClaimPersonas")
+  knowledgeItems    KnowledgeItem[] @relation("KnowledgeItemClaims")
+  reviewHistory     ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([reviewOwnerId])
+}
+
+model CaseStudy {
+  id                       String           @id @default(cuid())
+  companyName              String
+  title                    String
+  geographyOrMarkets       String?
+  businessModel            String?
+  initialProblem           String?
+  signalApproach           String?
+  activationDuration       String?
+  campaignTypes            String[]
+  bestFitObjections        String[]
+  approvedExternalWording  String?
+  approvalStatus           ApprovalStatus   @default(DRAFT)
+  usageRestrictions        String?
+  internalNotes            String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+  industries               Industry[]       @relation("CaseStudyIndustries")
+  bestFitPersonas          Persona[]        @relation("CaseStudyPersonas")
+  sources                  SourceDocument[] @relation("CaseStudySources")
+  metrics                  CaseStudyMetric[]
+
+  @@index([approvalStatus])
+}
+
+model CaseStudyMetric {
+  id              String          @id @default(cuid())
+  caseStudyId     String
+  metricName      String
+  value           String
+  unit            String?
+  direction       MetricDirection @default(UNKNOWN)
+  comparison      String?
+  timePeriod      String?
+  approvedWording String?
+  createdAt       DateTime        @default(now())
+  caseStudy       CaseStudy       @relation(fields: [caseStudyId], references: [id], onDelete: Cascade)
+}
+
+model Sequence {
+  id                String          @id @default(cuid())
+  title             String
+  description       String?
+  approvalStatus    ApprovalStatus @default(DRAFT)
+  usageRestrictions String?
+  internalNotes     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  steps             SequenceStep[]
+}
+
+model SequenceStep {
+  id          String   @id @default(cuid())
+  sequenceId  String
+  stepNumber  Int
+  channel     Channel
+  purpose     String
+  body        String
+  createdAt   DateTime @default(now())
+  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, stepNumber])
+}
+
+model KnowledgeSubmission {
+  id                String          @id @default(cuid())
+  authorId          String
+  knowledgeItemId   String?
+  title             String
+  submittedText     String
+  suggestedType     KnowledgeType
+  approvalStatus    ApprovalStatus @default(DRAFT)
+  sourceNotes       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  author            User            @relation("SubmissionAuthor", fields: [authorId], references: [id])
+  knowledgeItem     KnowledgeItem?  @relation(fields: [knowledgeItemId], references: [id])
+  reviewHistory     ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([authorId])
+}
+
+model ReviewDecision {
+  id                    String             @id @default(cuid())
+  actorId               String
+  decisionType          ReviewDecisionType
+  fromStatus            ApprovalStatus?
+  toStatus              ApprovalStatus?
+  notes                 String?
+  createdAt             DateTime           @default(now())
+  knowledgeItemId       String?
+  claimId               String?
+  knowledgeSubmissionId String?
+  actor                 User               @relation("ReviewDecisionActor", fields: [actorId], references: [id])
+  knowledgeItem         KnowledgeItem?     @relation(fields: [knowledgeItemId], references: [id])
+  claim                 Claim?             @relation(fields: [claimId], references: [id])
+  knowledgeSubmission   KnowledgeSubmission? @relation(fields: [knowledgeSubmissionId], references: [id])
+
+  @@index([actorId])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model InteractionOutcome {
+  id          String                 @id @default(cuid())
+  userId      String
+  outcomeType InteractionOutcomeType
+  channel     Channel
+  summary     String
+  notes       String?
+  createdAt   DateTime               @default(now())
+  user        User                   @relation(fields: [userId], references: [id])
+}
+
+model GeneratedDraft {
+  id                 String          @id @default(cuid())
+  userId             String
+  workflow           String
+  promptSnapshot     String?
+  draftContent       String
+  approvalStatus     ApprovalStatus @default(DRAFT)
+  submittedKnowledgeId String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user               User            @relation(fields: [userId], references: [id])
+
+  @@index([approvalStatus])
+  @@index([userId])
+}
