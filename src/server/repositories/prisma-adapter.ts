@@ -396,6 +396,12 @@ export class PrismaPersistenceAdapter implements PersistenceRepositories {
             userId: asString(draft.userId),
             workflow: asString(draft.workflow) as GeneratedDraft["workflow"],
             draftContent: asString(draft.draftContent),
+            alternativeContent: asOptionalString(draft.alternativeContent),
+            retrievedKnowledgeIds: asStringArray(draft.retrievedKnowledgeIds),
+            sourceIds: asStringArray(draft.sourceIds),
+            providerName: asOptionalString(draft.providerName),
+            modelName: asOptionalString(draft.modelName),
+            draftStatus: asOptionalString(draft.draftStatus) as GeneratedDraft["draftStatus"],
             promptSnapshot: asOptionalString(draft.promptSnapshot),
             createdAt: asDateString(draft.createdAt) ?? new Date().toISOString(),
           }

@@ -74,7 +74,7 @@ export function getImportedReviewError({
     }
   }
 
-  if (record.isCompetitorRelated) {
+  if (record.category === "OBJECTION" && record.isCompetitorRelated) {
     return "Competitor-related records require manual restriction or review before approval.";
   }
 

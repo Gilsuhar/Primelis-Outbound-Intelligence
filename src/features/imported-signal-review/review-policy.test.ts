@@ -141,6 +141,21 @@ describe("imported Signal review policy", () => {
     ).toContain("Competitor-related");
   });
 
+  it("allows source-backed product truth that mentions competitive scenarios", () => {
+    expect(
+      getImportedReviewError({
+        actor: admin,
+        record: record({
+          category: "PRODUCT_TRUTH",
+          contentType: "Product Truth",
+          title: "Three optimization scenarios",
+          isCompetitorRelated: true,
+        }),
+        action: "APPROVE",
+      }),
+    ).toBeNull();
+  });
+
   it("filters by missing approved wording, restricted usage, source, and status", () => {
     const records = [
       record({

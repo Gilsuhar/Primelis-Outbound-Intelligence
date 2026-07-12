@@ -91,6 +91,12 @@ enum CaseStudyUsageScope {
   PUBLIC_MARKETING
 }
 
+enum GeneratedDraftStatus {
+  DRAFT
+  SUBMITTED_FOR_REVIEW
+  ARCHIVED
+}
+
 model User {
   id                  String                @id @default(cuid())
   email               String                @unique
@@ -438,16 +444,25 @@ model InteractionOutcome {
 }
 
 model GeneratedDraft {
-  id                   String    @id @default(cuid())
-  userId               String
-  workflow             String
-  promptSnapshot       String?
-  draftContent         String
-  submittedKnowledgeId String?
-  submittedAt          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  user                 User      @relation(fields: [userId], references: [id])
+  id                    String               @id @default(cuid())
+  userId                String
+  workflow              String
+  promptSnapshot        String?
+  inputSnapshot         Json?
+  draftContent          String
+  alternativeContent    String?
+  retrievedKnowledgeIds String[]
+  sourceIds             String[]
+  providerName          String?
+  modelName             String?
+  draftStatus           GeneratedDraftStatus @default(DRAFT)
+  submittedKnowledgeId  String?
+  submittedAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  user                  User                 @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([workflow])
+  @@index([draftStatus])
 }

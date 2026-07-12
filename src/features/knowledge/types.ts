@@ -159,6 +159,12 @@ export type GeneratedDraft = {
   userId: string;
   workflow: "CREATE_OUTREACH" | "REPLY_TO_PROSPECT" | "BUILD_SEQUENCE" | "ASK_SIGNAL_BRAIN";
   draftContent: string;
+  alternativeContent?: string;
+  retrievedKnowledgeIds?: string[];
+  sourceIds?: string[];
+  providerName?: string;
+  modelName?: string;
+  draftStatus?: "DRAFT" | "SUBMITTED_FOR_REVIEW" | "ARCHIVED";
   promptSnapshot?: string;
   createdAt: string;
 };
