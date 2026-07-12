@@ -83,6 +83,14 @@ enum MetricDirection {
   UNKNOWN
 }
 
+enum CaseStudyUsageScope {
+  INTERNAL_ONLY
+  SALES_REPLY_ONLY
+  EMAIL_AND_LINKEDIN
+  DECK_ONLY
+  PUBLIC_MARKETING
+}
+
 model User {
   id                  String                @id @default(cuid())
   email               String                @unique
@@ -93,6 +101,9 @@ model User {
   submissions         KnowledgeSubmission[] @relation("SubmissionAuthor")
   reviewDecisions     ReviewDecision[]      @relation("ReviewDecisionActor")
   ownedClaims         Claim[]               @relation("ClaimReviewOwner")
+  reviewedKnowledge   KnowledgeItem[]       @relation("KnowledgeItemReviewOwner")
+  reviewedSources     SourceDocument[]      @relation("SourceDocumentReviewOwner")
+  reviewedCaseStudies CaseStudy[]           @relation("CaseStudyReviewOwner")
   interactionOutcomes InteractionOutcome[]
   generatedDrafts     GeneratedDraft[]
 }
@@ -113,14 +124,18 @@ model KnowledgeItem {
   summary           String?
   body              String?
   approvalStatus    ApprovalStatus        @default(DRAFT)
+  approvedWording   String?
   productScope      String                @default("Signal")
   productId         String?
   channels          Channel[]
   usageRestrictions String?
   internalNotes     String?
+  reviewOwnerId     String?
+  lastReviewedAt    DateTime?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   product           Product?              @relation(fields: [productId], references: [id])
+  reviewOwner       User?                 @relation("KnowledgeItemReviewOwner", fields: [reviewOwnerId], references: [id])
   industries        Industry[]            @relation("KnowledgeItemIndustries")
   personas          Persona[]             @relation("KnowledgeItemPersonas")
   claims            Claim[]               @relation("KnowledgeItemClaims")
@@ -136,6 +151,7 @@ model KnowledgeItem {
   @@index([type])
   @@index([productScope])
   @@index([productId])
+  @@index([reviewOwnerId])
 }
 
 model Industry {
@@ -177,14 +193,22 @@ model SourceDocument {
   fileReference  String?
   sourceDate     DateTime?
   description    String?
+  approvedWording String?
+  usageRestrictions String?
   internalNotes  String?
+  reviewOwnerId  String?
+  lastReviewedAt DateTime?
   approvalStatus ApprovalStatus        @default(NEEDS_REVIEW)
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
+  reviewOwner    User?                 @relation("SourceDocumentReviewOwner", fields: [reviewOwnerId], references: [id])
   claims         Claim[]               @relation("ClaimSources")
   knowledgeItems KnowledgeItem[]       @relation("KnowledgeItemSources")
   caseStudies    CaseStudy[]           @relation("CaseStudySources")
   submissions    KnowledgeSubmission[] @relation("SubmissionSources")
+  reviewHistory  ReviewDecision[]
+
+  @@index([reviewOwnerId])
 }
 
 model Claim {
@@ -285,16 +309,23 @@ model CaseStudy {
   bestFitObjections       String[]
   approvedExternalWording String?
   approvalStatus          ApprovalStatus    @default(DRAFT)
+  usageScope              CaseStudyUsageScope?
   usageRestrictions       String?
   internalNotes           String?
+  reviewOwnerId           String?
+  lastReviewedAt          DateTime?
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
+  reviewOwner             User?             @relation("CaseStudyReviewOwner", fields: [reviewOwnerId], references: [id])
   industries              Industry[]        @relation("CaseStudyIndustries")
   bestFitPersonas         Persona[]         @relation("CaseStudyPersonas")
   sources                 SourceDocument[]  @relation("CaseStudySources")
   metrics                 CaseStudyMetric[]
+  reviewHistory           ReviewDecision[]
 
   @@index([approvalStatus])
+  @@index([reviewOwnerId])
+  @@index([usageScope])
 }
 
 model CaseStudyMetric {
@@ -381,10 +412,14 @@ model ReviewDecision {
   knowledgeItemId       String?
   claimId               String?
   knowledgeSubmissionId String?
+  sourceDocumentId      String?
+  caseStudyId           String?
   actor                 User                 @relation("ReviewDecisionActor", fields: [actorId], references: [id])
   knowledgeItem         KnowledgeItem?       @relation(fields: [knowledgeItemId], references: [id])
   claim                 Claim?               @relation(fields: [claimId], references: [id])
   knowledgeSubmission   KnowledgeSubmission? @relation(fields: [knowledgeSubmissionId], references: [id])
+  sourceDocument        SourceDocument?      @relation(fields: [sourceDocumentId], references: [id])
+  caseStudy             CaseStudy?           @relation(fields: [caseStudyId], references: [id])
 
   @@index([actorId])
   @@index([toStatus])

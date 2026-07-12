@@ -5,6 +5,7 @@ import {
   Inbox,
   Layers3,
   Library,
+  ListChecks,
   MessageSquareReply,
   SearchCheck,
   Send,
@@ -53,6 +54,11 @@ export const secondaryNavigation = [
     label: "Review Queue",
     href: "/review-queue",
     icon: Inbox,
+  },
+  {
+    label: "Imported Signal Review",
+    href: "/imported-signal-review",
+    icon: ListChecks,
   },
   {
     label: "Claim Details",
