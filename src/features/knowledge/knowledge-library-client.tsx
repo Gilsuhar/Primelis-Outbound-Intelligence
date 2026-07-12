@@ -15,6 +15,7 @@ import {
   approvalStatuses,
   channelTags,
   knowledgeTypes,
+  type KnowledgeItemFixture,
   type KnowledgeLibraryFilters,
 } from "@/features/knowledge/types";
 import { formatEnumLabel, getKnowledgeTypeLabel } from "@/lib/status";
@@ -30,16 +31,25 @@ function updateFilter<K extends keyof KnowledgeLibraryFilters>(
   };
 }
 
-export function KnowledgeLibraryClient() {
+export function KnowledgeLibraryClient({
+  initialItems = knowledgeItemFixtures,
+  adapterMode = "fixture",
+}: {
+  initialItems?: KnowledgeItemFixture[];
+  adapterMode?: "fixture" | "prisma";
+}) {
   const [filters, setFilters] = useState<KnowledgeLibraryFilters>(getEmptyKnowledgeLibraryFilters);
 
   const filteredItems = useMemo(
-    () => filterKnowledgeItems(knowledgeItemFixtures, filters),
-    [filters],
+    () => filterKnowledgeItems(initialItems, filters),
+    [filters, initialItems],
   );
-  const personas = useMemo(() => getUniqueTagValues(knowledgeItemFixtures, "personas"), []);
-  const industries = useMemo(() => getUniqueTagValues(knowledgeItemFixtures, "industries"), []);
-  const competitors = useMemo(() => getUniqueTagValues(knowledgeItemFixtures, "competitors"), []);
+  const personas = useMemo(() => getUniqueTagValues(initialItems, "personas"), [initialItems]);
+  const industries = useMemo(() => getUniqueTagValues(initialItems, "industries"), [initialItems]);
+  const competitors = useMemo(
+    () => getUniqueTagValues(initialItems, "competitors"),
+    [initialItems],
+  );
 
   const hasActiveFilters =
     JSON.stringify(filters) !== JSON.stringify(getEmptyKnowledgeLibraryFilters());
@@ -52,16 +62,17 @@ export function KnowledgeLibraryClient() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Knowledge Library</h1>
             <p className="max-w-2xl text-sm leading-6 text-stone-600">
-              Fixture-backed view of knowledge records, approval status, sources, and claim links.
+              Persistence-backed view of knowledge records, approval status, sources, and claim
+              links.
             </p>
           </div>
           <span className="w-fit rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-            Development fixture data only
+            {adapterMode === "prisma" ? "Database mode" : "Development fixture data"}
           </span>
         </div>
       </section>
 
-      {knowledgeItemFixtures.length === 0 ? (
+      {initialItems.length === 0 ? (
         <section className="rounded-lg border border-line bg-white p-8 text-sm text-stone-600">
           No development fixture records are available yet.
         </section>
@@ -150,7 +161,7 @@ export function KnowledgeLibraryClient() {
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-stone-600">
                 Showing <span className="font-semibold text-ink">{filteredItems.length}</span> of{" "}
-                {knowledgeItemFixtures.length} development records
+                {initialItems.length} development records
               </p>
               {hasActiveFilters ? (
                 <button

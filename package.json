@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -24,6 +25,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.24.1"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

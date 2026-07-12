@@ -37,15 +37,17 @@ const actionButtons: Array<{ label: string; status: ApprovalStatus; action: Revi
   { label: "Send back for review", status: "NEEDS_REVIEW", action: "RETURN_TO_REVIEW" },
 ];
 
-export function ReviewQueueClient() {
+export function ReviewQueueClient({
+  initialSubmissions = knowledgeSubmissionFixtures,
+  adapterMode = "fixture",
+}: {
+  initialSubmissions?: KnowledgeSubmissionFixture[];
+  adapterMode?: "fixture" | "prisma";
+}) {
   const [viewer, setViewer] = useState<FixtureUser>(fixtureUsers[1]);
   const [filters, setFilters] = useState<ReviewQueueFilters>(defaultFilters);
-  const [submissions, setSubmissions] = useState<KnowledgeSubmissionFixture[]>(
-    knowledgeSubmissionFixtures,
-  );
-  const [expandedId, setExpandedId] = useState<string | null>(
-    knowledgeSubmissionFixtures[0]?.id ?? null,
-  );
+  const [submissions, setSubmissions] = useState<KnowledgeSubmissionFixture[]>(initialSubmissions);
+  const [expandedId, setExpandedId] = useState<string | null>(initialSubmissions[0]?.id ?? null);
   const [message, setMessage] = useState<string | null>(null);
 
   const filteredSubmissions = useMemo(
@@ -85,7 +87,7 @@ export function ReviewQueueClient() {
             </p>
           </div>
           <span className="w-fit rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-            Development fixture data only
+            {adapterMode === "prisma" ? "Database mode" : "Development fixture data"}
           </span>
         </div>
       </section>

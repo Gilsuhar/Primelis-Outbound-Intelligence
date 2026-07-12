@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import { fixtureUsers, knowledgeSubmissionFixtures } from "@/data/fixtures/knowledge-fixtures";
-import { applyStatusTransition, reviewActionTargets } from "@/features/review/status-transition";
+import { fixtureUsers } from "@/data/fixtures/knowledge-fixtures";
+import { reviewActionTargets, type TransitionErrorCode } from "@/features/review/status-transition";
+import { getPersistenceAdapter } from "@/server/repositories/adapter-factory";
 
 import { err, ok } from "./result";
 
@@ -13,7 +14,27 @@ const transitionInputSchema = z.object({
   internalNote: z.string().trim().optional(),
 });
 
-export function transitionReviewStatus(input: unknown) {
+function mapTransitionErrorCode(message: string): TransitionErrorCode | "TRANSITION_FAILED" {
+  if (message.includes("Only knowledge admins")) {
+    return "FORBIDDEN";
+  }
+
+  if (message.includes("require at least one source")) {
+    return "SOURCE_REQUIRED";
+  }
+
+  if (message.includes("status transition is not allowed")) {
+    return "INVALID_TRANSITION";
+  }
+
+  if (message.includes("Unknown review action")) {
+    return "UNKNOWN_ACTION";
+  }
+
+  return "TRANSITION_FAILED";
+}
+
+export async function transitionReviewStatus(input: unknown) {
   const parsed = transitionInputSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -21,32 +42,27 @@ export function transitionReviewStatus(input: unknown) {
   }
 
   const actor = fixtureUsers.find((user) => user.id === parsed.data.actorId);
-  const submission = knowledgeSubmissionFixtures.find(
-    (item) => item.id === parsed.data.submissionId,
-  );
-
   if (!actor) {
     return err("ACTOR_NOT_FOUND", "The review actor was not found.");
   }
 
-  if (!submission) {
-    return err("SUBMISSION_NOT_FOUND", "The review submission was not found.");
+  const repositories = getPersistenceAdapter();
+
+  try {
+    const submission = await repositories.reviews.transitionStatus({
+      actor,
+      submissionId: parsed.data.submissionId,
+      action: parsed.data.action,
+      reason: parsed.data.reason,
+      internalNote: parsed.data.internalNote,
+    });
+
+    return ok({
+      submission,
+      nextStatus: reviewActionTargets[parsed.data.action],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Review transition failed.";
+    return err(mapTransitionErrorCode(message), message);
   }
-
-  const result = applyStatusTransition({
-    actor,
-    submission,
-    action: parsed.data.action,
-    reason: parsed.data.reason,
-    internalNote: parsed.data.internalNote,
-  });
-
-  if (!result.ok) {
-    return err(result.code, result.message);
-  }
-
-  return ok({
-    submission: result.submission,
-    nextStatus: reviewActionTargets[parsed.data.action],
-  });
 }

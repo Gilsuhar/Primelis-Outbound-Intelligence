@@ -16,6 +16,7 @@ import {
   createLocalSubmission,
   type AddKnowledgeInput,
 } from "@/lib/validation/add-knowledge";
+import { createKnowledgeSubmissionAction } from "@/app/add-knowledge/actions";
 import { formatEnumLabel, getKnowledgeTypeLabel, getSourceTypeLabel } from "@/lib/status";
 
 type FieldErrors = Partial<Record<keyof AddKnowledgeInput, string>>;
@@ -73,7 +74,7 @@ export function AddKnowledgeForm() {
     updateField("channels", channels);
   }
 
-  function submitForm(event: React.FormEvent<HTMLFormElement>) {
+  async function submitForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const parsed = addKnowledgeSchema.safeParse(form);
@@ -84,10 +85,16 @@ export function AddKnowledgeForm() {
       return;
     }
 
-    const localSubmission = createLocalSubmission(parsed.data);
+    const persistedSubmission = await createKnowledgeSubmissionAction(parsed.data);
+
+    if (!persistedSubmission.ok) {
+      setErrors({ title: persistedSubmission.message });
+      setSubmission(null);
+      return;
+    }
 
     setErrors({});
-    setSubmission(localSubmission);
+    setSubmission(createLocalSubmission(parsed.data));
     setForm(defaultFormState);
   }
 

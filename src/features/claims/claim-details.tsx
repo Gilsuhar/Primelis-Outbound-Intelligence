@@ -3,11 +3,29 @@ import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { getClaimDetailsState } from "@/features/claims/queries";
+import type { ClaimFixture, SourceDocumentFixture } from "@/features/knowledge/types";
 import { getReviewHistoryLabel, orderReviewHistoryChronologically } from "@/features/review/audit";
 import { formatEnumLabel, getSourceTypeLabel } from "@/lib/status";
 
-export function ClaimDetails({ claimId }: { claimId: string }) {
-  const details = getClaimDetailsState(claimId);
+type ClaimDetailsData = {
+  claim: ClaimFixture;
+  sources: SourceDocumentFixture[];
+  warnings: {
+    missingSource: boolean;
+    restricted: boolean;
+    notApproved: boolean;
+  };
+};
+
+export function ClaimDetails({
+  claimId,
+  initialDetails,
+}: {
+  claimId: string;
+  initialDetails?: ClaimDetailsData;
+}) {
+  const fixtureDetails = getClaimDetailsState(claimId);
+  const details = initialDetails ?? fixtureDetails;
 
   if (details === "NOT_FOUND") {
     return (

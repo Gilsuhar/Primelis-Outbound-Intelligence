@@ -42,6 +42,67 @@ pnpm test
 pnpm build
 ```
 
+### Local PostgreSQL
+
+1. Create a local PostgreSQL database.
+2. Copy `.env.example` to `.env`.
+3. Set `DATABASE_URL` to the local PostgreSQL connection string.
+4. Set `DIRECT_URL` to the same value unless your migration workflow needs a
+   separate direct connection.
+5. Run:
+
+```bash
+pnpm prisma:validate
+pnpm prisma:generate
+pnpm prisma:migrate
+pnpm prisma:seed
+```
+
+### Supabase PostgreSQL
+
+1. Create a Supabase project and use the PostgreSQL connection string.
+2. Set `DATABASE_URL` to the pooled or app connection string appropriate for the
+   runtime.
+3. Set `DIRECT_URL` to the direct database connection string for migrations.
+4. Run the same Prisma validation, generate, migration, and seed commands.
+
+Supabase Auth and Supabase Storage are not required in this phase.
+
+### Fixture Fallback
+
+When `DATABASE_URL` is unavailable in development or test, the application uses
+the fixture adapter explicitly. This keeps local screens usable while the
+database is not configured. Production does not silently fall back to fixtures:
+`DATABASE_URL` is required.
+
+The active adapter is selected in `src/server/repositories/adapter-factory.ts`.
+Repository interfaces live in `src/server/repositories/types.ts`, with fixture
+and Prisma implementations behind the same service boundaries.
+
+### Migrations And Seed
+
+The initial migration SQL lives under `prisma/migrations/`. If no database is
+configured, migration SQL can still be reviewed safely. Once `DATABASE_URL` and
+`DIRECT_URL` are configured, run:
+
+```bash
+pnpm prisma:migrate
+pnpm prisma:seed
+```
+
+The seed uses generic development data only. It does not include real Primelis,
+Signal, customer, competitor, savings, pricing, or performance claims.
+
+### Troubleshooting
+
+- `DATABASE_URL` missing: development/test use fixture fallback; production
+  fails intentionally.
+- `DIRECT_URL` missing: set it to the direct PostgreSQL connection for Supabase
+  migrations, or to `DATABASE_URL` for local PostgreSQL.
+- Prisma Client outdated: run `pnpm prisma:generate` after schema changes.
+- Database unavailable: run fixture-backed tests and defer migration/seed until
+  a database connection is configured.
+
 ## Knowledge Safety Principles
 
 - Factual claims must be traceable to one or more source documents.
@@ -89,8 +150,8 @@ which preserves traceability rather than silently changing approval state.
 
 ## Generated Draft Separation
 
-AI generation is not implemented yet. The `GeneratedDraft` boundary exists only
-to protect future workflows:
+AI generation, retrieval, embeddings, and LLM APIs are not implemented yet. The
+`GeneratedDraft` boundary exists only to protect future workflows:
 
 - A generated draft is not knowledge.
 - A generated draft cannot be approved.

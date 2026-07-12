@@ -1,20 +1,21 @@
-import { fixtureKnowledgeAdapter } from "@/data/adapters/fixture-knowledge-adapter";
-import {
-  getApprovedCaseStudies,
-  getApprovedClaims,
-  getApprovedCompetitorMaterial,
-  getApprovedKnowledgeItems,
-  getApprovedMessageExamples,
-} from "@/features/knowledge/approved-queries";
+import { getPersistenceAdapter } from "@/server/repositories/adapter-factory";
 
 import { ok } from "./result";
 
-export function retrieveApprovedKnowledge() {
-  return ok({
-    claims: getApprovedClaims(fixtureKnowledgeAdapter),
-    knowledgeItems: getApprovedKnowledgeItems(fixtureKnowledgeAdapter),
-    caseStudies: getApprovedCaseStudies(fixtureKnowledgeAdapter),
-    messageExamples: getApprovedMessageExamples(fixtureKnowledgeAdapter),
-    competitorMaterial: getApprovedCompetitorMaterial(fixtureKnowledgeAdapter),
-  });
+export async function retrieveApprovedKnowledge() {
+  const repositories = getPersistenceAdapter();
+
+  return ok(await repositories.knowledge.getApprovedKnowledge());
+}
+
+export async function retrieveApprovedClaims() {
+  const repositories = getPersistenceAdapter();
+
+  return ok(await repositories.claims.getApprovedClaims());
+}
+
+export async function retrieveApprovedCaseStudies() {
+  const repositories = getPersistenceAdapter();
+
+  return ok(await repositories.caseStudies.getApprovedCaseStudies());
 }
