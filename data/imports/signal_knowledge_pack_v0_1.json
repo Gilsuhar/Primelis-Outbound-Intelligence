@@ -1,0 +1,474 @@
+{
+  "version": "0.1",
+  "created_at": "2026-07-12",
+  "product": {
+    "name": "Primelis Signal",
+    "scope": "Signal only",
+    "language": "English",
+    "default_import_status": "NEEDS_REVIEW"
+  },
+  "sources": [
+    {
+      "source_key": "signal_website",
+      "title": "Primelis Signal product page",
+      "source_type": "PUBLIC_WEBSITE",
+      "external_url": "https://www.primelis.com/primelis-signal/",
+      "source_date": "2026-07-12",
+      "description": "Public product information and approved marketing language."
+    },
+    {
+      "source_key": "ninjatrader_deck",
+      "title": "NinjaTrader x Primelis - Primelis Signal Tech",
+      "source_type": "SALES_DECK",
+      "file_reference": "NinjaTrader x Primelis - Primelis Signal Tech.pdf",
+      "description": "Customized Signal deck containing product details, pricing references, competitor context and case studies."
+    },
+    {
+      "source_key": "linkedin_batch_01",
+      "title": "LinkedIn conversations batch 01",
+      "source_type": "SALES_CONVERSATIONS",
+      "description": "Jack/NinjaTrader, Valentin/Adthena, Andrew/Revvim, Emrah/Booking.com, Rex/HubSpot, Neil/Helly Hansen, Micah."
+    },
+    {
+      "source_key": "email_batch_01",
+      "title": "Email conversations batch 01",
+      "source_type": "SALES_CONVERSATIONS",
+      "description": "On, Stitch Fix, Toast, QuillBot, 1-800Accountant."
+    },
+    {
+      "source_key": "deel_enterprise_thread",
+      "title": "Deel enterprise opportunity thread",
+      "source_type": "SALES_CONVERSATIONS",
+      "description": "Internal champion enablement, Adthena comparison, POC framing and strategic re-engagement."
+    }
+  ],
+  "knowledge_items": [
+    {
+      "knowledge_type": "PRODUCT_TRUTH",
+      "title": "Signal core value proposition",
+      "summary": "Reduce inefficient branded-search spend while protecting blended traffic, conversions and revenue.",
+      "content": "Signal is designed to identify non-incremental branded-search spend and optimize bids or ad activity based on live competitive conditions and blended paid, organic and conversion performance.",
+      "status": "NEEDS_REVIEW",
+      "channels": [
+        "EMAIL",
+        "LINKEDIN",
+        "INTERNAL"
+      ],
+      "source_keys": [
+        "signal_website",
+        "ninjatrader_deck"
+      ]
+    },
+    {
+      "knowledge_type": "PRODUCT_TRUTH",
+      "title": "Three optimization scenarios",
+      "summary": "Solo, Competitive and Ghost scenarios.",
+      "content": "Solo: the brand is the only advertiser and Signal may pause or reduce bids. Competitive: competitors are present and Signal seeks the lowest efficient CPC while protecting performance. Ghost: competitors are present while the brand ad is absent, creating a brand-protection opportunity.",
+      "status": "NEEDS_REVIEW",
+      "channels": [
+        "EMAIL",
+        "LINKEDIN",
+        "INTERNAL"
+      ],
+      "source_keys": [
+        "ninjatrader_deck",
+        "linkedin_batch_01",
+        "email_batch_01"
+      ]
+    },
+    {
+      "knowledge_type": "PRODUCT_TRUTH",
+      "title": "Blended performance framework",
+      "summary": "Paid and organic brand performance should be evaluated together.",
+      "content": "Signal combines SERP conditions with Google Ads, Google Search Console and conversion-source data to evaluate blended paid and organic traffic, CPC, conversions and business outcomes.",
+      "status": "NEEDS_REVIEW",
+      "channels": [
+        "EMAIL",
+        "LINKEDIN",
+        "INTERNAL"
+      ],
+      "source_keys": [
+        "signal_website",
+        "ninjatrader_deck",
+        "email_batch_01"
+      ]
+    }
+  ],
+  "case_studies": [
+    {
+      "company_name": "Crocs",
+      "title": "Crocs cuts brand bidding costs by 70% in three months",
+      "industries": [
+        "Retail",
+        "Footwear",
+        "E-commerce"
+      ],
+      "initial_problem": "Paid brand clicks were cannibalizing traffic that strong organic visibility could capture.",
+      "signal_approach": "Adaptive branded-search bidding while monitoring paid and organic performance.",
+      "activation_duration": "3 months",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Total branded search spend",
+          "value": 71.2,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 66.3,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Organic clicks",
+          "value": 0.55,
+          "unit": "percent",
+          "direction": "increase"
+        },
+        {
+          "metric_name": "Cost per branded search order",
+          "value": 14.9,
+          "unit": "percent",
+          "direction": "decrease"
+        }
+      ]
+    },
+    {
+      "company_name": "ZoomInfo",
+      "title": "ZoomInfo cuts cost per MQL by 40%",
+      "industries": [
+        "B2B SaaS",
+        "Data",
+        "Lead Generation"
+      ],
+      "initial_problem": "Brand costs were rising without generating more leads while organic search already captured part of the demand.",
+      "signal_approach": "Reduced spend where organic presence was strong while protecting lead volume.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "MQL volume",
+          "value": 20,
+          "unit": "percent",
+          "direction": "increase"
+        },
+        {
+          "metric_name": "Cost per MQL",
+          "value": 40,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Demo requests",
+          "value": 15,
+          "unit": "percent",
+          "direction": "increase"
+        },
+        {
+          "metric_name": "Cost per demo",
+          "value": 36,
+          "unit": "percent",
+          "direction": "decrease"
+        }
+      ]
+    },
+    {
+      "company_name": "AppsFlyer",
+      "title": "AppsFlyer reduces brand ad spend while increasing qualified lead volume",
+      "industries": [
+        "B2B SaaS",
+        "MarTech",
+        "Mobile Analytics"
+      ],
+      "initial_problem": "CPCs were rising across branded-search campaigns without a corresponding increase in qualified leads.",
+      "signal_approach": "Automated bidding framework across campaigns and markets, followed by global expansion.",
+      "activation_duration": "First 30 days",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Brand ad spend",
+          "value": 29,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 40,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Qualified leads",
+          "value": 25,
+          "unit": "percent",
+          "direction": "increase"
+        }
+      ]
+    },
+    {
+      "company_name": "Dior",
+      "title": "Dior POC leads to broader market expansion",
+      "industries": [
+        "Luxury",
+        "Fashion",
+        "Retail"
+      ],
+      "initial_problem": "Need to reduce branded media costs while maintaining performance.",
+      "signal_approach": "Initial POC in France, then expansion across additional markets.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Ad cost",
+          "value": 54,
+          "unit": "percent",
+          "direction": "decrease",
+          "comparison": "at equal performance"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 60,
+          "unit": "percent",
+          "direction": "decrease"
+        }
+      ]
+    },
+    {
+      "company_name": "TAG Heuer",
+      "title": "TAG Heuer reduces ad costs while maintaining performance",
+      "industries": [
+        "Luxury",
+        "Watches",
+        "Retail"
+      ],
+      "initial_problem": "Need to lower branded advertising cost across markets while preserving visibility.",
+      "signal_approach": "Branded-search optimization across Search, Shopping and Performance Max contexts.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Ad cost",
+          "value": 66,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 63,
+          "unit": "percent",
+          "direction": "decrease"
+        }
+      ]
+    },
+    {
+      "company_name": "Chloé",
+      "title": "Chloé reduces ad cost while organic traffic grows",
+      "industries": [
+        "Luxury",
+        "Fashion",
+        "Retail"
+      ],
+      "initial_problem": "Need to reduce branded-search cost while preserving campaign efficiency.",
+      "signal_approach": "Continuous branded-search optimization with blended paid and organic monitoring.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Ad cost",
+          "value": 51,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 49,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Organic traffic",
+          "value": 35,
+          "unit": "percent",
+          "direction": "increase"
+        }
+      ]
+    },
+    {
+      "company_name": "Polène",
+      "title": "Polène lowers branded ad cost and CPC",
+      "industries": [
+        "Luxury",
+        "Fashion",
+        "E-commerce"
+      ],
+      "initial_problem": "Need to reduce cost across Search, Shopping and Performance Max while keeping performance stable.",
+      "signal_approach": "Optimization across multiple campaign types and branded-search environments.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Ad cost",
+          "value": 51,
+          "unit": "percent",
+          "direction": "decrease",
+          "comparison": "at equal performance"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 66,
+          "unit": "percent",
+          "direction": "decrease"
+        }
+      ]
+    },
+    {
+      "company_name": "Sandro",
+      "title": "Sandro reduces brand investment and increases organic traffic",
+      "industries": [
+        "Fashion",
+        "Retail",
+        "E-commerce"
+      ],
+      "initial_problem": "Need to improve branded-search efficiency during a high-priority retail period.",
+      "signal_approach": "Initial activation in Germany followed by expansion to France, the UK and Italy.",
+      "status": "NEEDS_REVIEW",
+      "approved_external_wording": null,
+      "usage_restrictions": "Confirm external usage permission before automatic use.",
+      "source_keys": [
+        "ninjatrader_deck"
+      ],
+      "metrics": [
+        {
+          "metric_name": "Ad cost",
+          "value": 50,
+          "unit": "percent",
+          "direction": "decrease",
+          "comparison": "at equal performance"
+        },
+        {
+          "metric_name": "Average CPC",
+          "value": 40,
+          "unit": "percent",
+          "direction": "decrease"
+        },
+        {
+          "metric_name": "Organic traffic",
+          "value": 52,
+          "unit": "percent",
+          "direction": "increase"
+        }
+      ]
+    }
+  ],
+  "objections": [
+    {
+      "title": "We already use Adthena",
+      "status": "NEEDS_REVIEW",
+      "recommended_strategy": "Acknowledge the existing solution, avoid replacement pressure, introduce one meaningful Signal difference, use one relevant case study, suggest a comparison call.",
+      "approved_candidate_response": "That makes sense—Adthena is a well-established solution in search intelligence and brand bidding. The main reason it may still be worth comparing approaches is that Signal combines live SERP conditions with blended paid, organic and conversion performance to optimize CPCs across Solo, Competitive and Ghost scenarios.",
+      "source_keys": [
+        "linkedin_batch_01",
+        "email_batch_01",
+        "deel_enterprise_thread"
+      ]
+    },
+    {
+      "title": "We already use Revvim",
+      "status": "NEEDS_REVIEW",
+      "recommended_strategy": "Validate that the prospect is already addressing the problem, then position Signal around competitive-scenario optimization, blended performance and platform transparency.",
+      "approved_candidate_response": "Good to know—you are already addressing the right problem. The main reason to compare Signal is that it is designed to optimize not only the moments when your brand is alone, but also CPC efficiency when competitors are present.",
+      "source_keys": [
+        "linkedin_batch_01"
+      ]
+    },
+    {
+      "title": "Auction Insights shows many competitors",
+      "status": "NEEDS_REVIEW",
+      "recommended_strategy": "Explain the difference between aggregated Auction Insights and changing live SERP conditions by query, market, device and time. Use account-specific evidence when available.",
+      "source_keys": [
+        "linkedin_batch_01"
+      ]
+    },
+    {
+      "title": "We are happy with our current optimization",
+      "status": "NEEDS_REVIEW",
+      "recommended_strategy": "Do not push. Preserve the relationship and leave the door open for future benchmarking.",
+      "approved_candidate_response": "Glad to hear things are working well. Let’s stay in touch, and if you’d ever like to compare notes on branded search, I’d be happy to reconnect.",
+      "source_keys": [
+        "linkedin_batch_01"
+      ]
+    }
+  ],
+  "message_rules": [
+    {
+      "rule": "Answer the prospect's exact question before asking for a meeting.",
+      "status": "NEEDS_REVIEW",
+      "source_keys": [
+        "linkedin_batch_01",
+        "email_batch_01"
+      ]
+    },
+    {
+      "rule": "When a prospect asks for two bullet points, return exactly two bullet points.",
+      "status": "NEEDS_REVIEW",
+      "source_keys": [
+        "linkedin_batch_01"
+      ]
+    },
+    {
+      "rule": "Default to one relevant case study per message.",
+      "status": "NEEDS_REVIEW",
+      "source_keys": [
+        "email_batch_01",
+        "deel_enterprise_thread"
+      ]
+    },
+    {
+      "rule": "Do not use pricing, POC terms or commercial offers in generated outreach unless explicitly requested and approved.",
+      "status": "NEEDS_REVIEW",
+      "source_keys": [
+        "deel_enterprise_thread"
+      ]
+    },
+    {
+      "rule": "Avoid guarantees about traffic, conversions, top position or exact savings.",
+      "status": "NEEDS_REVIEW",
+      "source_keys": [
+        "linkedin_batch_01",
+        "email_batch_01",
+        "deel_enterprise_thread"
+      ]
+    }
+  ]
+}
