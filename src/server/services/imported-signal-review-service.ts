@@ -273,7 +273,7 @@ async function getCaseStudyRecords() {
     LEFT JOIN "SourceDocument" s ON s.id = css."B"
     WHERE cs.id LIKE ${`${importPrefix}-case-study-%`}
     GROUP BY cs.id, u.name
-    ORDER BY cs.companyName
+    ORDER BY cs."companyName"
   `;
   const metrics = await prisma.$queryRaw<Row[]>`
     SELECT *
