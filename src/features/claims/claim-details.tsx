@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { getClaimDetailsState } from "@/features/claims/queries";
+import { getReviewHistoryLabel, orderReviewHistoryChronologically } from "@/features/review/audit";
 import { formatEnumLabel, getSourceTypeLabel } from "@/lib/status";
 
 export function ClaimDetails({ claimId }: { claimId: string }) {
@@ -114,21 +115,23 @@ export function ClaimDetails({ claimId }: { claimId: string }) {
           <p className="mt-4 text-sm text-stone-600">No review-history entries yet.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {claim.reviewHistory.map((entry) => (
+            {orderReviewHistoryChronologically(claim.reviewHistory).map((entry) => (
               <article
                 className="rounded-md border border-line bg-[#fbfaf7] p-4 text-sm"
                 key={entry.id}
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="font-semibold text-ink">{entry.action}</p>
+                  <p className="font-semibold text-ink">{getReviewHistoryLabel(entry)}</p>
                   <p className="text-stone-500">
                     {new Date(entry.createdAt).toLocaleDateString("en-US")}
                   </p>
                 </div>
                 <p className="mt-2 text-stone-600">
-                  {entry.actorName} · {formatEnumLabel(entry.actorRole)}
+                  {entry.actorName} - {formatEnumLabel(entry.actorRole)}
                 </p>
-                {entry.notes ? <p className="mt-2 text-stone-600">{entry.notes}</p> : null}
+                {(entry.reason ?? entry.notes) ? (
+                  <p className="mt-2 text-stone-600">{entry.reason ?? entry.notes}</p>
+                ) : null}
               </article>
             ))}
           </div>

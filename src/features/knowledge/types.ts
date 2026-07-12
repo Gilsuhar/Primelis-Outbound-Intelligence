@@ -64,12 +64,16 @@ export type SourceDocumentFixture = {
 
 export type ReviewHistoryEntry = {
   id: string;
+  itemId?: string;
+  actorId?: string;
   actorName: string;
   actorRole: UserRole;
   action: string;
   fromStatus?: ApprovalStatus;
   toStatus?: ApprovalStatus;
+  reason?: string;
   notes?: string;
+  internalNote?: string;
   createdAt: string;
 };
 
@@ -122,8 +126,41 @@ export type KnowledgeSubmissionFixture = {
   industries: string[];
   competitors: string[];
   internalNotes?: string;
+  origin?: SubmissionOrigin;
   reviewHistory: ReviewHistoryEntry[];
   isClaim: boolean;
+};
+
+export type CaseStudyFixture = {
+  id: string;
+  title: string;
+  companyName: string;
+  approvalStatus: ApprovalStatus;
+  sourceIds: string[];
+  industries: string[];
+  personas: string[];
+  approvedExternalWording?: string;
+  usageRestrictions?: string;
+  internalNotes?: string;
+};
+
+export type SubmissionOrigin =
+  | {
+      type: "MANUAL";
+    }
+  | {
+      type: "GENERATED_DRAFT";
+      generatedDraftId: string;
+      workflow: string;
+    };
+
+export type GeneratedDraft = {
+  id: string;
+  userId: string;
+  workflow: "CREATE_OUTREACH" | "REPLY_TO_PROSPECT" | "BUILD_SEQUENCE" | "ASK_SIGNAL_BRAIN";
+  draftContent: string;
+  promptSnapshot?: string;
+  createdAt: string;
 };
 
 export type KnowledgeLibraryFilters = {

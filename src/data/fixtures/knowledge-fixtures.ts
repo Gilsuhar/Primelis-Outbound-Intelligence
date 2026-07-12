@@ -1,5 +1,7 @@
 import type {
   ClaimFixture,
+  CaseStudyFixture,
+  GeneratedDraft,
   FixtureUser,
   KnowledgeItemFixture,
   KnowledgeSubmissionFixture,
@@ -274,6 +276,32 @@ export const knowledgeItemFixtures: KnowledgeItemFixture[] = [
   },
 ];
 
+export const caseStudyFixtures: CaseStudyFixture[] = [
+  {
+    id: "case-study-approved-shell",
+    title: "Approved Development Case Study Shell",
+    companyName: "Example SaaS Company",
+    approvalStatus: "APPROVED",
+    sourceIds: ["source-fixture-overview"],
+    industries: ["SaaS"],
+    personas: ["Revenue Leader"],
+    approvedExternalWording: "Approved generic case-study shell for development only.",
+    usageRestrictions: "Development fixture only. No real metrics or customer claims.",
+    internalNotes: "No commercial result data is represented.",
+  },
+  {
+    id: "case-study-archived-shell",
+    title: "Archived Development Case Study Shell",
+    companyName: "Example Retail Brand",
+    approvalStatus: "ARCHIVED",
+    sourceIds: ["source-fixture-interview"],
+    industries: ["Retail"],
+    personas: ["Growth Marketer"],
+    usageRestrictions: "Archived and unavailable to generation-facing queries.",
+    internalNotes: "Development fixture only.",
+  },
+];
+
 export const knowledgeSubmissionFixtures: KnowledgeSubmissionFixture[] = [
   {
     id: "submission-needs-review",
@@ -291,6 +319,7 @@ export const knowledgeSubmissionFixtures: KnowledgeSubmissionFixture[] = [
     industries: ["General B2B"],
     competitors: [],
     internalNotes: "Safe to approve in fixture state.",
+    origin: { type: "MANUAL" },
     reviewHistory: [],
     isClaim: true,
   },
@@ -310,6 +339,7 @@ export const knowledgeSubmissionFixtures: KnowledgeSubmissionFixture[] = [
     industries: ["General B2B"],
     competitors: [],
     internalNotes: "Must not be approvable.",
+    origin: { type: "MANUAL" },
     reviewHistory: [],
     isClaim: true,
   },
@@ -340,6 +370,7 @@ export const knowledgeSubmissionFixtures: KnowledgeSubmissionFixture[] = [
         createdAt: "2026-06-20T08:00:00.000Z",
       },
     ],
+    origin: { type: "MANUAL" },
     isClaim: false,
   },
   {
@@ -358,6 +389,18 @@ export const knowledgeSubmissionFixtures: KnowledgeSubmissionFixture[] = [
     industries: ["SaaS"],
     competitors: [],
     reviewHistory: [],
+    origin: { type: "MANUAL" },
     isClaim: false,
+  },
+];
+
+export const generatedDraftFixtures: GeneratedDraft[] = [
+  {
+    id: "generated-draft-fixture",
+    userId: "fixture-user-sales",
+    workflow: "CREATE_OUTREACH",
+    draftContent: "Development generated draft placeholder content for review submission tests.",
+    promptSnapshot: "Development fixture prompt snapshot. No AI integration.",
+    createdAt: "2026-06-25T09:00:00.000Z",
   },
 ];

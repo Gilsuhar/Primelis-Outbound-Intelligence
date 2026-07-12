@@ -19,7 +19,8 @@ import {
   type ReviewQueueFilters,
 } from "@/features/knowledge/types";
 import { applyReviewAction } from "@/features/review/actions";
-import { canSeeReviewActions, canTransitionSubmission } from "@/lib/permissions";
+import { getTransitionError, type ReviewAction } from "@/features/review/status-transition";
+import { canSeeReviewActions } from "@/lib/permissions";
 import { formatEnumLabel, getKnowledgeTypeLabel, getSourceTypeLabel } from "@/lib/status";
 
 const defaultFilters: ReviewQueueFilters = {
@@ -28,12 +29,12 @@ const defaultFilters: ReviewQueueFilters = {
   sourcePresence: "ALL",
 };
 
-const actionButtons: Array<{ label: string; status: ApprovalStatus }> = [
-  { label: "Approve", status: "APPROVED" },
-  { label: "Restrict", status: "RESTRICTED" },
-  { label: "Reject", status: "REJECTED" },
-  { label: "Archive", status: "ARCHIVED" },
-  { label: "Send back for review", status: "NEEDS_REVIEW" },
+const actionButtons: Array<{ label: string; status: ApprovalStatus; action: ReviewAction }> = [
+  { label: "Approve", status: "APPROVED", action: "APPROVE" },
+  { label: "Restrict", status: "RESTRICTED", action: "RESTRICT" },
+  { label: "Reject", status: "REJECTED", action: "REJECT" },
+  { label: "Archive", status: "ARCHIVED", action: "ARCHIVE" },
+  { label: "Send back for review", status: "NEEDS_REVIEW", action: "RETURN_TO_REVIEW" },
 ];
 
 export function ReviewQueueClient() {
@@ -103,7 +104,7 @@ export function ReviewQueueClient() {
           >
             {fixtureUsers.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.name} · {formatEnumLabel(user.role)}
+                {user.name} - {formatEnumLabel(user.role)}
               </option>
             ))}
           </select>
@@ -235,7 +236,8 @@ function ReviewDetails({
           {showActions ? (
             <div className="flex flex-wrap gap-2">
               {actionButtons.map((action) => {
-                const allowed = canTransitionSubmission(viewer, submission, action.status);
+                const transitionError = getTransitionError(viewer, submission, action.action);
+                const allowed = transitionError === null;
 
                 return (
                   <button
@@ -248,6 +250,7 @@ function ReviewDetails({
                     disabled={!allowed}
                     key={action.status}
                     onClick={() => onAction(action.status)}
+                    title={transitionError?.message}
                     type="button"
                   >
                     {action.label}
@@ -296,7 +299,7 @@ function ReviewDetails({
                   >
                     <p className="font-semibold text-ink">{entry.action}</p>
                     <p className="mt-1 text-stone-600">
-                      {entry.actorName} · {new Date(entry.createdAt).toLocaleDateString("en-US")}
+                      {entry.actorName} - {new Date(entry.createdAt).toLocaleDateString("en-US")}
                     </p>
                   </div>
                 ))}

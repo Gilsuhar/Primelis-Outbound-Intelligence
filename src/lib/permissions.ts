@@ -3,6 +3,7 @@ import type {
   FixtureUser,
   KnowledgeSubmissionFixture,
 } from "@/features/knowledge/types";
+import { canApplyReviewAction, type ReviewAction } from "@/features/review/status-transition";
 
 export const adminOnlyStatuses: ApprovalStatus[] = [
   "APPROVED",
@@ -28,13 +29,14 @@ export function canTransitionSubmission(
   submission: KnowledgeSubmissionFixture,
   toStatus: ApprovalStatus,
 ) {
-  if (!isKnowledgeAdmin(user) && adminOnlyStatuses.includes(toStatus)) {
-    return false;
-  }
+  const statusActions: Partial<Record<ApprovalStatus, ReviewAction>> = {
+    NEEDS_REVIEW: "RETURN_TO_REVIEW",
+    APPROVED: "APPROVE",
+    RESTRICTED: "RESTRICT",
+    ARCHIVED: "ARCHIVE",
+    REJECTED: "REJECT",
+  };
+  const action = statusActions[toStatus];
 
-  if (toStatus === "APPROVED" && submission.isClaim && !hasSourceSupport(submission.sourceIds)) {
-    return false;
-  }
-
-  return true;
+  return action ? canApplyReviewAction(user, submission, action) : false;
 }

@@ -3,17 +3,15 @@ import type {
   FixtureUser,
   KnowledgeSubmissionFixture,
 } from "@/features/knowledge/types";
-import { canTransitionSubmission } from "@/lib/permissions";
 
-import { createReviewHistoryEntry } from "./review-history";
+import { applyStatusTransition, type ReviewAction } from "./status-transition";
 
-const actionLabels: Record<ApprovalStatus, string> = {
-  DRAFT: "Sent back for review",
-  NEEDS_REVIEW: "Sent back for review",
-  APPROVED: "Approved",
-  RESTRICTED: "Restricted",
-  ARCHIVED: "Archived",
-  REJECTED: "Rejected",
+const statusActions: Partial<Record<ApprovalStatus, ReviewAction>> = {
+  NEEDS_REVIEW: "RETURN_TO_REVIEW",
+  APPROVED: "APPROVE",
+  RESTRICTED: "RESTRICT",
+  ARCHIVED: "ARCHIVE",
+  REJECTED: "REJECT",
 };
 
 export function applyReviewAction(
@@ -21,31 +19,28 @@ export function applyReviewAction(
   actor: FixtureUser,
   toStatus: ApprovalStatus,
 ) {
-  if (!canTransitionSubmission(actor, submission, toStatus)) {
+  const action = statusActions[toStatus];
+
+  if (!action) {
     return {
       ok: false as const,
-      reason:
-        toStatus === "APPROVED" && submission.isClaim && submission.sourceIds.length === 0
-          ? "Claims without a source cannot be approved."
-          : "This user does not have permission to perform this review action.",
+      reason: "This status is not available as a review action.",
       submission,
     };
   }
 
-  const historyEntry = createReviewHistoryEntry({
+  const result = applyStatusTransition({
     actor,
-    action: actionLabels[toStatus],
-    fromStatus: submission.approvalStatus,
-    toStatus,
-    notes: `Development fixture action: ${actionLabels[toStatus]}.`,
+    submission,
+    action,
+    reason: `Development fixture action: ${action}.`,
   });
 
-  return {
-    ok: true as const,
-    submission: {
-      ...submission,
-      approvalStatus: toStatus,
-      reviewHistory: [historyEntry, ...submission.reviewHistory],
-    },
-  };
+  return result.ok
+    ? result
+    : {
+        ok: false as const,
+        reason: result.message,
+        submission,
+      };
 }
