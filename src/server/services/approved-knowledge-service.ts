@@ -1,21 +1,23 @@
-import { getPersistenceAdapter } from "@/server/repositories/adapter-factory";
-
+import {
+  resolvePersistenceRepositories,
+  type ServiceDependencies,
+} from "@/server/services/dependencies";
 import { ok } from "./result";
 
-export async function retrieveApprovedKnowledge() {
-  const repositories = getPersistenceAdapter();
+export async function retrieveApprovedKnowledge(dependencies?: ServiceDependencies) {
+  const repositories = resolvePersistenceRepositories(dependencies);
 
   return ok(await repositories.knowledge.getApprovedKnowledge());
 }
 
-export async function retrieveApprovedClaims() {
-  const repositories = getPersistenceAdapter();
+export async function retrieveApprovedClaims(dependencies?: ServiceDependencies) {
+  const repositories = resolvePersistenceRepositories(dependencies);
 
   return ok(await repositories.claims.getApprovedClaims());
 }
 
-export async function retrieveApprovedCaseStudies() {
-  const repositories = getPersistenceAdapter();
+export async function retrieveApprovedCaseStudies(dependencies?: ServiceDependencies) {
+  const repositories = resolvePersistenceRepositories(dependencies);
 
   return ok(await repositories.caseStudies.getApprovedCaseStudies());
 }

@@ -2,7 +2,10 @@ import { z } from "zod";
 
 import { fixtureUsers } from "@/data/fixtures/knowledge-fixtures";
 import { reviewActionTargets, type TransitionErrorCode } from "@/features/review/status-transition";
-import { getPersistenceAdapter } from "@/server/repositories/adapter-factory";
+import {
+  resolvePersistenceRepositories,
+  type ServiceDependencies,
+} from "@/server/services/dependencies";
 
 import { err, ok } from "./result";
 
@@ -34,7 +37,7 @@ function mapTransitionErrorCode(message: string): TransitionErrorCode | "TRANSIT
   return "TRANSITION_FAILED";
 }
 
-export async function transitionReviewStatus(input: unknown) {
+export async function transitionReviewStatus(input: unknown, dependencies?: ServiceDependencies) {
   const parsed = transitionInputSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -46,7 +49,7 @@ export async function transitionReviewStatus(input: unknown) {
     return err("ACTOR_NOT_FOUND", "The review actor was not found.");
   }
 
-  const repositories = getPersistenceAdapter();
+  const repositories = resolvePersistenceRepositories(dependencies);
 
   try {
     const submission = await repositories.reviews.transitionStatus({
