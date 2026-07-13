@@ -22,6 +22,10 @@ import { personas } from "@/features/playbook/playbook-content";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createSignalBrainProvider, type SignalBrainProvider } from "./ask-signal-brain-provider";
+import {
+  createInitialDraftVersion,
+  PrismaDraftVersionPersistence,
+} from "./draft-versioning-service";
 import { err, ok } from "./result";
 
 const signalBrainInputSchema = z.object({
@@ -420,6 +424,10 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
         NOW()
       )
     `;
+    await createInitialDraftVersion(
+      { generatedDraftId: id, creatorId },
+      { persistence: new PrismaDraftVersionPersistence(this.client) },
+    );
     return id;
   }
 }

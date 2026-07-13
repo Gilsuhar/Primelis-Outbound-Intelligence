@@ -16,6 +16,10 @@ import {
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createReplyAiProvider, type ReplyAiProvider } from "./reply-to-prospect-provider";
+import {
+  createInitialDraftVersion,
+  PrismaDraftVersionPersistence,
+} from "./draft-versioning-service";
 import { err, ok } from "./result";
 
 const replyInputSchema = z.object({
@@ -247,6 +251,10 @@ export class PrismaReplyPersistence implements ReplyPersistence {
         NOW()
       )
     `;
+    await createInitialDraftVersion(
+      { generatedDraftId: id, creatorId },
+      { persistence: new PrismaDraftVersionPersistence(this.client) },
+    );
     return id;
   }
 }

@@ -6,6 +6,8 @@ import type {
   ReplyToProspectInput,
 } from "@/features/reply-to-prospect/types";
 
+import { createAiProvider } from "./ai-provider";
+
 export type ReplyProviderRequest = {
   input: ReplyToProspectInput;
   intents: ProspectIntent[];
@@ -112,26 +114,61 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
 }
 
 export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): ReplyAiProvider {
-  if (!env.REPLY_TO_PROSPECT_AI_API_KEY) {
+  if (env.AI_PROVIDER !== "openai") {
     return new DeterministicReplyProvider();
   }
 
   return {
     metadata: {
-      providerName: "configured-provider-boundary",
-      modelName: "server-configured-model",
+      providerName: "openai",
+      modelName: env.OPENAI_MODEL ?? "not-configured",
       deterministic: false,
     },
     async generate(request) {
       const fallback = new DeterministicReplyProvider();
       const result = await fallback.generate(request);
-      return {
-        ...result,
-        safetyWarnings: [
-          ...result.safetyWarnings,
-          "A server-side AI key is configured, but no vendor adapter has been enabled yet.",
-        ],
-      };
+      const provider = createAiProvider(env);
+      const providerStatus = await provider.getProviderStatus();
+      if (providerStatus.status !== "CONFIGURED") {
+        return {
+          ...result,
+          safetyWarnings: [...result.safetyWarnings, providerStatus.message],
+        };
+      }
+      try {
+        const aiResult = await provider.refineDraft({
+          workflow: "REPLY_TO_PROSPECT",
+          currentDraft: result.recommendedReply,
+          context: {
+            approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            sourceReferences: request.records.flatMap((record) =>
+              record.sourceIds.map((id, index) => ({
+                id,
+                title: record.sourceTitles[index],
+                sourceDate: record.sourceDates[index],
+              })),
+            ),
+            safetyPolicy: result.safetyWarnings,
+          },
+        });
+        return {
+          ...result,
+          recommendedReply: aiResult.primaryContent,
+          shorterAlternative: aiResult.shorterAlternative ?? result.shorterAlternative,
+          claimsUsed: aiResult.factualClaimsUsed.length
+            ? aiResult.factualClaimsUsed
+            : result.claimsUsed,
+          safetyWarnings: [...result.safetyWarnings, ...aiResult.uncertaintyNotes],
+        };
+      } catch {
+        return {
+          ...result,
+          safetyWarnings: [
+            ...result.safetyWarnings,
+            "AI provider failed safely; deterministic fallback was used.",
+          ],
+        };
+      }
     },
   };
 }

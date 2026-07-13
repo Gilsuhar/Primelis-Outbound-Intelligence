@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
+import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import type {
   ReplyChannel,
   ReplyLength,
@@ -289,6 +290,8 @@ export function ReplyToProspectClient() {
                   </div>
                 </div>
               </article>
+
+              <DraftRefinementPanel draftId={result.draftId} workflow="REPLY_TO_PROSPECT" />
             </>
           ) : null}
         </section>

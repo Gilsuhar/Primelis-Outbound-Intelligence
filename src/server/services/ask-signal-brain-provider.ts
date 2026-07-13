@@ -10,6 +10,8 @@ import type {
 } from "@/features/ask-signal-brain/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 
+import { createAiProvider } from "./ai-provider";
+
 export type SignalBrainProviderRequest = {
   input: SignalBrainInput;
   intents: SignalBrainIntent[];
@@ -164,26 +166,58 @@ export class DeterministicSignalBrainProvider implements SignalBrainProvider {
 export function createSignalBrainProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): SignalBrainProvider {
-  if (!env.ASK_SIGNAL_BRAIN_AI_API_KEY) {
+  if (env.AI_PROVIDER !== "openai") {
     return new DeterministicSignalBrainProvider();
   }
 
   return {
     metadata: {
-      providerName: "configured-provider-boundary",
-      modelName: "server-configured-model",
+      providerName: "openai",
+      modelName: env.OPENAI_MODEL ?? "not-configured",
       deterministic: false,
     },
     async generate(request) {
       const fallback = new DeterministicSignalBrainProvider();
       const result = await fallback.generate(request);
-      return {
-        ...result,
-        safetyWarnings: [
-          ...result.safetyWarnings,
-          "A server-side AI key is configured, but no vendor adapter has been enabled for Signal Brain.",
-        ],
-      };
+      const provider = createAiProvider(env);
+      const providerStatus = await provider.getProviderStatus();
+      if (providerStatus.status !== "CONFIGURED") {
+        return {
+          ...result,
+          safetyWarnings: [...result.safetyWarnings, providerStatus.message],
+        };
+      }
+      try {
+        const aiResult = await provider.answerSignalBrain({
+          workflow: "ASK_SIGNAL_BRAIN",
+          currentDraft: result.directAnswer,
+          context: {
+            approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            sourceReferences: request.records.flatMap((record) =>
+              record.sourceIds.map((id, index) => ({
+                id,
+                title: record.sourceTitles[index],
+                sourceDate: record.sourceDates[index],
+              })),
+            ),
+            safetyPolicy: result.safetyWarnings,
+          },
+        });
+        return {
+          ...result,
+          directAnswer: aiResult.primaryContent,
+          conciseRecommendation: aiResult.shorterAlternative ?? result.conciseRecommendation,
+          safetyWarnings: [...result.safetyWarnings, ...aiResult.uncertaintyNotes],
+        };
+      } catch {
+        return {
+          ...result,
+          safetyWarnings: [
+            ...result.safetyWarnings,
+            "AI provider failed safely; deterministic fallback was used.",
+          ],
+        };
+      }
     },
   };
 }

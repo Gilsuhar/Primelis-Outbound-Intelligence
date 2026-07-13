@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
+import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import type { SignalBrainMode, SignalBrainResult } from "@/features/ask-signal-brain/types";
 
 const modeOptions: { label: string; value: SignalBrainMode }[] = [
@@ -322,6 +323,8 @@ export function AskSignalBrainClient() {
                   ))}
                 </div>
               </article>
+
+              <DraftRefinementPanel draftId={result.draftId} workflow="ASK_SIGNAL_BRAIN" />
             </>
           ) : null}
         </section>

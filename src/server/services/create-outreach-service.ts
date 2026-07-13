@@ -21,6 +21,10 @@ import {
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createOutreachAiProvider, type OutreachAiProvider } from "./create-outreach-provider";
+import {
+  createInitialDraftVersion,
+  PrismaDraftVersionPersistence,
+} from "./draft-versioning-service";
 import { err, ok } from "./result";
 
 const createOutreachSchema = z.object({
@@ -276,6 +280,10 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
         NOW()
       )
     `;
+    await createInitialDraftVersion(
+      { generatedDraftId: id, creatorId },
+      { persistence: new PrismaDraftVersionPersistence(this.client) },
+    );
     return id;
   }
 }

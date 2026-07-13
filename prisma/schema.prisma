@@ -112,6 +112,7 @@ model User {
   reviewedCaseStudies CaseStudy[]           @relation("CaseStudyReviewOwner")
   interactionOutcomes InteractionOutcome[]
   generatedDrafts     GeneratedDraft[]
+  draftVersions       DraftVersion[]
   accountAssessments  AccountAssessment[]
   suppressionImports  SuppressionImportBatch[]
   suppressionAudits   SuppressionAudit[]
@@ -467,10 +468,44 @@ model GeneratedDraft {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   user                  User                 @relation(fields: [userId], references: [id])
+  versions              DraftVersion[]
 
   @@index([userId])
   @@index([workflow])
   @@index([draftStatus])
+}
+
+model DraftVersion {
+  id                    String         @id @default(cuid())
+  generatedDraftId      String
+  draftFamilyId         String
+  parentVersionId       String?
+  versionNumber         Int
+  workflow              String
+  actionType            String
+  refinementCommand     String?
+  userInstruction       String?
+  generatedContent      String
+  alternativeContent    String?
+  sourceReferences      Json?
+  knowledgeReferences   String[]
+  providerName          String
+  modelName             String
+  providerStatus        String
+  safetyFlags           Json?
+  createdBy             String
+  createdAt             DateTime       @default(now())
+  isCurrent             Boolean        @default(false)
+  isPreferred           Boolean        @default(false)
+  manualEdit            Boolean        @default(false)
+  generatedDraft        GeneratedDraft @relation(fields: [generatedDraftId], references: [id], onDelete: Cascade)
+  creator               User           @relation(fields: [createdBy], references: [id])
+
+  @@index([generatedDraftId])
+  @@index([draftFamilyId])
+  @@index([workflow])
+  @@index([createdBy])
+  @@index([isCurrent])
 }
 
 model AccountAssessment {

@@ -26,6 +26,10 @@ import {
   createBuildSequenceAiProvider,
   type BuildSequenceAiProvider,
 } from "./build-sequence-provider";
+import {
+  createInitialDraftVersion,
+  PrismaDraftVersionPersistence,
+} from "./draft-versioning-service";
 import { err, ok } from "./result";
 
 const buildSequenceSchema = z.object({
@@ -444,6 +448,10 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
         NOW()
       )
     `;
+    await createInitialDraftVersion(
+      { generatedDraftId: id, creatorId },
+      { persistence: new PrismaDraftVersionPersistence(this.client) },
+    );
     return id;
   }
 }

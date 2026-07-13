@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, FileText, Send, ShieldCheck, Target } from "lucide-react";
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
+import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import type {
   CreateOutreachResult,
   OutreachChannel,
@@ -380,6 +381,8 @@ export function CreateOutreachClient() {
                   </div>
                 </div>
               </article>
+
+              <DraftRefinementPanel draftId={result.draftId} workflow="CREATE_OUTREACH" />
             </>
           ) : null}
         </section>

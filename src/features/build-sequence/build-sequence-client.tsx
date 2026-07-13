@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarDays, FileText, Layers3, Send, ShieldCheck } fro
 
 import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
+import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import type {
   BuildSequenceResult,
   SequenceChannel,
@@ -361,6 +362,8 @@ export function BuildSequenceClient() {
                   </div>
                 </div>
               </article>
+
+              <DraftRefinementPanel draftId={result.draftId} workflow="BUILD_SEQUENCE" />
             </>
           ) : null}
         </section>

@@ -14,6 +14,8 @@ import type {
 } from "@/features/build-sequence/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 
+import { createAiProvider } from "./ai-provider";
+
 export type BuildSequenceProviderRequest = {
   input: BuildSequenceInput;
   records: SequenceKnowledgeRecord[];
@@ -245,26 +247,51 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
 export function createBuildSequenceAiProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): BuildSequenceAiProvider {
-  if (!env.BUILD_SEQUENCE_AI_API_KEY) {
+  if (env.AI_PROVIDER !== "openai") {
     return new DeterministicBuildSequenceProvider();
   }
 
   return {
     metadata: {
-      providerName: "configured-provider-boundary",
-      modelName: "server-configured-sequence-model",
+      providerName: "openai",
+      modelName: env.OPENAI_MODEL ?? "not-configured",
       deterministic: false,
     },
     async generate(request) {
       const fallback = new DeterministicBuildSequenceProvider();
       const result = await fallback.generate(request);
-      return {
-        ...result,
-        safetyNotes: [
-          ...result.safetyNotes,
-          "A server-side sequence AI key is configured, but no vendor adapter has been enabled yet.",
-        ],
-      };
+      const provider = createAiProvider(env);
+      const providerStatus = await provider.getProviderStatus();
+      if (providerStatus.status !== "CONFIGURED") {
+        return {
+          ...result,
+          safetyNotes: [...result.safetyNotes, providerStatus.message],
+        };
+      }
+      try {
+        const aiResult = await provider.generateDraft({
+          workflow: "BUILD_SEQUENCE",
+          currentDraft: result.steps.map((step) => step.messageBody).join("\n\n"),
+          context: {
+            approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            sourceReferences: request.sourceReferences,
+            safetyPolicy: result.safetyNotes,
+          },
+        });
+        return {
+          ...result,
+          overallStrategy: aiResult.changeSummary ?? result.overallStrategy,
+          safetyNotes: [...result.safetyNotes, ...aiResult.uncertaintyNotes],
+        };
+      } catch {
+        return {
+          ...result,
+          safetyNotes: [
+            ...result.safetyNotes,
+            "AI provider failed safely; deterministic fallback was used.",
+          ],
+        };
+      }
     },
   };
 }

@@ -7,6 +7,8 @@ import type {
 } from "@/features/create-outreach/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 
+import { createAiProvider } from "./ai-provider";
+
 export type OutreachProviderRequest = {
   input: CreateOutreachInput;
   records: OutreachKnowledgeRecord[];
@@ -133,26 +135,57 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
 }
 
 export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): OutreachAiProvider {
-  if (!env.CREATE_OUTREACH_AI_API_KEY) {
+  if (env.AI_PROVIDER !== "openai") {
     return new DeterministicOutreachProvider();
   }
 
   return {
     metadata: {
-      providerName: "configured-provider-boundary",
-      modelName: "server-configured-outreach-model",
+      providerName: "openai",
+      modelName: env.OPENAI_MODEL ?? "not-configured",
       deterministic: false,
     },
     async generate(request) {
       const fallback = new DeterministicOutreachProvider();
       const result = await fallback.generate(request);
-      return {
-        ...result,
-        safetyNotes: [
-          ...result.safetyNotes,
-          "A server-side outreach AI key is configured, but no vendor adapter has been enabled yet.",
-        ],
-      };
+      const provider = createAiProvider(env);
+      const providerStatus = await provider.getProviderStatus();
+      if (providerStatus.status !== "CONFIGURED") {
+        return {
+          ...result,
+          safetyNotes: [...result.safetyNotes, providerStatus.message],
+        };
+      }
+      try {
+        const aiResult = await provider.generateDraft({
+          workflow: "CREATE_OUTREACH",
+          currentDraft: result.recommendedMessage,
+          context: {
+            approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            sourceReferences: request.sourceReferences,
+            safetyPolicy: result.safetyNotes,
+          },
+        });
+        return {
+          ...result,
+          recommendedMessage: aiResult.primaryContent,
+          shorterVersion: aiResult.shorterAlternative ?? result.shorterVersion,
+          cta: aiResult.cta ?? result.cta,
+          subjectLines: aiResult.subjectLines ?? result.subjectLines,
+          claimsUsed: aiResult.factualClaimsUsed.length
+            ? aiResult.factualClaimsUsed
+            : result.claimsUsed,
+          safetyNotes: [...result.safetyNotes, ...aiResult.uncertaintyNotes],
+        };
+      } catch {
+        return {
+          ...result,
+          safetyNotes: [
+            ...result.safetyNotes,
+            "AI provider failed safely; deterministic fallback was used.",
+          ],
+        };
+      }
     },
   };
 }
