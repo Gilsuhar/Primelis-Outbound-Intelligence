@@ -14,6 +14,7 @@ describe("role-based navigation", () => {
       "/create-outreach",
       "/build-sequence",
       "/reply-to-prospect",
+      "/ask-signal-brain",
       "/do-not-contact",
     ]);
     expect(navigation.admin).toEqual([]);

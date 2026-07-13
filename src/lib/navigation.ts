@@ -1,6 +1,7 @@
 import {
   Ban,
   BookOpen,
+  Brain,
   FilePlus2,
   Home,
   Inbox,
@@ -39,6 +40,11 @@ export const salesNavigation = [
     label: "Reply to Prospect",
     href: "/reply-to-prospect",
     icon: MessageSquareReply,
+  },
+  {
+    label: "Ask Signal Brain",
+    href: "/ask-signal-brain",
+    icon: Brain,
   },
   {
     label: "Do Not Contact",
