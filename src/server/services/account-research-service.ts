@@ -86,7 +86,20 @@ export class PrismaAccountResearchPersistence implements AccountResearchPersiste
   }
 
   async getSuppressionRecords() {
-    return [];
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "companyName", domain, status, "accountOwner", reason, notes, "lastContactDate"::text AS "lastContactDate"
+      FROM "SuppressionRecord"
+    `;
+    return rows.map((row) => ({
+      id: asString(row.id),
+      companyName: asString(row.companyName),
+      domain: asString(row.domain) || undefined,
+      status: asString(row.status) as DoNotContactRecord["status"],
+      owner: asString(row.accountOwner) || undefined,
+      reason: asString(row.reason) || undefined,
+      notes: asString(row.notes) || undefined,
+      lastContactDate: asString(row.lastContactDate) || undefined,
+    }));
   }
 
   async persistAssessment({

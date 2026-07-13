@@ -3,7 +3,11 @@
 import { useState, useTransition } from "react";
 import { AlertTriangle, Building2, CheckCircle2, ClipboardCheck, SearchCheck } from "lucide-react";
 
-import { assessAccountResearchAction } from "@/app/account-research/actions";
+import {
+  assessAccountResearchAction,
+  researchCompanyWebsiteAction,
+} from "@/app/account-research/actions";
+import type { WebsiteFinding, WebsiteResearchResult } from "@/features/connected-research/types";
 import type {
   AccountAssessmentResult,
   CompanyType,
@@ -127,6 +131,10 @@ function ResultBadge({ result }: { result: string }) {
 
 export function AccountResearchClient() {
   const [result, setResult] = useState<AccountAssessmentResult | null>(null);
+  const [research, setResearch] = useState<WebsiteResearchResult | null>(null);
+  const [reviewedFindings, setReviewedFindings] = useState<
+    Record<string, WebsiteFinding["reviewStatus"]>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -168,6 +176,27 @@ export function AccountResearchClient() {
         return;
       }
       setResult(response.data);
+    });
+  }
+
+  function runWebsiteResearch(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const response = await researchCompanyWebsiteAction({
+        companyName: optional(formData, "companyName"),
+        companyUrl: optional(formData, "companyDomain"),
+      });
+      if (!response.ok) {
+        setResearch(null);
+        setError(response.message);
+        return;
+      }
+      setResearch(response.data);
+      setReviewedFindings(
+        Object.fromEntries(
+          response.data.findings.map((finding, index) => [`${finding.field}-${index}`, "PENDING"]),
+        ),
+      );
     });
   }
 
@@ -319,13 +348,82 @@ export function AccountResearchClient() {
             </p>
           ) : null}
 
-          <button className="signal-button-primary" disabled={isPending} type="submit">
-            <SearchCheck aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Assessing..." : "Assess account"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="signal-button-primary" disabled={isPending} type="submit">
+              <SearchCheck aria-hidden="true" className="h-4 w-4" />
+              {isPending ? "Assessing..." : "Assess account"}
+            </button>
+            <button
+              className="signal-button-secondary"
+              disabled={isPending}
+              formAction={runWebsiteResearch}
+              type="submit"
+            >
+              Research company website
+            </button>
+          </div>
         </form>
 
         <section className="space-y-4">
+          {research ? (
+            <article className="rounded-2xl border border-line bg-white p-5">
+              <h2 className="text-lg font-semibold text-ink">Website research review</h2>
+              <p className="mt-1 text-sm text-[#6f6d5f]">
+                {research.status.replaceAll("_", " ").toLowerCase()} for {research.normalizedDomain}
+                . Review findings before using them in qualification.
+              </p>
+              <div className="mt-4 space-y-3">
+                {research.findings.map((finding, index) => {
+                  const key = `${finding.field}-${index}`;
+                  return (
+                    <div className="rounded-xl border border-line p-3" key={key}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-ink">
+                            {finding.field}: {finding.value}
+                          </p>
+                          <p className="mt-1 text-xs text-[#6f6d5f]">
+                            {finding.factStatus.toLowerCase()} · {finding.confidence} confidence ·{" "}
+                            {finding.sourceTitle}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            className="rounded-full bg-lime px-3 py-1 text-xs font-semibold text-ink"
+                            onClick={() =>
+                              setReviewedFindings((current) => ({ ...current, [key]: "ACCEPTED" }))
+                            }
+                            type="button"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink"
+                            onClick={() =>
+                              setReviewedFindings((current) => ({ ...current, [key]: "REJECTED" }))
+                            }
+                            type="button"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-[#34352e]">{finding.excerpt}</p>
+                      {finding.inferenceExplanation ? (
+                        <p className="mt-2 text-xs text-[#6f6d5f]">
+                          {finding.inferenceExplanation}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs font-semibold text-olive">
+                        Review status: {(reviewedFindings[key] ?? "PENDING").toLowerCase()}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          ) : null}
+
           <article className="rounded-2xl border border-line bg-white p-5">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardCheck aria-hidden="true" className="h-5 w-5 text-olive" />
