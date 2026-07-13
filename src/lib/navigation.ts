@@ -1,5 +1,6 @@
 import {
-  Brain,
+  Ban,
+  BookOpen,
   FilePlus2,
   Home,
   Inbox,
@@ -11,11 +12,18 @@ import {
   Send,
 } from "lucide-react";
 
-export const primaryNavigation = [
+import type { UserRole } from "@/features/knowledge/types";
+
+export const salesNavigation = [
   {
     label: "Home",
     href: "/",
     icon: Home,
+  },
+  {
+    label: "Signal Playbook",
+    href: "/playbook",
+    icon: BookOpen,
   },
   {
     label: "Create Outreach",
@@ -23,23 +31,23 @@ export const primaryNavigation = [
     icon: Send,
   },
   {
-    label: "Reply to Prospect",
-    href: "/reply-to-prospect",
-    icon: MessageSquareReply,
-  },
-  {
     label: "Build Sequence",
     href: "/build-sequence",
     icon: Layers3,
   },
   {
-    label: "Ask Signal Brain",
-    href: "/ask-signal-brain",
-    icon: Brain,
+    label: "Reply to Prospect",
+    href: "/reply-to-prospect",
+    icon: MessageSquareReply,
+  },
+  {
+    label: "Do Not Contact",
+    href: "/do-not-contact",
+    icon: Ban,
   },
 ] as const;
 
-export const secondaryNavigation = [
+export const adminNavigation = [
   {
     label: "Knowledge Library",
     href: "/knowledge-library",
@@ -66,3 +74,10 @@ export const secondaryNavigation = [
     icon: SearchCheck,
   },
 ] as const;
+
+export function getNavigationForRole(role: UserRole) {
+  return {
+    sales: salesNavigation,
+    admin: role === "KNOWLEDGE_ADMIN" ? adminNavigation : [],
+  };
+}

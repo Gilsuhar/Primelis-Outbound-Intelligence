@@ -1,12 +1,15 @@
 "use client";
 
+import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CheckCircle2 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
-import { primaryNavigation, secondaryNavigation } from "@/lib/navigation";
+import type { UserRole } from "@/features/knowledge/types";
+import { getNavigationForRole, adminNavigation, salesNavigation } from "@/lib/navigation";
 
-type NavigationItem = (typeof primaryNavigation | typeof secondaryNavigation)[number];
+type NavigationItem = (typeof salesNavigation | typeof adminNavigation)[number];
 
 function NavigationSection({
   label,
@@ -35,10 +38,10 @@ function NavigationSection({
               className={[
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
                 isActive
-                  ? "bg-[#e7f0ed] text-signal"
+                  ? "bg-lime text-ink"
                   : muted
-                    ? "text-stone-500 hover:bg-white hover:text-ink"
-                    : "text-stone-700 hover:bg-white hover:text-ink",
+                    ? "text-[#6f6d5f] hover:bg-white hover:text-ink"
+                    : "text-[#34352e] hover:bg-white hover:text-ink",
               ].join(" ")}
               href={item.href}
               key={item.href}
@@ -53,26 +56,40 @@ function NavigationSection({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, role }: { children: React.ReactNode; role: UserRole }) {
+  const navigation = getNavigationForRole(role);
+
   return (
-    <div className="min-h-screen lg:flex">
-      <aside className="border-b border-line bg-[#f2eee6]/95 px-4 py-4 lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+    <div className="min-h-screen bg-white lg:flex">
+      <aside className="border-b border-line bg-cream/95 px-4 py-4 lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 lg:block">
-          <Link className="block min-w-0" href="/">
-            <p className="truncate text-sm font-semibold uppercase tracking-[0.18em] text-signal">
-              Primelis
-            </p>
-            <p className="truncate text-lg font-semibold text-ink">Outbound Intelligence</p>
+          <Link className="flex min-w-0 items-center gap-3" href="/">
+            <Image
+              alt="Signal"
+              className="h-10 w-10 rounded-xl object-cover"
+              height={40}
+              priority
+              src="/brand/logo signal.jpg"
+              width={40}
+            />
+            <span className="block min-w-0">
+              <span className="block truncate text-xs font-semibold uppercase tracking-[0.18em] text-olive">
+                Primelis
+              </span>
+              <span className="block truncate text-lg font-semibold text-ink">Signal</span>
+            </span>
           </Link>
-          <div className="hidden items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600 sm:flex lg:mt-5">
-            <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
-            Signal only
+          <div className="hidden items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f] sm:flex lg:mt-5">
+            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
+            {role === "KNOWLEDGE_ADMIN" ? "Admin view" : "Sales view"}
           </div>
         </div>
 
         <div className="mx-auto mt-4 max-w-6xl space-y-6 lg:mt-8">
-          <NavigationSection label="Workflows" items={primaryNavigation} />
-          <NavigationSection label="Knowledge" items={secondaryNavigation} muted />
+          <NavigationSection label="Sales" items={navigation.sales} />
+          {navigation.admin.length > 0 ? (
+            <NavigationSection label="Admin" items={navigation.admin} muted />
+          ) : null}
         </div>
       </aside>
 

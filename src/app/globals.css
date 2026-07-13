@@ -4,8 +4,14 @@
 
 :root {
   color-scheme: light;
-  --background: #f7f4ee;
-  --foreground: #1f2933;
+  --background: #ffffff;
+  --foreground: #0e0e0e;
+  --signal-black: #0d0d0d;
+  --signal-lime: #dfee7a;
+  --signal-green: #5f7f28;
+  --signal-cream: #f4f2ea;
+  --signal-border: #e6e3d4;
+  --signal-muted: #7a7868;
 }
 
 * {
@@ -14,8 +20,7 @@
 
 body {
   margin: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(247, 244, 238, 0.92)), var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family:
     Inter,
@@ -40,5 +45,57 @@ select {
 }
 
 ::selection {
-  background: rgba(36, 95, 115, 0.18);
+  background: rgba(223, 238, 122, 0.72);
+}
+
+.signal-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: var(--signal-black);
+  color: #ffffff;
+  padding: 0.7rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(13, 13, 13, 0.16);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.signal-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 38px rgba(13, 13, 13, 0.2);
+}
+
+.signal-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--signal-border);
+  background: #ffffff;
+  color: var(--signal-black);
+  padding: 0.65rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(95, 127, 40, 0.42);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

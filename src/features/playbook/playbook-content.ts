@@ -1,0 +1,306 @@
+import type {
+  EvidenceLevel,
+  IndustryPlaybookEntry,
+  PersonaPlaybookEntry,
+  PlaybookProgressState,
+  PracticeScenario,
+  ViewerRole,
+} from "./types";
+
+export const evidenceDescriptions: Record<EvidenceLevel, string> = {
+  PROVEN: "Supported by current Signal case studies or approved product knowledge.",
+  STRONG_HYPOTHESIS:
+    "Supported by repeatable product logic, outbound experience, or adjacent evidence.",
+  EXPLORATORY: "Worth testing, but not yet validated as core ICP.",
+};
+
+export const coreIcpSignals = [
+  "Meaningful branded-search demand and strong direct brand recognition.",
+  "Active advertising on branded terms with a real need to decide when to appear and how much to bid.",
+  "Dedicated Paid Search, Performance Marketing, Acquisition, or Growth ownership.",
+  "Multi-market, multi-country, multi-brand, or regional complexity.",
+  "A commercial opportunity large enough for efficiency, control, or measurement gains to matter.",
+];
+
+export const companySizeGuidance = [
+  "Revenue above $50M, 200+ employees, active branded-search ads, and dedicated Paid Search or Performance ownership are high-priority signals.",
+  "$20M-$50M revenue or 100-200 employees can still be relevant when brand demand and branded-search activity are meaningful.",
+  "$20M+ revenue is a qualification signal, not a universal hard rule.",
+  "Do not present revenue or spend as verified unless the user provides it or a trusted source supports it.",
+  "Meaningful branded-search spend, often around $20K+ monthly, can be a strong signal, but it is not a universal minimum or commercial rule.",
+];
+
+export const qualificationChecklist = [
+  "Is the company advertising on branded terms?",
+  "Is organic brand visibility strong?",
+  "Is there multi-market or multi-brand complexity?",
+  "Is there a relevant Paid Search or Performance owner?",
+  "Is there a credible efficiency, control, or measurement angle?",
+  "Is a current tool known?",
+  "Which facts are verified?",
+  "Which points are assumptions?",
+  "Is the account suppressed?",
+];
+
+export const workSteps = [
+  "Find Account",
+  "Check Fit",
+  "Check Do Not Contact",
+  "Find Persona",
+  "Research",
+  "Choose Angle",
+  "Create Outreach",
+  "Build Sequence",
+  "Handle Reply",
+  "Record Outcome",
+];
+
+export const industries: IndustryPlaybookEntry[] = [
+  {
+    name: "Fashion and Luxury",
+    evidenceLevel: "PROVEN",
+    whySignalMayFit: [
+      "Strong brand demand and organic presence.",
+      "International activity and cross-market governance needs.",
+      "Sensitivity to brand CPC and spend efficiency.",
+    ],
+    primaryPersonas: [
+      "Global Paid Search Lead",
+      "Director of Paid Search",
+      "E-commerce Director",
+      "VP Performance Marketing",
+    ],
+    bestAngles: ["Brand-spend efficiency", "Cross-market control", "Paid and organic measurement"],
+    likelyObjection: "We already control brand campaigns closely.",
+    eligibleProof: ["Dior", "TAG Heuer", "Chloé", "Polène", "Sandro"],
+  },
+  {
+    name: "Retail and E-commerce",
+    evidenceLevel: "PROVEN",
+    whySignalMayFit: [
+      "Large branded-search demand and active campaign management.",
+      "Seasonality, multi-market activity, and efficiency sensitivity.",
+      "Order or conversion economics where branded spend matters.",
+    ],
+    primaryPersonas: [
+      "Director of Paid Search",
+      "VP Performance Marketing",
+      "E-commerce Director",
+      "Head of Acquisition",
+    ],
+    bestAngles: [
+      "Branded-spend efficiency",
+      "Preserving business outcomes",
+      "Control during changing competitor conditions",
+    ],
+    likelyObjection: "We tried reducing brand spend before.",
+    eligibleProof: ["Crocs"],
+  },
+  {
+    name: "B2B SaaS and Technology",
+    evidenceLevel: "PROVEN",
+    whySignalMayFit: [
+      "Branded search connects to lead generation and demo economics.",
+      "High CPC sensitivity and mature Demand Generation teams.",
+      "Advanced measurement expectations.",
+    ],
+    primaryPersonas: [
+      "VP Performance Marketing",
+      "Head of Paid Search",
+      "Head of Acquisition",
+      "Director of Demand Generation",
+    ],
+    bestAngles: ["Cost efficiency", "Qualified demand", "Paid and organic measurement"],
+    likelyObjection: "We already use a search intelligence platform.",
+    eligibleProof: ["ZoomInfo", "AppsFlyer"],
+  },
+  ...[
+    "Travel and Airlines",
+    "Fintech and Financial Services",
+    "Marketplaces",
+    "Subscription Businesses",
+    "Telecommunications",
+    "Gaming",
+    "Hospitality",
+  ].map((name) => ({
+    name,
+    evidenceLevel: "STRONG_HYPOTHESIS" as const,
+    whySignalMayFit: [
+      "Potential brand demand and market variation.",
+      "Likely performance-marketing maturity or acquisition sensitivity.",
+    ],
+    primaryPersonas: ["VP Performance Marketing", "Head of Acquisition", "Paid Search Lead"],
+    bestAngles: ["Efficiency", "Control", "Measurement quality"],
+    likelyObjection: "This may not be a current priority.",
+  })),
+  ...[
+    "Automotive",
+    "Insurance",
+    "Health and Wellness",
+    "Consumer Services",
+    "Home Services",
+    "Education",
+    "Media",
+    "B2B Services",
+  ].map((name) => ({
+    name,
+    evidenceLevel: "EXPLORATORY" as const,
+    whySignalMayFit: ["Worth testing only when brand demand and paid-search activity are visible."],
+    primaryPersonas: ["Paid Search owner", "Performance Marketing owner"],
+    bestAngles: ["Qualification-first discovery"],
+    likelyObjection: "Unclear fit without verified brand-search activity.",
+  })),
+];
+
+export const personas: PersonaPlaybookEntry[] = [
+  {
+    name: "Head or Director of Paid Search",
+    tier: "TIER_1",
+    caresAbout: "Control, CPC, incrementality, governance, and day-to-day execution.",
+    relevance: "Usually closest to branded-search strategy and efficiency decisions.",
+    bestAngle: "Methodology and control over when branded paid search is actually useful.",
+    suitableCta: "Worth comparing how you decide where paid brand spend is incremental?",
+    commonObjection: "We already manage this internally.",
+    secondaryStakeholder: "VP Performance Marketing",
+    prioritizeWhen: "A direct Paid Search owner exists and appears to own branded-search strategy.",
+    doNotPrioritizeWhen: "The role is execution-only with no budget or methodology influence.",
+  },
+  {
+    name: "VP Performance Marketing",
+    tier: "TIER_1",
+    caresAbout: "Spend efficiency, business outcomes, and scalable growth.",
+    relevance: "Often owns the budget and tradeoffs across channels.",
+    bestAngle: "Efficiency and measurement across paid and organic brand outcomes.",
+    suitableCta: "Open to a short comparison of how brand-search efficiency is measured?",
+    commonObjection: "This is not a priority.",
+    secondaryStakeholder: "Director of Paid Search",
+    prioritizeWhen: "They appear to own performance budget or acquisition outcomes.",
+    doNotPrioritizeWhen: "Paid Search ownership is clearly elsewhere and they are far removed.",
+  },
+  {
+    name: "Head of Growth or Acquisition",
+    tier: "TIER_1",
+    caresAbout: "Acquisition performance, conversion impact, and budget allocation.",
+    relevance: "May own the commercial outcome even when Paid Search is operationally delegated.",
+    bestAngle: "Branded-search efficiency as part of acquisition performance.",
+    suitableCta: "Worth seeing if this is relevant to your acquisition efficiency work?",
+    commonObjection: "Our agency handles this.",
+    secondaryStakeholder: "Paid Search Manager",
+    prioritizeWhen: "They own acquisition strategy or growth outcomes.",
+    doNotPrioritizeWhen: "They focus only on product-led or non-paid channels.",
+  },
+  {
+    name: "E-commerce or Digital Director",
+    tier: "TIER_2",
+    caresAbout: "Revenue, conversion paths, market consistency, and campaign performance.",
+    relevance: "Strong secondary target when search ownership sits inside digital commerce.",
+    bestAngle: "Cross-market control and efficiency without overclaiming performance lift.",
+    suitableCta: "Is brand-search efficiency something your team is reviewing this quarter?",
+    commonObjection: "We are happy with the current setup.",
+    secondaryStakeholder: "Paid Search Lead",
+    prioritizeWhen: "They own digital acquisition or branded campaign outcomes.",
+    doNotPrioritizeWhen: "They focus on site merchandising without acquisition ownership.",
+  },
+  {
+    name: "CMO or VP Marketing",
+    tier: "TIER_3",
+    caresAbout: "Governance, visibility, and consistency across markets.",
+    relevance: "Useful as an executive sponsor when the account is strategic or smaller.",
+    bestAngle: "Visibility and governance across brand demand and paid-search decisions.",
+    suitableCta: "Would it be useful to route this to the person who owns Paid Search efficiency?",
+    commonObjection: "Send me a deck.",
+    secondaryStakeholder: "VP Performance Marketing",
+    prioritizeWhen: "No operational owner is visible or the account is highly strategic.",
+    doNotPrioritizeWhen: "A better operational owner is obvious.",
+  },
+];
+
+export const practiceScenarios: PracticeScenario[] = [
+  {
+    id: "existing-adthena",
+    title: "Existing Adthena user",
+    prompt: "A prospect says they already use Adthena.",
+    guidance:
+      "Acknowledge the existing setup, avoid unsupported competitor claims, and ask whether comparing methodology would be useful.",
+  },
+  {
+    id: "methodology-question",
+    title: "Technical methodology question",
+    prompt: "A prospect asks how Signal looks at paid and organic together.",
+    guidance:
+      "Answer the question first, stay source-backed, and offer a short follow-up if they want detail.",
+  },
+  {
+    id: "auction-insights",
+    title: "Auction Insights objection",
+    prompt: "A prospect says Auction Insights already gives them what they need.",
+    guidance:
+      "Do not criticize Auction Insights. Frame the discussion around decision methodology and control.",
+  },
+  {
+    id: "deck-request",
+    title: "Deck request",
+    prompt: "A prospect replies: send me a deck.",
+    guidance: "Confirm the specific question the deck should answer and keep the CTA soft.",
+  },
+  {
+    id: "timing-objection",
+    title: "Timing objection",
+    prompt: "A prospect says now is not the right time.",
+    guidance:
+      "Respect timing, offer a low-pressure future check-in, and do not create urgency that is not supported.",
+  },
+];
+
+export const progressLabels: Record<keyof PlaybookProgressState, string> = {
+  learnSignal: "Learn Signal reviewed",
+  icp: "ICP reviewed",
+  industries: "Industries reviewed",
+  personas: "Personas reviewed",
+  qualification: "Qualification reviewed",
+  objections: "Objections reviewed",
+  caseStudies: "Case Studies reviewed",
+  practice: "Practice completed",
+  readyForUsMarket: "Ready for US market",
+  managerApproval: "Manager approval",
+};
+
+export function emptyProgress(): PlaybookProgressState {
+  return {
+    learnSignal: false,
+    icp: false,
+    industries: false,
+    personas: false,
+    qualification: false,
+    objections: false,
+    caseStudies: false,
+    practice: false,
+    readyForUsMarket: false,
+    managerApproval: false,
+  };
+}
+
+export function canManagerApprove(role: ViewerRole) {
+  return role === "KNOWLEDGE_ADMIN";
+}
+
+export function calculateProgress(progress: PlaybookProgressState, viewerRole: ViewerRole) {
+  const entries = Object.entries(progress) as Array<[keyof PlaybookProgressState, boolean]>;
+  const completed = entries.filter(([, value]) => value);
+  const percentage = Math.round((completed.length / entries.length) * 100);
+  const managerApprovalVisible = canManagerApprove(viewerRole);
+
+  return {
+    completionPercentage: percentage,
+    completedSections: completed.map(([key]) => progressLabels[key]),
+    remainingSections: entries.filter(([, value]) => !value).map(([key]) => progressLabels[key]),
+    readinessStatus: progress.managerApproval
+      ? "Approved"
+      : progress.readyForUsMarket
+        ? "Ready for manager review"
+        : percentage > 0
+          ? "In progress"
+          : "Not started",
+    managerApprovalVisible,
+  } as const;
+}
