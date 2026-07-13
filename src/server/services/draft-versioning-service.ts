@@ -51,6 +51,12 @@ const restoreSchema = z.object({
   creatorId: z.string().trim().min(1).optional(),
 });
 
+const stateSchema = z.object({
+  generatedDraftId: z.string().trim().min(1),
+  workflow: z.enum(refinementWorkflows),
+  creatorId: z.string().trim().min(1).optional(),
+});
+
 export type DraftVersionPersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
   getDraft(draftId: string): Promise<{
@@ -313,6 +319,39 @@ export async function createInitialDraftVersion(
   );
   if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
   return ok(initialized.versions.at(-1)!);
+}
+
+export async function getDraftRefinementState(
+  rawInput: unknown,
+  dependencies: DraftVersioningDependencies = {},
+) {
+  const parsed = stateSchema.safeParse(rawInput);
+  if (!parsed.success) return err("VALIDATION_ERROR", "Draft refinement input is malformed.");
+  const creatorId = parsed.data.creatorId ?? "seed-sales-user";
+  const persistence = dependencies.persistence ?? new PrismaDraftVersionPersistence();
+  if (!(await authorize(creatorId, persistence))) {
+    return err("FORBIDDEN", "Only authorized users can view draft versions.");
+  }
+  const initialized = await ensureInitialVersion(
+    parsed.data.generatedDraftId,
+    creatorId,
+    persistence,
+  );
+  if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
+  if (initialized.draft.workflow !== parsed.data.workflow) {
+    return err("VALIDATION_ERROR", "Draft workflow does not match the requested workflow.");
+  }
+  const versions = await persistence.getVersions(initialized.draft.id);
+  const current = versions.find((version) => version.isCurrent) ?? versions.at(-1);
+  if (!current) return err("DRAFT_NOT_FOUND", "Generated draft has no versions.");
+  const provider = dependencies.provider ?? createAiProvider();
+  const providerStatus = await provider.getProviderStatus();
+  return ok<DraftRefinementResult>({
+    providerStatus,
+    currentVersion: current,
+    versions,
+    safetyStatus: safetyStatus(current.safetyFlags),
+  });
 }
 
 export async function refineDraftVersion(

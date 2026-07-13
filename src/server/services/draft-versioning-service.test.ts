@@ -5,6 +5,7 @@ import type { DraftVersionView, RefinementWorkflow } from "@/features/draft-refi
 import { compactApprovedContext, validateDraftSafety } from "./approved-context-service";
 import { DeterministicAiProvider, OpenAiProvider, type AiProvider } from "./ai-provider";
 import {
+  getDraftRefinementState,
   refineDraftVersion,
   restoreDraftVersion,
   saveManualDraftEdit,
@@ -149,6 +150,47 @@ describe("Phase N draft provider and versioning", () => {
     expect(result.data.versions).toHaveLength(2);
     expect(result.data.currentVersion.parentVersionId).toBe("version-1");
     expect(result.data.versions[0].generatedContent).toContain("approved context");
+  });
+
+  it("loads the current initial version before any refinement action", async () => {
+    const store = persistence({ versions: [version()] });
+
+    const result = await getDraftRefinementState(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "CREATE_OUTREACH",
+      },
+      { persistence: store },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.currentVersion.id).toBe("version-1");
+    expect(result.data.currentVersion.isCurrent).toBe(true);
+    expect(result.data.currentVersion.isPreferred).toBe(true);
+    expect(result.data.versions).toHaveLength(1);
+    expect(result.data.providerStatus).toMatchObject({
+      providerName: "deterministic-development",
+      status: "NOT_CONFIGURED",
+    });
+  });
+
+  it("rejects loading a draft under the wrong workflow", async () => {
+    const store = persistence({ versions: [version()] });
+
+    const result = await getDraftRefinementState(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "REPLY_TO_PROSPECT",
+      },
+      { persistence: store },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Draft workflow does not match the requested workflow.",
+    });
   });
 
   it("custom feedback, manual edits, fix safety, and restore create separate versions", async () => {

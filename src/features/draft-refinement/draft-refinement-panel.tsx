@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { History, RefreshCw, ShieldCheck, Wand2 } from "lucide-react";
 
 import {
+  getDraftRefinementStateAction,
   refineDraftVersionAction,
   restoreDraftVersionAction,
   saveManualDraftEditAction,
@@ -35,6 +36,29 @@ export function DraftRefinementPanel({
   const [manualContent, setManualContent] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let active = true;
+    setResult(null);
+    setManualContent("");
+    setMessage(null);
+    void (async () => {
+      const response = await getDraftRefinementStateAction({
+        generatedDraftId: draftId,
+        workflow,
+      });
+      if (!active) return;
+      if (!response.ok) {
+        setMessage(response.message);
+        return;
+      }
+      setResult(response.data);
+      setManualContent(response.data.currentVersion.generatedContent);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [draftId, workflow]);
 
   function refine(command: RefinementCommand) {
     setMessage(null);

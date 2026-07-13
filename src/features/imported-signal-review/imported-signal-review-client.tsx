@@ -232,8 +232,8 @@ export function ImportedSignalReviewClient({
         </section>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[0.95fr_1.35fr]">
-        <div className="space-y-4">
+      <section className="grid min-w-0 gap-4 lg:grid-cols-[0.95fr_1.35fr]">
+        <div className="min-w-0 space-y-4">
           <BulkActions
             actor={actor}
             disabled={isPending || selectedIds.length === 0}
@@ -318,7 +318,7 @@ function RecordRow({
   return (
     <article
       className={[
-        "rounded-lg border bg-white p-3 shadow-sm",
+        "min-w-0 rounded-lg border bg-white p-3 shadow-sm",
         selected ? "border-signal" : "border-line",
       ].join(" ")}
     >
@@ -331,7 +331,7 @@ function RecordRow({
         />
         <button className="min-w-0 flex-1 text-left" onClick={onSelect} type="button">
           <span className="block truncate text-sm font-semibold text-ink">{record.title}</span>
-          <span className="mt-1 block text-xs text-stone-500">{record.id}</span>
+          <span className="mt-1 block break-all text-xs text-stone-500">{record.id}</span>
           <span className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge status={record.status} />
             <span className="text-xs text-stone-600">{record.contentType}</span>
@@ -409,7 +409,7 @@ function RecordReviewPanel({
   }
 
   return (
-    <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
+    <article className="min-w-0 rounded-lg border border-line bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
@@ -601,7 +601,9 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">{label}</p>
-      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-stone-700">{value}</p>
+      <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-stone-700">
+        {value}
+      </p>
     </div>
   );
 }
