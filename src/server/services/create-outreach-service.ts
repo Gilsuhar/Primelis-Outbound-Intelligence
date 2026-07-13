@@ -1,0 +1,348 @@
+import { randomUUID } from "node:crypto";
+
+import { z } from "zod";
+
+import {
+  detectAccountSignals,
+  getPersonaGuidance,
+  selectOutreachAngle,
+} from "@/features/create-outreach/outreach-policy";
+import {
+  outreachChannels,
+  outreachLengths,
+  outreachMessageTypes,
+  outreachTones,
+  type CreateOutreachInput,
+  type CreateOutreachResult,
+  type OutreachGeneration,
+  type OutreachKnowledgeRecord,
+  type OutreachSourceReference,
+} from "@/features/create-outreach/types";
+import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
+
+import { createOutreachAiProvider, type OutreachAiProvider } from "./create-outreach-provider";
+import { err, ok } from "./result";
+
+const createOutreachSchema = z.object({
+  companyName: z.string().trim().min(1).max(180),
+  companyWebsite: z.string().trim().max(240).optional(),
+  contactFirstName: z.string().trim().max(80).optional(),
+  contactRole: z.string().trim().min(1).max(160),
+  industry: z.string().trim().max(160).optional(),
+  companyContext: z.string().trim().max(240).optional(),
+  geographyOrMarkets: z.string().trim().max(240).optional(),
+  paidSearchContext: z.string().trim().max(500).optional(),
+  currentVendor: z.string().trim().max(160).optional(),
+  observedTrigger: z.string().trim().min(5).max(600),
+  channel: z.enum(outreachChannels),
+  messageType: z.enum(outreachMessageTypes),
+  desiredTone: z.enum(outreachTones),
+  desiredLength: z.enum(outreachLengths),
+  internalNotes: z.string().trim().max(1200).optional(),
+  creatorId: z.string().trim().min(1).optional(),
+});
+
+type Row = Record<string, unknown>;
+
+export type CreateOutreachPersistence = {
+  getActor(actorId: string): Promise<{ id: string; role: string } | null>;
+  retrieveEligibleKnowledge(input: CreateOutreachInput): Promise<OutreachKnowledgeRecord[]>;
+  persistDraft(input: {
+    creatorId: string;
+    request: CreateOutreachInput;
+    result: Omit<CreateOutreachResult, "draftId">;
+  }): Promise<string>;
+};
+
+export type CreateOutreachDependencies = {
+  provider?: OutreachAiProvider;
+  persistence?: CreateOutreachPersistence;
+};
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function containsCompetitorClaim(text: string) {
+  return /\b(adthena|revvim|auction insights|better than|beats|versus|competitor claim)\b/i.test(
+    text,
+  );
+}
+
+function containsCommercialTerms(text: string) {
+  return /\b(pricing|price|poc|proof of concept|trial|discount|commercial offer)\b/i.test(text);
+}
+
+function sanitizeOutput(text: string) {
+  return text.replace(
+    /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
+    "commercial details",
+  );
+}
+
+function mapKnowledgeRow(row: Row): OutreachKnowledgeRecord {
+  return {
+    id: asString(row.id),
+    title: asString(row.title),
+    type: asString(row.type) as OutreachKnowledgeRecord["type"],
+    approvedText:
+      asOptionalString(row.approvedWording) ??
+      asOptionalString(row.body) ??
+      asOptionalString(row.summary) ??
+      "",
+    channels: asStringArray(row.channels) as OutreachKnowledgeRecord["channels"],
+    usageRestrictions: asOptionalString(row.usageRestrictions),
+    sourceIds: asStringArray(row.sourceIds),
+    sourceTitles: asStringArray(row.sourceTitles),
+    sourceDates: asStringArray(row.sourceDates),
+  };
+}
+
+function isEligible(record: OutreachKnowledgeRecord, channel: CreateOutreachInput["channel"]) {
+  if (!record.approvedText.trim() || record.sourceIds.length === 0) {
+    return false;
+  }
+  if (!(record.channels.includes(channel) || record.channels.includes("INTERNAL"))) {
+    return false;
+  }
+  if (record.usageRestrictions?.trim()) {
+    return false;
+  }
+  if (
+    record.type === "OBJECTION" &&
+    containsCompetitorClaim(`${record.title} ${record.approvedText}`)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function sourceReferences(records: OutreachKnowledgeRecord[]): OutreachSourceReference[] {
+  const references = new Map<string, OutreachSourceReference>();
+  for (const record of records) {
+    record.sourceIds.forEach((id, index) => {
+      if (!references.has(id)) {
+        references.set(id, {
+          id,
+          title: record.sourceTitles[index] ?? id,
+          sourceDate: record.sourceDates[index],
+        });
+      }
+    });
+  }
+  return Array.from(references.values());
+}
+
+function knowledgeLimitations(input: CreateOutreachInput, records: OutreachKnowledgeRecord[]) {
+  const limitations = new Set<string>();
+  if (!input.companyWebsite) {
+    limitations.add(
+      "Company website was not provided, so account facts are treated conservatively.",
+    );
+  }
+  if (!input.paidSearchContext) {
+    limitations.add("No verified paid-search context was provided.");
+  }
+  if (input.currentVendor) {
+    limitations.add(
+      "Named vendor context is user-provided; no unsupported competitor claims were used.",
+    );
+  }
+  if (records.length === 0) {
+    limitations.add("No approved eligible Signal knowledge was available for this channel.");
+  }
+  return Array.from(limitations);
+}
+
+function safetyNotes(input: CreateOutreachInput, records: OutreachKnowledgeRecord[]) {
+  const notes = new Set<string>();
+  const combined = [
+    input.currentVendor,
+    input.paidSearchContext,
+    input.observedTrigger,
+    input.internalNotes,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (containsCompetitorClaim(combined)) {
+    notes.add("Competitor-specific claims were excluded unless approved and source-backed.");
+  }
+  if (containsCommercialTerms(combined)) {
+    notes.add("Pricing, POC, trial, discount, and commercial-offer language was blocked.");
+  }
+  if (records.every((record) => record.type !== "OBJECTION")) {
+    notes.add("Competitor objection records were not used.");
+  }
+  notes.add("No case studies were used because none are currently eligible for this workflow.");
+  return Array.from(notes);
+}
+
+export class PrismaCreateOutreachPersistence implements CreateOutreachPersistence {
+  constructor(private readonly client: MinimalPrismaClient = prisma) {}
+
+  async getActor(actorId: string) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, role
+      FROM "User"
+      WHERE id = ${actorId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    return row ? { id: asString(row.id), role: asString(row.role) } : null;
+  }
+
+  async retrieveEligibleKnowledge(input: CreateOutreachInput) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT
+        ki.id,
+        ki.title,
+        ki.type,
+        ki."approvedWording",
+        ki.body,
+        ki.summary,
+        ki.channels,
+        ki."usageRestrictions",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.id), NULL) AS "sourceIds",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.title), NULL) AS "sourceTitles",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s."sourceDate"::text), NULL) AS "sourceDates"
+      FROM "KnowledgeItem" ki
+      LEFT JOIN "_KnowledgeItemSources" kis ON kis."A" = ki.id
+      LEFT JOIN "SourceDocument" s ON s.id = kis."B"
+      WHERE ki."approvalStatus" = 'APPROVED'
+        AND ki.type IN ('PRODUCT_TRUTH', 'MESSAGE_EXAMPLE', 'OBJECTION')
+      GROUP BY ki.id
+      ORDER BY ki."updatedAt" DESC
+    `;
+    return rows.map(mapKnowledgeRow).filter((record) => isEligible(record, input.channel));
+  }
+
+  async persistDraft({
+    creatorId,
+    request,
+    result,
+  }: {
+    creatorId: string;
+    request: CreateOutreachInput;
+    result: Omit<CreateOutreachResult, "draftId">;
+  }) {
+    const id = randomUUID();
+    await this.client.$executeRaw`
+      INSERT INTO "GeneratedDraft" (
+        id,
+        "userId",
+        workflow,
+        "promptSnapshot",
+        "inputSnapshot",
+        "draftContent",
+        "alternativeContent",
+        "retrievedKnowledgeIds",
+        "sourceIds",
+        "providerName",
+        "modelName",
+        "draftStatus",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${id},
+        ${creatorId},
+        'CREATE_OUTREACH',
+        ${JSON.stringify({
+          channel: request.channel,
+          selectedAngle: result.selectedAngle,
+          subjectLines: result.subjectLines,
+          cta: result.cta,
+          safetyNotes: result.safetyNotes,
+        })},
+        ${JSON.stringify(request)}::jsonb,
+        ${result.recommendedMessage},
+        ${result.shorterVersion},
+        ${result.recordsUsed.map((record) => record.id)}::text[],
+        ${result.sourceReferences.map((source) => source.id)}::text[],
+        ${result.provider.providerName},
+        ${result.provider.modelName},
+        'DRAFT'::"GeneratedDraftStatus",
+        NOW(),
+        NOW()
+      )
+    `;
+    return id;
+  }
+}
+
+export async function generateCreateOutreach(
+  rawInput: unknown,
+  dependencies: CreateOutreachDependencies = {},
+) {
+  const parsed = createOutreachSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return err("VALIDATION_ERROR", "Create Outreach input is malformed.");
+  }
+
+  const input = parsed.data;
+  const creatorId = input.creatorId ?? "seed-sales-user";
+  const persistence = dependencies.persistence ?? new PrismaCreateOutreachPersistence();
+  const actor = await persistence.getActor(creatorId);
+  if (!actor || !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role)) {
+    return err("FORBIDDEN", "Only authorized sales or knowledge users can create outreach drafts.");
+  }
+
+  const provider = dependencies.provider ?? createOutreachAiProvider();
+  const records = await persistence.retrieveEligibleKnowledge(input);
+  const sources = sourceReferences(records);
+  const selected = selectOutreachAngle(input);
+  const baseGeneration = {
+    selectedAngle: selected.angle,
+    angleRationale: selected.rationale,
+    detectedSignals: detectAccountSignals(input),
+    personaGuidance: getPersonaGuidance(input.contactRole),
+    knowledgeLimitations: knowledgeLimitations(input, records),
+    safetyNotes: safetyNotes(input, records),
+  };
+  const generated = await provider.generate({
+    input,
+    records,
+    sourceReferences: sources,
+    generation: baseGeneration,
+  });
+  const safeGenerated: OutreachGeneration = {
+    ...generated,
+    subjectLines:
+      input.channel === "EMAIL" ? generated.subjectLines.map(sanitizeOutput).slice(0, 3) : [],
+    connectionRequest:
+      input.channel === "LINKEDIN" && generated.connectionRequest
+        ? sanitizeOutput(generated.connectionRequest)
+        : undefined,
+    recommendedMessage: sanitizeOutput(generated.recommendedMessage),
+    shorterVersion: sanitizeOutput(generated.shorterVersion),
+    cta: sanitizeOutput(generated.cta),
+    claimsUsed: generated.claimsUsed.map(sanitizeOutput),
+    safetyNotes: Array.from(new Set([...generated.safetyNotes, ...baseGeneration.safetyNotes])),
+  };
+  const resultWithoutId = {
+    ...safeGenerated,
+    recordsUsed: records,
+    sourceReferences: sources,
+    provider: provider.metadata,
+  };
+  const draftId = await persistence.persistDraft({
+    creatorId,
+    request: input,
+    result: resultWithoutId,
+  });
+
+  return ok<CreateOutreachResult>({
+    draftId,
+    ...resultWithoutId,
+  });
+}
