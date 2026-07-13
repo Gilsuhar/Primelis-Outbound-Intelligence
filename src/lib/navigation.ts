@@ -12,6 +12,7 @@ import {
   MessageSquareReply,
   SearchCheck,
   Send,
+  Upload,
 } from "lucide-react";
 
 import type { UserRole } from "@/features/knowledge/types";
@@ -79,6 +80,11 @@ export const adminNavigation = [
     label: "Imported Signal Review",
     href: "/imported-signal-review",
     icon: ListChecks,
+  },
+  {
+    label: "Account Import",
+    href: "/account-research/import",
+    icon: Upload,
   },
   {
     label: "Claim Details",

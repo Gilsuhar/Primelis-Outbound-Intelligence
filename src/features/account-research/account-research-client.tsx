@@ -5,8 +5,10 @@ import { AlertTriangle, Building2, CheckCircle2, ClipboardCheck, SearchCheck } f
 
 import {
   assessAccountResearchAction,
+  enrichCompanyAndContactsAction,
   researchCompanyWebsiteAction,
 } from "@/app/account-research/actions";
+import type { CompanyContactEnrichmentResult } from "@/features/company-contact-enrichment/types";
 import type { WebsiteFinding, WebsiteResearchResult } from "@/features/connected-research/types";
 import type {
   AccountAssessmentResult,
@@ -132,6 +134,7 @@ function ResultBadge({ result }: { result: string }) {
 export function AccountResearchClient() {
   const [result, setResult] = useState<AccountAssessmentResult | null>(null);
   const [research, setResearch] = useState<WebsiteResearchResult | null>(null);
+  const [enrichment, setEnrichment] = useState<CompanyContactEnrichmentResult | null>(null);
   const [reviewedFindings, setReviewedFindings] = useState<
     Record<string, WebsiteFinding["reviewStatus"]>
   >({});
@@ -197,6 +200,28 @@ export function AccountResearchClient() {
           response.data.findings.map((finding, index) => [`${finding.field}-${index}`, "PENDING"]),
         ),
       );
+    });
+  }
+
+  function runProviderEnrichment(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const response = await enrichCompanyAndContactsAction({
+        companyName: optional(formData, "companyName"),
+        companyDomain: optional(formData, "companyDomain"),
+        existingFields: {
+          industry: optional(formData, "industry") ?? "",
+          company_type: (formData.get("companyType") as string | null) ?? "",
+          revenue_range: optional(formData, "revenueContext") ?? "",
+          employee_range: optional(formData, "employeeContext") ?? "",
+        },
+      });
+      if (!response.ok) {
+        setEnrichment(null);
+        setError(response.message);
+        return;
+      }
+      setEnrichment(response.data);
     });
   }
 
@@ -361,10 +386,161 @@ export function AccountResearchClient() {
             >
               Research company website
             </button>
+            <button
+              className="signal-button-secondary"
+              disabled={isPending}
+              formAction={runProviderEnrichment}
+              type="submit"
+            >
+              Enrich company and contacts
+            </button>
           </div>
         </form>
 
         <section className="space-y-4">
+          {enrichment ? (
+            <article className="rounded-2xl border border-line bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">Company and contact enrichment</h2>
+                  <p className="mt-1 text-sm text-[#6f6d5f]">
+                    {enrichment.providerStatus.message} Run:{" "}
+                    {enrichment.enrichmentRunId ?? "not persisted"}
+                  </p>
+                </div>
+                <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-ink">
+                  {enrichment.providerStatus.status.replaceAll("_", " ").toLowerCase()}
+                </span>
+              </div>
+
+              {enrichment.warnings.length > 0 ? (
+                <div className="mt-3 rounded-xl border border-[#f1d8aa] bg-[#fff9eb] p-3 text-sm text-[#6f5a20]">
+                  {enrichment.warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              ) : null}
+
+              {enrichment.conflicts.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-semibold text-ink">Conflicts requiring review</p>
+                  {enrichment.conflicts.map((conflict) => (
+                    <div className="rounded-xl border border-line p-3 text-sm" key={conflict.field}>
+                      <p className="font-semibold text-ink">{conflict.field}</p>
+                      <p className="text-[#6f6d5f]">Existing: {conflict.existingValue}</p>
+                      <p className="text-[#6f6d5f]">Incoming: {conflict.incomingValue}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Company findings</p>
+                  <div className="mt-2 space-y-2">
+                    {enrichment.companyFields.length > 0 ? (
+                      enrichment.companyFields.map((field) => (
+                        <div
+                          className="rounded-xl border border-line p-3 text-sm"
+                          key={field.field}
+                        >
+                          <p className="font-semibold text-ink">
+                            {field.field}: {field.value}
+                          </p>
+                          <p className="text-xs text-[#6f6d5f]">
+                            {field.status.toLowerCase()} · {field.providerName} ·{" "}
+                            {new Date(field.retrievedAt).toLocaleString()}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              className="rounded-full bg-lime px-3 py-1 text-xs font-semibold text-ink"
+                              type="button"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink"
+                              type="button"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink"
+                              type="button"
+                            >
+                              Keep existing
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-xl border border-line p-3 text-sm text-[#6f6d5f]">
+                        No company findings are available from the provider.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">Relevant professional contacts</p>
+                  <div className="mt-2 space-y-2">
+                    {enrichment.contacts.length > 0 ? (
+                      enrichment.contacts.map((contact) => (
+                        <div
+                          className="rounded-xl border border-line p-3 text-sm"
+                          key={`${contact.fullName}-${contact.professionalTitle}`}
+                        >
+                          <p className="font-semibold text-ink">{contact.fullName}</p>
+                          <p className="text-[#34352e]">{contact.professionalTitle}</p>
+                          <p className="text-xs text-[#6f6d5f]">
+                            {contact.personaTier} · {contact.personaCategory} ·{" "}
+                            {contact.titleMatchQuality} · priority {contact.targetingPriority}
+                          </p>
+                          <p className="mt-1 text-xs text-[#6f6d5f]">{contact.rationale}</p>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              className="rounded-full bg-lime px-3 py-1 text-xs font-semibold text-ink"
+                              type="button"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink"
+                              type="button"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-xl border border-line p-3 text-sm text-[#6f6d5f]">
+                        No relevant contacts were returned. Manual research remains available.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {enrichment.workflowLinks.map((link) =>
+                  link.disabled ? (
+                    <span
+                      className="signal-button-secondary opacity-60"
+                      key={link.href}
+                      title={link.reason}
+                    >
+                      {link.label}
+                    </span>
+                  ) : (
+                    <a className="signal-button-secondary" href={link.href} key={link.href}>
+                      {link.label}
+                    </a>
+                  ),
+                )}
+              </div>
+            </article>
+          ) : null}
+
           {research ? (
             <article className="rounded-2xl border border-line bg-white p-5">
               <h2 className="text-lg font-semibold text-ink">Website research review</h2>

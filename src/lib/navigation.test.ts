@@ -29,6 +29,7 @@ describe("role-based navigation", () => {
       "/add-knowledge",
       "/review-queue",
       "/imported-signal-review",
+      "/account-research/import",
       "/claims/development-fixture",
     ]);
   });

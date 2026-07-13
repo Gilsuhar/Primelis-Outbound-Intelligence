@@ -116,6 +116,8 @@ model User {
   suppressionImports  SuppressionImportBatch[]
   suppressionAudits   SuppressionAudit[]
   websiteResearchRuns WebsiteResearchRun[]
+  companyEnrichmentRuns CompanyEnrichmentRun[]
+  providerSyncAudits    ProviderSyncAudit[]
 }
 
 model Product {
@@ -571,4 +573,95 @@ model WebsiteResearchRun {
   @@index([userId])
   @@index([normalizedDomain])
   @@index([researchStatus])
+}
+
+model CompanyEnrichmentRun {
+  id                String                    @id @default(cuid())
+  userId            String
+  companyName       String?
+  normalizedDomain  String
+  provider          String
+  status            String
+  requestedAt       DateTime                  @default(now())
+  completedAt       DateTime?
+  failureCategory   String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  user              User                      @relation(fields: [userId], references: [id])
+  companyFindings   CompanyEnrichmentFinding[]
+  contactFindings   ContactEnrichmentResult[]
+  audits            ProviderSyncAudit[]
+
+  @@index([userId])
+  @@index([normalizedDomain])
+  @@index([provider])
+  @@index([status])
+}
+
+model CompanyEnrichmentFinding {
+  id               String               @id @default(cuid())
+  enrichmentRunId  String
+  normalizedField  String
+  value            String
+  status           String
+  provider         String
+  fieldOrigin      String
+  retrievedAt      DateTime
+  confidence       String?
+  sourceUrl        String?
+  reviewStatus     String               @default("PENDING")
+  reviewerId       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  enrichmentRun    CompanyEnrichmentRun @relation(fields: [enrichmentRunId], references: [id], onDelete: Cascade)
+
+  @@index([enrichmentRunId])
+  @@index([normalizedField])
+  @@index([reviewStatus])
+}
+
+model ContactEnrichmentResult {
+  id                  String               @id @default(cuid())
+  enrichmentRunId     String
+  fullName            String
+  professionalTitle   String
+  companyName         String
+  companyDomain       String
+  countryOrRegion     String?
+  department          String?
+  seniority           String?
+  personaTier         String
+  personaCategory     String
+  professionalProfileUrl String?
+  businessEmail       String?
+  businessEmailStatus String?
+  provider            String
+  retrievedAt         DateTime
+  relevanceState      String
+  reviewStatus        String               @default("PENDING")
+  reviewerId          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  enrichmentRun       CompanyEnrichmentRun @relation(fields: [enrichmentRunId], references: [id], onDelete: Cascade)
+
+  @@index([enrichmentRunId])
+  @@index([companyDomain])
+  @@index([personaTier])
+  @@index([reviewStatus])
+}
+
+model ProviderSyncAudit {
+  id               String               @id @default(cuid())
+  enrichmentRunId  String?
+  providerOperation String
+  recordCount      Int
+  status           String
+  userId           String
+  createdAt        DateTime             @default(now())
+  enrichmentRun    CompanyEnrichmentRun? @relation(fields: [enrichmentRunId], references: [id])
+  user             User                 @relation(fields: [userId], references: [id])
+
+  @@index([enrichmentRunId])
+  @@index([userId])
+  @@index([createdAt])
 }
