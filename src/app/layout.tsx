@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppShell } from "@/components/app-shell";
-import { getTrustedRoleContext } from "@/lib/role-context";
+import { getPublicUser } from "@/lib/auth/server";
 
 import "./globals.css";
 
@@ -12,17 +12,17 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const viewer = getTrustedRoleContext();
+  const viewer = await getPublicUser();
 
   return (
     <html lang="en">
       <body>
-        <AppShell role={viewer.role}>{children}</AppShell>
+        <AppShell viewer={viewer}>{children}</AppShell>
       </body>
     </html>
   );

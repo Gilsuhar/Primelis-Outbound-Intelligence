@@ -1,7 +1,9 @@
 "use server";
 
 import { generateCreateOutreach } from "@/server/services/create-outreach-service";
+import { withAuthenticatedCreator } from "@/lib/auth/action-actor";
 
 export async function generateCreateOutreachAction(input: unknown) {
-  return generateCreateOutreach(input);
+  const authenticated = await withAuthenticatedCreator(input);
+  return generateCreateOutreach(authenticated.input);
 }

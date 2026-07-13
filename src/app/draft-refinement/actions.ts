@@ -6,19 +6,24 @@ import {
   restoreDraftVersion,
   saveManualDraftEdit,
 } from "@/server/services/draft-versioning-service";
+import { withAuthenticatedCreator } from "@/lib/auth/action-actor";
 
 export async function getDraftRefinementStateAction(input: unknown) {
-  return getDraftRefinementState(input);
+  const authenticated = await withAuthenticatedCreator(input);
+  return getDraftRefinementState(authenticated.input);
 }
 
 export async function refineDraftVersionAction(input: unknown) {
-  return refineDraftVersion(input);
+  const authenticated = await withAuthenticatedCreator(input);
+  return refineDraftVersion(authenticated.input);
 }
 
 export async function saveManualDraftEditAction(input: unknown) {
-  return saveManualDraftEdit(input);
+  const authenticated = await withAuthenticatedCreator(input);
+  return saveManualDraftEdit(authenticated.input);
 }
 
 export async function restoreDraftVersionAction(input: unknown) {
-  return restoreDraftVersion(input);
+  const authenticated = await withAuthenticatedCreator(input);
+  return restoreDraftVersion(authenticated.input);
 }

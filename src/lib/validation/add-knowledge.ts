@@ -33,6 +33,7 @@ export const addKnowledgeSchema = z
     competitors: z.string().trim().optional(),
     internalNotes: z.string().trim().optional(),
     suggestedApprovalStatus: z.enum(approvalStatuses),
+    creatorId: z.string().trim().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.content.trim().length < 10) {

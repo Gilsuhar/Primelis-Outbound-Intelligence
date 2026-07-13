@@ -99,6 +99,7 @@ enum GeneratedDraftStatus {
 
 model User {
   id                  String                @id @default(cuid())
+  authUserId          String?               @unique
   email               String                @unique
   name                String?
   role                UserRole              @default(SALES_USER)

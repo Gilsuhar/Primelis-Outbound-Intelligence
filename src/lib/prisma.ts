@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 type PrismaModelDelegate = {
   findMany(args?: unknown): Promise<unknown[]>;
   findUnique(args: unknown): Promise<Record<string, unknown> | null>;
+  findFirst(args: unknown): Promise<Record<string, unknown> | null>;
+  update(args: unknown): Promise<Record<string, unknown>>;
 };
 
 export type MinimalPrismaClient = {
@@ -12,6 +14,7 @@ export type MinimalPrismaClient = {
   sourceDocument: PrismaModelDelegate;
   caseStudy: PrismaModelDelegate;
   generatedDraft: PrismaModelDelegate;
+  user: PrismaModelDelegate;
 };
 
 const require = createRequire(import.meta.url);

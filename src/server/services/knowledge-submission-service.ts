@@ -18,5 +18,10 @@ export async function createKnowledgeSubmission(
 
   const repositories = resolvePersistenceRepositories(dependencies);
 
-  return ok(await repositories.submissions.createSubmission(parsed.data));
+  return ok(
+    await repositories.submissions.createSubmission({
+      ...parsed.data,
+      authorId: parsed.data.creatorId,
+    }),
+  );
 }

@@ -37,7 +37,9 @@ function version(overrides: Partial<DraftVersionView> = {}): DraftVersionView {
   };
 }
 
-function persistence(options: { versions?: DraftVersionView[]; role?: string } = {}) {
+function persistence(
+  options: { versions?: DraftVersionView[]; role?: string; draftUserId?: string } = {},
+) {
   const versions = [...(options.versions ?? [])];
   const store: DraftVersionPersistence & { versions: DraftVersionView[] } = {
     versions,
@@ -47,7 +49,7 @@ function persistence(options: { versions?: DraftVersionView[]; role?: string } =
     async getDraft(draftId: string) {
       return {
         id: draftId,
-        userId: "seed-sales-user",
+        userId: options.draftUserId ?? "seed-sales-user",
         workflow: "CREATE_OUTREACH" as RefinementWorkflow,
         draftContent:
           "Signal will always reduce your branded-search spend by 50% without affecting conversions.",
@@ -191,6 +193,44 @@ describe("Phase N draft provider and versioning", () => {
       code: "VALIDATION_ERROR",
       message: "Draft workflow does not match the requested workflow.",
     });
+  });
+
+  it("rejects cross-user draft access for sales users", async () => {
+    const store = persistence({
+      versions: [version()],
+      draftUserId: "seed-sales-user",
+    });
+
+    const result = await getDraftRefinementState(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "CREATE_OUTREACH",
+        creatorId: "other-sales-user",
+      },
+      { persistence: store },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("FORBIDDEN");
+  });
+
+  it("allows knowledge admins to inspect draft versions", async () => {
+    const store = persistence({
+      versions: [version()],
+      role: "KNOWLEDGE_ADMIN",
+      draftUserId: "seed-sales-user",
+    });
+
+    const result = await getDraftRefinementState(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "CREATE_OUTREACH",
+        creatorId: "admin-user",
+      },
+      { persistence: store },
+    );
+
+    expect(result.ok).toBe(true);
   });
 
   it("custom feedback, manual edits, fix safety, and restore create separate versions", async () => {

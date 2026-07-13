@@ -4,9 +4,11 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 
 import type { UserRole } from "@/features/knowledge/types";
+import { signOutAction } from "@/app/auth/actions";
+import type { PublicUser } from "@/lib/private-preview-auth";
 import { getNavigationForRole, adminNavigation, salesNavigation } from "@/lib/navigation";
 
 type NavigationItem = (typeof salesNavigation | typeof adminNavigation)[number];
@@ -56,7 +58,18 @@ function NavigationSection({
   );
 }
 
-export function AppShell({ children, role }: { children: React.ReactNode; role: UserRole }) {
+export function AppShell({
+  children,
+  viewer,
+}: {
+  children: React.ReactNode;
+  viewer: PublicUser | null;
+}) {
+  if (!viewer) {
+    return <main className="min-h-screen bg-cream">{children}</main>;
+  }
+
+  const role: UserRole = viewer.role;
   const navigation = getNavigationForRole(role);
 
   return (
@@ -79,9 +92,23 @@ export function AppShell({ children, role }: { children: React.ReactNode; role: 
               <span className="block truncate text-lg font-semibold text-ink">Signal</span>
             </span>
           </Link>
-          <div className="hidden items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f] sm:flex lg:mt-5">
-            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
-            {role === "KNOWLEDGE_ADMIN" ? "Admin view" : "Sales view"}
+          <div className="hidden flex-col gap-2 sm:flex lg:mt-5">
+            <div className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
+              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
+              {role === "KNOWLEDGE_ADMIN" ? "Admin view" : "Sales view"}
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-[#6f6d5f]">
+              <span className="min-w-0 truncate">{viewer.email}</span>
+              <form action={signOutAction}>
+                <button
+                  aria-label="Sign out"
+                  className="rounded-full p-1 text-olive transition hover:bg-cream hover:text-ink"
+                  type="submit"
+                >
+                  <LogOut aria-hidden="true" className="h-4 w-4" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 

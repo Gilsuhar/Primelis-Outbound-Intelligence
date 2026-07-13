@@ -273,7 +273,11 @@ function safetyStatus(flags: DraftSafetyFlag[]) {
 
 async function authorize(creatorId: string, persistence: DraftVersionPersistence) {
   const actor = await persistence.getActor(creatorId);
-  return Boolean(actor && ["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role));
+  return actor && ["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role) ? actor : null;
+}
+
+function canAccessDraft(actor: { id: string; role: string }, draft: { userId: string }) {
+  return actor.role === "KNOWLEDGE_ADMIN" || actor.id === draft.userId;
 }
 
 async function ensureInitialVersion(
@@ -329,7 +333,8 @@ export async function getDraftRefinementState(
   if (!parsed.success) return err("VALIDATION_ERROR", "Draft refinement input is malformed.");
   const creatorId = parsed.data.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaDraftVersionPersistence();
-  if (!(await authorize(creatorId, persistence))) {
+  const actor = await authorize(creatorId, persistence);
+  if (!actor) {
     return err("FORBIDDEN", "Only authorized users can view draft versions.");
   }
   const initialized = await ensureInitialVersion(
@@ -338,6 +343,9 @@ export async function getDraftRefinementState(
     persistence,
   );
   if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
+  if (!canAccessDraft(actor, initialized.draft)) {
+    return err("FORBIDDEN", "Only the draft owner can view draft versions.");
+  }
   if (initialized.draft.workflow !== parsed.data.workflow) {
     return err("VALIDATION_ERROR", "Draft workflow does not match the requested workflow.");
   }
@@ -362,7 +370,8 @@ export async function refineDraftVersion(
   if (!parsed.success) return err("VALIDATION_ERROR", "Draft refinement input is malformed.");
   const creatorId = parsed.data.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaDraftVersionPersistence();
-  if (!(await authorize(creatorId, persistence))) {
+  const actor = await authorize(creatorId, persistence);
+  if (!actor) {
     return err("FORBIDDEN", "Only authorized sales or knowledge users can refine drafts.");
   }
   const initialized = await ensureInitialVersion(
@@ -371,6 +380,9 @@ export async function refineDraftVersion(
     persistence,
   );
   if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
+  if (!canAccessDraft(actor, initialized.draft)) {
+    return err("FORBIDDEN", "Only the draft owner can refine drafts.");
+  }
   const current =
     initialized.versions.find((version) => version.isCurrent) ?? initialized.versions.at(-1)!;
   const provider = dependencies.provider ?? createAiProvider();
@@ -448,14 +460,17 @@ export async function saveManualDraftEdit(
   if (!parsed.success) return err("VALIDATION_ERROR", "Manual draft edit input is malformed.");
   const creatorId = parsed.data.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaDraftVersionPersistence();
-  if (!(await authorize(creatorId, persistence)))
-    return err("FORBIDDEN", "Only authorized users can edit drafts.");
+  const actor = await authorize(creatorId, persistence);
+  if (!actor) return err("FORBIDDEN", "Only authorized users can edit drafts.");
   const initialized = await ensureInitialVersion(
     parsed.data.generatedDraftId,
     creatorId,
     persistence,
   );
   if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
+  if (!canAccessDraft(actor, initialized.draft)) {
+    return err("FORBIDDEN", "Only the draft owner can edit drafts.");
+  }
   const current =
     initialized.versions.find((version) => version.isCurrent) ?? initialized.versions.at(-1)!;
   const content = stripPromptInjection(parsed.data.editedContent);
@@ -492,14 +507,17 @@ export async function restoreDraftVersion(
   if (!parsed.success) return err("VALIDATION_ERROR", "Restore input is malformed.");
   const creatorId = parsed.data.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaDraftVersionPersistence();
-  if (!(await authorize(creatorId, persistence)))
-    return err("FORBIDDEN", "Only authorized users can restore drafts.");
+  const actor = await authorize(creatorId, persistence);
+  if (!actor) return err("FORBIDDEN", "Only authorized users can restore drafts.");
   const initialized = await ensureInitialVersion(
     parsed.data.generatedDraftId,
     creatorId,
     persistence,
   );
   if (!initialized) return err("DRAFT_NOT_FOUND", "Generated draft was not found.");
+  if (!canAccessDraft(actor, initialized.draft)) {
+    return err("FORBIDDEN", "Only the draft owner can restore drafts.");
+  }
   const target = initialized.versions.find((version) => version.id === parsed.data.versionId);
   const current =
     initialized.versions.find((version) => version.isCurrent) ?? initialized.versions.at(-1)!;

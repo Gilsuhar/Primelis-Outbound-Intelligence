@@ -4,9 +4,9 @@ Internal sales intelligence and messaging foundation for Primelis Signal.
 
 ## Scope
 
-This foundation is Signal-only and English-only. It does not include AI generation,
-automated email sending, LinkedIn automation, CRM integration, pricing generation,
-web research, production authentication, analytics dashboards, or fake performance data.
+This foundation is Signal-only and English-only. It does not include automated
+email sending, LinkedIn automation, CRM integration, pricing generation, public
+signup, analytics dashboards, or fake performance data.
 
 ## Stack
 
@@ -14,7 +14,7 @@ web research, production authentication, analytics dashboards, or fake performan
 - TypeScript strict mode
 - Tailwind CSS
 - PostgreSQL with Prisma
-- Supabase-ready authentication placeholders
+- Supabase Auth private preview
 - Zod
 - pnpm
 - ESLint
@@ -66,7 +66,73 @@ pnpm prisma:seed
 3. Set `DIRECT_URL` to the direct database connection string for migrations.
 4. Run the same Prisma validation, generate, migration, and seed commands.
 
-Supabase Auth and Supabase Storage are not required in this phase.
+Supabase Auth is required for private preview access. Supabase Storage is not
+required.
+
+## Private Preview Authentication
+
+The app uses Supabase Auth magic links for invited users only. Public signup
+must remain disabled in the Supabase dashboard. The app also passes
+`shouldCreateUser: false` when requesting magic links, so users must be invited
+or created in Supabase Auth before they can receive access.
+
+Roles are trusted from the application `User` table, not from client fields or
+user-editable metadata. Supported private preview roles are:
+
+- `SALES`: stored internally as `SALES_USER`
+- `KNOWLEDGE_ADMIN`: stored internally as `KNOWLEDGE_ADMIN`
+
+An invited user must have a matching row in `User.email`. On first successful
+login, the app links the Supabase Auth user id to `User.authUserId`. If no
+matching profile row exists, authentication succeeds at Supabase but the app
+does not grant workspace access.
+
+Minimal invite and role assignment flow:
+
+1. Invite or create the user in Supabase Auth.
+2. Insert or update the matching application profile row with the user email and
+   one of the two trusted roles.
+3. Keep public signup disabled.
+4. Configure the Supabase Auth site URL and redirect URLs for the private
+   preview deployment, including `/auth/callback`.
+
+Required environment labels:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+NEXT_PUBLIC_SUPABASE_URL="https://PROJECT_REF.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="PUBLIC_ANON_OR_PUBLISHABLE_KEY"
+NEXT_PUBLIC_APP_URL="https://PRIVATE_PREVIEW_APP_URL"
+AI_PROVIDER=""
+OPENAI_API_KEY=""
+OPENAI_MODEL=""
+```
+
+Do not add a service-role key unless a future server-only admin operation truly
+requires it. No service-role key is required for the current private preview.
+
+### Deployment Readiness
+
+Use Vercel with the same environment labels configured in project settings. The
+build command is:
+
+```bash
+pnpm build
+```
+
+Prisma Client generation runs during install through `postinstall`. Apply
+migrations deliberately before preview use:
+
+```bash
+pnpm prisma:validate
+pnpm prisma:generate
+pnpm prisma migrate deploy
+```
+
+Do not run migrations automatically on every request. Do not reset the database.
+Rollback is the normal Vercel deployment rollback plus restoring the previous
+database backup if a migration needs to be reversed.
 
 ### Fixture Fallback
 

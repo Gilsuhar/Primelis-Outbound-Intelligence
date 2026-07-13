@@ -3,7 +3,7 @@ import { Ban, BookOpen, Layers3, MessageSquareReply, Send } from "lucide-react";
 
 import { SignalCard, SignalHero } from "@/components/signal-ui";
 import { adminNavigation } from "@/lib/navigation";
-import { getTrustedRoleContext } from "@/lib/role-context";
+import { requireCurrentUser } from "@/lib/auth/server";
 
 const primaryActions = [
   {
@@ -38,8 +38,8 @@ const primaryActions = [
   },
 ];
 
-export default function HomePage() {
-  const viewer = getTrustedRoleContext();
+export default async function HomePage() {
+  const viewer = await requireCurrentUser();
   const showAdmin = viewer.role === "KNOWLEDGE_ADMIN";
 
   return (

@@ -1,5 +1,7 @@
 import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
+import { requireCurrentUser } from "@/lib/auth/server";
 
-export default function CreateOutreachPage() {
+export default async function CreateOutreachPage() {
+  await requireCurrentUser();
   return <CreateOutreachClient />;
 }

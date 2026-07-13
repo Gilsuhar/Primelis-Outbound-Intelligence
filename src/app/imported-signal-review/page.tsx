@@ -1,7 +1,9 @@
 import { ImportedSignalReviewClient } from "@/features/imported-signal-review/imported-signal-review-client";
+import { requireRole } from "@/lib/auth/server";
 import { retrieveImportedSignalReview } from "@/server/services/imported-signal-review-service";
 
 export default async function ImportedSignalReviewPage() {
+  await requireRole("KNOWLEDGE_ADMIN");
   const result = await retrieveImportedSignalReview();
 
   return result.ok ? (
