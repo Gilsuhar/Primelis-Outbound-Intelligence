@@ -19,6 +19,8 @@ export type PublicUser = {
 
 export type LoginScreenState = "LOGIN_FORM" | "ACCESS_PENDING" | "SIGNED_IN";
 
+export type LoginErrorCode = "access_denied" | "callback_failed" | "oauth_failed";
+
 export const publicRoutes = ["/login", "/auth/callback", "/favicon.ico"] as const;
 
 export const adminRoutePrefixes = [
@@ -78,4 +80,18 @@ export function resolveLoginScreenState(input: {
 }): LoginScreenState {
   if (input.hasApplicationUser) return "SIGNED_IN";
   return input.hasSupabaseAuthUser ? "ACCESS_PENDING" : "LOGIN_FORM";
+}
+
+export function normalizePreviewEmail(email: string | null | undefined) {
+  return email?.trim().toLowerCase() ?? "";
+}
+
+export function getSafeInternalPath(value: string | null | undefined) {
+  if (!value?.startsWith("/") || value.startsWith("//")) return "/";
+  try {
+    const parsed = new URL(value, "https://preview.local");
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/";
+  }
 }

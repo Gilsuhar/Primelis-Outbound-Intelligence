@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   canAccessRoute,
+  getSafeInternalPath,
   isAdminRoute,
   isPublicRoute,
+  normalizePreviewEmail,
   resolveLoginScreenState,
   toPrivatePreviewRole,
 } from "@/lib/private-preview-auth";
@@ -47,5 +49,16 @@ describe("private preview auth policy", () => {
         hasApplicationUser: true,
       }),
     ).toBe("SIGNED_IN");
+  });
+
+  it("normalizes private preview emails before app-user lookup", () => {
+    expect(normalizePreviewEmail("  User@Example.COM ")).toBe("user@example.com");
+    expect(normalizePreviewEmail(null)).toBe("");
+  });
+
+  it("keeps only internal redirect paths", () => {
+    expect(getSafeInternalPath("/reply-to-prospect?draft=1")).toBe("/reply-to-prospect?draft=1");
+    expect(getSafeInternalPath("https://evil.example/capture")).toBe("/");
+    expect(getSafeInternalPath("//evil.example/capture")).toBe("/");
   });
 });

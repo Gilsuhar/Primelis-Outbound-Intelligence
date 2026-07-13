@@ -11,6 +11,7 @@ import { getAppUrl, getSupabaseAuthConfig } from "@/lib/auth/env";
 import {
   canAccessRoute,
   type AuthenticatedUser,
+  normalizePreviewEmail,
   type PublicUser,
   publicUserFromAuthenticatedUser,
 } from "@/lib/private-preview-auth";
@@ -57,12 +58,16 @@ export async function createSupabaseServerClient() {
   });
 }
 
-async function resolveLocalProfile(authUser: { id: string; email?: string | null }) {
-  if (!authUser.email) return null;
+export async function resolveApplicationUser(authUser: { id: string; email?: string | null }) {
+  const normalizedEmail = normalizePreviewEmail(authUser.email);
+  if (!normalizedEmail) return null;
 
   const existing = (await prisma.user.findFirst({
     where: {
-      OR: [{ authUserId: authUser.id }, { email: authUser.email }],
+      OR: [
+        { authUserId: authUser.id },
+        { email: { equals: normalizedEmail, mode: "insensitive" } },
+      ],
     },
     select: {
       id: true,
@@ -78,9 +83,23 @@ async function resolveLocalProfile(authUser: { id: string; email?: string | null
   if (!existing.authUserId) {
     return (await prisma.user.update({
       where: { id: existing.id },
-      data: { authUserId: authUser.id },
+      data: { authUserId: authUser.id, email: normalizedEmail },
       select: {
         id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    })) as LocalProfile;
+  }
+
+  if (existing.email !== normalizedEmail) {
+    return (await prisma.user.update({
+      where: { id: existing.id },
+      data: { email: normalizedEmail },
+      select: {
+        id: true,
+        authUserId: true,
         email: true,
         name: true,
         role: true,
@@ -102,7 +121,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 
   if (error || !user) return null;
 
-  const profile = await resolveLocalProfile(user);
+  const profile = await resolveApplicationUser(user);
   if (!profile) return null;
 
   return {

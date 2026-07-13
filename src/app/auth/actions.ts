@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
 import { createSupabaseServerClient, getRequestOrigin } from "@/lib/auth/server";
+import { getSafeInternalPath } from "@/lib/private-preview-auth";
 
 type LoginState = {
   ok: boolean;
@@ -65,6 +66,35 @@ export async function requestLoginLink(
     ok: true,
     message: "If this email has been invited, a private preview login link has been sent.",
   };
+}
+
+export async function continueWithGoogle(formData: FormData) {
+  if (!getSupabaseAuthConfig()) {
+    redirect("/login?error=oauth_failed");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    redirect("/login?error=oauth_failed");
+  }
+
+  const origin = await getRequestOrigin();
+  const intendedPath = getSafeInternalPath(formData.get("next")?.toString());
+  const callbackUrl = new URL("/auth/callback", origin);
+  if (intendedPath !== "/") callbackUrl.searchParams.set("next", intendedPath);
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl.toString(),
+    },
+  });
+
+  if (error || !data.url) {
+    redirect("/login?error=oauth_failed");
+  }
+
+  redirect(data.url);
 }
 
 export async function signOutAction() {

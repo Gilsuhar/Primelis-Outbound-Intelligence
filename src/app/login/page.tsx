@@ -1,11 +1,32 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser, getSupabaseAuthUser } from "@/lib/auth/server";
-import { resolveLoginScreenState } from "@/lib/private-preview-auth";
+import {
+  getSafeInternalPath,
+  type LoginErrorCode,
+  resolveLoginScreenState,
+} from "@/lib/private-preview-auth";
 
 import { LoginForm } from "./login-form";
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getSingleParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getLoginError(value: string | string[] | undefined): LoginErrorCode | undefined {
+  const error = getSingleParam(value);
+  if (error === "access_denied" || error === "callback_failed" || error === "oauth_failed") {
+    return error;
+  }
+  return undefined;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = (await searchParams) ?? {};
   const [applicationUser, supabaseUser] = await Promise.all([
     getCurrentUser(),
     getSupabaseAuthUser(),
@@ -17,5 +38,11 @@ export default async function LoginPage() {
 
   if (state === "SIGNED_IN") redirect("/");
 
-  return <LoginForm accessPending={state === "ACCESS_PENDING"} />;
+  return (
+    <LoginForm
+      accessPending={state === "ACCESS_PENDING"}
+      loginError={getLoginError(params.error)}
+      nextPath={getSafeInternalPath(getSingleParam(params.next))}
+    />
+  );
 }
