@@ -112,6 +112,7 @@ model User {
   reviewedCaseStudies CaseStudy[]           @relation("CaseStudyReviewOwner")
   interactionOutcomes InteractionOutcome[]
   generatedDrafts     GeneratedDraft[]
+  accountAssessments  AccountAssessment[]
 }
 
 model Product {
@@ -465,4 +466,30 @@ model GeneratedDraft {
   @@index([userId])
   @@index([workflow])
   @@index([draftStatus])
+}
+
+model AccountAssessment {
+  id                    String   @id @default(cuid())
+  userId                String
+  companyName           String
+  domain                String?
+  inputSnapshot         Json
+  factStatuses          Json
+  qualificationResult   String
+  confidence            String
+  verifiedSignals       String[]
+  assumptions           String[]
+  missingInformation    String[]
+  suppressionResult     Json
+  personaRecommendation Json
+  angleRecommendation   Json
+  recommendedNextAction String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([companyName])
+  @@index([domain])
+  @@index([qualificationResult])
 }

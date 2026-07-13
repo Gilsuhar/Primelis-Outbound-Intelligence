@@ -11,6 +11,7 @@ describe("role-based navigation", () => {
     expect(navigation.sales.map((item) => item.href)).toEqual([
       "/",
       "/playbook",
+      "/account-research",
       "/create-outreach",
       "/build-sequence",
       "/reply-to-prospect",

@@ -2,6 +2,7 @@ import {
   Ban,
   BookOpen,
   Brain,
+  Building2,
   FilePlus2,
   Home,
   Inbox,
@@ -25,6 +26,11 @@ export const salesNavigation = [
     label: "Signal Playbook",
     href: "/playbook",
     icon: BookOpen,
+  },
+  {
+    label: "Account Research",
+    href: "/account-research",
+    icon: Building2,
   },
   {
     label: "Create Outreach",
