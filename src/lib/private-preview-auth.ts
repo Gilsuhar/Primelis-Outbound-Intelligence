@@ -17,6 +17,8 @@ export type PublicUser = {
   role: UserRole;
 };
 
+export type LoginScreenState = "LOGIN_FORM" | "ACCESS_PENDING" | "SIGNED_IN";
+
 export const publicRoutes = ["/login", "/auth/callback", "/favicon.ico"] as const;
 
 export const adminRoutePrefixes = [
@@ -68,4 +70,12 @@ export function publicUserFromAuthenticatedUser(user: AuthenticatedUser): Public
     name: user.name,
     role: user.role,
   };
+}
+
+export function resolveLoginScreenState(input: {
+  hasSupabaseAuthUser: boolean;
+  hasApplicationUser: boolean;
+}): LoginScreenState {
+  if (input.hasApplicationUser) return "SIGNED_IN";
+  return input.hasSupabaseAuthUser ? "ACCESS_PENDING" : "LOGIN_FORM";
 }

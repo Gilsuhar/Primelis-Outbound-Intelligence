@@ -113,6 +113,18 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
   };
 }
 
+export async function getSupabaseAuthUser() {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return error ? null : user;
+}
+
 export async function requireCurrentUser(): Promise<AuthenticatedUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");

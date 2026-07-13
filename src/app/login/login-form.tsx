@@ -3,14 +3,14 @@
 import { useActionState } from "react";
 import Image from "next/image";
 
-import { requestLoginLink } from "@/app/auth/actions";
+import { requestLoginLink, signOutAction } from "@/app/auth/actions";
 
 const initialState = {
   ok: false,
   message: "",
 };
 
-export function LoginForm() {
+export function LoginForm({ accessPending = false }: { accessPending?: boolean }) {
   const [state, formAction, pending] = useActionState(requestLoginLink, initialState);
 
   return (
@@ -34,31 +34,50 @@ export function LoginForm() {
         </div>
 
         <p className="mt-5 text-sm leading-6 text-[#5f6156]">
-          Sign in with an invited work email to use the Signal workspace. Access is limited to
-          approved preview users.
+          {accessPending
+            ? "Your email is authenticated, but your application access is still pending a trusted workspace profile."
+            : "Sign in with an invited work email to use the Signal workspace. Access is limited to approved preview users."}
         </p>
 
-        <form action={formAction} className="mt-6 space-y-4">
-          <label className="block text-sm font-medium text-ink" htmlFor="email">
-            Work email
-          </label>
-          <input
-            autoComplete="email"
-            className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-olive focus:ring-2 focus:ring-lime/40"
-            id="email"
-            name="email"
-            placeholder="name@company.com"
-            required
-            type="email"
-          />
-          <button
-            className="w-full rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#2c2d27] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={pending}
-            type="submit"
-          >
-            {pending ? "Sending link..." : "Send private login link"}
-          </button>
-        </form>
+        {accessPending ? (
+          <>
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              Ask a Knowledge Admin to add your email to the application `User` table and assign
+              either the Sales or Knowledge Admin role. Sign out and try again after access is
+              assigned.
+            </div>
+            <form action={signOutAction} className="mt-4">
+              <button
+                className="w-full rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:bg-cream"
+                type="submit"
+              >
+                Sign out
+              </button>
+            </form>
+          </>
+        ) : (
+          <form action={formAction} className="mt-6 space-y-4">
+            <label className="block text-sm font-medium text-ink" htmlFor="email">
+              Work email
+            </label>
+            <input
+              autoComplete="email"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-olive focus:ring-2 focus:ring-lime/40"
+              id="email"
+              name="email"
+              placeholder="name@company.com"
+              required
+              type="email"
+            />
+            <button
+              className="w-full rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#2c2d27] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Sending link..." : "Send private login link"}
+            </button>
+          </form>
+        )}
 
         {state.message ? (
           <p

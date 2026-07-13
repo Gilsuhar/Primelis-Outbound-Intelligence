@@ -4,6 +4,7 @@ import {
   canAccessRoute,
   isAdminRoute,
   isPublicRoute,
+  resolveLoginScreenState,
   toPrivatePreviewRole,
 } from "@/lib/private-preview-auth";
 
@@ -28,5 +29,23 @@ describe("private preview auth policy", () => {
   it("maps internal sales role to the private preview role name", () => {
     expect(toPrivatePreviewRole("SALES_USER")).toBe("SALES");
     expect(toPrivatePreviewRole("KNOWLEDGE_ADMIN")).toBe("KNOWLEDGE_ADMIN");
+  });
+
+  it("shows access pending when Supabase Auth succeeds without an application user", () => {
+    expect(
+      resolveLoginScreenState({
+        hasSupabaseAuthUser: true,
+        hasApplicationUser: false,
+      }),
+    ).toBe("ACCESS_PENDING");
+  });
+
+  it("redirects only when a trusted application user exists", () => {
+    expect(
+      resolveLoginScreenState({
+        hasSupabaseAuthUser: true,
+        hasApplicationUser: true,
+      }),
+    ).toBe("SIGNED_IN");
   });
 });
