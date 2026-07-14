@@ -173,6 +173,37 @@ describe("Reply to Prospect service", () => {
     }
   });
 
+  it("answers methodology questions in plain language before pitching", async () => {
+    const { adapter } = persistence([
+      knowledge({
+        approvedText:
+          "Signal combines SERP conditions with Google Ads, Google Search Console and conversion-source data to evaluate blended paid and organic traffic.",
+      }),
+    ]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        channel: "LINKEDIN",
+        prospectMessage:
+          "How do you handle branded ads when no competitors are bidding on the brand?",
+        companyName: "Nike",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recommendedReply).toMatch(/Good question|look at it/i);
+      expect(result.data.recommendedReply).toMatch(/paid coverage|organic/i);
+      expect(result.data.recommendedReply).not.toMatch(
+        /\b(SERP|conversion-source|Google Search Console|solo|ghost|competitive)\b/i,
+      );
+      expect(result.data.recommendedReply.length).toBeLessThan(420);
+    }
+  });
+
   it("returns source references and persists generated drafts separately", async () => {
     const { adapter, persisted } = persistence([knowledge({ id: "knowledge-1" })]);
 

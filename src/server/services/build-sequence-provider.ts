@@ -65,16 +65,16 @@ function openingFor(input: BuildSequenceInput) {
   const company = input.companyName;
 
   if (!trigger) {
-    return `I thought ${company} could be worth a focused brand-search conversation.`;
+    return `I had ${company} on my list for a quick brand-search check.`;
   }
   if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `I thought ${company} could be worth a quick brand-search fit check.`;
+    return `I had ${company} on my list for a quick brand-search check.`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a possible brand-search visibility angle at ${company}.`;
+    return `I noticed a possible paid-brand question at ${company}.`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
-    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
+    return `I thought there may be a paid-brand efficiency question worth checking at ${company}.`;
   }
   if (/multi-market|governance|control/i.test(trigger)) {
     return `I thought ${company} may have a useful cross-market brand-search control question.`;
@@ -90,11 +90,11 @@ function ctaForStep(stepNumber: number, isFinal: boolean, channel: SequenceStep[
     return "If this is not useful, I can close the loop here.";
   }
   if (channel === "LINKEDIN") {
-    return stepNumber === 1 ? "Open to connecting?" : "Open to comparing notes?";
+    return stepNumber === 1 ? "Open to connecting?" : "Worth comparing notes?";
   }
   return stepNumber === 1
-    ? "Worth comparing how you decide this today?"
-    : "Open to comparing how you decide this today?";
+    ? "Worth a quick compare against how you decide this today?"
+    : "Worth comparing notes?";
 }
 
 function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: string) {
@@ -110,7 +110,7 @@ function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: s
 }
 
 function connectionRequestFor(input: BuildSequenceInput) {
-  return `Hi ${input.contactFirstName || "there"} - noticed a brand-search efficiency question at ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${input.companyName}. Open to connecting?`;
 }
 
 function fitSignalForEmail(value?: string) {
@@ -156,7 +156,7 @@ function accountContextLine(input: BuildSequenceInput) {
     return "";
   }
 
-  return `I thought ${input.companyName} could be worth a quick brand-search fit check because ${details.join(" and ")}.`;
+  return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
 }
 
 function personaPainLine(input: BuildSequenceInput) {
@@ -165,15 +165,15 @@ function personaPainLine(input: BuildSequenceInput) {
   )
     ? " For larger accounts, even small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `The hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when search results change enough to make paid coverage worth keeping.${scaleHint}`;
+  return `The risk is not running brand ads. It is not knowing which clicks are still worth buying, and which ones organic results would likely capture anyway.${scaleHint}`;
 }
 
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps compare paid brand ads with organic results and search-result changes, so the team can decide where to keep coverage and where to reduce wasted spend.";
+    return "Signal gives the team a way to compare paid coverage, organic results, and search-page changes before deciding where to keep spend and where to cut waste.";
   }
   if (/paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(fact)) {
-    return "Signal compares paid brand ads with organic results and search-result changes, so the team can make a clearer decision before changing coverage or spend.";
+    return "Signal gives the team a way to compare paid coverage, organic results, and search-page changes before deciding where to keep spend and where to cut waste.";
   }
   return fact;
 }
@@ -216,15 +216,15 @@ function bodyForPurpose({
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "A common issue is paying for brand clicks the company may already win organically.",
-      "The useful question is where paid brand search protects demand, and where it is just adding cost.",
+      "The awkward part with brand search is that it can look low-risk because performance looks good on the surface.",
+      "The harder question is whether those paid clicks are actually incremental, or whether organic results would have captured part of the demand anyway.",
       simpleSecondaryFact,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "The comparison I would suggest is simple: paid brand ads, organic results, and search-result changes in one view.",
-      "That makes it easier to decide where to keep coverage and where to reduce wasted spend.",
+      "The comparison I would suggest is practical: what happens across paid coverage, organic results, and the search page before changing spend.",
+      "That gives the team a cleaner way to decide where coverage is needed and where budget may be doing less work.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -247,7 +247,7 @@ function bodyForPurpose({
     LOW_PRESSURE_FOLLOW_UP: [
       greeting(input),
       "",
-      `I wanted to follow up without overloading the thread. The narrow question is whether paid brand coverage is worth a quick look for ${input.companyName}.`,
+      `Wanted to keep this narrow. If paid brand efficiency is on the radar at ${input.companyName}, it may be worth a quick check.`,
     ],
     BREAKUP_CLOSE_LOOP: [
       greeting(input),

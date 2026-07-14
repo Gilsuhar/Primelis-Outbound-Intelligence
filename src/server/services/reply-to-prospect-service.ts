@@ -103,7 +103,7 @@ export function classifyProspectMessage(message: string): ProspectIntent[] {
     intents.add("DECK_REQUEST");
   }
   if (
-    /\b(methodology|measure|measurement|incremental|organic|paid search|brand search)\b/.test(text)
+    /\b(methodology|measure|measurement|incremental|organic|paid search|brand search|branded ads|branded search|how do you handle)\b/.test(text)
   ) {
     intents.add("METHODOLOGY_QUESTION");
   }

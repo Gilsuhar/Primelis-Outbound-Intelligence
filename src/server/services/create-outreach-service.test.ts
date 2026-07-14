@@ -287,6 +287,10 @@ describe("Create Outreach service", () => {
       expect(result.data.recommendedMessage).not.toMatch(/\b(solo|ghost|scenario|scenarios)\b/i);
       expect(result.data.recommendedMessage).not.toMatch(/quick discovery|core icp/i);
       expect(result.data.recommendedMessage).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
+      expect(result.data.recommendedMessage).not.toMatch(
+        /\b(SERP|conversion-source|persona priority|operational control)\b/i,
+      );
+      expect(result.data.recommendedMessage.length).toBeLessThan(900);
     }
   });
 

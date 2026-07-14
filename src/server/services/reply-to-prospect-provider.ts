@@ -26,7 +26,7 @@ function openingFor(input: ReplyToProspectInput, intents: ProspectIntent[]) {
     return "Totally understood.";
   }
   if (intents.includes("DECK_REQUEST")) {
-    return "Yes, I can send a concise overview.";
+    return "Yes, happy to send it.";
   }
   if (intents.includes("TECHNICAL_QUESTION") || intents.includes("METHODOLOGY_QUESTION")) {
     return "Good question.";
@@ -54,26 +54,39 @@ function stripDisallowedCommercialTerms(text: string) {
 
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|serp|google ads|search console|conversion-source|conversion performance/i.test(fact)) {
-    return "Signal helps teams compare paid brand ads with organic results, so they can decide where paid coverage is useful and where organic demand may already be doing enough.";
+    return "The core idea is simple: compare paid brand coverage with organic results before deciding where spend is still needed.";
   }
   return fact;
 }
 
 function deckReply(input: ReplyToProspectInput, facts: string[]) {
-  const opener = input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send a concise overview.";
+  const opener = "Yes, happy to send it.";
   const context = input.companyName
-    ? `I will keep it focused on the ${input.companyName} use case rather than sending a generic product overview.`
-    : "I will keep it focused and practical rather than sending a generic product overview.";
+    ? `I will keep it focused on the ${input.companyName} angle rather than sending a generic overview.`
+    : "I will keep it focused and practical rather than sending a generic overview.";
   const usefulLine =
     facts[0] && !/not have enough/i.test(facts[0])
       ? humanizeFact(trimSentences(facts[0], 1))
-      : "The short version: it is about deciding when paid brand coverage is actually useful, and when organic results may already be doing enough.";
+      : "The short version: it helps teams decide when paid brand coverage is actually needed, and when organic results may already be doing enough.";
   const cta =
     input.channel === "LINKEDIN"
-      ? "I can send the deck here, and if useful I can also add two bullets on the part most relevant to your setup."
-      : "I can send the deck, and if useful I can add two bullets on the part most relevant to your setup.";
+      ? "I can send the deck and add two bullets on the part most relevant to your setup."
+      : "I can send the deck and add two bullets on the part most relevant to your setup.";
 
   return [opener, context, usefulLine, cta].join(" ");
+}
+
+function intentBridge(intents: ProspectIntent[]) {
+  if (intents.includes("EXISTING_VENDOR")) {
+    return "I would not frame this as replacing what you already use. The question is whether you have a clear way to decide when paid brand is still needed versus what organic already captures.";
+  }
+  if (intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")) {
+    return "I would look at it less as 'are competitors bidding?' and more as 'what would happen if we changed paid coverage?'";
+  }
+  if (intents.includes("NOT_INTERESTED")) {
+    return "No problem. The only reason I reached out is that paid brand can quietly become hard to judge from campaign metrics alone.";
+  }
+  return undefined;
 }
 
 export class DeterministicReplyProvider implements ReplyAiProvider {
@@ -104,17 +117,17 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     const companyPhrase = input.companyName ? ` for ${input.companyName}` : "";
     const cta =
       input.channel === "LINKEDIN"
-        ? "I can send the deck and add two bullets on the part most relevant to your setup."
-        : "I can send the deck or a short note with the two most relevant angles.";
+        ? "Worth comparing notes?"
+        : "Worth a quick compare against how you decide this today?";
+    const bridge = intentBridge(intents);
 
     const recommendedReply = intents.includes("DECK_REQUEST")
       ? deckReply(input, [primaryFact, secondaryFact].filter(Boolean))
       : [
           openingFor(input, intents),
+          bridge,
           primaryFact,
-          intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
-            ? "The key is not just seeing whether competitors are present. It is comparing paid coverage with what organic results would likely capture anyway."
-            : secondaryFact,
+          !bridge ? secondaryFact : "",
           cta,
         ]
           .filter(Boolean)
@@ -131,7 +144,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
             ? humanizeFact(trimSentences(facts[0], 1))
             : "I can only answer from approved Signal material.",
           input.channel === "LINKEDIN"
-            ? "Open to two tailored bullets?"
+            ? "Worth comparing notes?"
             : "Happy to send two tailored bullets.",
         ]
           .filter(Boolean)
