@@ -227,6 +227,7 @@ export function CreateOutreachClient() {
               required
               value={companyName}
             />
+            <TextField label="First name (optional)" name="contactFirstName" />
             <OptionalSelect
               label="Buyer role"
               name="contactRole"
@@ -277,7 +278,6 @@ export function CreateOutreachClient() {
                 onChange={setCompanyWebsite}
                 value={companyWebsite}
               />
-              <TextField label="First name" name="contactFirstName" />
               <OptionalSelect label="Market" name="geographyOrMarkets" options={marketOptions} />
               <OptionalSelect label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
               <OptionalSelect label="Paid-search context" name="paidSearchContext" options={paidSearchOptions} />
@@ -365,6 +365,29 @@ export function CreateOutreachClient() {
                     </p>
                   </div>
                 ) : null}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                    Based on
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {result.detectedSignals.slice(0, 5).map((signal) => (
+                      <span
+                        className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-stone-700"
+                        key={`${signal.label}-${signal.detail}`}
+                      >
+                        {signal.label}: {signal.detail}
+                      </span>
+                    ))}
+                    {result.recordsUsed.slice(0, 2).map((record) => (
+                      <span
+                        className="rounded-full border border-line bg-[#f8f5ef] px-3 py-1 text-xs font-medium text-stone-700"
+                        key={record.id}
+                      >
+                        Knowledge: {record.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
                     Recommended message

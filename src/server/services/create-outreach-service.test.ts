@@ -239,9 +239,9 @@ describe("Create Outreach service", () => {
       expect(result.data.recommendedMessage).toContain("Nike");
       expect(result.data.recommendedMessage).toContain("VP Performance Marketing");
       expect(result.data.recommendedMessage).toMatch(/brand|branded/i);
-      expect(result.data.recommendedMessage).toContain(
-        "Worth a quick compare of how you decide when branded paid search is incremental?",
-      );
+      expect(result.data.recommendedMessage).toContain("Hi there,");
+      expect(result.data.recommendedMessage).toContain("Worth comparing how you decide this today?");
+      expect(result.data.recommendedMessage).not.toMatch(/The reason this may fit|For a VP/i);
       expect(result.data.recommendedMessage).not.toMatch(/quick discovery|core icp/i);
       expect(result.data.recommendedMessage).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
     }

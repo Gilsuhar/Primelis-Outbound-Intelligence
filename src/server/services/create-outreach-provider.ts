@@ -45,7 +45,7 @@ function stripCommercialTerms(text: string) {
 }
 
 function greeting(input: CreateOutreachInput) {
-  return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi,";
+  return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
 }
 
 function cleanSelection(value?: string) {
@@ -89,7 +89,7 @@ function ctaFor(input: CreateOutreachInput) {
   if (input.channel === "LINKEDIN") {
     return "Open to comparing notes?";
   }
-  return "Worth a quick compare of how you decide when branded paid search is incremental?";
+  return "Worth comparing how you decide this today?";
 }
 
 function subjectLinesFor(input: CreateOutreachInput, angleLabel: string) {
@@ -105,14 +105,39 @@ function connectionRequestFor(input: CreateOutreachInput) {
   return `Hi ${input.contactFirstName || "there"} - noticed a potential brand-search methodology question at ${input.companyName}. Open to connecting?`;
 }
 
-function contextLine(input: CreateOutreachInput) {
+function contextDetails(input: CreateOutreachInput) {
   const details = [
     input.industry,
     cleanSelection(input.companyContext),
     input.geographyOrMarkets,
   ].filter(Boolean);
 
-  return details.length > 0 ? `The reason this may fit: ${details.join(", ")}.` : "";
+  return details;
+}
+
+function contextLine(input: CreateOutreachInput) {
+  const details = contextDetails(input);
+  if (details.length === 0) {
+    return `I thought ${input.companyName} could be worth a practical brand-search fit check.`;
+  }
+
+  return `I thought ${input.companyName} could be worth a practical brand-search fit check, especially given ${details.join(", ")}.`;
+}
+
+function personaLine(input: CreateOutreachInput) {
+  return `For ${input.contactRole}, I would keep the question practical: where is paid brand coverage actually incremental, and where can organic demand carry more of the outcome?`;
+}
+
+function humanizeProductFact(fact: string) {
+  if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
+    return "Signal helps teams separate solo, competitive, and ghost brand-search scenarios before deciding whether to keep, reduce, or pause paid coverage.";
+  }
+
+  if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
+    return "Signal compares paid brand activity with organic visibility and competitive conditions, so the team can make a clearer brand-search decision.";
+  }
+
+  return fact;
 }
 
 export class DeterministicOutreachProvider implements OutreachAiProvider {
@@ -134,22 +159,20 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const primaryFact = productFacts[0]
       ? trimSentences(productFacts[0], input.desiredLength === "DETAILED" ? 2 : 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
-    const personaPhrase = generation.personaGuidance.emphasis;
     const cta = ctaFor(input);
     const context = contextLine(input);
     const opening = triggerPhrase(input);
-    const roleLine = `For a ${input.contactRole}, the useful question is ${personaPhrase}: where brand paid search is helping, where organic demand already carries the outcome, and where competitors change the decision.`;
+    const roleLine = personaLine(input);
     const factLine =
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
         ? "Signal is used to compare paid brand activity with organic visibility and live competitive conditions before changing spend."
-        : primaryFact;
+        : humanizeProductFact(primaryFact);
 
     const recommended =
       input.channel === "EMAIL"
         ? [
             greeting(input),
             "",
-            opening,
             context,
             roleLine,
             factLine,
