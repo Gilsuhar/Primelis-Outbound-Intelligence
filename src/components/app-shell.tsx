@@ -69,13 +69,14 @@ export function AppShell({
   children: React.ReactNode;
   viewer: PublicUser | null;
 }) {
+  const language = useOutputLanguage();
+
   if (!viewer) {
     return <main className="min-h-screen bg-cream">{children}</main>;
   }
 
   const role: UserRole = viewer.role;
   const navigation = getNavigationForRole(role);
-  const language = useOutputLanguage();
 
   return (
     <div className="min-h-screen bg-white lg:flex">

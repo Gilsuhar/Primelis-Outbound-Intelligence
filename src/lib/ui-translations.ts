@@ -28,13 +28,18 @@ export type UiTextKey =
   | "home.learnSignal.description"
   | "home.createOutreach.title"
   | "home.createOutreach.description"
+  | "home.accountResearch.title"
+  | "home.accountResearch.description"
   | "home.buildSequence.title"
   | "home.buildSequence.description"
   | "home.replyToProspect.title"
   | "home.replyToProspect.description"
   | "home.doNotContact.title"
   | "home.doNotContact.description"
+  | "home.askSignalBrain.title"
+  | "home.askSignalBrain.description"
   | "home.adminShortcuts"
+  | "home.openTool"
   | "workflow.eyebrow"
   | "workflow.sourceBacked"
   | "workflow.approvedKnowledge"
@@ -197,13 +202,18 @@ const english: Record<UiTextKey, string> = {
   "home.createOutreach.title": "Create Outreach",
   "home.createOutreach.description":
     "Draft a concise email or LinkedIn message from approved Signal knowledge.",
+  "home.accountResearch.title": "Account Research",
+  "home.accountResearch.description": "Check fit, signals, and the next best workflow.",
   "home.buildSequence.title": "Build Sequence",
   "home.buildSequence.description": "Plan a short multi-step sequence with a clear angle.",
   "home.replyToProspect.title": "Reply to Prospect",
   "home.replyToProspect.description": "Answer a prospect message with source-backed guidance.",
   "home.doNotContact.title": "Check Do Not Contact",
   "home.doNotContact.description": "Search account suppression guidance before outreach.",
+  "home.askSignalBrain.title": "Ask Signal Brain",
+  "home.askSignalBrain.description": "Ask a specific question and get a safe recommendation.",
   "home.adminShortcuts": "Admin shortcuts",
+  "home.openTool": "Open",
   "workflow.eyebrow": "Sales workflow",
   "workflow.sourceBacked": "Source-backed only",
   "workflow.approvedKnowledge": "Approved knowledge only",
@@ -378,6 +388,8 @@ const french: Record<UiTextKey, string> = {
   "home.createOutreach.title": "Créer un message",
   "home.createOutreach.description":
     "Rédiger un email ou un message LinkedIn à partir de connaissances approuvées.",
+  "home.accountResearch.title": "Recherche compte",
+  "home.accountResearch.description": "Vérifier le fit, les signaux et la meilleure suite.",
   "home.buildSequence.title": "Créer une séquence",
   "home.buildSequence.description": "Préparer une courte séquence avec un angle clair.",
   "home.replyToProspect.title": "Répondre au prospect",
@@ -385,7 +397,10 @@ const french: Record<UiTextKey, string> = {
     "Répondre à un message prospect avec une réponse sourcée.",
   "home.doNotContact.title": "Vérifier Ne pas contacter",
   "home.doNotContact.description": "Vérifier les comptes à exclure avant tout outreach.",
+  "home.askSignalBrain.title": "Demander à Signal Brain",
+  "home.askSignalBrain.description": "Poser une question précise et obtenir une recommandation sûre.",
   "home.adminShortcuts": "Raccourcis admin",
+  "home.openTool": "Ouvrir",
   "workflow.eyebrow": "Workflow vente",
   "workflow.sourceBacked": "Sourcé uniquement",
   "workflow.approvedKnowledge": "Connaissance approuvée uniquement",
@@ -547,7 +562,12 @@ const portuguese: Record<UiTextKey, string> = {
   "home.description":
     "Um espaço focado para aprender Signal, qualificar contas e criar mensagens outbound para o mercado dos EUA.",
   "home.openPlaybook": "Abrir playbook Signal",
+  "home.accountResearch.title": "Pesquisa de conta",
+  "home.accountResearch.description": "Verificar fit, sinais e próxima ação.",
+  "home.askSignalBrain.title": "Perguntar ao Signal Brain",
+  "home.askSignalBrain.description": "Fazer uma pergunta específica e receber recomendação segura.",
   "home.adminShortcuts": "Atalhos admin",
+  "home.openTool": "Abrir",
   "workflow.eyebrow": "Fluxo de vendas",
   "workflow.sourceBacked": "Apenas com fontes",
   "workflow.approvedKnowledge": "Apenas conhecimento aprovado",

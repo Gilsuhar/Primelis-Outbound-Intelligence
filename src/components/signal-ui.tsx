@@ -10,20 +10,39 @@ export function SignalHero({
   title,
   description,
   action,
+  compactOnMobile = false,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   action?: { href: string; label: string };
+  compactOnMobile?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-gradient-to-br from-[#F1F3C8] via-[#E2E8A8] to-[#C8D189] p-6 shadow-signal sm:p-8">
-      <div className="max-w-3xl space-y-4">
+    <section
+      className={[
+        "overflow-hidden rounded-[20px] border border-line bg-gradient-to-br from-[#F1F3C8] via-[#E2E8A8] to-[#C8D189] shadow-signal",
+        compactOnMobile ? "p-4 sm:p-8" : "p-6 sm:p-8",
+      ].join(" ")}
+    >
+      <div className={["max-w-3xl", compactOnMobile ? "space-y-3 sm:space-y-4" : "space-y-4"].join(" ")}>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4f6624]">{eyebrow}</p>
-        <h1 className="overflow-visible pb-3 font-display text-4xl font-semibold leading-[1.22] text-ink sm:text-5xl">
+        <h1
+          className={[
+            "overflow-visible pb-2 font-display font-semibold leading-[1.16] text-ink sm:pb-3 sm:leading-[1.22]",
+            compactOnMobile ? "text-3xl sm:text-5xl" : "text-4xl sm:text-5xl",
+          ].join(" ")}
+        >
           {title}
         </h1>
-        <p className="max-w-2xl text-base leading-7 text-[#34352e]">{description}</p>
+        <p
+          className={[
+            "max-w-2xl text-[#34352e]",
+            compactOnMobile ? "text-sm leading-6 sm:text-base sm:leading-7" : "text-base leading-7",
+          ].join(" ")}
+        >
+          {description}
+        </p>
         {action ? (
           <Link className="signal-button-primary" href={action.href}>
             {action.label}

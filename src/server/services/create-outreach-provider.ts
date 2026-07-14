@@ -66,19 +66,19 @@ function triggerPhrase(input: CreateOutreachInput) {
   const company = input.companyName;
 
   if (!trigger) {
-    return `I had ${company} on my list for a quick brand-search check.`;
+    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
   }
   if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `I had ${company} on my list for a quick brand-search check.`;
+    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
   }
   if (/competitors/i.test(trigger)) {
     return `I noticed a possible paid-brand question at ${company}.`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
-    return `I thought there may be a paid-brand efficiency question worth checking at ${company}.`;
+    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
   }
   if (/multi-market|governance|control/i.test(trigger)) {
-    return `I thought ${company} may have a useful cross-market brand-search control question.`;
+    return `I thought ${company} may have a useful cross-market brand-search question.`;
   }
   if (/growth|acquisition/i.test(trigger)) {
     return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
@@ -98,6 +98,21 @@ function ctaFor(input: CreateOutreachInput) {
 
 function subjectLinesFor(input: CreateOutreachInput) {
   const company = input.companyName;
+  const role = input.contactRole.toLowerCase();
+  if (/growth|acquisition/i.test(role)) {
+    return [
+      `${company} brand search and acquisition efficiency`,
+      `Quick thought on ${company} paid brand`,
+      `Paid brand coverage at ${company}`,
+    ];
+  }
+  if (/cmo|chief/i.test(role)) {
+    return [
+      `${company} brand-search visibility`,
+      `Quick question on paid brand at ${company}`,
+      `Paid vs organic coverage at ${company}`,
+    ];
+  }
   return [
     `${company} paid brand question`,
     `Paid or organic at ${company}?`,
@@ -146,25 +161,35 @@ function contextLine(input: CreateOutreachInput) {
     return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
   }
 
-  return `I had ${input.companyName} on my list because there may be a practical brand-search efficiency question worth checking.`;
+  return `I had ${input.companyName} on my list because there may be a practical paid-brand question worth checking.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
+  const role = input.contactRole.toLowerCase();
   const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
     input.companyContext ?? "",
   )
-    ? " For larger accounts, even small changes in paid brand coverage can affect budget and reporting."
+    ? " At that scale, small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `The risk is not running brand ads. It is not knowing which clicks are still worth buying, and which ones organic results would likely capture anyway.${scaleHint}`;
+  if (/cmo|chief/i.test(role)) {
+    return `The hard part is not whether brand ads perform. It is whether the team can see where paid coverage is protecting demand, and where it may be spending on demand the brand would capture anyway.${scaleHint}`;
+  }
+  if (/growth|acquisition/i.test(role)) {
+    return `The practical question is whether paid brand is helping acquisition efficiency, or whether part of that budget is buying clicks that would have arrived through organic results anyway.${scaleHint}`;
+  }
+  if (/paid search|sem|performance/i.test(role)) {
+    return `The practical question is not whether to run brand search. It is where paid coverage protects demand, and where organic results can carry more of the outcome.${scaleHint}`;
+  }
+  return `The practical question is not whether to run brand search. It is which paid clicks are still worth buying, and which ones organic results would likely capture anyway.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal gives the team a way to compare paid coverage, organic results, and search-page changes before deciding where to keep spend and where to cut waste.";
+    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal gives the team a way to compare paid coverage, organic results, and search-page changes before deciding where to keep spend and where to cut waste.";
+    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
   }
 
   return fact;

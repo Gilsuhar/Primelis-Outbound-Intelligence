@@ -60,18 +60,15 @@ function humanizeFact(fact: string) {
 }
 
 function deckReply(input: ReplyToProspectInput, facts: string[]) {
-  const opener = "Yes, happy to send it.";
+  const opener = input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
   const context = input.companyName
-    ? `I will keep it focused on the ${input.companyName} angle rather than sending a generic overview.`
-    : "I will keep it focused and practical rather than sending a generic overview.";
+    ? `I will keep the deck focused on the ${input.companyName} angle instead of sending a generic overview.`
+    : "I will keep the deck focused and practical instead of sending a generic overview.";
   const usefulLine =
     facts[0] && !/not have enough/i.test(facts[0])
       ? humanizeFact(trimSentences(facts[0], 1))
       : "The short version: it helps teams decide when paid brand coverage is actually needed, and when organic results may already be doing enough.";
-  const cta =
-    input.channel === "LINKEDIN"
-      ? "I can send the deck and add two bullets on the part most relevant to your setup."
-      : "I can send the deck and add two bullets on the part most relevant to your setup.";
+  const cta = "I can also add two bullets on the part most relevant to your setup.";
 
   return [opener, context, usefulLine, cta].join(" ");
 }
@@ -127,7 +124,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
           openingFor(input, intents),
           bridge,
           primaryFact,
-          !bridge ? secondaryFact : "",
+          !bridge && secondaryFact ? secondaryFact : "",
           cta,
         ]
           .filter(Boolean)
@@ -136,7 +133,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     const shorterAlternative = intents.includes("DECK_REQUEST")
       ? [
           input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
-          "I will keep it focused on when paid brand coverage is useful and where it may be wasteful.",
+          "I will keep it focused on when paid brand coverage is useful and where organic may already be doing enough.",
         ].join(" ")
       : [
           openingFor(input, intents),
