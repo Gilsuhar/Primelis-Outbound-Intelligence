@@ -4,11 +4,11 @@ import { addKnowledgeSchema, createLocalSubmission } from "./add-knowledge";
 
 const validInput = {
   knowledgeType: "CLAIM",
-  title: "Development fixture submission",
-  summary: "A neutral development fixture summary.",
-  content: "This is neutral factual fixture content for review.",
+  title: "Knowledge submission",
+  summary: "A neutral review summary.",
+  content: "This is neutral factual content for review.",
   product: "Signal",
-  sourceTitle: "Development Source",
+  sourceTitle: "Signal Source",
   sourceType: "INTERNAL_DOCUMENT",
   externalUrl: "https://example.com/source",
   fileReference: "",

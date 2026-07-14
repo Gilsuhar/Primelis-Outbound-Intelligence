@@ -9,7 +9,7 @@ async function main() {
     create: {
       id: "seed-sales-user",
       email: "development.sales@example.invalid",
-      name: "Development Sales User",
+      name: "Sales User",
       role: "SALES_USER",
     },
   });
@@ -20,16 +20,16 @@ async function main() {
     create: {
       id: "seed-admin-user",
       email: "development.admin@example.invalid",
-      name: "Development Knowledge Admin",
+      name: "Knowledge Admin",
       role: "KNOWLEDGE_ADMIN",
     },
   });
 
   const product = await prisma.product.upsert({
-    where: { name: "Development Product" },
+    where: { name: "Signal" },
     update: {},
     create: {
-      name: "Development Product",
+      name: "Signal",
     },
   });
 
@@ -38,12 +38,12 @@ async function main() {
     update: {},
     create: {
       id: "seed-source-overview",
-      title: "Development Fixture Source Overview",
+      title: "Signal Product Overview",
       sourceType: "INTERNAL_DOCUMENT",
-      fileReference: "fixtures/source-overview.md",
+      fileReference: "sources/signal-product-overview.md",
       sourceDate: new Date("2026-05-10"),
-      description: "Generic source metadata for development seeding.",
-      internalNotes: "No real Primelis, Signal, customer, pricing, or competitor data.",
+      description: "Source metadata for approved Signal product knowledge.",
+      internalNotes: "Internal review source.",
       approvalStatus: "APPROVED",
     },
   });
@@ -55,9 +55,9 @@ async function main() {
       id: "seed-source-notes",
       title: "Example SaaS Company Discovery Notes",
       sourceType: "CUSTOMER_CONVERSATION",
-      fileReference: "fixtures/example-saas-notes.md",
+      fileReference: "sources/example-saas-notes.md",
       sourceDate: new Date("2026-05-22"),
-      description: "Neutral source-style fixture for development only.",
+      description: "Example customer-discovery style source for review workflows.",
       internalNotes: "No real customer information.",
       approvalStatus: "APPROVED",
     },
@@ -68,14 +68,14 @@ async function main() {
     update: {},
     create: {
       id: "seed-approved-claim",
-      exactText: "Development fixture claim about a generic workflow.",
-      approvedWording: "Approved development wording for a generic workflow.",
+      exactText: "Signal helps structure outbound decisions around approved product knowledge and review status.",
+      approvedWording: "Signal helps sellers use approved product knowledge when preparing outbound messages.",
       approvalStatus: "APPROVED",
       productId: product.id,
       allowedChannels: ["EMAIL", "LINKEDIN"],
       reviewOwnerId: adminUser.id,
       lastReviewedAt: new Date("2026-06-18"),
-      internalNotes: "Development fixture only.",
+      internalNotes: "Approved internal workflow claim.",
       sources: {
         connect: [{ id: sourceOverview.id }, { id: sourceNotes.id }],
       },
@@ -87,7 +87,7 @@ async function main() {
     update: {},
     create: {
       id: "seed-missing-source-claim",
-      exactText: "Development fixture claim intentionally missing a source.",
+      exactText: "Claim awaiting source support before approval.",
       approvalStatus: "NEEDS_REVIEW",
       productId: product.id,
       allowedChannels: ["INTERNAL"],
@@ -101,8 +101,8 @@ async function main() {
     update: {},
     create: {
       id: "seed-restricted-claim",
-      exactText: "Restricted development fixture claim for internal review only.",
-      approvedWording: "Restricted development wording for internal review only.",
+      exactText: "Restricted claim for internal review only.",
+      approvedWording: "Restricted wording for internal review only.",
       approvalStatus: "RESTRICTED",
       productId: product.id,
       allowedChannels: ["INTERNAL"],
@@ -120,9 +120,9 @@ async function main() {
     create: {
       id: "seed-case-study",
       companyName: "Example SaaS Company",
-      title: "Development Case Study Shell",
+      title: "Case Study Shell",
       approvalStatus: "APPROVED",
-      approvedExternalWording: "Approved generic case-study shell for development only.",
+      approvedExternalWording: "Approved case-study shell for internal demonstration only.",
       usageRestrictions: "No real metrics or customer claims.",
       sources: {
         connect: [{ id: sourceOverview.id }],
@@ -136,13 +136,13 @@ async function main() {
     create: {
       id: "seed-case-study-metric",
       caseStudyId: caseStudy.id,
-      metricName: "Development Metric",
+      metricName: "Example Metric",
       value: "N/A",
-      unit: "fixture",
+      unit: "example",
       direction: "UNKNOWN",
       comparison: "No real result data.",
-      timePeriod: "Development only",
-      approvedWording: "Development metric placeholder.",
+      timePeriod: "Example period",
+      approvedWording: "Example metric placeholder.",
     },
   });
 
@@ -152,12 +152,12 @@ async function main() {
     create: {
       id: "seed-submission-needs-review",
       authorId: salesUser.id,
-      title: "Development Knowledge Submission",
-      submittedText: "Neutral development fixture content submitted for review.",
+      title: "Knowledge Submission",
+      submittedText: "Neutral content submitted for review.",
       suggestedType: "CLAIM",
       approvalStatus: "NEEDS_REVIEW",
       sourceNotes: "Generic source notes.",
-      sourceTitle: "Development Fixture Source Overview",
+      sourceTitle: "Signal Product Overview",
       sourceType: "INTERNAL_DOCUMENT",
       channels: ["EMAIL"],
       originType: "MANUAL",
@@ -177,8 +177,8 @@ async function main() {
       action: "Approved",
       fromStatus: "NEEDS_REVIEW",
       toStatus: "APPROVED",
-      reason: "Development fixture review history.",
-      notes: "Development fixture review history.",
+      reason: "Review history.",
+      notes: "Review history.",
       claimId: "seed-approved-claim",
     },
   });
@@ -190,8 +190,8 @@ async function main() {
       id: "seed-generated-draft",
       userId: salesUser.id,
       workflow: "CREATE_OUTREACH",
-      draftContent: "Development generated draft placeholder content.",
-      promptSnapshot: "Development fixture prompt snapshot. No AI integration.",
+      draftContent: "Generated draft placeholder content.",
+      promptSnapshot: "Draft prompt snapshot.",
     },
   });
 }

@@ -34,7 +34,7 @@ export function submitGeneratedDraftForReview({
     approvalStatus: "NEEDS_REVIEW",
     sourceIds,
     submittedAt: new Date().toISOString(),
-    summary: "Submission created from a generated draft fixture.",
+    summary: "Submission created from a generated draft.",
     content: draft.draftContent,
     channels: ["INTERNAL"],
     personas: [],

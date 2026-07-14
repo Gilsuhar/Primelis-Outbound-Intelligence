@@ -12,12 +12,12 @@ export function getTrustedRoleContext(env: NodeJS.ProcessEnv = process.env): Tru
   return role === "KNOWLEDGE_ADMIN"
     ? {
         id: "seed-admin-user",
-        name: "Development Knowledge Admin",
+        name: "Knowledge Admin",
         role,
       }
     : {
         id: "seed-sales-user",
-        name: "Development Sales User",
+        name: "Sales User",
         role,
       };
 }

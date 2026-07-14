@@ -84,7 +84,7 @@ function mapKnowledgeItem(row: Row): KnowledgeItemFixture {
     lastReviewedDate: asDateString(row.lastReviewedAt),
     summary: asOptionalString(row.summary) ?? "",
     claimId: asOptionalString(row.claimId),
-    fixtureLabel: "Database record",
+    fixtureLabel: "Saved record",
   };
 }
 
