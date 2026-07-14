@@ -106,27 +106,50 @@ function connectionRequestFor(input: CreateOutreachInput) {
   return `Hi ${input.contactFirstName || "there"} - noticed a potential brand-search methodology question at ${input.companyName}. Open to connecting?`;
 }
 
-function contextDetails(input: CreateOutreachInput) {
-  const details = [
-    input.industry,
-    cleanSelection(input.companyContext),
-    input.geographyOrMarkets,
-  ].filter(Boolean);
+function fitSignalForEmail(value?: string) {
+  const clean = cleanSelection(value);
+  if (!clean) {
+    return undefined;
+  }
+  if (/\$|revenue|employees|enterprise|multi-market|multi-country/i.test(clean)) {
+    return "enough scale and complexity for brand-search decisions to matter";
+  }
+  if (/monthly|spend/i.test(clean)) {
+    return "enough branded-search activity for efficiency gains to matter";
+  }
+  if (/brand demand|paid-search owner/i.test(clean)) {
+    return "likely brand demand and a clear paid-search owner";
+  }
+  if (/validate brand demand|not enough signal|unknown/i.test(clean)) {
+    return "a brand-demand question worth validating before any pitch";
+  }
+  return clean.toLowerCase();
+}
 
-  return details;
+function contextDetails(input: CreateOutreachInput) {
+  return [
+    input.industry ? `the ${input.industry} category` : undefined,
+    fitSignalForEmail(input.companyContext),
+    input.geographyOrMarkets ? `${input.geographyOrMarkets} market context` : undefined,
+  ].filter(Boolean);
 }
 
 function contextLine(input: CreateOutreachInput) {
   const details = contextDetails(input);
   if (details.length === 0) {
-    return `I thought ${input.companyName} could be worth a practical brand-search fit check.`;
+    return `I had ${input.companyName} on my list for a practical brand-search fit check.`;
   }
 
-  return `I thought ${input.companyName} could be worth a practical brand-search fit check, especially given ${details.join(", ")}.`;
+  return `I had ${input.companyName} on my list because ${details.join(" and ")} can make brand-search decisions more operational than they look from the outside.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
-  return `For ${input.contactRole}, I would keep the question practical: where is paid brand coverage actually incremental, and where can organic demand carry more of the outcome?`;
+  const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
+    input.companyContext ?? "",
+  )
+    ? " At that level, small brand-search decisions can turn into real budget and measurement questions."
+    : "";
+  return `For ${input.contactRole}, the pain is usually not launching another report. It is knowing when paid brand coverage is protecting demand, when it is incremental, and when organic demand can carry more of the outcome.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
@@ -135,7 +158,7 @@ function humanizeProductFact(fact: string) {
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal compares paid brand activity with organic visibility and competitive conditions, so the team can make a clearer brand-search decision.";
+    return "Signal compares paid brand activity with organic visibility and competitive conditions, so the team can make a clearer decision before changing coverage or spend.";
   }
 
   return fact;

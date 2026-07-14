@@ -112,6 +112,40 @@ function connectionRequestFor(input: BuildSequenceInput) {
   return `Hi ${input.contactFirstName || "there"} - noticed a reason to compare brand-search methodology at ${input.companyName}. Open to connecting?`;
 }
 
+function fitSignalForEmail(value?: string) {
+  const clean = cleanSelection(value);
+  if (!clean) {
+    return undefined;
+  }
+  if (/\$|revenue|employees|enterprise|multi-market|multi-country/i.test(clean)) {
+    return "enough scale and complexity for brand-search decisions to matter";
+  }
+  if (/monthly|spend/i.test(clean)) {
+    return "enough branded-search activity for efficiency gains to matter";
+  }
+  if (/brand demand|paid-search owner/i.test(clean)) {
+    return "likely brand demand and a clear paid-search owner";
+  }
+  if (/validate brand demand|not enough signal|unknown/i.test(clean)) {
+    return "a brand-demand question worth validating before any pitch";
+  }
+  return clean.toLowerCase();
+}
+
+function accountContextLine(input: BuildSequenceInput) {
+  const details = [
+    input.industry ? `the ${input.industry} category` : undefined,
+    fitSignalForEmail(input.companyContext),
+    input.geographyOrMarkets ? `${input.geographyOrMarkets} market context` : undefined,
+  ].filter(Boolean);
+
+  if (details.length === 0) {
+    return "";
+  }
+
+  return `I had ${input.companyName} on my list because ${details.join(" and ")} can make brand-search decisions more operational than they look from the outside.`;
+}
+
 function bodyForPurpose({
   input,
   purpose,
@@ -130,21 +164,14 @@ function bodyForPurpose({
   const trigger = input.observedTrigger.trim();
   const opening = openingFor(input);
   const persona = input.contactRole;
-  const context = [
-    input.industry,
-    cleanSelection(input.companyContext),
-    input.geographyOrMarkets,
-  ]
-    .filter(Boolean)
-    .join("; ");
+  const context = accountContextLine(input);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      opening,
-      context ? `The reason this may fit: ${context}.` : "",
+      context || opening,
       primaryFact,
-      `For a ${persona}, the practical question is whether the methodology gives enough confidence to decide where brand spend is actually needed.`,
+      `For ${persona}, the practical question is whether the methodology gives enough confidence to decide where brand spend is actually needed.`,
     ],
     PROBLEM_FRAMING: [
       greeting(input),

@@ -253,6 +253,29 @@ describe("Create Outreach service", () => {
     }
   });
 
+  it("uses ICP dropdown values as reasoning without quoting validation labels", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateCreateOutreach(
+      {
+        ...baseInput,
+        companyName: "Nike",
+        contactRole: "VP Performance Marketing",
+        industry: "Fashion and Luxury",
+        companyContext: "$50M+ revenue or 200+ employees",
+        observedTrigger: "Validate branded-search activity",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const publicCopy = `${result.data.recommendedMessage}\n${result.data.shorterVersion}`;
+      expect(publicCopy).toMatch(/scale|complexity|brand-search/i);
+      expect(publicCopy).not.toMatch(/\$50M|200\+ employees|revenue/i);
+    }
+  });
+
   it("persists generated outreach separately as a draft", async () => {
     const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
 
