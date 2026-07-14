@@ -8,6 +8,7 @@ import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refineme
 import { industries, personas } from "@/features/playbook/playbook-content";
 import type {
   CreateOutreachResult,
+  OutreachEmailSection,
   OutreachChannel,
   OutreachLength,
   OutreachMessageType,
@@ -71,6 +72,67 @@ function inferDomain(company: string) {
     .split(/\s+/)[0];
 
   return cleaned ? `${cleaned}.com` : "";
+}
+
+function variantIndex(current: number, length: number) {
+  return (current + 1) % length;
+}
+
+function subjectLineVariants(result: CreateOutreachResult, company: string) {
+  const angle = result.selectedAngle.replaceAll("_", " ").toLowerCase();
+  return [
+    result.subjectLines,
+    [
+      `${company} paid + organic question`,
+      `Brand search at ${company}`,
+      `${company}: where paid brand is incremental`,
+    ],
+    [
+      `Quick Signal fit check for ${company}`,
+      `${company} brand coverage`,
+      `${company} and ${angle}`,
+    ],
+  ].filter((group) => group.length > 0);
+}
+
+function sectionVariants(section: OutreachEmailSection, result: CreateOutreachResult) {
+  const companySignal =
+    result.detectedSignals.find((signal) => /company|website/i.test(signal.label))?.detail ??
+    "this account";
+  const persona = result.personaGuidance.persona;
+
+  if (section.label === "INTRO") {
+    return [
+      section.text,
+      section.text.replace("I thought", "I noticed").replace("could be worth", "may be worth"),
+      section.text.replace(
+        /I thought .*?could be worth/i,
+        `I had ${companySignal} on my list as a company that could be worth`,
+      ),
+    ];
+  }
+
+  if (section.label === "PAIN POINT") {
+    return [
+      section.text,
+      `The practical risk for ${persona} is overpaying for demand the brand may already be capturing organically, especially when competitor pressure changes by market.`,
+      `The useful question is not whether branded search works. It is where it is incremental, where it protects demand, and where it creates avoidable spend.`,
+    ];
+  }
+
+  if (section.label === "SOLUTION") {
+    return [
+      section.text,
+      "Signal brings paid brand activity, organic visibility, and competitive pressure into one view so the team can decide where to appear, reduce, or stay out.",
+      "Signal is designed to make the brand-search decision more operational: compare the paid result against organic demand and live SERP conditions before changing spend.",
+    ];
+  }
+
+  return [
+    section.text,
+    "Worth a quick look at how you make that decision today?",
+    "Open to comparing notes on your current brand-search approach?",
+  ];
 }
 
 function OptionalSelect({
@@ -154,7 +216,21 @@ export function CreateOutreachClient() {
   const [result, setResult] = useState<CreateOutreachResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [sectionDrafts, setSectionDrafts] = useState<Partial<Record<OutreachEmailSection["label"], string>>>({});
+  const [sectionVariantIndexes, setSectionVariantIndexes] = useState<
+    Partial<Record<OutreachEmailSection["label"], number>>
+  >({});
+  const [subjectDrafts, setSubjectDrafts] = useState<string[] | null>(null);
+  const [subjectVariantIndex, setSubjectVariantIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
+
+  const displayedSections =
+    result?.emailSections.map((section) => ({
+      ...section,
+      text: sectionDrafts[section.label] ?? section.text,
+    })) ?? [];
+  const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
+  const displayedFullEmail = displayedSections.map((section) => section.text).join("\n\n");
 
   async function copyText(key: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -190,7 +266,31 @@ export function CreateOutreachClient() {
       }
 
       setResult(response.data);
+      setSectionDrafts({});
+      setSectionVariantIndexes({});
+      setSubjectDrafts(null);
+      setSubjectVariantIndex(0);
     });
+  }
+
+  function regenerateSection(section: OutreachEmailSection) {
+    if (!result) {
+      return;
+    }
+    const variants = sectionVariants(section, result);
+    const nextIndex = variantIndex(sectionVariantIndexes[section.label] ?? 0, variants.length);
+    setSectionVariantIndexes((current) => ({ ...current, [section.label]: nextIndex }));
+    setSectionDrafts((current) => ({ ...current, [section.label]: variants[nextIndex] }));
+  }
+
+  function regenerateSubjects() {
+    if (!result) {
+      return;
+    }
+    const variants = subjectLineVariants(result, companyName || "this account");
+    const nextIndex = variantIndex(subjectVariantIndex, variants.length);
+    setSubjectVariantIndex(nextIndex);
+    setSubjectDrafts(variants[nextIndex]);
   }
 
   return (
@@ -233,6 +333,12 @@ export function CreateOutreachClient() {
               }}
               required
               value={companyName}
+            />
+            <TextField
+              label="Website"
+              name="companyWebsite"
+              onChange={setCompanyWebsite}
+              value={companyWebsite}
             />
             <TextField label="First name (optional)" name="contactFirstName" />
             <OptionalSelect
@@ -279,12 +385,6 @@ export function CreateOutreachClient() {
               Advanced optional details
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <TextField
-                label="Website"
-                name="companyWebsite"
-                onChange={setCompanyWebsite}
-                value={companyWebsite}
-              />
               <OptionalSelect label="Market" name="geographyOrMarkets" options={marketOptions} />
               <OptionalSelect label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
               <OptionalSelect label="Paid-search context" name="paidSearchContext" options={paidSearchOptions} />
@@ -347,17 +447,38 @@ export function CreateOutreachClient() {
               <div className="space-y-4">
                 {result.subjectLines.length > 0 ? (
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                      Subject lines
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                        Subject lines
+                      </p>
+                      <button
+                        className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                        onClick={regenerateSubjects}
+                        type="button"
+                      >
+                        Generate
+                      </button>
+                    </div>
                     <div className="mt-2 space-y-2">
-                      {result.subjectLines.map((subject) => (
-                        <p
-                          className="rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink"
+                      {displayedSubjectLines.map((subject) => (
+                        <div
+                          className="flex items-center justify-between gap-3 rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink"
                           key={subject}
                         >
-                          {subject}
-                        </p>
+                          <span>{subject}</span>
+                          <button
+                            className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                            onClick={() => copyText(subject, subject)}
+                            type="button"
+                          >
+                            {copiedKey === subject ? (
+                              <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                            )}
+                            {copiedKey === subject ? "Copied" : "Copy"}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -404,7 +525,7 @@ export function CreateOutreachClient() {
                       <span className="text-sm font-semibold text-ink">Full email</span>
                       <button
                         className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                        onClick={() => copyText("full-email", result.recommendedMessage)}
+                        onClick={() => copyText("full-email", displayedFullEmail)}
                         type="button"
                       >
                         {copiedKey === "full-email" ? (
@@ -416,26 +537,38 @@ export function CreateOutreachClient() {
                       </button>
                     </div>
                     <div className="divide-y divide-line">
-                      {result.emailSections.map((section) => (
-                        <div className="grid gap-3 p-3 sm:grid-cols-[8rem_1fr_auto]" key={section.label}>
+                      {displayedSections.map((section) => (
+                        <div
+                          className="grid gap-3 p-3 sm:grid-cols-[8rem_1fr_auto]"
+                          key={section.label}
+                        >
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
                             {section.label.replace("PAIN POINT", "PAIN")}
                           </p>
                           <p className="whitespace-pre-line text-sm leading-6 text-ink">
                             {section.text}
                           </p>
-                          <button
-                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                            onClick={() => copyText(section.label, section.text)}
-                            type="button"
-                          >
-                            {copiedKey === section.label ? (
-                              <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                            ) : (
-                              <Copy aria-hidden="true" className="h-3.5 w-3.5" />
-                            )}
-                            {copiedKey === section.label ? "Copied" : "Copy"}
-                          </button>
+                          <div className="flex flex-wrap gap-2 sm:justify-end">
+                            <button
+                              className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                              onClick={() => regenerateSection(section)}
+                              type="button"
+                            >
+                              Generate
+                            </button>
+                            <button
+                              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                              onClick={() => copyText(section.label, section.text)}
+                              type="button"
+                            >
+                              {copiedKey === section.label ? (
+                                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                              ) : (
+                                <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                              )}
+                              {copiedKey === section.label ? "Copied" : "Copy"}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
