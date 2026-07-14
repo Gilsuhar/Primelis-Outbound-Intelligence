@@ -564,15 +564,38 @@ export function CreateOutreachClient() {
                     <div className="divide-y divide-line">
                       {displayedSections.map((section) => (
                         <div
-                          className="grid gap-3 p-3 sm:grid-cols-[8rem_1fr_auto]"
+                          className="space-y-3 p-3"
                           key={section.label}
                         >
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
-                            {section.label.replace("PAIN POINT", "PAIN")}
-                          </p>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
+                              {section.label.replace("PAIN POINT", "PAIN")}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                                onClick={() => regenerateSection(section)}
+                                type="button"
+                              >
+                                {t("workflow.generate")}
+                              </button>
+                              <button
+                                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                                onClick={() => copyText(section.label, section.text)}
+                                type="button"
+                              >
+                                {copiedKey === section.label ? (
+                                  <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                                )}
+                                {copiedKey === section.label ? t("workflow.copied") : t("workflow.copy")}
+                              </button>
+                            </div>
+                          </div>
                           <textarea
                             aria-label={`${section.label} text`}
-                            className="min-h-28 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-ink"
+                            className="min-h-36 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-ink"
                             onChange={(event) =>
                               setSectionDrafts((current) => ({
                                 ...current,
@@ -581,27 +604,6 @@ export function CreateOutreachClient() {
                             }
                             value={section.text}
                           />
-                          <div className="flex flex-wrap gap-2 sm:justify-end">
-                            <button
-                              className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                              onClick={() => regenerateSection(section)}
-                              type="button"
-                            >
-                              {t("workflow.generate")}
-                            </button>
-                            <button
-                              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                              onClick={() => copyText(section.label, section.text)}
-                              type="button"
-                            >
-                              {copiedKey === section.label ? (
-                                <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                              ) : (
-                                <Copy aria-hidden="true" className="h-3.5 w-3.5" />
-                              )}
-                              {copiedKey === section.label ? t("workflow.copied") : t("workflow.copy")}
-                            </button>
-                          </div>
                         </div>
                       ))}
                     </div>
