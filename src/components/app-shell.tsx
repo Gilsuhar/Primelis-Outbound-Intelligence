@@ -10,7 +10,8 @@ import type { UserRole } from "@/features/knowledge/types";
 import { signOutAction } from "@/app/auth/actions";
 import type { PublicUser } from "@/lib/private-preview-auth";
 import { getNavigationForRole, adminNavigation, salesNavigation } from "@/lib/navigation";
-import { LanguageSelector } from "@/components/language-selector";
+import { LanguageSelector, useOutputLanguage } from "@/components/language-selector";
+import { translateNavigationLabel, translateUi } from "@/lib/ui-translations";
 
 type NavigationItem = (typeof salesNavigation | typeof adminNavigation)[number];
 
@@ -18,10 +19,12 @@ function NavigationSection({
   label,
   items,
   muted = false,
+  language,
 }: {
   label: string;
   items: readonly NavigationItem[];
   muted?: boolean;
+  language: ReturnType<typeof useOutputLanguage>;
 }) {
   const pathname = usePathname();
 
@@ -50,7 +53,7 @@ function NavigationSection({
               key={item.href}
             >
               <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
+              <span>{translateNavigationLabel(item.label, language)}</span>
             </Link>
           );
         })}
@@ -72,6 +75,7 @@ export function AppShell({
 
   const role: UserRole = viewer.role;
   const navigation = getNavigationForRole(role);
+  const language = useOutputLanguage();
 
   return (
     <div className="min-h-screen bg-white lg:flex">
@@ -96,7 +100,9 @@ export function AppShell({
           <div className="hidden flex-col gap-2 sm:flex lg:mt-5">
             <div className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
               <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
-              {role === "KNOWLEDGE_ADMIN" ? "Admin view" : "Sales view"}
+              {role === "KNOWLEDGE_ADMIN"
+                ? translateUi("shell.adminView", language)
+                : translateUi("shell.salesView", language)}
             </div>
             <div className="flex items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-[#6f6d5f]">
               <span className="min-w-0 truncate">{viewer.email}</span>
@@ -114,9 +120,18 @@ export function AppShell({
         </div>
 
         <div className="mx-auto mt-4 max-w-6xl space-y-6 lg:mt-8">
-          <NavigationSection label="Sales" items={navigation.sales} />
+          <NavigationSection
+            label={translateUi("nav.sales", language)}
+            items={navigation.sales}
+            language={language}
+          />
           {navigation.admin.length > 0 ? (
-            <NavigationSection label="Admin" items={navigation.admin} muted />
+            <NavigationSection
+              label={translateUi("nav.admin", language)}
+              items={navigation.admin}
+              language={language}
+              muted
+            />
           ) : null}
         </div>
       </aside>

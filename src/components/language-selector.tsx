@@ -8,6 +8,7 @@ import {
   normalizeOutputLanguage,
   type OutputLanguage,
 } from "@/lib/output-language";
+import { translateUi } from "@/lib/ui-translations";
 
 const storageKey = "primelis-output-language";
 const languageOptions: Array<{ value: OutputLanguage; country: string; label: string }> = [
@@ -88,7 +89,9 @@ export function LanguageSelector() {
         type="button"
       >
         <Globe2 aria-hidden="true" className="h-4 w-4 text-olive" />
-        <span className="hidden text-[#6f6d5f] sm:inline">Output language</span>
+        <span className="hidden text-[#6f6d5f] sm:inline">
+          {translateUi("language.selector", language)}
+        </span>
         <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-olive">
           {selected.country}
         </span>
