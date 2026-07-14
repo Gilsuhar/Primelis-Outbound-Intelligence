@@ -140,6 +140,39 @@ describe("Reply to Prospect service", () => {
     }
   });
 
+  it("answers LinkedIn deck requests directly without product jargon", async () => {
+    const { adapter } = persistence([
+      knowledge({
+        approvedText:
+          "Solo: the brand is the only advertiser and Signal may pause or reduce bids. Competitive: competitors are present and Signal seeks efficient CPC. Signal combines SERP conditions with Google Ads, Google Search Console and conversion-source data.",
+      }),
+    ]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        channel: "LINKEDIN",
+        prospectMessage:
+          "Do you have a deck I can checkout?",
+        companyName: "Nike",
+        contactRole: "Head of Paid Search",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("DECK_REQUEST");
+      expect(result.data.recommendedReply).toMatch(/Yes, happy to send/i);
+      expect(result.data.recommendedReply).toMatch(/deck/i);
+      expect(result.data.recommendedReply).not.toMatch(
+        /\b(Solo|Competitive|Ghost|SERP|conversion-source|Google Search Console|reduce bids)\b/i,
+      );
+      expect(result.data.recommendedReply.length).toBeLessThan(420);
+    }
+  });
+
   it("returns source references and persists generated drafts separately", async () => {
     const { adapter, persisted } = persistence([knowledge({ id: "knowledge-1" })]);
 

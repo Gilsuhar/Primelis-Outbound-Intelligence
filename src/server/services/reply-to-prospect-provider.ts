@@ -51,6 +51,30 @@ function stripDisallowedCommercialTerms(text: string) {
   );
 }
 
+function humanizeFact(fact: string) {
+  if (/solo|competitive|ghost|pause|reduce bids|serp|google ads|search console|conversion-source|conversion performance/i.test(fact)) {
+    return "Signal helps teams compare paid brand ads with organic results, so they can decide where paid coverage is useful and where it may be wasteful.";
+  }
+  return fact;
+}
+
+function deckReply(input: ReplyToProspectInput, facts: string[]) {
+  const opener = input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send a concise overview.";
+  const context = input.companyName
+    ? `I will keep it focused on the ${input.companyName} use case rather than sending a generic product overview.`
+    : "I will keep it focused and practical rather than sending a generic product overview.";
+  const usefulLine =
+    facts[0] && !/not have enough/i.test(facts[0])
+      ? humanizeFact(trimSentences(facts[0], 1))
+      : "The short version: it is about deciding when paid brand coverage is actually useful, and when organic results may already be doing enough.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "I can send the deck here, and if useful I can also add two bullets on the part most relevant to your setup."
+      : "I can send the deck, and if useful I can add two bullets on the part most relevant to your setup.";
+
+  return [opener, context, usefulLine, cta].join(" ");
+}
+
 export class DeterministicReplyProvider implements ReplyAiProvider {
   metadata: ReplyProviderMetadata = {
     providerName: "deterministic-development",
@@ -71,10 +95,10 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
       .filter((record) => record.type === "MESSAGE_EXAMPLE")
       .map((record) => record.approvedText);
     const primaryFact = facts[0]
-      ? trimSentences(facts[0], input.desiredLength === "DETAILED" ? 3 : 2)
+      ? humanizeFact(trimSentences(facts[0], input.desiredLength === "DETAILED" ? 3 : 2))
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
     const secondaryFact = facts[1]
-      ? trimSentences(stripDisallowedCommercialTerms(facts[1]), 1)
+      ? humanizeFact(trimSentences(stripDisallowedCommercialTerms(facts[1]), 1))
       : "";
     const companyPhrase = input.companyName ? ` for ${input.companyName}` : "";
     const cta =
@@ -82,19 +106,26 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
         ? "Would it be useful if I sent two bullets tailored to your setup?"
         : "Would it be useful if I sent a short note with the two most relevant angles?";
 
-    const recommendedReply = [openingFor(input, intents), primaryFact, secondaryFact, cta]
-      .filter(Boolean)
-      .join(" ");
+    const recommendedReply = intents.includes("DECK_REQUEST")
+      ? deckReply(input, [primaryFact, secondaryFact].filter(Boolean))
+      : [openingFor(input, intents), primaryFact, secondaryFact, cta].filter(Boolean).join(" ");
 
-    const shorterAlternative = [
-      openingFor(input, intents),
-      facts[0] ? trimSentences(facts[0], 1) : "I can only answer from approved Signal material.",
-      input.channel === "LINKEDIN"
-        ? "Open to two tailored bullets?"
-        : "Happy to send two tailored bullets.",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const shorterAlternative = intents.includes("DECK_REQUEST")
+      ? [
+          input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
+          "I will keep it focused on when paid brand coverage is useful and where it may be wasteful.",
+        ].join(" ")
+      : [
+          openingFor(input, intents),
+          facts[0]
+            ? humanizeFact(trimSentences(facts[0], 1))
+            : "I can only answer from approved Signal material.",
+          input.channel === "LINKEDIN"
+            ? "Open to two tailored bullets?"
+            : "Happy to send two tailored bullets.",
+        ]
+          .filter(Boolean)
+          .join(" ");
 
     const strategyParts = [
       `Detected ${intents.map((intent) => intent.toLowerCase().replaceAll("_", " ")).join(", ")}${companyPhrase}.`,
@@ -127,6 +158,9 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
     async generate(request) {
       const fallback = new DeterministicReplyProvider();
       const result = await fallback.generate(request);
+      if (request.intents.includes("DECK_REQUEST")) {
+        return result;
+      }
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
