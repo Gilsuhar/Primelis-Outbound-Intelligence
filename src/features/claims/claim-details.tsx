@@ -37,7 +37,7 @@ export function ClaimDetails({
           </p>
           <h1 className="mt-3 text-3xl font-semibold text-ink">Claim not found</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            No development fixture claim exists for this ID.
+            No claim exists for this ID.
           </p>
         </section>
       </div>
@@ -61,7 +61,7 @@ export function ClaimDetails({
           <StatusBadge status={claim.approvalStatus} />
         </div>
         <span className="inline-flex rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-          Development fixture data only
+          Review before use
         </span>
       </section>
 

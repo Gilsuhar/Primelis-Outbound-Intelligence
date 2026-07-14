@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 import {
-  AlertTriangle,
-  CheckCircle2,
   FileText,
   MessageSquareReply,
   ShieldCheck,
@@ -283,18 +281,17 @@ export function ReplyToProspectClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Generated replies will appear here with the records and source references used.
+                Paste the prospect message and generate a reply you can edit and send.
               </p>
             )}
           </article>
 
           {result ? (
             <>
-              <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-[#32795d]" />
-                  <h2 className="text-lg font-semibold text-ink">Strategy and evidence</h2>
-                </div>
+              <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                <summary className="cursor-pointer text-lg font-semibold text-ink">
+                  Strategy and evidence
+                </summary>
                 <p className="text-sm leading-6 text-stone-700">{result.responseStrategy}</p>
                 <div className="mt-4 space-y-3">
                   {result.recordsUsed.map((record) => (
@@ -306,13 +303,12 @@ export function ReplyToProspectClient() {
                     </div>
                   ))}
                 </div>
-              </article>
+              </details>
 
-              <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <AlertTriangle aria-hidden="true" className="h-5 w-5 text-[#9a6a20]" />
-                  <h2 className="text-lg font-semibold text-ink">Safety and sources</h2>
-                </div>
+              <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                <summary className="cursor-pointer text-lg font-semibold text-ink">
+                  Safety and sources
+                </summary>
                 <div className="space-y-3">
                   {result.safetyWarnings.length > 0 ? (
                     result.safetyWarnings.map((warning) => (
@@ -335,7 +331,7 @@ export function ReplyToProspectClient() {
                     ))}
                   </div>
                 </div>
-              </article>
+              </details>
 
               <DraftRefinementPanel draftId={result.draftId} workflow="REPLY_TO_PROSPECT" />
             </>

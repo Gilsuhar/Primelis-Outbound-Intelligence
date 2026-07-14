@@ -4,7 +4,7 @@ import React from "react";
 import { useMemo, useState } from "react";
 import { Ban, Search } from "lucide-react";
 
-import { SectionHeader, SignalHero } from "@/components/signal-ui";
+import { SectionHeader } from "@/components/signal-ui";
 import { searchDoNotContactRecords } from "./do-not-contact-policy";
 import type { DoNotContactRecord } from "./types";
 
@@ -23,12 +23,17 @@ export function DoNotContactClient({ records }: { records: DoNotContactRecord[] 
   const results = useMemo(() => searchDoNotContactRecords(records, query), [query, records]);
 
   return (
-    <div className="space-y-8">
-      <SignalHero
-        description="Search company or domain before starting outreach. This phase is a lightweight suppression-list workspace with no CRM connection and no external data collection."
-        eyebrow="Sales safety"
-        title="Check Do Not Contact before outreach."
-      />
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-olive">
+          Sales safety
+        </p>
+        <h1 className="text-3xl font-semibold text-ink">Do Not Contact check</h1>
+        <p className="max-w-2xl text-sm leading-6 text-[#6f6d5f]">
+          Search the company or domain before outreach. If there is a match, do not send until it is
+          reviewed.
+        </p>
+      </section>
 
       <section className="space-y-4">
         <SectionHeader
@@ -56,8 +61,8 @@ export function DoNotContactClient({ records }: { records: DoNotContactRecord[] 
           </span>
           <h2 className="mt-4 text-xl font-semibold text-ink">No suppression records yet</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#6f6d5f]">
-            Import or connect real suppression data before relying on this list operationally. Do
-            not seed fake commercial accounts or infer account ownership.
+            No blocked accounts have been imported yet. Add real suppression data before using this
+            as the final approval step.
           </p>
         </section>
       ) : (

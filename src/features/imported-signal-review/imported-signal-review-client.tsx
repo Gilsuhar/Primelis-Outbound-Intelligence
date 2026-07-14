@@ -37,13 +37,13 @@ import { formatEnumLabel } from "@/lib/status";
 
 const adminActor: ReviewActor = {
   id: "seed-admin-user",
-  name: "Development Knowledge Admin",
+  name: "Knowledge Admin",
   role: "KNOWLEDGE_ADMIN",
 };
 
 const salesActor: ReviewActor = {
   id: "seed-sales-user",
-  name: "Development Sales User",
+  name: "Sales User",
   role: "SALES_USER",
 };
 
@@ -170,8 +170,8 @@ export function ImportedSignalReviewClient({
               }
               value={actor.role === "KNOWLEDGE_ADMIN" ? "admin" : "sales"}
             >
-              <option value="admin">Development Knowledge Admin</option>
-              <option value="sales">Development Sales User</option>
+              <option value="admin">Knowledge Admin</option>
+              <option value="sales">Sales User</option>
             </select>
           </label>
         </div>

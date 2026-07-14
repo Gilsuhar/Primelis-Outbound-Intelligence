@@ -33,7 +33,7 @@ export function applyReviewAction(
     actor,
     submission,
     action,
-    reason: `Development fixture action: ${action}.`,
+    reason: `Review action: ${action}.`,
   });
 
   return result.ok

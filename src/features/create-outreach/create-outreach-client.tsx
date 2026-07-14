@@ -617,7 +617,7 @@ export function CreateOutreachClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Your draft will appear here.
+                Generate a draft, then edit the intro, pain point, solution, and CTA before sending.
               </p>
             )}
           </article>

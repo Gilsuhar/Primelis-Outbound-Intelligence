@@ -62,19 +62,19 @@ export function KnowledgeLibraryClient({
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Knowledge Library</h1>
             <p className="max-w-2xl text-sm leading-6 text-stone-600">
-              Persistence-backed view of knowledge records, approval status, sources, and claim
-              links.
+              Manage the approved product facts, examples, objections, and proof points used by the
+              sales workflows.
             </p>
           </div>
           <span className="w-fit rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-            {adapterMode === "prisma" ? "Database mode" : "Development fixture data"}
+            {adapterMode === "prisma" ? "Live database" : "Local preview"}
           </span>
         </div>
       </section>
 
       {initialItems.length === 0 ? (
         <section className="rounded-lg border border-line bg-white p-8 text-sm text-stone-600">
-          No development fixture records are available yet.
+          No knowledge records are available yet.
         </section>
       ) : (
         <>
@@ -92,7 +92,7 @@ export function KnowledgeLibraryClient({
                     onChange={(event) =>
                       setFilters(updateFilter(filters, "search", event.target.value))
                     }
-                    placeholder="Search title, summary, or fixture label"
+                    placeholder="Search title, summary, or label"
                     value={filters.search}
                   />
                 </span>
@@ -161,7 +161,7 @@ export function KnowledgeLibraryClient({
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-stone-600">
                 Showing <span className="font-semibold text-ink">{filteredItems.length}</span> of{" "}
-                {initialItems.length} development records
+                {initialItems.length} records
               </p>
               {hasActiveFilters ? (
                 <button
@@ -176,7 +176,7 @@ export function KnowledgeLibraryClient({
 
             {filteredItems.length === 0 ? (
               <div className="rounded-lg border border-line bg-white p-8 text-sm text-stone-600">
-                No fixture records match the current filters.
+                No records match the current filters.
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-line bg-white shadow-sm">

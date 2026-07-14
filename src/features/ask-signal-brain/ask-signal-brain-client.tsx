@@ -2,9 +2,7 @@
 
 import { useState, useTransition } from "react";
 import {
-  AlertTriangle,
   Brain,
-  CheckCircle2,
   ExternalLink,
   FileText,
   Lightbulb,
@@ -321,8 +319,7 @@ export function AskSignalBrainClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-[#6f6d5f]">
-                Answers will appear here with reasoning, sources, restrictions, and suggested next
-                workflow links.
+                Choose a question, add context only if needed, and the answer will appear here.
               </p>
             )}
           </article>
@@ -379,12 +376,11 @@ export function AskSignalBrainClient() {
                 ) : null}
               </article>
 
-              <article className="rounded-2xl border border-line bg-white p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-olive" />
-                  <h2 className="text-lg font-semibold text-ink">Knowledge used</h2>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+              <details className="rounded-2xl border border-line bg-white p-5">
+                <summary className="cursor-pointer text-lg font-semibold text-ink">
+                  Knowledge, sources, and safety
+                </summary>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {result.recordsUsed.map((record) => (
                     <div className="rounded-xl border border-line p-3" key={record.id}>
                       <p className="text-sm font-semibold text-ink">{record.title}</p>
@@ -392,17 +388,8 @@ export function AskSignalBrainClient() {
                     </div>
                   ))}
                 </div>
-              </article>
-
-              <article className="rounded-2xl border border-line bg-white p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <AlertTriangle aria-hidden="true" className="h-5 w-5 text-[#9a6a20]" />
-                  <h2 className="text-lg font-semibold text-ink">Sources and safety</h2>
-                </div>
-                <details className="rounded-xl border border-line p-3" open>
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
-                    Safety details
-                  </summary>
+                <details className="mt-4 rounded-xl border border-line p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">Safety</summary>
                   <div className="mt-3 space-y-2">
                     {result.safetyWarnings.length > 0 ? (
                       result.safetyWarnings.map((warning) => (
@@ -419,9 +406,7 @@ export function AskSignalBrainClient() {
                   </div>
                 </details>
                 <details className="mt-3 rounded-xl border border-line p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
-                    Sources
-                  </summary>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">Sources</summary>
                   <div className="mt-3 space-y-2">
                     {result.sourceReferences.map((source) => (
                       <p className="text-sm text-[#34352e]" key={source.id}>
@@ -431,7 +416,7 @@ export function AskSignalBrainClient() {
                     ))}
                   </div>
                 </details>
-              </article>
+              </details>
 
               <article className="rounded-2xl border border-line bg-white p-5">
                 <h2 className="text-lg font-semibold text-ink">Related workflows</h2>

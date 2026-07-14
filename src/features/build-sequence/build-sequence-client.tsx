@@ -539,7 +539,7 @@ export function BuildSequenceClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                The generated sequence strategy and evidence will appear here.
+                Build a sequence, then edit each subject, body, and CTA before copying.
               </p>
             )}
           </article>

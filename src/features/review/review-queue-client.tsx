@@ -82,19 +82,19 @@ export function ReviewQueueClient({
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Review Queue</h1>
             <p className="max-w-2xl text-sm leading-6 text-stone-600">
-              Review generic fixture submissions, inspect source presence, and record local review
-              history entries.
+              Review submitted knowledge, check source support, and approve only what is safe for
+              sales workflows.
             </p>
           </div>
           <span className="w-fit rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-            {adapterMode === "prisma" ? "Database mode" : "Development fixture data"}
+            {adapterMode === "prisma" ? "Live database" : "Local preview"}
           </span>
         </div>
       </section>
 
       <section className="grid gap-3 rounded-lg border border-line bg-white p-4 shadow-sm lg:grid-cols-4">
         <label className="space-y-1 text-sm font-medium text-stone-700">
-          Fixture viewer
+          Reviewer
           <select
             className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-signal focus:ring-2 focus:ring-signal/20"
             onChange={(event) =>
@@ -155,7 +155,7 @@ export function ReviewQueueClient({
       <section className="space-y-3">
         {filteredSubmissions.length === 0 ? (
           <div className="rounded-lg border border-line bg-white p-8 text-sm text-stone-600">
-            No fixture submissions match the current filters.
+            No submissions match the current filters.
           </div>
         ) : (
           filteredSubmissions.map((submission) => (
@@ -262,7 +262,7 @@ function ReviewDetails({
             </div>
           ) : (
             <p className="rounded-md border border-line bg-[#fbfaf7] p-3 text-sm text-stone-600">
-              Sales users can view fixture submissions but cannot approve, restrict, reject, or
+              Sales users can view submissions but cannot approve, restrict, reject, or
               archive knowledge.
             </p>
           )}

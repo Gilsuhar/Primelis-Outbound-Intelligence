@@ -106,12 +106,12 @@ export function AddKnowledgeForm() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Add Knowledge</h1>
             <p className="max-w-2xl text-sm leading-6 text-stone-600">
-              Submit generic development knowledge for review. Successful local submissions default
-              to Needs Review and are not approved automatically.
+              Add a product fact, message example, objection response, or proof point for review.
+              Approved items can be used by the sales workflows.
             </p>
           </div>
           <span className="w-fit rounded-md border border-[#ead3a1] bg-[#fff7e8] px-3 py-2 text-xs font-semibold text-[#8a5a2b]">
-            Local fixture submission
+            Needs review before use
           </span>
         </div>
       </section>
@@ -121,10 +121,10 @@ export function AddKnowledgeForm() {
           <div className="flex items-start gap-3">
             <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">Submission created locally</p>
+              <p className="font-semibold">Submission created</p>
               <p className="mt-1">
                 {submission.title} is now marked {formatEnumLabel(submission.approvalStatus)} for
-                fixture review. It was not approved.
+                review. It was not approved yet.
               </p>
             </div>
           </div>
