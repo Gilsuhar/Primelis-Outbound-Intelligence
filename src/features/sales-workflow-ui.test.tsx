@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/ask-signal-brain/actions", () => ({
@@ -29,6 +29,7 @@ import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-bra
 import { BuildSequenceClient } from "@/features/build-sequence/build-sequence-client";
 import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
 import { ReplyToProspectClient } from "@/features/reply-to-prospect/reply-to-prospect-client";
+import { AccountResearchClient } from "@/features/account-research/account-research-client";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -47,6 +48,13 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
   });
 
+  it("infers website/domain from the company name", () => {
+    render(<CreateOutreachClient />);
+
+    fireEvent.change(screen.getByLabelText("Company"), { target: { value: "Nike" } });
+    expect((screen.getByLabelText("Website") as HTMLInputElement).value).toBe("nike.com");
+  });
+
   it("keeps Build Sequence focused on dropdown-first inputs", () => {
     render(<BuildSequenceClient />);
 
@@ -60,6 +68,14 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Duration")).toBeTruthy();
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
+  });
+
+  it("infers domains in Account Research and explains the result", () => {
+    render(<AccountResearchClient />);
+
+    fireEvent.change(screen.getByLabelText("Company name"), { target: { value: "Nike" } });
+    expect((screen.getByLabelText("Company domain") as HTMLInputElement).value).toBe("nike.com");
+    expect(screen.getByText(/You will see fit, confidence, suppression status/i)).toBeTruthy();
   });
 
   it("keeps Reply and Brain advanced context closed by default", () => {

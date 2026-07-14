@@ -82,6 +82,20 @@ const durationOptions = [
   "3 weeks",
 ];
 
+function inferDomain(company: string) {
+  const cleaned = company
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\b(inc|llc|ltd|limited|group|company|co|corp|corporation)\b/g, "")
+    .trim()
+    .split(/\s+/)[0];
+
+  return cleaned ? `${cleaned}.com` : "";
+}
+
 type SmartFieldProps = {
   name: string;
   label: string;
@@ -136,7 +150,36 @@ function SmartField({
   );
 }
 
+function TextField({
+  name,
+  label,
+  required = false,
+  value,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  required?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1 text-sm font-medium text-stone-700">
+      {label}
+      <input
+        className="w-full rounded-md border border-line px-3 py-2 text-sm"
+        name={name}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        required={required}
+        value={value}
+      />
+    </label>
+  );
+}
+
 export function BuildSequenceClient() {
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
@@ -206,7 +249,16 @@ export function BuildSequenceClient() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <SmartField label="Company" name="companyName" options={[]} required />
+            <TextField
+              label="Company"
+              name="companyName"
+              onChange={(value) => {
+                setCompanyName(value);
+                setCompanyWebsite(inferDomain(value));
+              }}
+              required
+              value={companyName}
+            />
             <SmartField
               label="Buyer role"
               name="contactRole"
@@ -274,7 +326,12 @@ export function BuildSequenceClient() {
               Advanced optional details
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <SmartField label="Website" name="companyWebsite" options={[]} />
+              <TextField
+                label="Website"
+                name="companyWebsite"
+                onChange={setCompanyWebsite}
+                value={companyWebsite}
+              />
               <SmartField label="First name" name="contactFirstName" options={[]} />
               <SmartField
                 label="Market"

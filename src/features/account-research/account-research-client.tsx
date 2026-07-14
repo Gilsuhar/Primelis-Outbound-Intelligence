@@ -80,6 +80,20 @@ const statusFields = [
   "doNotContactStatus",
 ] as const;
 
+function inferDomain(company: string) {
+  const cleaned = company
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\b(inc|llc|ltd|limited|group|company|co|corp|corporation)\b/g, "")
+    .trim()
+    .split(/\s+/)[0];
+
+  return cleaned ? `${cleaned}.com` : "";
+}
+
 function optional(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
@@ -194,6 +208,8 @@ function ResultBadge({ result }: { result: string }) {
 }
 
 export function AccountResearchClient() {
+  const [companyName, setCompanyName] = useState("");
+  const [companyDomain, setCompanyDomain] = useState("");
   const [result, setResult] = useState<AccountAssessmentResult | null>(null);
   const [research, setResearch] = useState<WebsiteResearchResult | null>(null);
   const [enrichment, setEnrichment] = useState<CompanyContactEnrichmentResult | null>(null);
@@ -312,19 +328,28 @@ export function AccountResearchClient() {
               <h2 className="text-lg font-semibold text-ink">Step 1: Account basics</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                ["companyName", "Company name"],
-                ["companyDomain", "Company domain"],
-              ].map(([name, label]) => (
-                <label className="block space-y-1 text-sm font-medium text-[#34352e]" key={name}>
-                  {label}
-                  <input
-                    className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                    name={name}
-                    required={name === "companyName"}
-                  />
-                </label>
-              ))}
+              <label className="block space-y-1 text-sm font-medium text-[#34352e]">
+                Company name
+                <input
+                  className="w-full rounded-md border border-line px-3 py-2 text-sm"
+                  name="companyName"
+                  onChange={(event) => {
+                    setCompanyName(event.target.value);
+                    setCompanyDomain(inferDomain(event.target.value));
+                  }}
+                  required
+                  value={companyName}
+                />
+              </label>
+              <label className="block space-y-1 text-sm font-medium text-[#34352e]">
+                Company domain
+                <input
+                  className="w-full rounded-md border border-line px-3 py-2 text-sm"
+                  name="companyDomain"
+                  onChange={(event) => setCompanyDomain(event.target.value)}
+                  value={companyDomain}
+                />
+              </label>
               <SmartSelect
                 label="Industry"
                 name="industry"
@@ -696,14 +721,39 @@ export function AccountResearchClient() {
                   </span>
                 </div>
                 <p className="text-sm leading-6 text-[#34352e]">{result.recommendedNextAction}</p>
+                <div className="rounded-xl border border-line bg-cream p-3">
+                  <p className="text-sm font-semibold text-ink">Next step</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6f6d5f]">
+                    If this account is a fit, continue to outreach or a sequence from the links
+                    below. If it is missing signals, add the missing information and assess again.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {result.workflowLinks.map((link) =>
+                      link.disabled ? (
+                        <span
+                          className="signal-button-secondary opacity-60"
+                          key={link.href}
+                          title={link.reason}
+                        >
+                          {link.label}
+                        </span>
+                      ) : (
+                        <a className="signal-button-secondary" href={link.href} key={link.href}>
+                          {link.label}
+                        </a>
+                      ),
+                    )}
+                  </div>
+                </div>
                 <p className="rounded-xl bg-cream p-3 text-sm leading-6 text-[#6f6d5f]">
                   {result.suppression.label}. {result.suppression.verificationWarning}
                 </p>
               </div>
             ) : (
               <p className="text-sm leading-6 text-[#6f6d5f]">
-                Submit an account assessment to see fit, confidence, suppression status, persona,
-                angle, missing information, and next workflow.
+                Fill the basics, choose what you know from the dropdowns, then click Assess
+                account. You will see fit, confidence, suppression status, recommended persona,
+                angle, missing information, and the next workflow to use.
               </p>
             )}
           </article>
@@ -758,26 +808,9 @@ export function AccountResearchClient() {
               <article className="rounded-2xl border border-line bg-white p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <AlertTriangle aria-hidden="true" className="h-5 w-5 text-[#9a6a20]" />
-                  <h2 className="text-lg font-semibold text-ink">Checklist and workflows</h2>
+                  <h2 className="text-lg font-semibold text-ink">Research checklist</h2>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {result.workflowLinks.map((link) =>
-                    link.disabled ? (
-                      <span
-                        className="signal-button-secondary opacity-60"
-                        key={link.href}
-                        title={link.reason}
-                      >
-                        {link.label}
-                      </span>
-                    ) : (
-                      <a className="signal-button-secondary" href={link.href} key={link.href}>
-                        {link.label}
-                      </a>
-                    ),
-                  )}
-                </div>
-                <details className="mt-4 rounded-xl border border-line p-3">
+                <details className="rounded-xl border border-line p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-ink">
                     Research checklist
                   </summary>

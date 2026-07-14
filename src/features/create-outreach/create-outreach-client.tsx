@@ -59,6 +59,20 @@ const triggerOptions = [
   "Light discovery before pitching Signal",
 ];
 
+function inferDomain(company: string) {
+  const cleaned = company
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\b(inc|llc|ltd|limited|group|company|co|corp|corporation)\b/g, "")
+    .trim()
+    .split(/\s+/)[0];
+
+  return cleaned ? `${cleaned}.com` : "";
+}
+
 function OptionalSelect({
   name,
   label,
@@ -103,16 +117,36 @@ function OptionalSelect({
   );
 }
 
-function TextField({ name, label, required = false }: { name: string; label: string; required?: boolean }) {
+function TextField({
+  name,
+  label,
+  required = false,
+  value,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  required?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
+}) {
   return (
     <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
       {label}
-      <input className="w-full rounded-md border border-line px-3 py-2 text-sm" name={name} required={required} />
+      <input
+        className="w-full rounded-md border border-line px-3 py-2 text-sm"
+        name={name}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        required={required}
+        value={value}
+      />
     </label>
   );
 }
 
 export function CreateOutreachClient() {
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
   const [messageType, setMessageType] = useState<OutreachMessageType>("FIRST_TOUCH");
   const [tone, setTone] = useState<OutreachTone>("CONSULTATIVE");
@@ -183,7 +217,16 @@ export function CreateOutreachClient() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextField label="Company" name="companyName" required />
+            <TextField
+              label="Company"
+              name="companyName"
+              onChange={(value) => {
+                setCompanyName(value);
+                setCompanyWebsite(inferDomain(value));
+              }}
+              required
+              value={companyName}
+            />
             <OptionalSelect
               label="Buyer role"
               name="contactRole"
@@ -228,7 +271,12 @@ export function CreateOutreachClient() {
               Advanced optional details
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <TextField label="Website" name="companyWebsite" />
+              <TextField
+                label="Website"
+                name="companyWebsite"
+                onChange={setCompanyWebsite}
+                value={companyWebsite}
+              />
               <TextField label="First name" name="contactFirstName" />
               <OptionalSelect label="Market" name="geographyOrMarkets" options={marketOptions} />
               <OptionalSelect label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
