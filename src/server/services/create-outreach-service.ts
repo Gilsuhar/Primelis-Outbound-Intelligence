@@ -332,6 +332,10 @@ export async function generateCreateOutreach(
         ? sanitizeOutput(generated.connectionRequest)
         : undefined,
     recommendedMessage: sanitizeOutput(generated.recommendedMessage),
+    emailSections: generated.emailSections.map((section) => ({
+      ...section,
+      text: sanitizeOutput(section.text),
+    })),
     shorterVersion: sanitizeOutput(generated.shorterVersion),
     cta: sanitizeOutput(generated.cta),
     claimsUsed: generated.claimsUsed.map(sanitizeOutput),

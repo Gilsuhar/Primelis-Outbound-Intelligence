@@ -241,6 +241,12 @@ describe("Create Outreach service", () => {
       expect(result.data.recommendedMessage).toMatch(/brand|branded/i);
       expect(result.data.recommendedMessage).toContain("Hi there,");
       expect(result.data.recommendedMessage).toContain("Worth comparing how you decide this today?");
+      expect(result.data.emailSections.map((section) => section.label)).toEqual([
+        "INTRO",
+        "PAIN POINT",
+        "SOLUTION",
+        "SOFT CTA",
+      ]);
       expect(result.data.recommendedMessage).not.toMatch(/The reason this may fit|For a VP/i);
       expect(result.data.recommendedMessage).not.toMatch(/quick discovery|core icp/i);
       expect(result.data.recommendedMessage).not.toMatch(/\b(pricing|poc|guarantee)\b/i);

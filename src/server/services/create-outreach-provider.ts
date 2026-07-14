@@ -18,6 +18,7 @@ export type OutreachProviderRequest = {
     | "subjectLines"
     | "connectionRequest"
     | "recommendedMessage"
+    | "emailSections"
     | "shorterVersion"
     | "cta"
     | "claimsUsed"
@@ -167,20 +168,28 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
         ? "Signal is used to compare paid brand activity with organic visibility and live competitive conditions before changing spend."
         : humanizeProductFact(primaryFact);
+    const emailSections = [
+      {
+        label: "INTRO" as const,
+        text: `${greeting(input)}\n\n${context}`,
+      },
+      {
+        label: "PAIN POINT" as const,
+        text: roleLine,
+      },
+      {
+        label: "SOLUTION" as const,
+        text: factLine,
+      },
+      {
+        label: "SOFT CTA" as const,
+        text: cta,
+      },
+    ];
 
     const recommended =
       input.channel === "EMAIL"
-        ? [
-            greeting(input),
-            "",
-            context,
-            roleLine,
-            factLine,
-            "",
-            cta,
-          ]
-            .filter((line) => line !== "")
-            .join("\n")
+        ? emailSections.map((section) => section.text).join("\n\n")
         : [
             `${input.contactFirstName ? `${input.contactFirstName}, ` : ""}${opening}`,
             factLine,
@@ -203,6 +212,10 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       subjectLines: input.channel === "EMAIL" ? subjectLinesFor(input, angleLabel) : [],
       connectionRequest: input.channel === "LINKEDIN" ? connectionRequestFor(input) : undefined,
       recommendedMessage: stripCommercialTerms(recommended),
+      emailSections: emailSections.map((section) => ({
+        ...section,
+        text: stripCommercialTerms(section.text),
+      })),
       shorterVersion: stripCommercialTerms(shorter),
       cta,
       claimsUsed: productFacts.map((fact) => trimSentences(fact, 1)),
@@ -245,6 +258,7 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
         return {
           ...result,
           recommendedMessage: aiResult.primaryContent,
+          emailSections: result.emailSections,
           shorterVersion: aiResult.shorterAlternative ?? result.shorterVersion,
           cta: aiResult.cta ?? result.cta,
           subjectLines: aiResult.subjectLines ?? result.subjectLines,

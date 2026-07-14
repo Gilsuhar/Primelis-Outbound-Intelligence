@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, FileText, Send, ShieldCheck, Target } from "lucide-react";
+import { AlertTriangle, Check, Copy, FileText, Send, ShieldCheck, Target } from "lucide-react";
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
@@ -153,7 +153,14 @@ export function CreateOutreachClient() {
   const [length, setLength] = useState<OutreachLength>("STANDARD");
   const [result, setResult] = useState<CreateOutreachResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  async function copyText(key: string, text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    window.setTimeout(() => setCopiedKey(null), 1600);
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -392,9 +399,47 @@ export function CreateOutreachClient() {
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
                     Recommended message
                   </p>
-                  <p className="mt-2 whitespace-pre-line rounded-md bg-[#f8f5ef] p-3 text-sm leading-6 text-ink">
-                    {result.recommendedMessage}
-                  </p>
+                  <div className="mt-2 overflow-hidden rounded-lg border border-line bg-[#f8f5ef]">
+                    <div className="flex items-center justify-between border-b border-line bg-white px-3 py-2">
+                      <span className="text-sm font-semibold text-ink">Full email</span>
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                        onClick={() => copyText("full-email", result.recommendedMessage)}
+                        type="button"
+                      >
+                        {copiedKey === "full-email" ? (
+                          <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                        )}
+                        {copiedKey === "full-email" ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <div className="divide-y divide-line">
+                      {result.emailSections.map((section) => (
+                        <div className="grid gap-3 p-3 sm:grid-cols-[8rem_1fr_auto]" key={section.label}>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
+                            {section.label.replace("PAIN POINT", "PAIN")}
+                          </p>
+                          <p className="whitespace-pre-line text-sm leading-6 text-ink">
+                            {section.text}
+                          </p>
+                          <button
+                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                            onClick={() => copyText(section.label, section.text)}
+                            type="button"
+                          >
+                            {copiedKey === section.label ? (
+                              <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                            )}
+                            {copiedKey === section.label ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">

@@ -74,10 +74,16 @@ export type OutreachSourceReference = {
   sourceDate?: string;
 };
 
+export type OutreachEmailSection = {
+  label: "INTRO" | "PAIN POINT" | "SOLUTION" | "SOFT CTA";
+  text: string;
+};
+
 export type OutreachGeneration = {
   subjectLines: string[];
   connectionRequest?: string;
   recommendedMessage: string;
+  emailSections: OutreachEmailSection[];
   shorterVersion: string;
   cta: string;
   selectedAngle: OutreachAngle;
