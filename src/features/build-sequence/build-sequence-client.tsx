@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, CalendarDays, FileText, Layers3, Send, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  Check,
+  Copy,
+  FileText,
+  Layers3,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 
 import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
@@ -11,6 +20,7 @@ import type {
   BuildSequenceResult,
   SequenceChannel,
   SequenceLength,
+  SequenceStep,
   SequenceTone,
 } from "@/features/build-sequence/types";
 
@@ -94,6 +104,70 @@ function inferDomain(company: string) {
     .split(/\s+/)[0];
 
   return cleaned ? `${cleaned}.com` : "";
+}
+
+function variantIndex(current: number, length: number) {
+  return (current + 1) % length;
+}
+
+function subjectVariants(step: SequenceStep, company: string) {
+  return [
+    step.subjectLine ?? "",
+    `${company} brand-search question`,
+    `Paid brand at ${company}`,
+    `${company}: paid and organic`,
+  ].filter(Boolean);
+}
+
+function bodyVariants(step: SequenceStep, company: string) {
+  const firstLine = step.messageBody.split("\n").find(Boolean) ?? "Hi there,";
+
+  if (step.purpose === "FIRST_TOUCH_RELEVANCE") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nI thought ${company} could be worth a quick brand-search fit check.\n\nThe question is simple: where is paid brand coverage still helping, and where are organic results already doing enough?`,
+      `${firstLine}\n\nI had ${company} on my list because brand search can quietly become expensive when the team cannot separate useful coverage from wasted spend.`,
+    ];
+  }
+
+  if (step.purpose === "PROBLEM_FRAMING") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nA common issue is paying for brand clicks the company may already win organically.\n\nThe useful question is where paid brand search protects demand, and where it just adds cost.`,
+      `${firstLine}\n\nThe risk is not running paid brand ads. The risk is not knowing which part is actually doing work.`,
+    ];
+  }
+
+  if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nThe comparison I would suggest is simple: paid brand ads, organic results, and search-result changes in one view.\n\nThat makes it easier to decide where to keep coverage and where to reduce wasted spend.`,
+      `${firstLine}\n\nInstead of another report, the useful view is a practical decision: keep, reduce, or test paid brand coverage based on what organic results can already carry.`,
+    ];
+  }
+
+  if (step.purpose === "BREAKUP_CLOSE_LOOP") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nI will close the loop after this note.\n\nIf paid brand efficiency becomes a priority later, the useful starting point is a quick look at where paid coverage is helping and where organic results already do enough.`,
+      `${firstLine}\n\nLast note from me. If this is not relevant now, no problem at all.`,
+    ];
+  }
+
+  return [
+    step.messageBody,
+    `${firstLine}\n\nI wanted to keep this narrow: is paid brand coverage still creating value, or is some of that demand already covered organically?`,
+    `${firstLine}\n\nThis may be worth a quick check before making any larger change to brand-search spend.`,
+  ];
+}
+
+function ctaVariants(step: SequenceStep) {
+  return [
+    step.cta,
+    "Worth comparing how you decide this today?",
+    "Open to a quick look at whether this is relevant?",
+    "If this is not useful, I can close the loop here.",
+  ];
 }
 
 type SmartFieldProps = {
@@ -185,7 +259,57 @@ export function BuildSequenceClient() {
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
   const [result, setResult] = useState<BuildSequenceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [stepBodyDrafts, setStepBodyDrafts] = useState<Record<number, string>>({});
+  const [stepSubjectDrafts, setStepSubjectDrafts] = useState<Record<number, string>>({});
+  const [stepCtaDrafts, setStepCtaDrafts] = useState<Record<number, string>>({});
+  const [stepBodyVariantIndexes, setStepBodyVariantIndexes] = useState<Record<number, number>>({});
+  const [stepSubjectVariantIndexes, setStepSubjectVariantIndexes] = useState<Record<number, number>>(
+    {},
+  );
+  const [stepCtaVariantIndexes, setStepCtaVariantIndexes] = useState<Record<number, number>>({});
   const [isPending, startTransition] = useTransition();
+
+  const displayedSteps =
+    result?.steps.map((step) => ({
+      ...step,
+      subjectLine: stepSubjectDrafts[step.stepNumber] ?? step.subjectLine,
+      messageBody: stepBodyDrafts[step.stepNumber] ?? step.messageBody,
+      cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
+    })) ?? [];
+
+  async function copyText(key: string, text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    window.setTimeout(() => setCopiedKey(null), 1600);
+  }
+
+  function fullStepText(step: SequenceStep) {
+    return [step.subjectLine, step.connectionRequest, step.messageBody, step.cta]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  function regenerateSubject(step: SequenceStep) {
+    const variants = subjectVariants(step, companyName || "this account");
+    const nextIndex = variantIndex(stepSubjectVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    setStepSubjectVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
+    setStepSubjectDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
+  }
+
+  function regenerateBody(step: SequenceStep) {
+    const variants = bodyVariants(step, companyName || "this account");
+    const nextIndex = variantIndex(stepBodyVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    setStepBodyVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
+    setStepBodyDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
+  }
+
+  function regenerateCta(step: SequenceStep) {
+    const variants = ctaVariants(step);
+    const nextIndex = variantIndex(stepCtaVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    setStepCtaVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
+    setStepCtaDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -215,6 +339,12 @@ export function BuildSequenceClient() {
       }
 
       setResult(response.data);
+      setStepBodyDrafts({});
+      setStepSubjectDrafts({});
+      setStepCtaDrafts({});
+      setStepBodyVariantIndexes({});
+      setStepSubjectVariantIndexes({});
+      setStepCtaVariantIndexes({});
     });
   }
 
@@ -422,32 +552,111 @@ export function BuildSequenceClient() {
                   <h2 className="text-lg font-semibold text-ink">Timeline</h2>
                 </div>
                 <div className="space-y-3">
-                  {result.steps.map((step) => (
+                  {displayedSteps.map((step) => (
                     <section className="rounded-md border border-line p-3" key={step.stepNumber}>
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                        <span>Step {step.stepNumber}</span>
-                        <span>{step.channel}</span>
-                        <span>{step.delay}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                          <span>Step {step.stepNumber}</span>
+                          <span>{step.channel}</span>
+                          <span>{step.delay}</span>
+                        </div>
+                        <button
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                          onClick={() => copyText(`step-${step.stepNumber}`, fullStepText(step))}
+                          type="button"
+                        >
+                          {copiedKey === `step-${step.stepNumber}` ? (
+                            <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                          ) : (
+                            <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                          )}
+                          {copiedKey === `step-${step.stepNumber}` ? "Copied" : "Copy step"}
+                        </button>
                       </div>
                       <p className="mt-2 text-sm font-semibold text-ink">
                         {purposeLabels[step.purpose]}
                       </p>
                       <p className="mt-1 text-xs text-stone-500">{step.channelRationale}</p>
                       {step.subjectLine ? (
-                        <p className="mt-3 rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink">
-                          {step.subjectLine}
-                        </p>
+                        <div className="mt-3 rounded-md bg-[#f8f5ef] p-3">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                              Subject
+                            </p>
+                            <button
+                              className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                              onClick={() => regenerateSubject(step)}
+                              type="button"
+                            >
+                              Generate
+                            </button>
+                          </div>
+                          <input
+                            className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink"
+                            onChange={(event) =>
+                              setStepSubjectDrafts((current) => ({
+                                ...current,
+                                [step.stepNumber]: event.target.value,
+                              }))
+                            }
+                            value={step.subjectLine}
+                          />
+                        </div>
                       ) : null}
                       {step.connectionRequest ? (
                         <p className="mt-3 rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink">
                           {step.connectionRequest}
                         </p>
                       ) : null}
-                      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-stone-700">
-                        {step.messageBody}
-                      </p>
+                      <div className="mt-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                            Body
+                          </p>
+                          <button
+                            className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                            onClick={() => regenerateBody(step)}
+                            type="button"
+                          >
+                            Generate
+                          </button>
+                        </div>
+                        <textarea
+                          className="min-h-40 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-stone-700"
+                          onChange={(event) =>
+                            setStepBodyDrafts((current) => ({
+                              ...current,
+                              [step.stepNumber]: event.target.value,
+                            }))
+                          }
+                          value={step.messageBody}
+                        />
+                      </div>
                       {step.cta ? (
-                        <p className="mt-3 text-sm font-medium text-signal">{step.cta}</p>
+                        <div className="mt-3 rounded-md bg-[#f8f5ef] p-3">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                              CTA
+                            </p>
+                            <button
+                              className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                              onClick={() => regenerateCta(step)}
+                              type="button"
+                            >
+                              Generate
+                            </button>
+                          </div>
+                          <textarea
+                            className="min-h-20 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm font-medium leading-6 text-signal"
+                            onChange={(event) =>
+                              setStepCtaDrafts((current) => ({
+                                ...current,
+                                [step.stepNumber]: event.target.value,
+                              }))
+                            }
+                            value={step.cta}
+                          />
+                        </div>
                       ) : null}
                     </section>
                   ))}

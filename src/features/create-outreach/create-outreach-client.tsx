@@ -469,12 +469,21 @@ export function CreateOutreachClient() {
                       </button>
                     </div>
                     <div className="mt-2 space-y-2">
-                      {displayedSubjectLines.map((subject) => (
+                      {displayedSubjectLines.map((subject, index) => (
                         <div
                           className="flex items-center justify-between gap-3 rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink"
-                          key={subject}
+                          key={`${subject}-${index}`}
                         >
-                          <span>{subject}</span>
+                          <input
+                            aria-label={`Subject line ${index + 1}`}
+                            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-ink outline-none transition focus:border-line focus:bg-white"
+                            onChange={(event) => {
+                              const nextSubjects = [...displayedSubjectLines];
+                              nextSubjects[index] = event.target.value;
+                              setSubjectDrafts(nextSubjects);
+                            }}
+                            value={subject}
+                          />
                           <button
                             className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
                             onClick={() => copyText(subject, subject)}
@@ -554,9 +563,17 @@ export function CreateOutreachClient() {
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
                             {section.label.replace("PAIN POINT", "PAIN")}
                           </p>
-                          <p className="whitespace-pre-line text-sm leading-6 text-ink">
-                            {section.text}
-                          </p>
+                          <textarea
+                            aria-label={`${section.label} text`}
+                            className="min-h-28 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-ink"
+                            onChange={(event) =>
+                              setSectionDrafts((current) => ({
+                                ...current,
+                                [section.label]: event.target.value,
+                              }))
+                            }
+                            value={section.text}
+                          />
                           <div className="flex flex-wrap gap-2 sm:justify-end">
                             <button
                               className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
