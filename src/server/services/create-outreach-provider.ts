@@ -1,4 +1,3 @@
-import { labelForOutreachAngle } from "@/features/create-outreach/outreach-policy";
 import type {
   CreateOutreachInput,
   OutreachGeneration,
@@ -72,7 +71,7 @@ function triggerPhrase(input: CreateOutreachInput) {
     return `I thought ${company} could be worth a quick brand-search fit check.`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a possible competitor-pressure angle around branded search at ${company}.`;
+    return `I noticed a possible brand-search efficiency angle at ${company}.`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
     return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
@@ -83,7 +82,7 @@ function triggerPhrase(input: CreateOutreachInput) {
   if (/growth|acquisition/i.test(trigger)) {
     return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
   }
-  return `${trigger} made me think a brand-search methodology conversation may be relevant for ${company}.`;
+  return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
 }
 
 function ctaFor(input: CreateOutreachInput) {
@@ -93,17 +92,17 @@ function ctaFor(input: CreateOutreachInput) {
   return "Worth comparing how you decide this today?";
 }
 
-function subjectLinesFor(input: CreateOutreachInput, angleLabel: string) {
+function subjectLinesFor(input: CreateOutreachInput) {
   const company = input.companyName;
   return [
     `${company} brand-search question`,
     `Paid + organic at ${company}`,
-    `${company} and ${angleLabel}`,
+    `${company} brand-spend check`,
   ];
 }
 
 function connectionRequestFor(input: CreateOutreachInput) {
-  return `Hi ${input.contactFirstName || "there"} - noticed a potential brand-search methodology question at ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - noticed a potential brand-search efficiency question at ${input.companyName}. Open to connecting?`;
 }
 
 function fitSignalForEmail(value?: string) {
@@ -128,7 +127,6 @@ function fitSignalForEmail(value?: string) {
 
 function contextDetails(input: CreateOutreachInput) {
   return [
-    input.industry ? `the ${input.industry} category` : undefined,
     fitSignalForEmail(input.companyContext),
     input.geographyOrMarkets ? `${input.geographyOrMarkets} market context` : undefined,
   ].filter(Boolean);
@@ -140,25 +138,29 @@ function contextLine(input: CreateOutreachInput) {
     return `I thought ${input.companyName} could be worth a quick brand-search fit check.`;
   }
 
-  return `I thought ${input.companyName} could be worth a quick brand-search fit check because of ${details.join(" and ")}.`;
+  if (details.some((detail) => /brand demand|paid-search|brand-search|spend/i.test(String(detail)))) {
+    return `I had ${input.companyName} on my list because branded search is one of those channels where spend can look safe, but the real question is whether paid coverage is still adding value.`;
+  }
+
+  return `I had ${input.companyName} on my list because there may be a practical brand-search efficiency question worth checking.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
   const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
     input.companyContext ?? "",
   )
-    ? " At that level, even small changes in paid brand coverage can affect budget and reporting."
+    ? " At that scale, even small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `For ${input.contactRole}, the hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when competitors make it worth staying visible.${scaleHint}`;
+  return `The hard part is separating brand clicks worth paying for from demand organic search may already capture.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps compare paid brand ads with organic results and competitor activity, so the team can decide where to keep coverage and where to reduce wasted spend.";
+    return "Signal helps compare paid brand ads with organic results and changes in the search page, so the team can see where coverage is useful and where spend may be wasted.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal compares paid brand ads with organic visibility and competitor activity, so the team can make a clearer decision before changing coverage or spend.";
+    return "Signal compares paid brand ads with organic visibility and search-page changes, so the team can make a clearer decision before changing coverage or spend.";
   }
 
   return fact;
@@ -188,7 +190,6 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const productFacts = records
       .filter((record) => record.type === "PRODUCT_TRUTH")
       .map((record) => stripCommercialTerms(record.approvedText));
-    const angleLabel = labelForOutreachAngle(generation.selectedAngle);
     const primaryFact = productFacts[0]
       ? trimSentences(productFacts[0], input.desiredLength === "DETAILED" ? 2 : 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
@@ -242,7 +243,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
 
     return {
       ...generation,
-      subjectLines: input.channel === "EMAIL" ? subjectLinesFor(input, angleLabel) : [],
+      subjectLines: input.channel === "EMAIL" ? subjectLinesFor(input) : [],
       connectionRequest: input.channel === "LINKEDIN" ? connectionRequestFor(input) : undefined,
       recommendedMessage: stripCommercialTerms(recommended),
       emailSections: emailSections.map((section) => ({
