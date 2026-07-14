@@ -19,7 +19,12 @@ function getSingleParam(value: string | string[] | undefined) {
 
 function getLoginError(value: string | string[] | undefined): LoginErrorCode | undefined {
   const error = getSingleParam(value);
-  if (error === "access_denied" || error === "callback_failed" || error === "oauth_failed") {
+  if (
+    error === "access_denied" ||
+    error === "configuration_error" ||
+    error === "oauth_failed" ||
+    error === "oauth_start_failed"
+  ) {
     return error;
   }
   return undefined;

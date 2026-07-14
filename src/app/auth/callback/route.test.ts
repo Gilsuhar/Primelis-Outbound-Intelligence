@@ -58,7 +58,9 @@ function mockCodeExchange(input: {
           cookieAdapter.cookies.setAll(input.cookies ?? []);
           return {
             data: { session: input.error ? null : { access_token: "created" } },
-            error: input.error ? { message: "redacted" } : null,
+            error: input.error
+              ? { message: "redacted", code: "pkce_verifier_missing", status: 400 }
+              : null,
           };
         }),
         getUser: vi.fn(async () => ({
@@ -131,13 +133,16 @@ describe("Supabase auth callback", () => {
 
     expect(createServerClientMock).not.toHaveBeenCalled();
     expect(response.headers.get("location")).toBe(
-      "https://preview.example/login?error=callback_failed",
+      "https://preview.example/login?error=oauth_failed",
     );
   });
 
   it("returns a safe login error when the OAuth provider returns an error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const response = await GET(
-      callbackRequest("/auth/callback?error=provider_error&error_description=secret"),
+      callbackRequest(
+        "/auth/callback?error=provider_error&error_status=400&error_description=sensitive-detail",
+      ),
     );
 
     expect(createServerClientMock).not.toHaveBeenCalled();
@@ -145,7 +150,12 @@ describe("Supabase auth callback", () => {
       "https://preview.example/login?error=oauth_failed",
     );
     expect(response.headers.get("location")).not.toContain("provider_error");
-    expect(response.headers.get("location")).not.toContain("secret");
+    expect(response.headers.get("location")).not.toContain("sensitive-detail");
+    const serializedLogs = JSON.stringify(warn.mock.calls);
+    expect(serializedLogs).toContain("provider_error");
+    expect(serializedLogs).toContain("400");
+    expect(serializedLogs).not.toContain("sensitive-detail");
+    warn.mockRestore();
   });
 
   it("returns a safe login error without exposing the provider error when exchange fails", async () => {
@@ -154,7 +164,7 @@ describe("Supabase auth callback", () => {
     const response = await GET(callbackRequest("/auth/callback?code=expired-code"));
 
     expect(response.headers.get("location")).toBe(
-      "https://preview.example/login?error=callback_failed",
+      "https://preview.example/login?error=oauth_failed",
     );
     expect(response.headers.get("location")).not.toContain("redacted");
   });
@@ -205,5 +215,24 @@ describe("Supabase auth callback", () => {
     });
 
     expect(nextRequest.cookies.get("sb-access-token")?.value).toBe("access-cookie");
+  });
+
+  it("logs only safe callback diagnostics", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockCodeExchange({ error: true });
+
+    await GET(callbackRequest("/auth/callback?code=sensitive-code"));
+
+    const serializedLogs = JSON.stringify([...info.mock.calls, ...warn.mock.calls]);
+    expect(serializedLogs).toContain("callback_exchange_failed");
+    expect(serializedLogs).toContain("pkce_verifier_missing");
+    expect(serializedLogs).not.toContain("sensitive-code");
+    expect(serializedLogs).not.toContain("User@Example.com");
+    expect(serializedLogs).not.toContain("access_token");
+    expect(serializedLogs).not.toContain("refresh_token");
+
+    info.mockRestore();
+    warn.mockRestore();
   });
 });

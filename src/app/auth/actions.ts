@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
+import { getSafeSupabaseError, logAuthDiagnostic } from "@/lib/auth/diagnostics";
 import { createSupabaseServerClient, getRequestOrigin } from "@/lib/auth/server";
 import { getSafeInternalPath } from "@/lib/private-preview-auth";
 
@@ -70,12 +71,33 @@ export async function requestLoginLink(
 
 export async function continueWithGoogle(formData: FormData) {
   if (!getSupabaseAuthConfig()) {
-    redirect("/login?error=oauth_failed");
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "initiation_configuration_invalid",
+    });
+    redirect("/login?error=configuration_error");
   }
 
-  const supabase = await createSupabaseServerClient();
+  let pkceVerifierPersisted = false;
+  const supabase = await createSupabaseServerClient({
+    requireCookieWrites: true,
+    onPkceVerifierPersisted: () => {
+      pkceVerifierPersisted = true;
+    },
+    onCookieWriteFailure: () => {
+      logAuthDiagnostic("warn", {
+        operation: "google_oauth",
+        stage: "initiation_pkce_cookie_write_failed",
+        pkceVerifierPersisted: false,
+      });
+    },
+  });
   if (!supabase) {
-    redirect("/login?error=oauth_failed");
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "initiation_client_unavailable",
+    });
+    redirect("/login?error=configuration_error");
   }
 
   const origin = await getRequestOrigin();
@@ -83,16 +105,40 @@ export async function continueWithGoogle(formData: FormData) {
   const callbackUrl = new URL("/auth/callback", origin);
   if (intendedPath !== "/") callbackUrl.searchParams.set("next", intendedPath);
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: callbackUrl.toString(),
-    },
-  });
+  let oauthResult;
+  try {
+    oauthResult = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl.toString(),
+      },
+    });
+  } catch {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "initiation_failed",
+      pkceVerifierPersisted,
+    });
+    redirect("/login?error=oauth_start_failed");
+  }
+
+  const { data, error } = oauthResult;
 
   if (error || !data.url) {
-    redirect("/login?error=oauth_failed");
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "initiation_failed",
+      pkceVerifierPersisted,
+      ...getSafeSupabaseError(error),
+    });
+    redirect("/login?error=oauth_start_failed");
   }
+
+  logAuthDiagnostic("info", {
+    operation: "google_oauth",
+    stage: "initiation_ready",
+    pkceVerifierPersisted,
+  });
 
   redirect(data.url);
 }

@@ -36,9 +36,12 @@ function mockSupabaseOAuth(input: { error?: boolean; providerUrl?: string }) {
     data: { url: input.providerUrl ?? "https://accounts.google.example/oauth" },
     error: input.error ? { message: "redacted" } : null,
   }));
-  createSupabaseServerClientMock.mockResolvedValue({
-    auth: { signInWithOAuth },
-  } as never);
+  createSupabaseServerClientMock.mockImplementation(async (options) => {
+    options?.onPkceVerifierPersisted?.();
+    return {
+      auth: { signInWithOAuth },
+    } as never;
+  });
   return { signInWithOAuth };
 }
 
@@ -65,6 +68,9 @@ describe("Google OAuth login action", () => {
         redirectTo: "https://preview.example/auth/callback",
       },
     });
+    expect(createSupabaseServerClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({ requireCookieWrites: true }),
+    );
   });
 
   it("preserves only a safe internal intended destination", async () => {
@@ -101,9 +107,23 @@ describe("Google OAuth login action", () => {
     mockSupabaseOAuth({ error: true });
 
     await expect(continueWithGoogle(formData())).rejects.toThrow(
-      "NEXT_REDIRECT:/login?error=oauth_failed",
+      "NEXT_REDIRECT:/login?error=oauth_start_failed",
     );
 
-    expect(redirectMock).toHaveBeenCalledWith("/login?error=oauth_failed");
+    expect(redirectMock).toHaveBeenCalledWith("/login?error=oauth_start_failed");
+  });
+
+  it("stops initiation when the PKCE verifier cookie cannot be persisted", async () => {
+    createSupabaseServerClientMock.mockResolvedValue({
+      auth: {
+        signInWithOAuth: vi.fn(async () => {
+          throw new Error("Required authentication cookie could not be persisted.");
+        }),
+      },
+    } as never);
+
+    await expect(continueWithGoogle(formData())).rejects.toThrow(
+      "NEXT_REDIRECT:/login?error=oauth_start_failed",
+    );
   });
 });

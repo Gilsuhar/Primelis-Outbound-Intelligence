@@ -13,8 +13,9 @@ const initialState = {
 
 const loginErrorMessages: Record<LoginErrorCode, string> = {
   access_denied: "This Google account is not approved for the private preview.",
-  callback_failed: "We could not finish authentication. Please try again.",
-  oauth_failed: "We could not start Google sign-in. Please try again.",
+  configuration_error: "Private preview authentication is not configured correctly.",
+  oauth_failed: "We could not finish Google sign-in. Please try again.",
+  oauth_start_failed: "We could not start Google sign-in. Please try again.",
 };
 
 export function LoginForm({

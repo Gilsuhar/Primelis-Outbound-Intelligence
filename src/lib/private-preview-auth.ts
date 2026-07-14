@@ -19,7 +19,8 @@ export type PublicUser = {
 
 export type LoginScreenState = "LOGIN_FORM" | "ACCESS_PENDING" | "SIGNED_IN";
 
-export type LoginErrorCode = "access_denied" | "callback_failed" | "oauth_failed";
+export type LoginErrorCode =
+  "access_denied" | "configuration_error" | "oauth_failed" | "oauth_start_failed";
 
 export const publicRoutes = ["/login", "/auth/callback", "/favicon.ico"] as const;
 

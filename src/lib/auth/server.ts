@@ -3,10 +3,14 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
-import type { CookieOptions } from "@supabase/ssr";
 
 import type { UserRole } from "@/features/knowledge/types";
 import { prisma } from "@/lib/prisma";
+import {
+  persistSupabaseCookies,
+  type SupabaseCookiePersistenceOptions,
+  type SupabaseCookieToSet,
+} from "@/lib/auth/cookie-persistence";
 import { getAppUrl, getSupabaseAuthConfig } from "@/lib/auth/env";
 import {
   canAccessRoute,
@@ -15,12 +19,6 @@ import {
   type PublicUser,
   publicUserFromAuthenticatedUser,
 } from "@/lib/private-preview-auth";
-
-type CookieToSet = {
-  name: string;
-  value: string;
-  options: CookieOptions;
-};
 
 type LocalProfile = {
   id: string;
@@ -34,7 +32,7 @@ function normalizeRole(role: string | null | undefined): UserRole {
   return role === "KNOWLEDGE_ADMIN" ? "KNOWLEDGE_ADMIN" : "SALES_USER";
 }
 
-export async function createSupabaseServerClient() {
+export async function createSupabaseServerClient(options: SupabaseCookiePersistenceOptions = {}) {
   const config = getSupabaseAuthConfig();
   if (!config) return null;
 
@@ -45,14 +43,8 @@ export async function createSupabaseServerClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet: CookieToSet[]) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Server Components cannot always write refreshed cookies; middleware handles refresh.
-        }
+      setAll(cookiesToSet: SupabaseCookieToSet[]) {
+        persistSupabaseCookies(cookieStore, cookiesToSet, options);
       },
     },
   });

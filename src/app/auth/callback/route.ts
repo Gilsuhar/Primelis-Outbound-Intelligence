@@ -3,6 +3,11 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
+import {
+  getSafeSupabaseCallbackError,
+  getSafeSupabaseError,
+  logAuthDiagnostic,
+} from "@/lib/auth/diagnostics";
 import { resolveApplicationUser } from "@/lib/auth/server";
 import { getSafeInternalPath, normalizePreviewEmail } from "@/lib/private-preview-auth";
 
@@ -20,7 +25,7 @@ function getSafeRedirectUrl(request: NextRequest) {
 
 function getLoginErrorUrl(
   request: NextRequest,
-  error: "access_denied" | "callback_failed" | "oauth_failed",
+  error: "access_denied" | "configuration_error" | "oauth_failed",
 ) {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("error", error);
@@ -40,16 +45,34 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
 
   if (requestUrl.searchParams.has("error")) {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_provider_error",
+      callbackCodePresent: Boolean(code),
+      pkceExchangeSucceeded: false,
+      ...getSafeSupabaseCallbackError(requestUrl.searchParams),
+    });
     return NextResponse.redirect(getLoginErrorUrl(request, "oauth_failed"));
   }
 
   if (!code) {
-    return NextResponse.redirect(getLoginErrorUrl(request, "callback_failed"));
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_code_missing",
+      callbackCodePresent: false,
+      pkceExchangeSucceeded: false,
+    });
+    return NextResponse.redirect(getLoginErrorUrl(request, "oauth_failed"));
   }
 
   const config = getSupabaseAuthConfig();
   if (!config) {
-    return NextResponse.redirect(getLoginErrorUrl(request, "callback_failed"));
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_configuration_invalid",
+      callbackCodePresent: true,
+    });
+    return NextResponse.redirect(getLoginErrorUrl(request, "configuration_error"));
   }
 
   const cookiesToSet: CookieToSet[] = [];
@@ -66,8 +89,22 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return redirectWithCookies(getLoginErrorUrl(request, "callback_failed"), cookiesToSet);
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_exchange_failed",
+      callbackCodePresent: true,
+      pkceExchangeSucceeded: false,
+      ...getSafeSupabaseError(error),
+    });
+    return redirectWithCookies(getLoginErrorUrl(request, "oauth_failed"), cookiesToSet);
   }
+
+  logAuthDiagnostic("info", {
+    operation: "google_oauth",
+    stage: "callback_exchange_succeeded",
+    callbackCodePresent: true,
+    pkceExchangeSucceeded: true,
+  });
 
   const {
     data: { user },
@@ -76,6 +113,15 @@ export async function GET(request: NextRequest) {
 
   const normalizedEmail = normalizePreviewEmail(user?.email);
   if (userError || !user || !normalizedEmail) {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_user_unavailable",
+      callbackCodePresent: true,
+      pkceExchangeSucceeded: true,
+      sessionUserReturned: Boolean(user),
+      approvedUserAuthorized: false,
+      ...getSafeSupabaseError(userError),
+    });
     await supabase.auth.signOut();
     return redirectWithCookies(getLoginErrorUrl(request, "access_denied"), cookiesToSet);
   }
@@ -86,9 +132,26 @@ export async function GET(request: NextRequest) {
   });
 
   if (!applicationUser) {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_access_denied",
+      callbackCodePresent: true,
+      pkceExchangeSucceeded: true,
+      sessionUserReturned: true,
+      approvedUserAuthorized: false,
+    });
     await supabase.auth.signOut();
     return redirectWithCookies(getLoginErrorUrl(request, "access_denied"), cookiesToSet);
   }
+
+  logAuthDiagnostic("info", {
+    operation: "google_oauth",
+    stage: "callback_authorized",
+    callbackCodePresent: true,
+    pkceExchangeSucceeded: true,
+    sessionUserReturned: true,
+    approvedUserAuthorized: true,
+  });
 
   return redirectWithCookies(getSafeRedirectUrl(request), cookiesToSet);
 }
