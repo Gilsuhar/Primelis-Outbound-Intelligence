@@ -42,6 +42,7 @@ const createOutreachSchema = z.object({
   messageType: z.enum(outreachMessageTypes),
   desiredTone: z.enum(outreachTones),
   desiredLength: z.enum(outreachLengths),
+  useCaseStudy: z.boolean().optional().default(false),
   internalNotes: z.string().trim().max(1200).optional(),
   creatorId: z.string().trim().min(1).optional(),
 });
@@ -112,6 +113,20 @@ function mapKnowledgeRow(row: Row): OutreachKnowledgeRecord {
   };
 }
 
+function mapCaseStudyRow(row: Row): OutreachKnowledgeRecord {
+  return {
+    id: asString(row.id),
+    title: asString(row.title),
+    type: "CASE_STUDY",
+    approvedText: asOptionalString(row.approvedWording) ?? "",
+    channels: ["EMAIL", "LINKEDIN", "INTERNAL"],
+    usageRestrictions: asOptionalString(row.usageRestrictions),
+    sourceIds: asStringArray(row.sourceIds),
+    sourceTitles: asStringArray(row.sourceTitles),
+    sourceDates: asStringArray(row.sourceDates),
+  };
+}
+
 function isEligible(record: OutreachKnowledgeRecord, channel: CreateOutreachInput["channel"]) {
   if (!record.approvedText.trim() || record.sourceIds.length === 0) {
     return false;
@@ -165,6 +180,9 @@ function knowledgeLimitations(input: CreateOutreachInput, records: OutreachKnowl
   if (records.length === 0) {
     limitations.add("No approved eligible Signal knowledge was available for this channel.");
   }
+  if (input.useCaseStudy && !input.industry) {
+    limitations.add("Case-study proof was requested, but no industry was selected.");
+  }
   return Array.from(limitations);
 }
 
@@ -187,7 +205,11 @@ function safetyNotes(input: CreateOutreachInput, records: OutreachKnowledgeRecor
   if (records.every((record) => record.type !== "OBJECTION")) {
     notes.add("Competitor objection records were not used.");
   }
-  notes.add("No case studies were used because none are currently eligible for this workflow.");
+  if (!input.useCaseStudy) {
+    notes.add("Case studies were not used because the optional proof setting was off.");
+  } else if (records.every((record) => record.type !== "CASE_STUDY")) {
+    notes.add("No eligible industry-matched case study was available for this draft.");
+  }
   return Array.from(notes);
 }
 
@@ -206,7 +228,7 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
   }
 
   async retrieveEligibleKnowledge(input: CreateOutreachInput) {
-    const rows = await this.client.$queryRaw<Row[]>`
+    const knowledgeRows = await this.client.$queryRaw<Row[]>`
       SELECT
         ki.id,
         ki.title,
@@ -227,7 +249,41 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
       GROUP BY ki.id
       ORDER BY ki."updatedAt" DESC
     `;
-    return rows.map(mapKnowledgeRow).filter((record) => isEligible(record, input.channel));
+    const records = knowledgeRows
+      .map(mapKnowledgeRow)
+      .filter((record) => isEligible(record, input.channel));
+
+    if (!input.useCaseStudy || !input.industry) {
+      return records;
+    }
+
+    const caseStudyRows = await this.client.$queryRaw<Row[]>`
+      SELECT
+        cs.id,
+        cs.title,
+        cs."approvedExternalWording" AS "approvedWording",
+        cs."usageRestrictions",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.id), NULL) AS "sourceIds",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.title), NULL) AS "sourceTitles",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s."sourceDate"::text), NULL) AS "sourceDates"
+      FROM "CaseStudy" cs
+      JOIN "_CaseStudyIndustries" csi ON csi."A" = cs.id
+      JOIN "Industry" i ON i.id = csi."B"
+      LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
+      LEFT JOIN "SourceDocument" s ON s.id = css."B"
+      WHERE cs."approvalStatus" = 'APPROVED'
+        AND cs."approvedExternalWording" IS NOT NULL
+        AND cs."usageScope" IN ('EMAIL_AND_LINKEDIN', 'PUBLIC_MARKETING')
+        AND LOWER(i.name) = LOWER(${input.industry})
+      GROUP BY cs.id
+      ORDER BY cs."updatedAt" DESC
+      LIMIT 1
+    `;
+
+    return [
+      ...records,
+      ...caseStudyRows.map(mapCaseStudyRow).filter((record) => isEligible(record, input.channel)),
+    ];
   }
 
   async persistDraft({

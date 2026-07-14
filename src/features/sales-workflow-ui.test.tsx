@@ -45,6 +45,7 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Reason for outreach")).toBeTruthy();
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Email length")).toBeTruthy();
+    expect(screen.getByText("Use relevant case study if available")).toBeTruthy();
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
   });
 

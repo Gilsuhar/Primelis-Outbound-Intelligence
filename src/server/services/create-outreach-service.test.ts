@@ -58,7 +58,7 @@ function persistence(records: OutreachKnowledgeRecord[], actorRole = "SALES_USER
           !record.usageRestrictions &&
           record.sourceIds.length > 0 &&
           record.approvedText.length > 0 &&
-          record.type !== "CASE_STUDY" &&
+          (input.useCaseStudy || record.type !== "CASE_STUDY") &&
           !(record.type === "OBJECTION" && /adthena|revvim|competitor/i.test(record.approvedText)),
       ),
     persistDraft: async (draft) => {
@@ -114,7 +114,38 @@ describe("Create Outreach service", () => {
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["product-truth"]);
       expect(result.data.safetyNotes).toContain(
-        "No case studies were used because none are currently eligible for this workflow.",
+        "Case studies were not used because the optional proof setting was off.",
+      );
+    }
+  });
+
+  it("can include an optional approved case study proof point when requested", async () => {
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "retail-case-study",
+        title: "Retail proof",
+        type: "CASE_STUDY" as OutreachKnowledgeRecord["type"],
+        approvedText:
+          "A comparable retail brand reduced wasted brand-search spend while maintaining organic traffic.",
+      }),
+    ]);
+
+    const result = await generateCreateOutreach(
+      { ...baseInput, industry: "Retail", useCaseStudy: true },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recordsUsed.map((record) => record.id)).toContain("retail-case-study");
+      expect(result.data.emailSections.find((section) => section.label === "SOLUTION")?.text).toContain(
+        "Optional proof point",
+      );
+      expect(result.data.claimsUsed).toEqual(
+        expect.arrayContaining([
+          "A comparable retail brand reduced wasted brand-search spend while maintaining organic traffic.",
+        ]),
       );
     }
   });

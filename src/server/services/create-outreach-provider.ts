@@ -164,6 +164,15 @@ function humanizeProductFact(fact: string) {
   return fact;
 }
 
+function caseStudyLine(records: OutreachKnowledgeRecord[]) {
+  const caseStudy = records.find((record) => record.type === "CASE_STUDY");
+  if (!caseStudy) {
+    return undefined;
+  }
+
+  return `Optional proof point: ${trimSentences(caseStudy.approvedText, 1)}`;
+}
+
 export class DeterministicOutreachProvider implements OutreachAiProvider {
   metadata: ReplyProviderMetadata = {
     providerName: "deterministic-development",
@@ -191,6 +200,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
         ? "Signal is used to compare paid brand activity with organic visibility and live competitive conditions before changing spend."
         : humanizeProductFact(primaryFact);
+    const proofLine = caseStudyLine(records);
     const emailSections = [
       {
         label: "INTRO" as const,
@@ -202,7 +212,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       },
       {
         label: "SOLUTION" as const,
-        text: factLine,
+        text: [factLine, proofLine].filter(Boolean).join("\n\n"),
       },
       {
         label: "SOFT CTA" as const,
@@ -241,7 +251,12 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       })),
       shorterVersion: stripCommercialTerms(shorter),
       cta,
-      claimsUsed: productFacts.map((fact) => trimSentences(fact, 1)),
+      claimsUsed: [
+        ...productFacts.map((fact) => trimSentences(fact, 1)),
+        ...records
+          .filter((record) => record.type === "CASE_STUDY")
+          .map((record) => trimSentences(record.approvedText, 1)),
+      ],
     };
   }
 }

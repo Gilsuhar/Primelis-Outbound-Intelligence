@@ -256,6 +256,7 @@ export function CreateOutreachClient() {
         messageType,
         desiredTone: tone,
         desiredLength: length,
+        useCaseStudy: formData.get("useCaseStudy") === "on",
         internalNotes: formData.get("internalNotes") || undefined,
       });
 
@@ -377,6 +378,14 @@ export function CreateOutreachClient() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="flex items-center gap-2 rounded-md border border-line bg-[#f8f5ef] px-3 py-2 text-sm font-medium text-stone-700 sm:col-span-2">
+              <input
+                className="h-4 w-4 rounded border-line text-signal"
+                name="useCaseStudy"
+                type="checkbox"
+              />
+              Use relevant case study if available
             </label>
           </div>
 

@@ -34,6 +34,7 @@ export type CreateOutreachInput = {
   messageType: OutreachMessageType;
   desiredTone: OutreachTone;
   desiredLength: OutreachLength;
+  useCaseStudy?: boolean;
   internalNotes?: string;
   creatorId?: string;
 };
