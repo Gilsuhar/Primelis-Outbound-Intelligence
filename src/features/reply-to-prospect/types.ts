@@ -1,4 +1,5 @@
 import type { ChannelTag } from "@/features/knowledge/types";
+import type { OutputLanguage } from "@/lib/output-language";
 
 export const replyChannels = ["EMAIL", "LINKEDIN"] as const;
 export const replyTones = ["DIRECT", "CONSULTATIVE", "WARM", "EXECUTIVE"] as const;
@@ -26,6 +27,7 @@ export type ReplyToProspectInput = {
   channel: ReplyChannel;
   desiredTone: ReplyTone;
   desiredLength: ReplyLength;
+  outputLanguage?: OutputLanguage;
   contextNotes?: string;
   creatorId?: string;
 };

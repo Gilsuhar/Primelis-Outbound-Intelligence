@@ -20,6 +20,7 @@ import {
   type SequenceSourceReference,
   type SequenceStep,
 } from "@/features/build-sequence/types";
+import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import {
@@ -53,6 +54,7 @@ const buildSequenceSchema = z.object({
   ]),
   desiredTone: z.enum(sequenceTones),
   desiredOverallDuration: z.string().trim().min(3).max(120),
+  outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   internalNotes: z.string().trim().max(1200).optional(),
   creatorId: z.string().trim().min(1).optional(),
 });

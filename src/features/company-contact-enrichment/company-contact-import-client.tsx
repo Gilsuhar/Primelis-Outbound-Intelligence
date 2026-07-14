@@ -74,7 +74,7 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
 
   const placeholder =
     importType === "COMPANY"
-      ? "company_name,domain,industry,employee_range,revenue_range,headquarters_country,company_type,source"
+      ? "company_name,domain,industry,employee_range,revenue_range,headquarters_country,company_type,source\nNike,nike.com,,10000+,$50M+,United States,B2C,target list"
       : "full_name,title,company_name,domain,country,department,seniority,professional_profile_url,business_email,business_email_status,source";
 
   return (
@@ -87,7 +87,8 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
           Import Company and Contact CSV
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-          Preview normalized company and professional contact enrichment data before writing it.
+          Paste a company or contact list, preview the automatic Signal classification, then confirm
+          only when the rows look right.
         </p>
       </section>
 
@@ -95,6 +96,11 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
         <div className="flex items-center gap-2 border-b border-line pb-3">
           <FileUp aria-hidden="true" className="h-5 w-5 text-olive" />
           <h2 className="text-lg font-semibold text-ink">CSV import</h2>
+        </div>
+        <div className="mt-4 rounded-lg border border-line bg-cream px-3 py-2 text-sm leading-6 text-[#34352e]">
+          Minimum company columns: <span className="font-semibold">company_name, domain</span>.
+          If industry, size, or revenue are missing, Signal will infer a suggested industry, ICP fit,
+          persona, and outreach angle for review.
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <label className="block space-y-1 text-sm font-medium text-[#34352e]">
@@ -185,6 +191,32 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
               )}
             </pre>
           </details>
+          {importType === "COMPANY" && preview.validRows.length > 0 ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-line">
+              <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr] gap-3 bg-cream px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#6f6d5f]">
+                <span>Company</span>
+                <span>Industry</span>
+                <span>ICP fit</span>
+                <span>Angle</span>
+              </div>
+              <div className="divide-y divide-line bg-white">
+                {preview.validRows.slice(0, 8).map((row, index) => (
+                  <div
+                    className="grid grid-cols-[1.2fr_1fr_1fr_1fr] gap-3 px-3 py-3 text-sm"
+                    key={`${row.domain}-${index}`}
+                  >
+                    <div>
+                      <p className="font-semibold text-ink">{row.company_name}</p>
+                      <p className="text-xs text-[#6f6d5f]">{row.domain}</p>
+                    </div>
+                    <p className="text-[#34352e]">{row.signal_industry || row.industry}</p>
+                    <p className="text-[#34352e]">{row.signal_icp_fit}</p>
+                    <p className="text-[#34352e]">{row.recommended_outreach_angle}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>

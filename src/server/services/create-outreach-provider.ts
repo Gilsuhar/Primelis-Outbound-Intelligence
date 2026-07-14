@@ -5,6 +5,7 @@ import type {
   OutreachSourceReference,
 } from "@/features/create-outreach/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
+import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider } from "./ai-provider";
 
@@ -292,6 +293,7 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
+            outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
         return {

@@ -1,5 +1,6 @@
 import type { ChannelTag } from "@/features/knowledge/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
+import type { OutputLanguage } from "@/lib/output-language";
 
 export const sequenceChannels = ["EMAIL", "LINKEDIN", "MIXED"] as const;
 export const sequenceStepChannels = ["EMAIL", "LINKEDIN"] as const;
@@ -45,6 +46,7 @@ export type BuildSequenceInput = {
   sequenceLength: SequenceLength;
   desiredTone: SequenceTone;
   desiredOverallDuration: string;
+  outputLanguage?: OutputLanguage;
   internalNotes?: string;
   creatorId?: string;
 };

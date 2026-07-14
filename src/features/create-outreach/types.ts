@@ -1,5 +1,6 @@
 import type { ChannelTag } from "@/features/knowledge/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
+import type { OutputLanguage } from "@/lib/output-language";
 
 export const outreachChannels = ["EMAIL", "LINKEDIN"] as const;
 export const outreachMessageTypes = ["FIRST_TOUCH", "FOLLOW_UP", "RE_ENGAGEMENT"] as const;
@@ -34,6 +35,7 @@ export type CreateOutreachInput = {
   messageType: OutreachMessageType;
   desiredTone: OutreachTone;
   desiredLength: OutreachLength;
+  outputLanguage?: OutputLanguage;
   useCaseStudy?: boolean;
   internalNotes?: string;
   creatorId?: string;

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
+import { useOutputLanguage } from "@/components/language-selector";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
@@ -252,6 +253,7 @@ function TextField({
 }
 
 export function BuildSequenceClient() {
+  const outputLanguage = useOutputLanguage();
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
@@ -329,6 +331,7 @@ export function BuildSequenceClient() {
         sequenceLength,
         desiredTone: tone,
         desiredOverallDuration: formData.get("desiredOverallDuration"),
+        outputLanguage,
         internalNotes: formData.get("internalNotes") || undefined,
       });
 
@@ -373,6 +376,7 @@ export function BuildSequenceClient() {
           action={onSubmit}
           className="space-y-4 rounded-lg border border-line bg-white p-4 shadow-sm"
         >
+          <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Layers3 aria-hidden="true" className="h-5 w-5 text-signal" />
             <h2 className="text-lg font-semibold text-ink">Quick brief</h2>

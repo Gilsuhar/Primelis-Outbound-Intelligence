@@ -115,6 +115,107 @@ function validEmail(value: string) {
   return !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function includesAny(text: string, values: string[]) {
+  return values.some((value) => text.includes(value));
+}
+
+function classifyCompanyRow(row: Record<string, string>): Record<string, string> {
+  const name = normalizeName(row.company_name ?? "");
+  const domain = normalizeDomain(row.domain ?? "");
+  const text = `${name} ${domain} ${normalizeName(row.industry ?? "")}`;
+  const employeeRange = row.employee_range ?? row.employees ?? "";
+  const revenueRange = row.revenue_range ?? row.revenue ?? "";
+  const sizeText = `${employeeRange} ${revenueRange}`.toLowerCase();
+
+  let industry = row.industry?.trim() || "";
+  let persona = "Head or Director of Paid Search";
+  let angle = "Brand-search efficiency";
+  let fit = "Possible fit - validate brand demand first";
+  const notes: string[] = [];
+
+  if (
+    includesAny(text, [
+      "nike",
+      "adidas",
+      "dior",
+      "chloe",
+      "polene",
+      "sandro",
+      "tagheuer",
+      "luxury",
+      "fashion",
+      "apparel",
+    ])
+  ) {
+    industry = industry || "Fashion and Luxury";
+    angle = "Brand-spend efficiency";
+    notes.push("Fashion/luxury brands often have meaningful brand demand and market variation.");
+  } else if (
+    includesAny(text, [
+      "shop",
+      "retail",
+      "ecommerce",
+      "e-commerce",
+      "marketplace",
+      "zalando",
+      "asos",
+      "farfetch",
+      "amazon",
+    ])
+  ) {
+    industry = industry || "Retail and E-commerce";
+    angle = "Paid and organic measurement";
+    notes.push("Retail and e-commerce accounts often need clearer paid + organic decisions.");
+  } else if (
+    includesAny(text, [
+      "saas",
+      "software",
+      "cloud",
+      "dynatrace",
+      "datadog",
+      "newrelic",
+      "hubspot",
+      "salesforce",
+      "zoominfo",
+    ])
+  ) {
+    industry = industry || "B2B SaaS and Technology";
+    persona = "Head of Growth or Acquisition";
+    angle = "Qualified demand and demo economics";
+    notes.push("B2B SaaS accounts can care about cost per qualified demand and brand efficiency.");
+  } else if (includesAny(text, ["bank", "fintech", "finance", "insurance", "pay", "stripe"])) {
+    industry = industry || "Fintech and Financial Services";
+    persona = "VP Performance Marketing";
+    angle = "Measurement quality";
+    notes.push("Financial services may need careful measurement and governance language.");
+  } else if (includesAny(text, ["air", "travel", "hotel", "hospitality", "booking"])) {
+    industry = industry || "Travel and Airlines";
+    angle = "Market control and visibility";
+    notes.push("Travel and hospitality can vary heavily by market and season.");
+  } else {
+    industry = industry || "General B2B";
+    notes.push("Industry was inferred conservatively; review before outreach.");
+  }
+
+  if (/\$?50m|\$?100m|\$?250m|\$?500m|enterprise|1000|5000|10,000|200\+/.test(sizeText)) {
+    fit = "Strong fit - brand demand and paid-search owner";
+    notes.push("Size/spend context suggests the account may justify a brand-search check.");
+  } else if (/\$?20m|100-200|100\+|mid-market/.test(sizeText)) {
+    fit = "Possible fit - validate brand demand first";
+    notes.push("Mid-market signal found; validate branded-search activity first.");
+  }
+
+  return {
+    ...row,
+    industry: industry || "General B2B",
+    signal_industry: industry || "General B2B",
+    signal_icp_fit: row.signal_icp_fit || fit,
+    recommended_persona: row.recommended_persona || persona,
+    recommended_outreach_angle: row.recommended_outreach_angle || angle,
+    classification_notes: row.classification_notes || notes.join(" "),
+  };
+}
+
 export class PrismaCompanyContactImportPersistence implements CompanyContactImportPersistence {
   constructor(private readonly client: MinimalPrismaClient = prisma) {}
 
@@ -255,7 +356,7 @@ export function buildCompanyContactImportPreview(
   }
 
   for (const row of rows) {
-    const values = row.values;
+    const values = importType === "COMPANY" ? classifyCompanyRow(row.values) : row.values;
     const key =
       importType === "COMPANY" ? normalizeDomain(values.domain ?? "") : contactKey(values);
     if (hasFormula(values)) {

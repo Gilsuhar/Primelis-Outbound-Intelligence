@@ -10,6 +10,7 @@ import type { UserRole } from "@/features/knowledge/types";
 import { signOutAction } from "@/app/auth/actions";
 import type { PublicUser } from "@/lib/private-preview-auth";
 import { getNavigationForRole, adminNavigation, salesNavigation } from "@/lib/navigation";
+import { LanguageSelector } from "@/components/language-selector";
 
 type NavigationItem = (typeof salesNavigation | typeof adminNavigation)[number];
 
@@ -121,7 +122,12 @@ export function AppShell({
       </aside>
 
       <main className="min-w-0 flex-1 lg:pl-72">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">{children}</div>
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-10 lg:py-6">
+          <div className="mb-5 flex justify-end">
+            <LanguageSelector />
+          </div>
+          {children}
+        </div>
       </main>
     </div>
   );

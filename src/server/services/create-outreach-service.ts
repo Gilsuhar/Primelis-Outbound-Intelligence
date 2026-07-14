@@ -18,6 +18,7 @@ import {
   type OutreachKnowledgeRecord,
   type OutreachSourceReference,
 } from "@/features/create-outreach/types";
+import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createOutreachAiProvider, type OutreachAiProvider } from "./create-outreach-provider";
@@ -42,6 +43,7 @@ const createOutreachSchema = z.object({
   messageType: z.enum(outreachMessageTypes),
   desiredTone: z.enum(outreachTones),
   desiredLength: z.enum(outreachLengths),
+  outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   useCaseStudy: z.boolean().optional().default(false),
   internalNotes: z.string().trim().max(1200).optional(),
   creatorId: z.string().trim().min(1).optional(),

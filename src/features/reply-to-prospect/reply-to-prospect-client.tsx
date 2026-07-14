@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
+import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { personas } from "@/features/playbook/playbook-content";
 import type {
@@ -73,6 +74,7 @@ function OptionalSelect({
 }
 
 export function ReplyToProspectClient() {
+  const outputLanguage = useOutputLanguage();
   const [result, setResult] = useState<ReplyToProspectResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -90,6 +92,7 @@ export function ReplyToProspectClient() {
         channel,
         desiredTone: tone,
         desiredLength: length,
+        outputLanguage,
         contextNotes: formData.get("contextNotes") || undefined,
       });
 
@@ -128,6 +131,7 @@ export function ReplyToProspectClient() {
           action={onSubmit}
           className="space-y-4 rounded-lg border border-line bg-white p-4 shadow-sm"
         >
+          <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <MessageSquareReply aria-hidden="true" className="h-5 w-5 text-signal" />
             <h2 className="text-lg font-semibold text-ink">Quick reply brief</h2>

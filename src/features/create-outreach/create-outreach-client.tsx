@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Check, Copy, FileText, Send, ShieldCheck, Target } from "lucide-react";
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
+import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
 import type {
@@ -207,6 +208,7 @@ function TextField({
 }
 
 export function CreateOutreachClient() {
+  const outputLanguage = useOutputLanguage();
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
@@ -256,6 +258,7 @@ export function CreateOutreachClient() {
         messageType,
         desiredTone: tone,
         desiredLength: length,
+        outputLanguage,
         useCaseStudy: formData.get("useCaseStudy") === "on",
         internalNotes: formData.get("internalNotes") || undefined,
       });
@@ -319,6 +322,7 @@ export function CreateOutreachClient() {
           action={onSubmit}
           className="space-y-4 rounded-lg border border-line bg-white p-4 shadow-sm"
         >
+          <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Target aria-hidden="true" className="h-5 w-5 text-signal" />
             <h2 className="text-lg font-semibold text-ink">Quick brief</h2>

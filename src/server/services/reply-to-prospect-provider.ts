@@ -5,6 +5,7 @@ import type {
   ReplyProviderMetadata,
   ReplyToProspectInput,
 } from "@/features/reply-to-prospect/types";
+import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider } from "./ai-provider";
 
@@ -183,6 +184,7 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               })),
             ),
             safetyPolicy: result.safetyWarnings,
+            outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
         return {

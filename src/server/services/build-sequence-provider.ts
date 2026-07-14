@@ -13,6 +13,7 @@ import type {
   SequenceStep,
 } from "@/features/build-sequence/types";
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
+import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider } from "./ai-provider";
 
@@ -380,6 +381,7 @@ export function createBuildSequenceAiProvider(
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
+            outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
         return {

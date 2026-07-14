@@ -13,6 +13,7 @@ import {
   type ReplyToProspectInput,
   type ReplyToProspectResult,
 } from "@/features/reply-to-prospect/types";
+import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createReplyAiProvider, type ReplyAiProvider } from "./reply-to-prospect-provider";
@@ -29,6 +30,7 @@ const replyInputSchema = z.object({
   channel: z.enum(replyChannels),
   desiredTone: z.enum(replyTones),
   desiredLength: z.enum(replyLengths),
+  outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   contextNotes: z.string().trim().max(2000).optional(),
   creatorId: z.string().trim().min(1).optional(),
 });
