@@ -211,7 +211,13 @@ describe("Build Sequence service", () => {
   });
 
   it("creates a concise Nike-style sequence from quick dropdown inputs", async () => {
-    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const { adapter } = persistence([
+      knowledge({
+        id: "product-truth",
+        approvedText:
+          "Signal combines SERP conditions with Google Ads, Google Search Console and conversion-source data to evaluate blended paid and organic traffic, CPC, conversions and business outcomes.",
+      }),
+    ]);
 
     const result = await generateBuildSequence(
       {
@@ -240,6 +246,9 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
+      expect(JSON.stringify(result.data.steps)).not.toMatch(
+        /SERP|conversion-source|methodology gives|operational than|branded paid search is incremental/i,
+      );
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
     }
   });

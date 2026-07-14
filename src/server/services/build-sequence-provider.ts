@@ -44,7 +44,7 @@ function stripCommercialTerms(text: string) {
 }
 
 function greeting(input: BuildSequenceInput) {
-  return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi,";
+  return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
 }
 
 function cleanSelection(value?: string) {
@@ -70,7 +70,7 @@ function openingFor(input: BuildSequenceInput) {
     return `I thought ${company} could be worth a quick brand-search fit check.`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a possible competitor-pressure angle around branded search at ${company}.`;
+    return `I noticed a possible brand-search visibility angle at ${company}.`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
     return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
@@ -81,27 +81,27 @@ function openingFor(input: BuildSequenceInput) {
   if (/growth|acquisition/i.test(trigger)) {
     return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
   }
-  return `${trigger} made me think a brand-search methodology conversation may be relevant for ${company}.`;
+  return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
 }
 
 function ctaForStep(stepNumber: number, isFinal: boolean, channel: SequenceStep["channel"]) {
   if (isFinal) {
-    return "If this is not relevant, I can close the loop here.";
+    return "If this is not useful, I can close the loop here.";
   }
   if (channel === "LINKEDIN") {
     return stepNumber === 1 ? "Open to connecting?" : "Open to comparing notes?";
   }
   return stepNumber === 1
-    ? "Worth a quick compare of how you decide when branded paid search is incremental?"
-    : "Would it be useful to compare the methodology?";
+    ? "Worth comparing how you decide this today?"
+    : "Open to comparing how you decide this today?";
 }
 
 function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: string) {
   const subjects = [
-    `${input.companyName} and ${angleLabel}`,
-    `Question on ${input.companyName}'s brand search`,
-    `Methodology thought for ${input.companyName}`,
-    `Following up on ${angleLabel}`,
+    `${input.companyName} brand-search question`,
+    `Paid brand at ${input.companyName}`,
+    `${input.companyName}: paid and organic`,
+    `Closing the loop`,
     `Close the loop?`,
     `Last note on brand search`,
   ];
@@ -109,7 +109,7 @@ function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: s
 }
 
 function connectionRequestFor(input: BuildSequenceInput) {
-  return `Hi ${input.contactFirstName || "there"} - noticed a reason to compare brand-search methodology at ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - noticed a brand-search efficiency question at ${input.companyName}. Open to connecting?`;
 }
 
 function fitSignalForEmail(value?: string) {
@@ -118,16 +118,16 @@ function fitSignalForEmail(value?: string) {
     return undefined;
   }
   if (/\$|revenue|employees|enterprise|multi-market|multi-country/i.test(clean)) {
-    return "enough scale and complexity for brand-search decisions to matter";
+    return "a larger paid-search setup where small brand decisions can affect spend";
   }
   if (/monthly|spend/i.test(clean)) {
-    return "enough branded-search activity for efficiency gains to matter";
+    return "active brand-search spend where efficiency can matter";
   }
   if (/brand demand|paid-search owner/i.test(clean)) {
-    return "likely brand demand and a clear paid-search owner";
+    return "clear brand demand and someone owning paid search";
   }
   if (/validate brand demand|not enough signal|unknown/i.test(clean)) {
-    return "a brand-demand question worth validating before any pitch";
+    return "a brand-demand question worth checking first";
   }
   return clean.toLowerCase();
 }
@@ -143,7 +143,33 @@ function accountContextLine(input: BuildSequenceInput) {
     return "";
   }
 
-  return `I had ${input.companyName} on my list because ${details.join(" and ")} can make brand-search decisions more operational than they look from the outside.`;
+  return `I thought ${input.companyName} could be worth a quick brand-search fit check because of ${details.join(" and ")}.`;
+}
+
+function personaPainLine(input: BuildSequenceInput) {
+  const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
+    input.companyContext ?? "",
+  )
+    ? " At that level, even small changes in paid brand coverage can affect budget and reporting."
+    : "";
+  return `For ${input.contactRole}, the hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when search results change enough to make paid coverage worth keeping.${scaleHint}`;
+}
+
+function humanizeFact(fact: string) {
+  if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
+    return "Signal helps compare paid brand ads with organic results and search-result changes, so the team can decide where to keep coverage and where to reduce wasted spend.";
+  }
+  if (/paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(fact)) {
+    return "Signal compares paid brand ads with organic results and search-result changes, so the team can make a clearer decision before changing coverage or spend.";
+  }
+  return fact;
+}
+
+function customerFacingAngle(angleLabel: string) {
+  return angleLabel
+    .replace(/methodology comparison/i, "paid and organic search")
+    .replace(/market control and visibility/i, "brand-search visibility")
+    .replace(/solo.*ghost/i, "paid brand coverage");
 }
 
 function bodyForPurpose({
@@ -163,27 +189,29 @@ function bodyForPurpose({
 }) {
   const trigger = input.observedTrigger.trim();
   const opening = openingFor(input);
-  const persona = input.contactRole;
   const context = accountContextLine(input);
+  const simplePrimaryFact = humanizeFact(primaryFact);
+  const simpleSecondaryFact = humanizeFact(secondaryFact);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
       context || opening,
-      primaryFact,
-      `For ${persona}, the practical question is whether the methodology gives enough confidence to decide where brand spend is actually needed.`,
+      personaPainLine(input),
+      simplePrimaryFact,
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The issue is usually not more reporting. It is knowing where paid brand spend is helping, where organic demand already carries the outcome, and where competitors change the decision.",
-      secondaryFact,
+      "A common issue is paying for brand clicks the company may already win organically.",
+      "The useful question is where paid brand search protects demand, and where it is just adding cost.",
+      simpleSecondaryFact,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      `One reason this may be worth a look is methodology: ${primaryFact}`,
-      "I am not making a claim about any current vendor, just suggesting a comparison of approach.",
+      "The comparison I would suggest is simple: paid brand ads, organic results, and search-result changes in one view.",
+      "That makes it easier to decide where to keep coverage and where to reduce wasted spend.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -195,24 +223,24 @@ function bodyForPurpose({
       greeting(input),
       "",
       `There is approved customer evidence available for this channel, but I would use it only as supporting context rather than the whole pitch.`,
-      secondaryFact,
+      simpleSecondaryFact,
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
       "",
-      `A useful technical question may be how paid and organic brand-search signals are evaluated together before deciding what to change.`,
-      secondaryFact,
+      `A useful question may be how the team compares paid brand ads with organic results before deciding what to change.`,
+      simpleSecondaryFact,
     ],
     LOW_PRESSURE_FOLLOW_UP: [
       greeting(input),
       "",
-      `I wanted to follow up without overloading the thread. The narrow question is whether ${angleLabel} is worth a quick comparison for ${input.companyName}.`,
+      `I wanted to follow up without overloading the thread. The narrow question is whether paid brand coverage is worth a quick look for ${input.companyName}.`,
     ],
     BREAKUP_CLOSE_LOOP: [
       greeting(input),
       "",
-      `I will close the loop after this note. If ${angleLabel} is not relevant right now, no problem.`,
-      "If it becomes a priority later, the useful starting point would be the methodology question rather than a generic platform overview.",
+      "I will close the loop after this note.",
+      "If paid brand efficiency becomes a priority later, the useful starting point is a quick look at where paid coverage is helping and where organic results already do enough.",
     ],
   };
 
@@ -254,6 +282,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     generation,
   }: BuildSequenceProviderRequest): Promise<SequenceGeneration> {
     const angleLabel = labelForSequenceAngle(generation.selectedAngle);
+    const emailAngle = customerFacingAngle(angleLabel);
     const productFacts = records
       .filter((record) => record.type === "PRODUCT_TRUTH")
       .map((record) => stripCommercialTerms(record.approvedText));
@@ -287,7 +316,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
               : "LinkedIn keeps the touch lighter and different from the email copy."
             : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`) +
           " Account context is user-provided until verified.",
-        subjectLine: channel === "EMAIL" ? subjectFor(input, stepNumber, angleLabel) : undefined,
+        subjectLine: channel === "EMAIL" ? subjectFor(input, stepNumber, emailAngle) : undefined,
         connectionRequest:
           channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input) : undefined,
         messageBody: bodyForPurpose({
@@ -296,11 +325,13 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           channel,
           primaryFact,
           secondaryFact: caseStudyFacts[0] ?? secondaryFact,
-          angleLabel,
+          angleLabel: emailAngle,
         }),
         cta,
         claimsUsed: [
-          purpose === "SOCIAL_PROOF" ? (caseStudyFacts[0] ?? secondaryFact) : primaryFact,
+          purpose === "SOCIAL_PROOF"
+            ? humanizeFact(caseStudyFacts[0] ?? secondaryFact)
+            : humanizeFact(primaryFact),
         ],
         sourceIds,
       };
@@ -311,7 +342,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       steps,
       claimsUsed: Array.from(new Set(steps.flatMap((step) => step.claimsUsed))),
       overallStrategy: stripCommercialTerms(
-        `Use ${purposeLabels[purposes[0]]} first, then vary the angle across methodology, account context, and a low-pressure close. Keep the sequence concise and anchored to ${angleLabel}.`,
+        `Use ${purposeLabels[purposes[0]]} first, then vary the angle across account relevance, paid and organic search, and a low-pressure close. Keep the sequence concise and anchored to ${emailAngle}.`,
       ),
     };
   }
