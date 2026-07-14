@@ -17,6 +17,8 @@ type CookieToSet = {
   options: CookieOptions;
 };
 
+type HeadersToSet = Record<string, string>;
+
 function getSafeRedirectUrl(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const next = getSafeInternalPath(requestUrl.searchParams.get("next"));
@@ -32,10 +34,13 @@ function getLoginErrorUrl(
   return loginUrl;
 }
 
-function redirectWithCookies(url: URL, cookiesToSet: CookieToSet[]) {
+function redirectWithCookies(url: URL, cookiesToSet: CookieToSet[], headersToSet: HeadersToSet) {
   const response = NextResponse.redirect(url);
   cookiesToSet.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
+  });
+  Object.entries(headersToSet).forEach(([key, value]) => {
+    response.headers.set(key, value);
   });
   return response;
 }
@@ -76,13 +81,15 @@ export async function GET(request: NextRequest) {
   }
 
   const cookiesToSet: CookieToSet[] = [];
+  const headersToSet: HeadersToSet = {};
   const supabase = createServerClient(config.url, config.anonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(nextCookies: CookieToSet[]) {
+      setAll(nextCookies: CookieToSet[], nextHeaders = {}) {
         cookiesToSet.push(...nextCookies);
+        Object.assign(headersToSet, nextHeaders);
       },
     },
   });
@@ -96,7 +103,11 @@ export async function GET(request: NextRequest) {
       pkceExchangeSucceeded: false,
       ...getSafeSupabaseError(error),
     });
-    return redirectWithCookies(getLoginErrorUrl(request, "oauth_failed"), cookiesToSet);
+    return redirectWithCookies(
+      getLoginErrorUrl(request, "oauth_failed"),
+      cookiesToSet,
+      headersToSet,
+    );
   }
 
   logAuthDiagnostic("info", {
@@ -123,13 +134,35 @@ export async function GET(request: NextRequest) {
       ...getSafeSupabaseError(userError),
     });
     await supabase.auth.signOut();
-    return redirectWithCookies(getLoginErrorUrl(request, "access_denied"), cookiesToSet);
+    return redirectWithCookies(
+      getLoginErrorUrl(request, "access_denied"),
+      cookiesToSet,
+      headersToSet,
+    );
   }
 
-  const applicationUser = await resolveApplicationUser({
-    id: user.id,
-    email: normalizedEmail,
-  });
+  let applicationUser;
+  try {
+    applicationUser = await resolveApplicationUser({
+      id: user.id,
+      email: normalizedEmail,
+    });
+  } catch {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "callback_application_user_lookup_failed",
+      callbackCodePresent: true,
+      pkceExchangeSucceeded: true,
+      sessionUserReturned: true,
+      approvedUserAuthorized: false,
+    });
+    await supabase.auth.signOut();
+    return redirectWithCookies(
+      getLoginErrorUrl(request, "configuration_error"),
+      cookiesToSet,
+      headersToSet,
+    );
+  }
 
   if (!applicationUser) {
     logAuthDiagnostic("warn", {
@@ -141,7 +174,11 @@ export async function GET(request: NextRequest) {
       approvedUserAuthorized: false,
     });
     await supabase.auth.signOut();
-    return redirectWithCookies(getLoginErrorUrl(request, "access_denied"), cookiesToSet);
+    return redirectWithCookies(
+      getLoginErrorUrl(request, "access_denied"),
+      cookiesToSet,
+      headersToSet,
+    );
   }
 
   logAuthDiagnostic("info", {
@@ -153,5 +190,5 @@ export async function GET(request: NextRequest) {
     approvedUserAuthorized: true,
   });
 
-  return redirectWithCookies(getSafeRedirectUrl(request), cookiesToSet);
+  return redirectWithCookies(getSafeRedirectUrl(request), cookiesToSet, headersToSet);
 }

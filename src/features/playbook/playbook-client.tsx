@@ -41,6 +41,102 @@ const sectionLinks = [
   ["progress", "Progress"],
 ] as const;
 
+type SectionId = (typeof sectionLinks)[number][0];
+
+function PlaybookTabs({
+  activeSection,
+  onChange,
+}: {
+  activeSection: SectionId;
+  onChange: (section: SectionId) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-line bg-cream p-2">
+      <div className="flex gap-2 overflow-x-auto">
+        {sectionLinks.map(([id, label]) => (
+          <button
+            className={[
+              "shrink-0 rounded-full px-3 py-2 text-sm font-semibold transition",
+              activeSection === id
+                ? "bg-lime text-ink shadow-soft"
+                : "bg-white text-[#5c5a4f] hover:text-ink",
+            ].join(" ")}
+            key={id}
+            onClick={() => onChange(id)}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompactDetails({
+  title,
+  eyebrow,
+  badge,
+  children,
+}: {
+  title: string;
+  eyebrow?: string;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-2xl border border-line bg-cream p-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+        <span>
+          {eyebrow ? (
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+              {eyebrow}
+            </span>
+          ) : null}
+          <span className="block text-base font-semibold text-ink">{title}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          {badge}
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-[#6f6d5f]" />
+        </span>
+      </summary>
+      <div className="mt-4 border-t border-line pt-4 text-sm leading-6 text-[#5c5a4f]">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function PlaybookSection({
+  id,
+  eyebrow,
+  title,
+  description,
+  hidden = false,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description?: string;
+  hidden?: boolean;
+  children: React.ReactNode;
+}) {
+  if (hidden) {
+    return null;
+  }
+
+  return (
+    <section
+      className="scroll-mt-6 rounded-2xl border border-line bg-white p-5 shadow-soft"
+      id={id}
+    >
+      <SectionHeader eyebrow={eyebrow} title={title} description={description} />
+      <div className="mt-5 space-y-4">{children}</div>
+    </section>
+  );
+}
+
 function WarningLabel({ text }: { text: string }) {
   return (
     <span className="inline-flex rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-[#6f6d5f]">
@@ -83,6 +179,7 @@ export function PlaybookClient({
 }) {
   const [progress, setProgress] = useState<PlaybookProgressState>(emptyProgress);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
+  const [activeSection, setActiveSection] = useState<SectionId>("learn");
   const progressView = useMemo(
     () => calculateProgress(progress, viewerRole),
     [progress, viewerRole],
@@ -100,27 +197,15 @@ export function PlaybookClient({
         title="Learn the product. Pick the right accounts. Keep the message sharp."
       />
 
-      <nav
-        aria-label="Playbook sections"
-        className="flex gap-2 overflow-x-auto rounded-2xl border border-line bg-cream p-2"
-      >
-        {sectionLinks.map(([id, label]) => (
-          <a
-            className="shrink-0 rounded-full px-3 py-2 text-sm font-semibold text-[#5c5a4f] hover:bg-white hover:text-ink"
-            href={`#${id}`}
-            key={id}
-          >
-            {label}
-          </a>
-        ))}
-      </nav>
+      <PlaybookTabs activeSection={activeSection} onChange={setActiveSection} />
 
-      <section className="space-y-4" id="learn">
-        <SectionHeader
-          eyebrow="A. Learn Signal"
-          title="What Signal helps teams decide"
-          description="Use approved product truth for factual claims. Treat guidance as internal unless it is explicitly approved for external wording."
-        />
+      <PlaybookSection
+        description="Use approved product truth for factual claims. Treat guidance as internal unless it is explicitly approved for external wording."
+        eyebrow="A. Learn Signal"
+        hidden={activeSection !== "learn"}
+        id="learn"
+        title="What Signal helps teams decide"
+      >
         <div className="grid gap-4 lg:grid-cols-3">
           {data.approvedProductTruth.length > 0 ? (
             data.approvedProductTruth.slice(0, 3).map((record) => (
@@ -144,30 +229,28 @@ export function PlaybookClient({
             />
           )}
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {[
-            "Solo scenario: branded search where paid presence may not be incrementally useful.",
-            "Competitive scenario: competitors or intermediaries may change the paid-search decision.",
-            "Ghost scenario: paid brand activity may appear useful while organic outcomes tell a different story.",
-            "Signal does not promise guaranteed traffic, conversions, exact savings, or universal spend cuts.",
-          ].map((item) => (
-            <div
-              className="rounded-2xl border border-line bg-white p-4 text-sm leading-6 text-[#5c5a4f]"
-              key={item}
-            >
-              {item}
-            </div>
-          ))}
-        </div>
-      </section>
+        <CompactDetails title="Three scenarios and safety limits">
+          <ul className="space-y-2">
+            {[
+              "Solo scenario: branded search where paid presence may not be incrementally useful.",
+              "Competitive scenario: competitors or intermediaries may change the paid-search decision.",
+              "Ghost scenario: paid brand activity may appear useful while organic outcomes tell a different story.",
+              "Signal does not promise guaranteed traffic, conversions, exact savings, or universal spend cuts.",
+            ].map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </CompactDetails>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="icp">
-        <SectionHeader
-          eyebrow="B. Signal ICP"
-          title="Approved Signal ICP v1"
-          description="A strong candidate usually has most of these signals. Revenue or company size alone never qualifies an account."
-        />
-        <div className="grid gap-4 md:grid-cols-2">
+      <PlaybookSection
+        description="A strong candidate usually has most of these signals. Revenue or company size alone never qualifies an account."
+        eyebrow="B. Signal ICP"
+        hidden={activeSection !== "icp"}
+        id="icp"
+        title="Approved Signal ICP v1"
+      >
+        <div className="grid gap-3 md:grid-cols-2">
           <SignalCard title="Core ICP">
             <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
               {coreIcpSignals.map((signal) => (
@@ -183,21 +266,22 @@ export function PlaybookClient({
             </ul>
           </SignalCard>
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="industries">
-        <SectionHeader
-          eyebrow="C. Industries"
-          title="Prioritize proven segments first"
-          description="Strong hypothesis and exploratory segments are useful for testing, not proof."
-        />
-        <div className="grid gap-4 xl:grid-cols-3">
+      <PlaybookSection
+        description="Strong hypothesis and exploratory segments are useful for testing, not proof."
+        eyebrow="C. Industries"
+        hidden={activeSection !== "industries"}
+        id="industries"
+        title="Prioritize proven segments first"
+      >
+        <div className="grid gap-3 lg:grid-cols-2">
           {data.industries.map((industry) => (
-            <article className="rounded-2xl border border-line bg-cream p-5" key={industry.name}>
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-lg font-semibold text-ink">{industry.name}</h3>
-                <EvidenceBadge level={industry.evidenceLevel} />
-              </div>
+            <CompactDetails
+              badge={<EvidenceBadge level={industry.evidenceLevel} />}
+              key={industry.name}
+              title={industry.name}
+            >
               <p className="mt-2 text-xs text-[#6f6d5f]">
                 {evidenceDescriptions[industry.evidenceLevel]}
               </p>
@@ -215,17 +299,18 @@ export function PlaybookClient({
                   Eligible proof: {industry.eligibleProof.join(", ")}
                 </p>
               ) : null}
-            </article>
+            </CompactDetails>
           ))}
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="personas">
-        <SectionHeader
-          eyebrow="D. Personas"
-          title="Target ownership, not title seniority alone"
-          description="Direct Paid Search ownership is often best, but Performance, Growth, Acquisition, Digital, or E-commerce leaders can be equally important when they own the outcome."
-        />
+      <PlaybookSection
+        description="Direct Paid Search ownership is often best, but Performance, Growth, Acquisition, Digital, or E-commerce leaders can be equally important when they own the outcome."
+        eyebrow="D. Personas"
+        hidden={activeSection !== "personas"}
+        id="personas"
+        title="Target ownership, not title seniority alone"
+      >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.personas.map((persona) => (
             <details className="rounded-2xl border border-line bg-white p-5" key={persona.name}>
@@ -264,10 +349,14 @@ export function PlaybookClient({
             </details>
           ))}
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="transition">
-        <SectionHeader eyebrow="E. US Market Transition" title="Practical shifts for US outreach" />
+      <PlaybookSection
+        eyebrow="E. US Market Transition"
+        hidden={activeSection !== "transition"}
+        id="transition"
+        title="Practical shifts for US outreach"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           {[
             "Expect titles like VP Performance Marketing, Head of Growth, Director of Demand Generation, SEM Manager, and PPC Lead.",
@@ -276,17 +365,20 @@ export function PlaybookClient({
             "Use soft, specific CTAs and respect US time zones when scheduling.",
             "Check whether ownership sits at HQ, regional, or global level before assuming the buyer.",
           ].map((item) => (
-            <SignalCard description={item} key={item} title="Guidance" />
+            <CompactDetails key={item} title="Guidance">
+              {item}
+            </CompactDetails>
           ))}
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="qualify">
-        <SectionHeader
-          eyebrow="F. Qualify an Account"
-          title="Keep the fit decision simple"
-          description="Use Strong fit, Possible fit, or Do not target. Do not build a fake score."
-        />
+      <PlaybookSection
+        description="Use Strong fit, Possible fit, or Do not target. Do not build a fake score."
+        eyebrow="F. Qualify an Account"
+        hidden={activeSection !== "qualify"}
+        id="qualify"
+        title="Keep the fit decision simple"
+      >
         <SignalCard title="Checklist">
           <ul className="mt-4 grid gap-2 text-sm leading-6 text-[#5c5a4f] sm:grid-cols-2">
             {qualificationChecklist.map((item) => (
@@ -294,10 +386,14 @@ export function PlaybookClient({
             ))}
           </ul>
         </SignalCard>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="work">
-        <SectionHeader eyebrow="G. How to Work" title="One operating flow" />
+      <PlaybookSection
+        eyebrow="G. How to Work"
+        hidden={activeSection !== "work"}
+        id="work"
+        title="One operating flow"
+      >
         <div className="flex flex-wrap gap-2">
           {workSteps.map((step) => (
             <span
@@ -326,14 +422,15 @@ export function PlaybookClient({
             Handle Reply
           </Link>
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="objections">
-        <SectionHeader
-          eyebrow="H. Objections"
-          title="Respond without unsupported claims"
-          description="Competitor language stays cautious. Restricted wording is not send-ready proof."
-        />
+      <PlaybookSection
+        description="Competitor language stays cautious. Restricted wording is not send-ready proof."
+        eyebrow="H. Objections"
+        hidden={activeSection !== "objections"}
+        id="objections"
+        title="Respond without unsupported claims"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           {[
             "We already use Adthena",
@@ -347,7 +444,7 @@ export function PlaybookClient({
             "We tried lowering brand spend before",
             "We always have competitors",
           ].map((objection) => (
-            <SignalCard key={objection} title={objection}>
+            <CompactDetails key={objection} title={objection}>
               <p className="mt-3 text-sm leading-6 text-[#5c5a4f]">
                 Understand what they mean, answer the real concern, avoid competitor weakness
                 claims, and use Reply to Prospect for a careful response.
@@ -358,22 +455,23 @@ export function PlaybookClient({
               >
                 Open Reply to Prospect
               </Link>
-            </SignalCard>
+            </CompactDetails>
           ))}
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="case-studies">
-        <SectionHeader
-          eyebrow="I. Case Studies"
-          title="Use customer evidence carefully"
-          description="Case studies retain their review and usage state. Do not treat restricted stories as universally approved."
-        />
+      <PlaybookSection
+        description="Case studies retain their review and usage state. Do not treat restricted stories as universally approved."
+        eyebrow="I. Case Studies"
+        hidden={activeSection !== "case-studies"}
+        id="case-studies"
+        title="Use customer evidence carefully"
+      >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.caseStudies.length > 0 ? (
             data.caseStudies.map((record) => (
-              <article className="rounded-2xl border border-line bg-white p-5" key={record.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <details className="rounded-2xl border border-line bg-white p-5" key={record.id}>
+                <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3">
                   <h3 className="text-lg font-semibold text-ink">{record.title}</h3>
                   <WarningLabel
                     text={
@@ -382,14 +480,12 @@ export function PlaybookClient({
                         ? "Verify before external use"
                         : record.usageScope === "SALES_REPLY_ONLY"
                           ? "Reply use only"
-                          : "Internal use only"
+                        : "Internal use only"
                     }
                   />
-                </div>
-                <p className="mt-2 text-sm text-[#6f6d5f]">
-                  {record.industries.join(", ") || "Industry not tagged"}
-                </p>
-                <div className="mt-3 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+                </summary>
+                <div className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+                  <p>{record.industries.join(", ") || "Industry not tagged"}</p>
                   {record.metrics.map((metric) => (
                     <p key={metric.id}>
                       <strong>{metric.metricName}:</strong> {metric.value} {metric.unit ?? ""}
@@ -402,7 +498,7 @@ export function PlaybookClient({
                   </p>
                   <p>Best-fit persona: {record.personas.join(", ") || "Verify before use"}</p>
                 </div>
-              </article>
+              </details>
             ))
           ) : (
             <SignalCard
@@ -411,24 +507,29 @@ export function PlaybookClient({
             />
           )}
         </div>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="dnc">
-        <SectionHeader eyebrow="J. Do Not Contact" title="Check suppression before outreach" />
+      <PlaybookSection
+        eyebrow="J. Do Not Contact"
+        hidden={activeSection !== "dnc"}
+        id="dnc"
+        title="Check suppression before outreach"
+      >
         <SignalCard
           description="Use the Do Not Contact list before creating outreach or sequences. The current phase does not connect a CRM or collect external data."
           href="/do-not-contact"
           icon={Ban}
           title="Open Do Not Contact"
         />
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="practice">
-        <SectionHeader
-          eyebrow="K. Practice"
-          title="Five quick non-AI scenarios"
-          description="Write or choose an answer, reveal guidance, and mark practice complete."
-        />
+      <PlaybookSection
+        description="Write or choose an answer, reveal guidance, and mark practice complete."
+        eyebrow="K. Practice"
+        hidden={activeSection !== "practice"}
+        id="practice"
+        title="Five quick non-AI scenarios"
+      >
         <div className="space-y-3">
           {data.practiceScenarios.map((scenario) => (
             <details className="rounded-2xl border border-line bg-cream p-5" key={scenario.id}>
@@ -466,14 +567,15 @@ export function PlaybookClient({
           <GraduationCap className="h-4 w-4" />
           {progress.practice ? "Practice complete" : "Mark practice complete"}
         </button>
-      </section>
+      </PlaybookSection>
 
-      <section className="space-y-4" id="progress">
-        <SectionHeader
-          eyebrow="L. Progress"
-          title="Lightweight readiness"
-          description="No time tracking, behavioral monitoring, or productivity scoring."
-        />
+      <PlaybookSection
+        description="No time tracking, behavioral monitoring, or productivity scoring."
+        eyebrow="L. Progress"
+        hidden={activeSection !== "progress"}
+        id="progress"
+        title="Lightweight readiness"
+      >
         <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
           <SignalCard title={`${progressView.completionPercentage}% complete`}>
             <p className="mt-2 text-sm text-[#6f6d5f]">{progressView.readinessStatus}</p>
@@ -510,7 +612,7 @@ export function PlaybookClient({
             and manager approval only.
           </p>
         </div>
-      </section>
+      </PlaybookSection>
     </div>
   );
 }

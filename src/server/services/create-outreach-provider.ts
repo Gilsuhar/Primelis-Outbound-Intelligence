@@ -48,24 +48,71 @@ function greeting(input: CreateOutreachInput) {
   return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi,";
 }
 
+function cleanSelection(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+  return value
+    .replace(/^Strong fit\s*-\s*/i, "")
+    .replace(/^Possible fit\s*-\s*/i, "")
+    .replace(/^Core ICP:\s*/i, "")
+    .replace(/^Quick discovery:\s*/i, "")
+    .trim();
+}
+
+function triggerPhrase(input: CreateOutreachInput) {
+  const trigger = cleanSelection(input.observedTrigger);
+  const company = input.companyName;
+
+  if (!trigger) {
+    return `I thought ${company} could be worth a focused brand-search conversation.`;
+  }
+  if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
+    return `I thought ${company} could be worth a quick brand-search fit check.`;
+  }
+  if (/competitors/i.test(trigger)) {
+    return `I noticed a possible competitor-pressure angle around branded search at ${company}.`;
+  }
+  if (/efficiency|brand-spend/i.test(trigger)) {
+    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
+  }
+  if (/multi-market|governance|control/i.test(trigger)) {
+    return `I thought ${company} may have a useful cross-market brand-search control question.`;
+  }
+  if (/growth|acquisition/i.test(trigger)) {
+    return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
+  }
+  return `${trigger} made me think a brand-search methodology conversation may be relevant for ${company}.`;
+}
+
 function ctaFor(input: CreateOutreachInput) {
   if (input.channel === "LINKEDIN") {
-    return "Open to a quick exchange on whether this is relevant?";
+    return "Open to comparing notes?";
   }
-  return "Worth a short exchange to see if this is relevant?";
+  return "Worth a quick compare of how you decide when branded paid search is incremental?";
 }
 
 function subjectLinesFor(input: CreateOutreachInput, angleLabel: string) {
   const company = input.companyName;
   return [
-    `${company} and branded-search efficiency`,
-    `Idea for ${company}'s brand search`,
-    `Question on ${angleLabel}`,
+    `${company} brand-search question`,
+    `Paid + organic at ${company}`,
+    `${company} and ${angleLabel}`,
   ];
 }
 
 function connectionRequestFor(input: CreateOutreachInput) {
-  return `Hi ${input.contactFirstName || "there"} - noticed a reason to compare branded-search methodology at ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - noticed a potential brand-search methodology question at ${input.companyName}. Open to connecting?`;
+}
+
+function contextLine(input: CreateOutreachInput) {
+  const details = [
+    input.industry,
+    cleanSelection(input.companyContext),
+    input.geographyOrMarkets,
+  ].filter(Boolean);
+
+  return details.length > 0 ? `The reason this may fit: ${details.join(", ")}.` : "";
 }
 
 export class DeterministicOutreachProvider implements OutreachAiProvider {
@@ -88,26 +135,32 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       ? trimSentences(productFacts[0], input.desiredLength === "DETAILED" ? 2 : 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
     const personaPhrase = generation.personaGuidance.emphasis;
-    const trigger = input.observedTrigger.trim();
-    const assumptionNote = input.paidSearchContext
-      ? "Given the paid-search context you shared,"
-      : "Based on the outreach trigger you shared,";
     const cta = ctaFor(input);
+    const context = contextLine(input);
+    const opening = triggerPhrase(input);
+    const roleLine = `For a ${input.contactRole}, the useful question is ${personaPhrase}: where brand paid search is helping, where organic demand already carries the outcome, and where competitors change the decision.`;
+    const factLine =
+      primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
+        ? "Signal is used to compare paid brand activity with organic visibility and live competitive conditions before changing spend."
+        : primaryFact;
 
     const recommended =
       input.channel === "EMAIL"
         ? [
             greeting(input),
             "",
-            `${assumptionNote} I thought ${angleLabel} could be worth a look for ${input.companyName}.`,
-            `${primaryFact}`,
-            `For a ${input.contactRole}, the useful lens is ${personaPhrase}, without assuming details we have not verified.`,
+            opening,
+            context,
+            roleLine,
+            factLine,
             "",
             cta,
-          ].join("\n")
+          ]
+            .filter((line) => line !== "")
+            .join("\n")
         : [
-            `${input.contactFirstName ? `${input.contactFirstName}, ` : ""}${assumptionNote.toLowerCase()} ${angleLabel} may be worth a look at ${input.companyName}.`,
-            primaryFact,
+            `${input.contactFirstName ? `${input.contactFirstName}, ` : ""}${opening}`,
+            factLine,
             cta,
           ].join(" ");
 
@@ -116,11 +169,11 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
         ? [
             greeting(input),
             "",
-            `${trigger} made me think ${angleLabel} may be relevant for ${input.companyName}. ${trimSentences(primaryFact, 1)}`,
+            `${opening} ${trimSentences(factLine, 1)}`,
             "",
             cta,
           ].join("\n")
-        : `${trigger} made me think ${angleLabel} may be relevant for ${input.companyName}. ${cta}`;
+        : `${opening} ${cta}`;
 
     return {
       ...generation,

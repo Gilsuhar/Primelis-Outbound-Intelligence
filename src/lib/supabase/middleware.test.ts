@@ -73,8 +73,8 @@ function mockSupabaseUser(user: { id: string; email: string } | null) {
 
     return {
       auth: {
-        getUser: vi.fn(async () => ({
-          data: { user },
+        getClaims: vi.fn(async () => ({
+          data: { claims: user ? { sub: user.id, email: user.email } : null },
           error: user ? null : { message: "not authenticated" },
         })),
       },

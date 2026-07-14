@@ -29,19 +29,21 @@ export async function updateSession(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet: CookieToSet[]) {
+      setAll(cookiesToSet: CookieToSet[], headersToSet = {}) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
         });
+        Object.entries(headersToSet).forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
+  const user = error ? null : data?.claims;
 
   if (!user && !isPublicRoute(pathname)) {
     const loginUrl = request.nextUrl.clone();

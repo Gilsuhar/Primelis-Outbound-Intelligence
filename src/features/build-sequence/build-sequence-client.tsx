@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarDays, FileText, Layers3, Send, ShieldCheck } fro
 import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
+import { industries, personas } from "@/features/playbook/playbook-content";
 import type {
   BuildSequenceResult,
   SequenceChannel,
@@ -26,6 +27,114 @@ const lengths: { label: string; value: SequenceLength }[] = [
   { label: "5 steps", value: 5 },
   { label: "6 steps", value: 6 },
 ];
+
+const companySizeOptions = [
+  "Strong fit - brand demand and paid-search owner",
+  "Possible fit - validate brand demand first",
+  "Not enough signal yet",
+  "$20M-$50M revenue or 100-200 employees",
+  "$50M+ revenue or 200+ employees",
+  "$20K+ monthly branded-search spend",
+  "Enterprise / multi-market account",
+  "Unknown size; qualify first",
+];
+
+const marketOptions = [
+  "United States",
+  "US and Europe",
+  "Multi-country",
+  "Regional market",
+  "Global brand",
+];
+
+const paidSearchOptions = [
+  "Runs branded-search ads",
+  "Strong organic brand visibility",
+  "Competitors appear on brand terms",
+  "Agency manages paid search",
+  "Unknown; ask discovery question",
+];
+
+const vendorOptions = [
+  "Adthena",
+  "Revvim",
+  "Auction Insights",
+  "Google Ads only",
+  "Agency-managed setup",
+  "Unknown",
+];
+
+const triggerOptions = [
+  "Validate branded-search activity",
+  "Competitors may be appearing on brand terms",
+  "Potential brand-spend efficiency opportunity",
+  "Multi-market control or governance question",
+  "Recent growth or acquisition push",
+  "Existing tool may not answer paid + organic methodology",
+  "Light discovery before pitching Signal",
+];
+
+const durationOptions = [
+  "8 business days",
+  "10 business days",
+  "12 business days",
+  "15 business days",
+  "3 weeks",
+];
+
+type SmartFieldProps = {
+  name: string;
+  label: string;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+  textarea?: boolean;
+  defaultValue?: string;
+};
+
+function SmartField({
+  name,
+  label,
+  options,
+  placeholder = "Enter manually",
+  required = false,
+  textarea = false,
+  defaultValue = "",
+}: SmartFieldProps) {
+  const [value, setValue] = useState(defaultValue);
+  const [customValue, setCustomValue] = useState("");
+  const isCustom = value === "__custom";
+  const finalValue = isCustom ? customValue : value;
+  const Input = textarea ? "textarea" : "input";
+
+  return (
+    <label className="space-y-1 text-sm font-medium text-stone-700">
+      {label}
+      <select
+        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      >
+        <option value="">Choose...</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value="__custom">Other / enter manually</option>
+      </select>
+      {isCustom ? (
+        <Input
+          className="mt-2 min-h-10 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+          onChange={(event) => setCustomValue(event.target.value)}
+          placeholder={placeholder}
+          value={customValue}
+        />
+      ) : null}
+      <input name={name} required={required} type="hidden" value={finalValue} />
+    </label>
+  );
+}
 
 export function BuildSequenceClient() {
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
@@ -76,7 +185,7 @@ export function BuildSequenceClient() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Build Sequence</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Create a concise multi-step sequence using approved, source-backed Signal knowledge.
+              Build a short sequence from the same quick brief, without starting from a blank page.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
@@ -93,103 +202,35 @@ export function BuildSequenceClient() {
         >
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Layers3 aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Account and sequence</h2>
+            <h2 className="text-lg font-semibold text-ink">Quick brief</h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Company
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyName"
-                required
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Website
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyWebsite"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              First name
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="contactFirstName"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Contact role
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="contactRole"
-                required
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Industry
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="industry"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Size or revenue context
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyContext"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Geography or markets
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="geographyOrMarkets"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Current vendor/tool
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="currentVendor"
-              />
-            </label>
-          </div>
-
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Known paid-search context
-            <textarea
-              className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="paidSearchContext"
-            />
-          </label>
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Observed trigger or reason for outreach
-            <textarea
-              className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="observedTrigger"
+            <SmartField label="Company" name="companyName" options={[]} required />
+            <SmartField
+              label="Buyer role"
+              name="contactRole"
+              options={personas.map((persona) => persona.name)}
               required
             />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-4">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Channel
-              <select
-                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-                onChange={(event) => setPrimaryChannel(event.target.value as SequenceChannel)}
-                value={primaryChannel}
-              >
-                <option value="EMAIL">Email</option>
-                <option value="LINKEDIN">LinkedIn</option>
-                <option value="MIXED">Mixed</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
+            <SmartField
+              label="Fit / ICP"
+              name="companyContext"
+              options={companySizeOptions}
+              required
+            />
+            <SmartField
+              label="Industry"
+              name="industry"
+              options={industries.map((industry) => industry.name)}
+            />
+            <SmartField
+              label="Reason for outreach"
+              name="observedTrigger"
+              options={triggerOptions}
+              required
+            />
+            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Steps
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -205,7 +246,7 @@ export function BuildSequenceClient() {
                 ))}
               </select>
             </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
+            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Tone
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -219,24 +260,50 @@ export function BuildSequenceClient() {
                 ))}
               </select>
             </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Duration
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                defaultValue="12 business days"
-                name="desiredOverallDuration"
-                required
-              />
-            </label>
+            <SmartField
+              defaultValue="12 business days"
+              label="Duration"
+              name="desiredOverallDuration"
+              options={durationOptions}
+              required
+            />
           </div>
 
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Internal notes
-            <textarea
-              className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="internalNotes"
-            />
-          </label>
+          <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Advanced optional details
+            </summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <SmartField label="Website" name="companyWebsite" options={[]} />
+              <SmartField label="First name" name="contactFirstName" options={[]} />
+              <SmartField
+                label="Market"
+                name="geographyOrMarkets"
+                options={marketOptions}
+              />
+              <SmartField label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
+              <SmartField
+                label="Paid-search context"
+                name="paidSearchContext"
+                options={paidSearchOptions}
+              />
+              <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+                Channel
+                <select
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  onChange={(event) => setPrimaryChannel(event.target.value as SequenceChannel)}
+                  value={primaryChannel}
+                >
+                  <option value="EMAIL">Email</option>
+                  <option value="LINKEDIN">LinkedIn</option>
+                  <option value="MIXED">Mixed</option>
+                </select>
+              </label>
+              <div className="sm:col-span-2">
+                <SmartField label="Internal notes" name="internalNotes" options={[]} textarea />
+              </div>
+            </div>
+          </details>
 
           {error ? (
             <p className="rounded-md border border-[#f1c6b7] bg-[#fff4ef] px-3 py-2 text-sm text-[#9a3f24]">

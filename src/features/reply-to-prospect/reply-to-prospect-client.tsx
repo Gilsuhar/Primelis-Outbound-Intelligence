@@ -11,6 +11,7 @@ import {
 
 import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
+import { personas } from "@/features/playbook/playbook-content";
 import type {
   ReplyChannel,
   ReplyLength,
@@ -30,6 +31,48 @@ const lengthOptions: { label: string; value: ReplyLength }[] = [
   { label: "Standard", value: "STANDARD" },
   { label: "Detailed", value: "DETAILED" },
 ];
+
+function OptionalSelect({
+  name,
+  label,
+  options,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+}) {
+  const [value, setValue] = useState("");
+  const [custom, setCustom] = useState("");
+  const isCustom = value === "__custom";
+
+  return (
+    <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
+      {label}
+      <select
+        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      >
+        <option value="">Choose...</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value="__custom">Other / enter manually</option>
+      </select>
+      {isCustom ? (
+        <input
+          className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
+          onChange={(event) => setCustom(event.target.value)}
+          placeholder="Enter manually"
+          value={custom}
+        />
+      ) : null}
+      <input name={name} type="hidden" value={isCustom ? custom : value} />
+    </label>
+  );
+}
 
 export function ReplyToProspectClient() {
   const [result, setResult] = useState<ReplyToProspectResult | null>(null);
@@ -72,7 +115,7 @@ export function ReplyToProspectClient() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Reply to Prospect</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Draft a concise, source-backed reply using approved Signal knowledge only.
+              Paste the reply, choose the buyer role and tone, then generate a careful response.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
@@ -89,7 +132,7 @@ export function ReplyToProspectClient() {
         >
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <MessageSquareReply aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Prospect input</h2>
+            <h2 className="text-lg font-semibold text-ink">Quick reply brief</h2>
           </div>
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">
@@ -103,24 +146,22 @@ export function ReplyToProspectClient() {
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1 text-sm font-medium text-stone-700">
+            <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Company
               <input
                 className="w-full rounded-md border border-line px-3 py-2 text-sm"
                 name="companyName"
               />
             </label>
-            <label className="block space-y-1 text-sm font-medium text-stone-700">
-              Contact role
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="contactRole"
-              />
-            </label>
+            <OptionalSelect
+              label="Buyer role"
+              name="contactRole"
+              options={personas.map((persona) => persona.name)}
+            />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block space-y-1 text-sm font-medium text-stone-700">
+            <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Channel
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -131,7 +172,7 @@ export function ReplyToProspectClient() {
                 <option value="LINKEDIN">LinkedIn</option>
               </select>
             </label>
-            <label className="block space-y-1 text-sm font-medium text-stone-700">
+            <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Tone
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -145,7 +186,7 @@ export function ReplyToProspectClient() {
                 ))}
               </select>
             </label>
-            <label className="block space-y-1 text-sm font-medium text-stone-700">
+            <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Length
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -161,13 +202,18 @@ export function ReplyToProspectClient() {
             </label>
           </div>
 
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Context notes
-            <textarea
-              className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
-              name="contextNotes"
-            />
-          </label>
+          <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Advanced optional context
+            </summary>
+            <label className="mt-3 block space-y-1 text-sm font-medium text-stone-700">
+              Context notes
+              <textarea
+                className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+                name="contextNotes"
+              />
+            </label>
+          </details>
 
           {error ? (
             <p className="rounded-md border border-[#f1c6b7] bg-[#fff4ef] px-3 py-2 text-sm text-[#9a3f24]">

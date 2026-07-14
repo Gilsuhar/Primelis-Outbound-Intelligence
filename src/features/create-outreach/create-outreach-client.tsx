@@ -5,6 +5,7 @@ import { AlertTriangle, FileText, Send, ShieldCheck, Target } from "lucide-react
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
+import { industries, personas } from "@/features/playbook/playbook-content";
 import type {
   CreateOutreachResult,
   OutreachChannel,
@@ -25,6 +26,91 @@ const lengths: { label: string; value: OutreachLength }[] = [
   { label: "Standard", value: "STANDARD" },
   { label: "Detailed", value: "DETAILED" },
 ];
+
+const companySizeOptions = [
+  "Strong fit - brand demand and paid-search owner",
+  "Possible fit - validate brand demand first",
+  "Not enough signal yet",
+  "$20M-$50M revenue or 100-200 employees",
+  "$50M+ revenue or 200+ employees",
+  "$20K+ monthly branded-search spend",
+  "Enterprise / multi-market account",
+  "Unknown size; qualify first",
+];
+
+const marketOptions = ["United States", "US and Europe", "Multi-country", "Regional market", "Global brand"];
+
+const paidSearchOptions = [
+  "Runs branded-search ads",
+  "Strong organic brand visibility",
+  "Competitors appear on brand terms",
+  "Agency manages paid search",
+  "Unknown; ask discovery question",
+];
+
+const vendorOptions = ["Adthena", "Revvim", "Auction Insights", "Google Ads only", "Agency-managed setup", "Unknown"];
+
+const triggerOptions = [
+  "Validate branded-search activity",
+  "Competitors may be appearing on brand terms",
+  "Potential brand-spend efficiency opportunity",
+  "Multi-market control or governance question",
+  "Recent growth or acquisition push",
+  "Light discovery before pitching Signal",
+];
+
+function OptionalSelect({
+  name,
+  label,
+  options,
+  required = false,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+  required?: boolean;
+}) {
+  const [value, setValue] = useState("");
+  const [custom, setCustom] = useState("");
+  const isCustom = value === "__custom";
+
+  return (
+    <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+      {label}
+      <select
+        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      >
+        <option value="">Choose...</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value="__custom">Other / enter manually</option>
+      </select>
+      {isCustom ? (
+        <input
+          className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
+          onChange={(event) => setCustom(event.target.value)}
+          placeholder="Enter manually"
+          value={custom}
+        />
+      ) : null}
+      <input name={name} required={required} type="hidden" value={isCustom ? custom : value} />
+    </label>
+  );
+}
+
+function TextField({ name, label, required = false }: { name: string; label: string; required?: boolean }) {
+  return (
+    <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+      {label}
+      <input className="w-full rounded-md border border-line px-3 py-2 text-sm" name={name} required={required} />
+    </label>
+  );
+}
 
 export function CreateOutreachClient() {
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
@@ -76,7 +162,7 @@ export function CreateOutreachClient() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-ink">Create Outreach</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Generate concise cold outreach using approved, source-backed Signal knowledge.
+              Pick the account basics, generate a short first draft, then refine.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
@@ -93,114 +179,21 @@ export function CreateOutreachClient() {
         >
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Target aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Account and contact</h2>
+            <h2 className="text-lg font-semibold text-ink">Quick brief</h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Company
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyName"
-                required
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Website
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyWebsite"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              First name
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="contactFirstName"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Contact role
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="contactRole"
-                required
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Industry
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="industry"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Size or revenue context
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="companyContext"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Geography or markets
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="geographyOrMarkets"
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Current vendor/tool
-              <input
-                className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                name="currentVendor"
-              />
-            </label>
-          </div>
-
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Known paid-search context
-            <textarea
-              className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="paidSearchContext"
-            />
-          </label>
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Observed trigger
-            <textarea
-              className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="observedTrigger"
+            <TextField label="Company" name="companyName" required />
+            <OptionalSelect
+              label="Buyer role"
+              name="contactRole"
+              options={personas.map((persona) => persona.name)}
               required
             />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-4">
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Channel
-              <select
-                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-                onChange={(event) => setChannel(event.target.value as OutreachChannel)}
-                value={channel}
-              >
-                <option value="EMAIL">Email</option>
-                <option value="LINKEDIN">LinkedIn</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Type
-              <select
-                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-                onChange={(event) => setMessageType(event.target.value as OutreachMessageType)}
-                value={messageType}
-              >
-                <option value="FIRST_TOUCH">First touch</option>
-                <option value="FOLLOW_UP">Follow-up</option>
-                <option value="RE_ENGAGEMENT">Re-engagement</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
+            <OptionalSelect label="Fit / ICP" name="companyContext" options={companySizeOptions} required />
+            <OptionalSelect label="Industry" name="industry" options={industries.map((industry) => industry.name)} />
+            <OptionalSelect label="Reason for outreach" name="observedTrigger" options={triggerOptions} required />
+            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               Tone
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
@@ -214,8 +207,8 @@ export function CreateOutreachClient() {
                 ))}
               </select>
             </label>
-            <label className="space-y-1 text-sm font-medium text-stone-700">
-              Length
+            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+              Email length
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setLength(event.target.value as OutreachLength)}
@@ -230,13 +223,48 @@ export function CreateOutreachClient() {
             </label>
           </div>
 
-          <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Internal notes
-            <textarea
-              className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="internalNotes"
-            />
-          </label>
+          <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Advanced optional details
+            </summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <TextField label="Website" name="companyWebsite" />
+              <TextField label="First name" name="contactFirstName" />
+              <OptionalSelect label="Market" name="geographyOrMarkets" options={marketOptions} />
+              <OptionalSelect label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
+              <OptionalSelect label="Paid-search context" name="paidSearchContext" options={paidSearchOptions} />
+              <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+                Channel
+                <select
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  onChange={(event) => setChannel(event.target.value as OutreachChannel)}
+                  value={channel}
+                >
+                  <option value="EMAIL">Email</option>
+                  <option value="LINKEDIN">LinkedIn</option>
+                </select>
+              </label>
+              <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+                Type
+                <select
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  onChange={(event) => setMessageType(event.target.value as OutreachMessageType)}
+                  value={messageType}
+                >
+                  <option value="FIRST_TOUCH">First touch</option>
+                  <option value="FOLLOW_UP">Follow-up</option>
+                  <option value="RE_ENGAGEMENT">Re-engagement</option>
+                </select>
+              </label>
+              <label className="block space-y-1 text-sm font-medium text-stone-700 sm:col-span-2">
+                Internal notes
+                <textarea
+                  className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
+                  name="internalNotes"
+                />
+              </label>
+            </div>
+          </details>
 
           {error ? (
             <p className="rounded-md border border-[#f1c6b7] bg-[#fff4ef] px-3 py-2 text-sm text-[#9a3f24]">
@@ -250,7 +278,7 @@ export function CreateOutreachClient() {
             type="submit"
           >
             <Send aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Drafting..." : "Generate outreach"}
+            {isPending ? "Drafting..." : "Generate email"}
           </button>
         </form>
 
@@ -314,7 +342,7 @@ export function CreateOutreachClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Generated outreach will appear here with sources and safety evidence.
+                Your draft will appear here.
               </p>
             )}
           </article>

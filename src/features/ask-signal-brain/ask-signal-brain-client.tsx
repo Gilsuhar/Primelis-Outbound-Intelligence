@@ -13,6 +13,7 @@ import {
 
 import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
+import { industries, personas } from "@/features/playbook/playbook-content";
 import type { SignalBrainMode, SignalBrainResult } from "@/features/ask-signal-brain/types";
 
 const modeOptions: { label: string; value: SignalBrainMode }[] = [
@@ -25,6 +26,66 @@ const modeOptions: { label: string; value: SignalBrainMode }[] = [
   { label: "Claim safety check", value: "CLAIM_SAFETY_CHECK" },
 ];
 
+const questionTemplates = [
+  "Is this company a good Signal fit?",
+  "Who is the best persona to contact?",
+  "What angle should I use for outreach?",
+  "How should I respond to this objection?",
+  "Which case study is safest to use?",
+  "Is this claim safe to send externally?",
+];
+
+const companySizeOptions = [
+  "$20M-$50M revenue or 100-200 employees",
+  "$50M+ revenue or 200+ employees",
+  "$20K+ monthly branded-search spend",
+  "Enterprise / multi-market account",
+  "Unknown size; qualify first",
+];
+
+const marketOptions = [
+  "United States",
+  "US and Europe",
+  "Multi-country",
+  "Regional market",
+  "Global brand",
+];
+
+const paidSearchOptions = [
+  "Runs branded-search ads",
+  "Strong organic brand visibility",
+  "Competitors appear on brand terms",
+  "Agency manages paid search",
+  "Unknown; ask discovery question",
+];
+
+const vendorOptions = [
+  "Adthena",
+  "Revvim",
+  "Auction Insights",
+  "Google Ads only",
+  "Agency-managed setup",
+  "Unknown",
+];
+
+const triggerOptions = [
+  "Potential branded-search efficiency opportunity",
+  "Competitors visible on brand terms",
+  "Multi-market governance question",
+  "Prospect asked a methodology question",
+  "Prospect raised an objection",
+  "Need safe evidence before outreach",
+];
+
+type SmartFieldProps = {
+  name: string;
+  label: string;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+  textarea?: boolean;
+};
+
 function label(value: string) {
   return value.replaceAll("_", " ").toLowerCase();
 }
@@ -32,6 +93,49 @@ function label(value: string) {
 function fieldValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function SmartField({
+  name,
+  label,
+  options,
+  placeholder = "Enter manually",
+  required = false,
+  textarea = false,
+}: SmartFieldProps) {
+  const [value, setValue] = useState("");
+  const [customValue, setCustomValue] = useState("");
+  const isCustom = value === "__custom";
+  const finalValue = isCustom ? customValue : value;
+  const Input = textarea ? "textarea" : "input";
+
+  return (
+    <label className="block space-y-1 text-sm font-medium text-[#34352e]">
+      {label}
+      <select
+        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      >
+        <option value="">Choose...</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value="__custom">Other / enter manually</option>
+      </select>
+      {isCustom ? (
+        <Input
+          className="mt-2 min-h-10 w-full rounded-md border border-line bg-white px-3 py-2 text-sm leading-6"
+          onChange={(event) => setCustomValue(event.target.value)}
+          placeholder={placeholder}
+          value={customValue}
+        />
+      ) : null}
+      <input name={name} required={required} type="hidden" value={finalValue} />
+    </label>
+  );
 }
 
 export function AskSignalBrainClient() {
@@ -80,8 +184,7 @@ export function AskSignalBrainClient() {
               Ask Signal Brain
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-              Ask internal Signal questions using approved knowledge, playbook guidance, ICP logic,
-              and eligible usage-scoped evidence.
+              Ask one specific question and get a safe recommendation from approved Signal context.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
@@ -95,18 +198,17 @@ export function AskSignalBrainClient() {
         <form action={onSubmit} className="space-y-4 rounded-2xl border border-line bg-white p-5">
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Brain aria-hidden="true" className="h-5 w-5 text-olive" />
-            <h2 className="text-lg font-semibold text-ink">Question</h2>
+            <h2 className="text-lg font-semibold text-ink">Quick question</h2>
           </div>
 
-          <label className="block space-y-1 text-sm font-medium text-[#34352e]">
-            What do you want to know?
-            <textarea
-              className="min-h-36 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
-              name="question"
-              placeholder="Example: Is this company a good Signal fit?"
-              required
-            />
-          </label>
+          <SmartField
+            label="What do you want to know?"
+            name="question"
+            options={questionTemplates}
+            placeholder="Write the exact question"
+            required
+            textarea
+          />
 
           <label className="block space-y-1 text-sm font-medium text-[#34352e]">
             Answer mode
@@ -123,31 +225,50 @@ export function AskSignalBrainClient() {
             </select>
           </label>
 
-          <details className="rounded-xl border border-line bg-cream p-3" open>
+          <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Optional account context
+              Advanced account context
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {[
-                ["companyName", "Company"],
-                ["companyWebsite", "Website"],
-                ["contactRole", "Contact role"],
-                ["industry", "Industry"],
-                ["companySizeOrRevenue", "Company size or revenue"],
-                ["geographyOrMarkets", "Geography or markets"],
-                ["paidSearchContext", "Paid-search context"],
-                ["currentVendor", "Known vendor or tool"],
-                ["observedTrigger", "Observed trigger"],
-                ["internalNotes", "Internal notes"],
-              ].map(([name, text]) => (
-                <label className="block space-y-1 text-sm font-medium text-[#34352e]" key={name}>
-                  {text}
-                  <textarea
-                    className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2 text-sm leading-6"
-                    name={name}
-                  />
-                </label>
-              ))}
+              <SmartField label="Company" name="companyName" options={[]} />
+              <SmartField label="Website" name="companyWebsite" options={[]} />
+              <SmartField
+                label="Buyer role"
+                name="contactRole"
+                options={personas.map((persona) => persona.name)}
+              />
+              <SmartField
+                label="Industry"
+                name="industry"
+                options={industries.map((industry) => industry.name)}
+              />
+              <SmartField
+                label="Company size or revenue"
+                name="companySizeOrRevenue"
+                options={companySizeOptions}
+              />
+              <SmartField
+                label="Geography or markets"
+                name="geographyOrMarkets"
+                options={marketOptions}
+              />
+              <SmartField
+                label="Paid-search context"
+                name="paidSearchContext"
+                options={paidSearchOptions}
+              />
+              <SmartField
+                label="Known vendor or tool"
+                name="currentVendor"
+                options={vendorOptions}
+              />
+              <SmartField
+                label="Observed trigger"
+                name="observedTrigger"
+                options={triggerOptions}
+                textarea
+              />
+              <SmartField label="Internal notes" name="internalNotes" options={[]} textarea />
             </div>
           </details>
 

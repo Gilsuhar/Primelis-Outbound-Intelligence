@@ -9,7 +9,7 @@ function nonEmpty(value: string | undefined): value is string {
 
 export function getSupabaseAuthConfig(env: NodeJS.ProcessEnv = process.env) {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   return nonEmpty(url) && nonEmpty(anonKey) ? { url, anonKey } : null;
 }

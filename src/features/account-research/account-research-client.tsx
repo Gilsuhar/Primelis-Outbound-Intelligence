@@ -16,6 +16,7 @@ import type {
   FactStatus,
   YesNoUnknown,
 } from "@/features/account-research/types";
+import { industries } from "@/features/playbook/playbook-content";
 
 const yesNoUnknown: Array<{ label: string; value: YesNoUnknown }> = [
   { label: "Unknown", value: "UNKNOWN" },
@@ -39,6 +40,24 @@ const factStatusOptions: Array<{ label: string; value: FactStatus }> = [
   { label: "Assumption", value: "ASSUMPTION" },
   { label: "Unknown", value: "UNKNOWN" },
 ];
+
+const marketOptions = [
+  "United States",
+  "US and Europe",
+  "Multi-country",
+  "Regional market",
+  "Global brand",
+];
+const revenueOptions = [
+  "Core ICP: brand demand + paid-search ownership",
+  "Possible ICP: validate brand demand first",
+  "Do not target yet: missing paid-search signal",
+  "$20M-$50M revenue",
+  "$50M+ revenue",
+  "$20K+ monthly branded-search spend",
+  "Unknown",
+];
+const employeeOptions = ["100-200 employees", "200+ employees", "Enterprise team", "Unknown"];
 
 const statusFields = [
   "industry",
@@ -116,6 +135,49 @@ function StatusSelect({ name }: { name: string }) {
         </option>
       ))}
     </select>
+  );
+}
+
+function SmartSelect({
+  name,
+  label,
+  options,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+}) {
+  const [value, setValue] = useState("");
+  const [custom, setCustom] = useState("");
+  const isCustom = value === "__custom";
+
+  return (
+    <label className="block min-w-0 space-y-1 text-sm font-medium text-[#34352e]">
+      {label}
+      <select
+        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      >
+        <option value="">Choose...</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value="__custom">Other / enter manually</option>
+      </select>
+      {isCustom ? (
+        <input
+          className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
+          onChange={(event) => setCustom(event.target.value)}
+          placeholder="Enter manually"
+          value={custom}
+        />
+      ) : null}
+      <input name={name} type="hidden" value={isCustom ? custom : value} />
+      <StatusSelect name={name} />
+    </label>
   );
 }
 
@@ -253,11 +315,6 @@ export function AccountResearchClient() {
               {[
                 ["companyName", "Company name"],
                 ["companyDomain", "Company domain"],
-                ["industry", "Industry"],
-                ["headquartersOrMainMarket", "Headquarters or main market"],
-                ["marketsOrCountries", "Markets or countries"],
-                ["revenueContext", "Revenue context"],
-                ["employeeContext", "Employee context"],
               ].map(([name, label]) => (
                 <label className="block space-y-1 text-sm font-medium text-[#34352e]" key={name}>
                   {label}
@@ -266,11 +323,25 @@ export function AccountResearchClient() {
                     name={name}
                     required={name === "companyName"}
                   />
-                  {name !== "companyName" && name !== "companyDomain" ? (
-                    <StatusSelect name={name} />
-                  ) : null}
                 </label>
               ))}
+              <SmartSelect
+                label="Industry"
+                name="industry"
+                options={industries.map((industry) => industry.name)}
+              />
+              <SmartSelect
+                label="Headquarters or main market"
+                name="headquartersOrMainMarket"
+                options={marketOptions}
+              />
+              <SmartSelect
+                label="Markets or countries"
+                name="marketsOrCountries"
+                options={marketOptions}
+              />
+              <SmartSelect label="ICP" name="revenueContext" options={revenueOptions} />
+              <SmartSelect label="Employee context" name="employeeContext" options={employeeOptions} />
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
                 Company type
                 <select
@@ -287,7 +358,7 @@ export function AccountResearchClient() {
             </div>
           </section>
 
-          <details className="rounded-xl border border-line bg-cream p-3" open>
+          <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
               Step 2: Search and organization signals
             </summary>
@@ -326,7 +397,7 @@ export function AccountResearchClient() {
             </div>
           </details>
 
-          <details className="rounded-xl border border-line bg-cream p-3" open>
+          <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
               Step 3: Suppression check
             </summary>
@@ -378,6 +449,13 @@ export function AccountResearchClient() {
               <SearchCheck aria-hidden="true" className="h-4 w-4" />
               {isPending ? "Assessing..." : "Assess account"}
             </button>
+          </div>
+
+          <details className="rounded-xl border border-line bg-cream p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Advanced tools
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
             <button
               className="signal-button-secondary"
               disabled={isPending}
@@ -394,7 +472,8 @@ export function AccountResearchClient() {
             >
               Enrich company and contacts
             </button>
-          </div>
+            </div>
+          </details>
         </form>
 
         <section className="space-y-4">

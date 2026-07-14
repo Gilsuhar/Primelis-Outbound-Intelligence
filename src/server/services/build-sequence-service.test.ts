@@ -210,6 +210,40 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("creates a concise Nike-style sequence from quick dropdown inputs", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Nike",
+        contactFirstName: undefined,
+        contactRole: "VP Performance Marketing",
+        industry: "Fashion and Luxury",
+        companyContext: "Strong fit - brand demand and paid-search owner",
+        geographyOrMarkets: "United States",
+        paidSearchContext: "Runs branded-search ads",
+        currentVendor: "Unknown",
+        observedTrigger: "Validate branded-search activity",
+        sequenceLength: 3,
+        desiredOverallDuration: "8 business days",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps).toHaveLength(3);
+      expect(result.data.steps[0].subjectLine).toContain("Nike");
+      expect(result.data.steps[0].messageBody).toContain("Nike");
+      expect(result.data.steps[0].messageBody).toContain("VP Performance Marketing");
+      expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
+      expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
+      expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
+      expect(JSON.stringify(result.data.steps)).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
+    }
+  });
+
   it("uses valid delays and a low-pressure final breakup step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 

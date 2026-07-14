@@ -214,6 +214,39 @@ describe("Create Outreach service", () => {
     expect(linkedIn.ok && linkedIn.data.connectionRequest).toContain("Open to connecting");
   });
 
+  it("creates a sendable quick-brief email for a Nike-style ICP scenario", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateCreateOutreach(
+      {
+        ...baseInput,
+        companyName: "Nike",
+        contactFirstName: undefined,
+        contactRole: "VP Performance Marketing",
+        industry: "Fashion and Luxury",
+        companyContext: "Strong fit - brand demand and paid-search owner",
+        geographyOrMarkets: "United States",
+        paidSearchContext: "Runs branded-search ads",
+        currentVendor: "Unknown",
+        observedTrigger: "Validate branded-search activity",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recommendedMessage).toContain("Nike");
+      expect(result.data.recommendedMessage).toContain("VP Performance Marketing");
+      expect(result.data.recommendedMessage).toMatch(/brand|branded/i);
+      expect(result.data.recommendedMessage).toContain(
+        "Worth a quick compare of how you decide when branded paid search is incremental?",
+      );
+      expect(result.data.recommendedMessage).not.toMatch(/quick discovery|core icp/i);
+      expect(result.data.recommendedMessage).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
+    }
+  });
+
   it("persists generated outreach separately as a draft", async () => {
     const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
 

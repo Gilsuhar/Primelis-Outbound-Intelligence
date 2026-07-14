@@ -47,16 +47,53 @@ function greeting(input: BuildSequenceInput) {
   return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi,";
 }
 
+function cleanSelection(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+  return value
+    .replace(/^Strong fit\s*-\s*/i, "")
+    .replace(/^Possible fit\s*-\s*/i, "")
+    .replace(/^Core ICP:\s*/i, "")
+    .replace(/^Quick discovery:\s*/i, "")
+    .trim();
+}
+
+function openingFor(input: BuildSequenceInput) {
+  const trigger = cleanSelection(input.observedTrigger);
+  const company = input.companyName;
+
+  if (!trigger) {
+    return `I thought ${company} could be worth a focused brand-search conversation.`;
+  }
+  if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
+    return `I thought ${company} could be worth a quick brand-search fit check.`;
+  }
+  if (/competitors/i.test(trigger)) {
+    return `I noticed a possible competitor-pressure angle around branded search at ${company}.`;
+  }
+  if (/efficiency|brand-spend/i.test(trigger)) {
+    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
+  }
+  if (/multi-market|governance|control/i.test(trigger)) {
+    return `I thought ${company} may have a useful cross-market brand-search control question.`;
+  }
+  if (/growth|acquisition/i.test(trigger)) {
+    return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
+  }
+  return `${trigger} made me think a brand-search methodology conversation may be relevant for ${company}.`;
+}
+
 function ctaForStep(stepNumber: number, isFinal: boolean, channel: SequenceStep["channel"]) {
   if (isFinal) {
     return "If this is not relevant, I can close the loop here.";
   }
   if (channel === "LINKEDIN") {
-    return stepNumber === 1 ? "Open to connecting?" : "Worth a quick exchange if this is relevant?";
+    return stepNumber === 1 ? "Open to connecting?" : "Open to comparing notes?";
   }
   return stepNumber === 1
-    ? "Worth a short exchange to see if this is relevant?"
-    : "Would it be useful to compare notes?";
+    ? "Worth a quick compare of how you decide when branded paid search is incremental?"
+    : "Would it be useful to compare the methodology?";
 }
 
 function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: string) {
@@ -91,20 +128,28 @@ function bodyForPurpose({
   angleLabel: string;
 }) {
   const trigger = input.observedTrigger.trim();
+  const opening = openingFor(input);
   const persona = input.contactRole;
-  const sharedCaution = "I am treating the account details as user-provided, not verified facts.";
+  const context = [
+    input.industry,
+    cleanSelection(input.companyContext),
+    input.geographyOrMarkets,
+  ]
+    .filter(Boolean)
+    .join("; ");
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Using only the user-provided trigger, ${trigger} made me think ${angleLabel} could be relevant for ${input.companyName}.`,
+      opening,
+      context ? `The reason this may fit: ${context}.` : "",
       primaryFact,
-      `For a ${persona}, the practical question is whether the methodology gives enough confidence to act without over-assuming the account context.`,
+      `For a ${persona}, the practical question is whether the methodology gives enough confidence to decide where brand spend is actually needed.`,
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The pattern I would frame is not simply more reporting; it is knowing where paid brand spend is actually helping and where it may be inefficient.",
+      "The issue is usually not more reporting. It is knowing where paid brand spend is helping, where organic demand already carries the outcome, and where competitors change the decision.",
       secondaryFact,
     ],
     METHODOLOGY_DIFFERENTIATION: [
@@ -116,8 +161,8 @@ function bodyForPurpose({
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
       "",
-      `${input.companyName} context I would use carefully: ${trigger}`,
-      `${sharedCaution} That makes this a light hypothesis rather than a hard claim.`,
+      `${input.companyName} context I would use carefully: ${cleanSelection(trigger) ?? trigger}`,
+      "I would treat it as user-provided context, keep it as a light hypothesis, and use the conversation to validate whether the brand-search question is real.",
     ],
     SOCIAL_PROOF: [
       greeting(input),
@@ -209,11 +254,12 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
         delay: delayFor(stepNumber, input.sequenceLength, input.desiredOverallDuration),
         purpose,
         channelRationale:
-          input.primaryChannel === "MIXED"
+          (input.primaryChannel === "MIXED"
             ? channel === "EMAIL"
               ? "Email carries the more complete thought without duplicating LinkedIn copy."
               : "LinkedIn keeps the touch lighter and different from the email copy."
-            : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`,
+            : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`) +
+          " Account context is user-provided until verified.",
         subjectLine: channel === "EMAIL" ? subjectFor(input, stepNumber, angleLabel) : undefined,
         connectionRequest:
           channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input) : undefined,

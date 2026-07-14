@@ -102,12 +102,15 @@ Required environment labels:
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 DIRECT_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 NEXT_PUBLIC_SUPABASE_URL="https://PROJECT_REF.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="PUBLIC_ANON_OR_PUBLISHABLE_KEY"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
 NEXT_PUBLIC_APP_URL="https://PRIVATE_PREVIEW_APP_URL"
 AI_PROVIDER=""
 OPENAI_API_KEY=""
 OPENAI_MODEL=""
 ```
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback, but new
+Supabase projects should use the publishable key from the project Connect dialog.
 
 Do not add a service-role key unless a future server-only admin operation truly
 requires it. No service-role key is required for the current private preview.
