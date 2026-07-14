@@ -11,6 +11,7 @@ import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { personas } from "@/features/playbook/playbook-content";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   ReplyChannel,
   ReplyLength,
@@ -42,7 +43,9 @@ function OptionalSelect({
 }) {
   const [value, setValue] = useState("");
   const [custom, setCustom] = useState("");
+  const outputLanguage = useOutputLanguage();
   const isCustom = value === "__custom";
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
   return (
     <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
@@ -52,19 +55,19 @@ function OptionalSelect({
         onChange={(event) => setValue(event.target.value)}
         value={value}
       >
-        <option value="">Choose...</option>
+        <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
-        <option value="__custom">Other / enter manually</option>
+        <option value="__custom">{t("workflow.otherManual")}</option>
       </select>
       {isCustom ? (
         <input
           className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
           onChange={(event) => setCustom(event.target.value)}
-          placeholder="Enter manually"
+          placeholder={t("workflow.enterManually")}
           value={custom}
         />
       ) : null}
@@ -75,6 +78,7 @@ function OptionalSelect({
 
 export function ReplyToProspectClient() {
   const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [result, setResult] = useState<ReplyToProspectResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -110,18 +114,18 @@ export function ReplyToProspectClient() {
     <div className="space-y-6">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-signal">
-          Sales workflow
+          {t("workflow.eyebrow")}
         </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold text-ink">Reply to Prospect</h1>
+            <h1 className="text-3xl font-semibold text-ink">{t("workflow.reply.title")}</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Paste the reply, choose the buyer role and tone, then generate a careful response.
+              {t("workflow.reply.description")}
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
             <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
-            Approved knowledge only
+            {t("workflow.approvedKnowledge")}
           </div>
         </div>
       </section>
@@ -134,29 +138,29 @@ export function ReplyToProspectClient() {
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <MessageSquareReply aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Quick reply brief</h2>
+            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickReplyBrief")}</h2>
           </div>
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">
-            Prospect message
+            {t("workflow.prospectMessage")}
             <textarea
               className="min-h-40 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
               name="prospectMessage"
-              placeholder="Paste the prospect's message here."
+              placeholder={t("workflow.reply.placeholder")}
               required
             />
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Company
+              {t("workflow.company")}
               <input
                 className="w-full rounded-md border border-line px-3 py-2 text-sm"
                 name="companyName"
               />
             </label>
             <OptionalSelect
-              label="Buyer role"
+              label={t("workflow.buyerRole")}
               name="contactRole"
               options={personas.map((persona) => persona.name)}
             />
@@ -164,7 +168,7 @@ export function ReplyToProspectClient() {
 
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Channel
+              {t("workflow.channel")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setChannel(event.target.value as ReplyChannel)}
@@ -175,7 +179,7 @@ export function ReplyToProspectClient() {
               </select>
             </label>
             <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Tone
+              {t("workflow.tone")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setTone(event.target.value as ReplyTone)}
@@ -189,7 +193,7 @@ export function ReplyToProspectClient() {
               </select>
             </label>
             <label className="block min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Length
+              {t("workflow.length")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setLength(event.target.value as ReplyLength)}
@@ -206,10 +210,10 @@ export function ReplyToProspectClient() {
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Advanced optional context
+              {t("workflow.advancedOptionalContext")}
             </summary>
             <label className="mt-3 block space-y-1 text-sm font-medium text-stone-700">
-              Context notes
+              {t("workflow.contextNotes")}
               <textarea
                 className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
                 name="contextNotes"
@@ -229,7 +233,7 @@ export function ReplyToProspectClient() {
             type="submit"
           >
             <MessageSquareReply aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Drafting..." : "Generate reply"}
+            {isPending ? t("workflow.drafting") : t("workflow.generateReply")}
           </button>
         </form>
 
@@ -237,13 +241,13 @@ export function ReplyToProspectClient() {
           <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <FileText aria-hidden="true" className="h-5 w-5 text-signal" />
-              <h2 className="text-lg font-semibold text-ink">Generated response</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("workflow.generatedResponse")}</h2>
             </div>
             {result ? (
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    Recommended reply
+                    {t("workflow.recommendedReply")}
                   </p>
                   <p className="mt-2 whitespace-pre-line rounded-md bg-[#f8f5ef] p-3 text-sm leading-6 text-ink">
                     {result.recommendedReply}
@@ -251,7 +255,7 @@ export function ReplyToProspectClient() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    Shorter alternative
+                    {t("workflow.shorterAlternative")}
                   </p>
                   <p className="mt-2 whitespace-pre-line rounded-md bg-white p-3 text-sm leading-6 text-stone-700 ring-1 ring-line">
                     {result.shorterAlternative}
@@ -285,7 +289,7 @@ export function ReplyToProspectClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Paste the prospect message and generate a reply you can edit and send.
+                {t("workflow.reply.empty")}
               </p>
             )}
           </article>
@@ -294,7 +298,7 @@ export function ReplyToProspectClient() {
             <>
               <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer text-lg font-semibold text-ink">
-                  Strategy and evidence
+                  {t("workflow.strategy")}
                 </summary>
                 <p className="text-sm leading-6 text-stone-700">{result.responseStrategy}</p>
                 <div className="mt-4 space-y-3">
@@ -311,7 +315,7 @@ export function ReplyToProspectClient() {
 
               <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer text-lg font-semibold text-ink">
-                  Safety and sources
+                  {t("workflow.sourcesAndSafety")}
                 </summary>
                 <div className="space-y-3">
                   {result.safetyWarnings.length > 0 ? (

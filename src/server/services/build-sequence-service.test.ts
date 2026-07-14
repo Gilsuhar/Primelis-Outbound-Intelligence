@@ -242,7 +242,8 @@ describe("Build Sequence service", () => {
       expect(result.data.steps).toHaveLength(3);
       expect(result.data.steps[0].subjectLine).toContain("Nike");
       expect(result.data.steps[0].messageBody).toContain("Nike");
-      expect(result.data.steps[0].messageBody).toContain("VP Performance Marketing");
+      expect(result.data.steps[0].messageBody).not.toContain("VP Performance Marketing");
+      expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);

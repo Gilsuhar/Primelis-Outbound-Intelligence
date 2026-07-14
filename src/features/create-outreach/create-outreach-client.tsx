@@ -7,6 +7,7 @@ import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   CreateOutreachResult,
   OutreachEmailSection,
@@ -100,7 +101,6 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
   const companySignal =
     result.detectedSignals.find((signal) => /company|website/i.test(signal.label))?.detail ??
     "this account";
-  const persona = result.personaGuidance.persona;
 
   if (section.label === "INTRO") {
     return [
@@ -116,7 +116,7 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
   if (section.label === "PAIN POINT") {
     return [
       section.text,
-      `For ${persona}, the practical risk is paying for clicks the brand may already win organically, especially when competitor pressure changes by market.`,
+      `The practical risk is paying for clicks the brand may already win organically, especially when competitor pressure changes by market.`,
       `The useful question is simple: where does paid brand search protect revenue, and where is it just adding cost?`,
     ];
   }
@@ -149,7 +149,9 @@ function OptionalSelect({
 }) {
   const [value, setValue] = useState("");
   const [custom, setCustom] = useState("");
+  const outputLanguage = useOutputLanguage();
   const isCustom = value === "__custom";
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
   return (
     <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
@@ -159,19 +161,19 @@ function OptionalSelect({
         onChange={(event) => setValue(event.target.value)}
         value={value}
       >
-        <option value="">Choose...</option>
+        <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
-        <option value="__custom">Other / enter manually</option>
+        <option value="__custom">{t("workflow.otherManual")}</option>
       </select>
       {isCustom ? (
         <input
           className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
           onChange={(event) => setCustom(event.target.value)}
-          placeholder="Enter manually"
+          placeholder={t("workflow.enterManually")}
           value={custom}
         />
       ) : null}
@@ -209,6 +211,7 @@ function TextField({
 
 export function CreateOutreachClient() {
   const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
@@ -301,18 +304,18 @@ export function CreateOutreachClient() {
     <div className="space-y-6">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-signal">
-          Sales workflow
+          {t("workflow.eyebrow")}
         </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold text-ink">Create Outreach</h1>
+            <h1 className="text-3xl font-semibold text-ink">{t("workflow.create.title")}</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Pick the account basics, generate a short first draft, then refine.
+              {t("workflow.create.description")}
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
             <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
-            Source-backed only
+            {t("workflow.sourceBacked")}
           </div>
         </div>
       </section>
@@ -325,12 +328,12 @@ export function CreateOutreachClient() {
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Target aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Quick brief</h2>
+            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickBrief")}</h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
-              label="Company"
+              label={t("workflow.company")}
               name="companyName"
               onChange={(value) => {
                 setCompanyName(value);
@@ -340,23 +343,23 @@ export function CreateOutreachClient() {
               value={companyName}
             />
             <TextField
-              label="Website"
+              label={t("workflow.website")}
               name="companyWebsite"
               onChange={setCompanyWebsite}
               value={companyWebsite}
             />
-            <TextField label="First name (optional)" name="contactFirstName" />
+            <TextField label={t("workflow.firstNameOptional")} name="contactFirstName" />
             <OptionalSelect
-              label="Buyer role"
+              label={t("workflow.buyerRole")}
               name="contactRole"
               options={personas.map((persona) => persona.name)}
               required
             />
-            <OptionalSelect label="Fit / ICP" name="companyContext" options={companySizeOptions} required />
-            <OptionalSelect label="Industry" name="industry" options={industries.map((industry) => industry.name)} />
-            <OptionalSelect label="Reason for outreach" name="observedTrigger" options={triggerOptions} required />
+            <OptionalSelect label={t("workflow.fitIcp")} name="companyContext" options={companySizeOptions} required />
+            <OptionalSelect label={t("workflow.industry")} name="industry" options={industries.map((industry) => industry.name)} />
+            <OptionalSelect label={t("workflow.reasonForOutreach")} name="observedTrigger" options={triggerOptions} required />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Tone
+              {t("workflow.tone")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setTone(event.target.value as OutreachTone)}
@@ -370,7 +373,7 @@ export function CreateOutreachClient() {
               </select>
             </label>
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Email length
+              {t("workflow.emailLength")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setLength(event.target.value as OutreachLength)}
@@ -389,20 +392,20 @@ export function CreateOutreachClient() {
                 name="useCaseStudy"
                 type="checkbox"
               />
-              Use relevant case study if available
+              {t("workflow.useCaseStudy")}
             </label>
           </div>
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Advanced optional details
+              {t("workflow.advancedOptionalDetails")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <OptionalSelect label="Market" name="geographyOrMarkets" options={marketOptions} />
-              <OptionalSelect label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
-              <OptionalSelect label="Paid-search context" name="paidSearchContext" options={paidSearchOptions} />
+              <OptionalSelect label={t("workflow.market")} name="geographyOrMarkets" options={marketOptions} />
+              <OptionalSelect label={t("workflow.currentVendor")} name="currentVendor" options={vendorOptions} />
+              <OptionalSelect label={t("workflow.paidSearchContext")} name="paidSearchContext" options={paidSearchOptions} />
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-                Channel
+                {t("workflow.channel")}
                 <select
                   className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                   onChange={(event) => setChannel(event.target.value as OutreachChannel)}
@@ -413,7 +416,7 @@ export function CreateOutreachClient() {
                 </select>
               </label>
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-                Type
+                {t("workflow.type")}
                 <select
                   className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                   onChange={(event) => setMessageType(event.target.value as OutreachMessageType)}
@@ -425,7 +428,7 @@ export function CreateOutreachClient() {
                 </select>
               </label>
               <label className="block space-y-1 text-sm font-medium text-stone-700 sm:col-span-2">
-                Internal notes
+                {t("workflow.internalNotes")}
                 <textarea
                   className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
                   name="internalNotes"
@@ -446,7 +449,7 @@ export function CreateOutreachClient() {
             type="submit"
           >
             <Send aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Drafting..." : "Generate email"}
+            {isPending ? t("workflow.drafting") : t("workflow.generateEmail")}
           </button>
         </form>
 
@@ -454,7 +457,7 @@ export function CreateOutreachClient() {
           <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <FileText aria-hidden="true" className="h-5 w-5 text-signal" />
-              <h2 className="text-lg font-semibold text-ink">Generated message</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("workflow.generatedMessage")}</h2>
             </div>
             {result ? (
               <div className="space-y-4">
@@ -462,14 +465,14 @@ export function CreateOutreachClient() {
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                        Subject lines
+                        {t("workflow.subjectLines")}
                       </p>
                       <button
                         className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
                         onClick={regenerateSubjects}
                         type="button"
                       >
-                        Generate
+                        {t("workflow.generate")}
                       </button>
                     </div>
                     <div className="mt-2 space-y-2">
@@ -498,7 +501,7 @@ export function CreateOutreachClient() {
                             ) : (
                               <Copy aria-hidden="true" className="h-3.5 w-3.5" />
                             )}
-                            {copiedKey === subject ? "Copied" : "Copy"}
+                            {copiedKey === subject ? t("workflow.copied") : t("workflow.copy")}
                           </button>
                         </div>
                       ))}
@@ -517,7 +520,7 @@ export function CreateOutreachClient() {
                 ) : null}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    Based on
+                    {t("workflow.basedOn")}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {result.detectedSignals.slice(0, 5).map((signal) => (
@@ -540,11 +543,11 @@ export function CreateOutreachClient() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    Recommended message
+                    {t("workflow.recommendedMessage")}
                   </p>
                   <div className="mt-2 overflow-hidden rounded-lg border border-line bg-[#f8f5ef]">
                     <div className="flex items-center justify-between border-b border-line bg-white px-3 py-2">
-                      <span className="text-sm font-semibold text-ink">Full email</span>
+                      <span className="text-sm font-semibold text-ink">{t("workflow.fullEmail")}</span>
                       <button
                         className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
                         onClick={() => copyText("full-email", displayedFullEmail)}
@@ -555,7 +558,7 @@ export function CreateOutreachClient() {
                         ) : (
                           <Copy aria-hidden="true" className="h-3.5 w-3.5" />
                         )}
-                        {copiedKey === "full-email" ? "Copied" : "Copy"}
+                        {copiedKey === "full-email" ? t("workflow.copied") : t("workflow.copy")}
                       </button>
                     </div>
                     <div className="divide-y divide-line">
@@ -584,7 +587,7 @@ export function CreateOutreachClient() {
                               onClick={() => regenerateSection(section)}
                               type="button"
                             >
-                              Generate
+                              {t("workflow.generate")}
                             </button>
                             <button
                               className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
@@ -596,7 +599,7 @@ export function CreateOutreachClient() {
                               ) : (
                                 <Copy aria-hidden="true" className="h-3.5 w-3.5" />
                               )}
-                              {copiedKey === section.label ? "Copied" : "Copy"}
+                              {copiedKey === section.label ? t("workflow.copied") : t("workflow.copy")}
                             </button>
                           </div>
                         </div>
@@ -606,7 +609,7 @@ export function CreateOutreachClient() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    Shorter version
+                    {t("workflow.shorterVersion")}
                   </p>
                   <p className="mt-2 whitespace-pre-line rounded-md bg-white p-3 text-sm leading-6 text-stone-700 ring-1 ring-line">
                     {result.shorterVersion}
@@ -614,14 +617,14 @@ export function CreateOutreachClient() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    CTA
+                    {t("workflow.cta")}
                   </p>
                   <p className="mt-2 text-sm text-stone-700">{result.cta}</p>
                 </div>
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Generate a draft, then edit the intro, pain point, solution, and CTA before sending.
+                {t("workflow.create.empty")}
               </p>
             )}
           </article>
@@ -631,7 +634,7 @@ export function CreateOutreachClient() {
               <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center gap-2">
                   <Target aria-hidden="true" className="h-5 w-5 text-signal" />
-                  <h2 className="text-lg font-semibold text-ink">Angle and signals</h2>
+                  <h2 className="text-lg font-semibold text-ink">{t("workflow.angleAndSignals")}</h2>
                 </div>
                 <p className="text-sm font-semibold text-ink">
                   {result.selectedAngle.replaceAll("_", " ").toLowerCase()}
@@ -659,7 +662,7 @@ export function CreateOutreachClient() {
               <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center gap-2">
                   <AlertTriangle aria-hidden="true" className="h-5 w-5 text-[#9a6a20]" />
-                  <h2 className="text-lg font-semibold text-ink">Sources and safety</h2>
+                  <h2 className="text-lg font-semibold text-ink">{t("workflow.sourcesAndSafety")}</h2>
                 </div>
                 <div className="space-y-3">
                   {result.safetyNotes.map((note) => (

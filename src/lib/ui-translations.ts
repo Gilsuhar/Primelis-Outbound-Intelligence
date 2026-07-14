@@ -1,6 +1,6 @@
 import type { OutputLanguage } from "@/lib/output-language";
 
-type UiTextKey =
+export type UiTextKey =
   | "language.selector"
   | "nav.sales"
   | "nav.admin"
@@ -35,6 +35,112 @@ type UiTextKey =
   | "home.doNotContact.title"
   | "home.doNotContact.description"
   | "home.adminShortcuts"
+  | "workflow.eyebrow"
+  | "workflow.sourceBacked"
+  | "workflow.approvedKnowledge"
+  | "workflow.draftOnly"
+  | "workflow.quickBrief"
+  | "workflow.quickReplyBrief"
+  | "workflow.quickQuestion"
+  | "workflow.generatedMessage"
+  | "workflow.generatedResponse"
+  | "workflow.strategy"
+  | "workflow.answer"
+  | "workflow.guidance"
+  | "workflow.subjectLines"
+  | "workflow.basedOn"
+  | "workflow.recommendedMessage"
+  | "workflow.recommendedReply"
+  | "workflow.fullEmail"
+  | "workflow.shorterVersion"
+  | "workflow.shorterAlternative"
+  | "workflow.cta"
+  | "workflow.angleAndSignals"
+  | "workflow.sourcesAndSafety"
+  | "workflow.advancedOptionalDetails"
+  | "workflow.advancedOptionalContext"
+  | "workflow.advancedAccountContext"
+  | "workflow.generate"
+  | "workflow.copy"
+  | "workflow.copied"
+  | "workflow.generateEmail"
+  | "workflow.generateReply"
+  | "workflow.buildSequence"
+  | "workflow.askSignalBrain"
+  | "workflow.drafting"
+  | "workflow.building"
+  | "workflow.answering"
+  | "workflow.choose"
+  | "workflow.otherManual"
+  | "workflow.enterManually"
+  | "workflow.company"
+  | "workflow.website"
+  | "workflow.firstNameOptional"
+  | "workflow.firstName"
+  | "workflow.buyerRole"
+  | "workflow.fitIcp"
+  | "workflow.industry"
+  | "workflow.reasonForOutreach"
+  | "workflow.tone"
+  | "workflow.emailLength"
+  | "workflow.length"
+  | "workflow.channel"
+  | "workflow.type"
+  | "workflow.market"
+  | "workflow.currentVendor"
+  | "workflow.paidSearchContext"
+  | "workflow.internalNotes"
+  | "workflow.contextNotes"
+  | "workflow.prospectMessage"
+  | "workflow.steps"
+  | "workflow.duration"
+  | "workflow.useCaseStudy"
+  | "workflow.create.title"
+  | "workflow.create.description"
+  | "workflow.create.empty"
+  | "workflow.sequence.title"
+  | "workflow.sequence.description"
+  | "workflow.sequence.empty"
+  | "workflow.reply.title"
+  | "workflow.reply.description"
+  | "workflow.reply.placeholder"
+  | "workflow.reply.empty"
+  | "workflow.brain.title"
+  | "workflow.brain.description"
+  | "workflow.brain.questionLabel"
+  | "workflow.brain.answerMode"
+  | "workflow.brain.empty"
+  | "account.title"
+  | "account.description"
+  | "account.step1"
+  | "account.step2"
+  | "account.step3"
+  | "account.step4"
+  | "account.companyName"
+  | "account.companyDomain"
+  | "account.headquarters"
+  | "account.markets"
+  | "account.employeeContext"
+  | "account.companyType"
+  | "account.assess"
+  | "playbook.eyebrow"
+  | "playbook.title"
+  | "playbook.description"
+  | "playbook.learn.title"
+  | "playbook.learn.description"
+  | "playbook.learn.details"
+  | "playbook.icp.title"
+  | "playbook.icp.description"
+  | "playbook.industries.title"
+  | "playbook.personas.title"
+  | "playbook.transition.title"
+  | "playbook.qualify.title"
+  | "playbook.work.title"
+  | "playbook.objections.title"
+  | "playbook.caseStudies.title"
+  | "playbook.dnc.title"
+  | "playbook.practice.title"
+  | "playbook.progress.title"
   | "dnc.eyebrow"
   | "dnc.title"
   | "dnc.description"
@@ -98,6 +204,119 @@ const english: Record<UiTextKey, string> = {
   "home.doNotContact.title": "Check Do Not Contact",
   "home.doNotContact.description": "Search account suppression guidance before outreach.",
   "home.adminShortcuts": "Admin shortcuts",
+  "workflow.eyebrow": "Sales workflow",
+  "workflow.sourceBacked": "Source-backed only",
+  "workflow.approvedKnowledge": "Approved knowledge only",
+  "workflow.draftOnly": "Draft only",
+  "workflow.quickBrief": "Quick brief",
+  "workflow.quickReplyBrief": "Quick reply brief",
+  "workflow.quickQuestion": "Quick question",
+  "workflow.generatedMessage": "Generated message",
+  "workflow.generatedResponse": "Generated response",
+  "workflow.strategy": "Strategy",
+  "workflow.answer": "Answer",
+  "workflow.guidance": "Guidance",
+  "workflow.subjectLines": "Subject lines",
+  "workflow.basedOn": "Based on",
+  "workflow.recommendedMessage": "Recommended message",
+  "workflow.recommendedReply": "Recommended reply",
+  "workflow.fullEmail": "Full email",
+  "workflow.shorterVersion": "Shorter version",
+  "workflow.shorterAlternative": "Shorter alternative",
+  "workflow.cta": "CTA",
+  "workflow.angleAndSignals": "Angle and signals",
+  "workflow.sourcesAndSafety": "Sources and safety",
+  "workflow.advancedOptionalDetails": "Advanced optional details",
+  "workflow.advancedOptionalContext": "Advanced optional context",
+  "workflow.advancedAccountContext": "Advanced account context",
+  "workflow.generate": "Generate",
+  "workflow.copy": "Copy",
+  "workflow.copied": "Copied",
+  "workflow.generateEmail": "Generate email",
+  "workflow.generateReply": "Generate reply",
+  "workflow.buildSequence": "Build sequence",
+  "workflow.askSignalBrain": "Ask Signal Brain",
+  "workflow.drafting": "Drafting...",
+  "workflow.building": "Building...",
+  "workflow.answering": "Answering...",
+  "workflow.choose": "Choose...",
+  "workflow.otherManual": "Other / enter manually",
+  "workflow.enterManually": "Enter manually",
+  "workflow.company": "Company",
+  "workflow.website": "Website",
+  "workflow.firstNameOptional": "First name (optional)",
+  "workflow.firstName": "First name",
+  "workflow.buyerRole": "Buyer role",
+  "workflow.fitIcp": "Fit / ICP",
+  "workflow.industry": "Industry",
+  "workflow.reasonForOutreach": "Reason for outreach",
+  "workflow.tone": "Tone",
+  "workflow.emailLength": "Email length",
+  "workflow.length": "Length",
+  "workflow.channel": "Channel",
+  "workflow.type": "Type",
+  "workflow.market": "Market",
+  "workflow.currentVendor": "Current vendor/tool",
+  "workflow.paidSearchContext": "Paid-search context",
+  "workflow.internalNotes": "Internal notes",
+  "workflow.contextNotes": "Context notes",
+  "workflow.prospectMessage": "Prospect message",
+  "workflow.steps": "Steps",
+  "workflow.duration": "Duration",
+  "workflow.useCaseStudy": "Use relevant case study if available",
+  "workflow.create.title": "Create Outreach",
+  "workflow.create.description": "Pick the account basics, generate a short first draft, then refine.",
+  "workflow.create.empty": "Generate a draft, then edit the intro, pain point, solution, and CTA before sending.",
+  "workflow.sequence.title": "Build Sequence",
+  "workflow.sequence.description":
+    "Build a short sequence from the same quick brief, without starting from a blank page.",
+  "workflow.sequence.empty": "Build a sequence, then edit each subject, body, and CTA before copying.",
+  "workflow.reply.title": "Reply to Prospect",
+  "workflow.reply.description":
+    "Paste the reply, choose the buyer role and tone, then generate a careful response.",
+  "workflow.reply.placeholder": "Paste the prospect's message here.",
+  "workflow.reply.empty": "Paste the prospect message and generate a reply you can edit and send.",
+  "workflow.brain.title": "Ask Signal Brain",
+  "workflow.brain.description":
+    "Ask one specific question and get a safe recommendation from approved Signal context.",
+  "workflow.brain.questionLabel": "What do you want to know?",
+  "workflow.brain.answerMode": "Answer mode",
+  "workflow.brain.empty": "Choose a question, add context only if needed, and the answer will appear here.",
+  "account.title": "Account Research",
+  "account.description":
+    "Fill only what you know, then get a fit decision, recommended angle, and next action.",
+  "account.step1": "Step 1: Account basics",
+  "account.step2": "Step 2: Search and organization signals",
+  "account.step3": "Step 3: Suppression check",
+  "account.step4": "Step 4: Qualification result",
+  "account.companyName": "Company name",
+  "account.companyDomain": "Company domain",
+  "account.headquarters": "Headquarters or main market",
+  "account.markets": "Markets or countries",
+  "account.employeeContext": "Employee context",
+  "account.companyType": "Company type",
+  "account.assess": "Assess account",
+  "playbook.eyebrow": "Signal Playbook",
+  "playbook.title": "Learn the product. Pick the right accounts. Keep the message sharp.",
+  "playbook.description":
+    "A concise internal guide for experienced Primelis sellers learning Signal in the US market. Use it to qualify accounts, choose the right persona, and stay careful with evidence.",
+  "playbook.learn.title": "What Signal helps teams decide",
+  "playbook.learn.description":
+    "Use approved product truth for factual claims. Treat guidance as internal unless it is explicitly approved for external wording.",
+  "playbook.learn.details": "Three scenarios and safety limits",
+  "playbook.icp.title": "Approved Signal ICP v1",
+  "playbook.icp.description":
+    "A strong candidate usually has most of these signals. Revenue or company size alone never qualifies an account.",
+  "playbook.industries.title": "Prioritize proven segments first",
+  "playbook.personas.title": "Target ownership, not title seniority alone",
+  "playbook.transition.title": "Practical shifts for US outreach",
+  "playbook.qualify.title": "Keep the fit decision simple",
+  "playbook.work.title": "One operating flow",
+  "playbook.objections.title": "Respond without unsupported claims",
+  "playbook.caseStudies.title": "Use customer evidence carefully",
+  "playbook.dnc.title": "Check suppression before outreach",
+  "playbook.practice.title": "Five quick non-AI scenarios",
+  "playbook.progress.title": "Lightweight readiness",
   "dnc.eyebrow": "Sales safety",
   "dnc.title": "Do Not Contact check",
   "dnc.description":
@@ -167,6 +386,112 @@ const french: Record<UiTextKey, string> = {
   "home.doNotContact.title": "Vérifier Ne pas contacter",
   "home.doNotContact.description": "Vérifier les comptes à exclure avant tout outreach.",
   "home.adminShortcuts": "Raccourcis admin",
+  "workflow.eyebrow": "Workflow vente",
+  "workflow.sourceBacked": "Sourcé uniquement",
+  "workflow.approvedKnowledge": "Connaissance approuvée uniquement",
+  "workflow.draftOnly": "Brouillon uniquement",
+  "workflow.quickBrief": "Brief rapide",
+  "workflow.quickReplyBrief": "Brief de réponse",
+  "workflow.quickQuestion": "Question rapide",
+  "workflow.generatedMessage": "Message généré",
+  "workflow.generatedResponse": "Réponse générée",
+  "workflow.strategy": "Stratégie",
+  "workflow.answer": "Réponse",
+  "workflow.guidance": "Guidance",
+  "workflow.subjectLines": "Objets",
+  "workflow.basedOn": "Basé sur",
+  "workflow.recommendedMessage": "Message recommandé",
+  "workflow.recommendedReply": "Réponse recommandée",
+  "workflow.fullEmail": "Email complet",
+  "workflow.shorterVersion": "Version courte",
+  "workflow.shorterAlternative": "Alternative courte",
+  "workflow.cta": "CTA",
+  "workflow.angleAndSignals": "Angle et signaux",
+  "workflow.sourcesAndSafety": "Sources et sécurité",
+  "workflow.advancedOptionalDetails": "Détails optionnels avancés",
+  "workflow.advancedOptionalContext": "Contexte optionnel avancé",
+  "workflow.advancedAccountContext": "Contexte compte avancé",
+  "workflow.generate": "Générer",
+  "workflow.copy": "Copier",
+  "workflow.copied": "Copié",
+  "workflow.generateEmail": "Générer l'email",
+  "workflow.generateReply": "Générer la réponse",
+  "workflow.buildSequence": "Créer la séquence",
+  "workflow.askSignalBrain": "Demander à Signal Brain",
+  "workflow.drafting": "Rédaction...",
+  "workflow.building": "Création...",
+  "workflow.answering": "Réponse...",
+  "workflow.choose": "Choisir...",
+  "workflow.otherManual": "Autre / saisir manuellement",
+  "workflow.enterManually": "Saisir manuellement",
+  "workflow.company": "Entreprise",
+  "workflow.website": "Site web",
+  "workflow.firstNameOptional": "Prénom (optionnel)",
+  "workflow.firstName": "Prénom",
+  "workflow.buyerRole": "Rôle acheteur",
+  "workflow.fitIcp": "Fit / ICP",
+  "workflow.industry": "Industrie",
+  "workflow.reasonForOutreach": "Raison du contact",
+  "workflow.tone": "Ton",
+  "workflow.emailLength": "Longueur email",
+  "workflow.length": "Longueur",
+  "workflow.channel": "Canal",
+  "workflow.type": "Type",
+  "workflow.market": "Marché",
+  "workflow.currentVendor": "Outil actuel",
+  "workflow.paidSearchContext": "Contexte paid search",
+  "workflow.internalNotes": "Notes internes",
+  "workflow.contextNotes": "Notes de contexte",
+  "workflow.prospectMessage": "Message prospect",
+  "workflow.steps": "Étapes",
+  "workflow.duration": "Durée",
+  "workflow.useCaseStudy": "Utiliser une étude de cas pertinente si disponible",
+  "workflow.create.title": "Créer un message",
+  "workflow.create.description": "Choisissez les bases du compte, générez un premier draft court, puis ajustez.",
+  "workflow.create.empty": "Générez un draft, puis modifiez l'intro, le pain point, la solution et le CTA.",
+  "workflow.sequence.title": "Créer une séquence",
+  "workflow.sequence.description": "Créez une courte séquence depuis le même brief, sans repartir de zéro.",
+  "workflow.sequence.empty": "Créez une séquence, puis modifiez chaque objet, corps et CTA.",
+  "workflow.reply.title": "Répondre au prospect",
+  "workflow.reply.description": "Collez le message, choisissez le rôle et le ton, puis générez une réponse.",
+  "workflow.reply.placeholder": "Collez ici le message du prospect.",
+  "workflow.reply.empty": "Collez le message du prospect et générez une réponse modifiable.",
+  "workflow.brain.title": "Demander à Signal Brain",
+  "workflow.brain.description": "Posez une question précise et obtenez une recommandation sûre.",
+  "workflow.brain.questionLabel": "Que voulez-vous savoir ?",
+  "workflow.brain.answerMode": "Mode de réponse",
+  "workflow.brain.empty": "Choisissez une question, ajoutez du contexte seulement si besoin, puis la réponse apparaîtra ici.",
+  "account.title": "Recherche compte",
+  "account.description": "Renseignez uniquement ce que vous savez, puis obtenez le fit, l'angle et l'action suivante.",
+  "account.step1": "Étape 1 : bases du compte",
+  "account.step2": "Étape 2 : signaux search et organisation",
+  "account.step3": "Étape 3 : suppression",
+  "account.step4": "Étape 4 : résultat de qualification",
+  "account.companyName": "Nom de l'entreprise",
+  "account.companyDomain": "Domaine",
+  "account.headquarters": "Siège ou marché principal",
+  "account.markets": "Marchés ou pays",
+  "account.employeeContext": "Contexte effectifs",
+  "account.companyType": "Type d'entreprise",
+  "account.assess": "Qualifier le compte",
+  "playbook.eyebrow": "Playbook Signal",
+  "playbook.title": "Comprendre le produit. Choisir les bons comptes. Garder un message clair.",
+  "playbook.description": "Guide interne concis pour apprendre Signal sur le marché US, qualifier les comptes et rester prudent avec les preuves.",
+  "playbook.learn.title": "Ce que Signal aide à décider",
+  "playbook.learn.description": "Utilisez les vérités produit approuvées pour les claims factuels.",
+  "playbook.learn.details": "Trois scénarios et limites de sécurité",
+  "playbook.icp.title": "ICP Signal approuvé v1",
+  "playbook.icp.description": "Un bon compte possède généralement plusieurs signaux. La taille seule ne qualifie pas.",
+  "playbook.industries.title": "Prioriser les segments prouvés",
+  "playbook.personas.title": "Cibler l'ownership, pas seulement le titre",
+  "playbook.transition.title": "Ajustements pratiques pour le marché US",
+  "playbook.qualify.title": "Garder la qualification simple",
+  "playbook.work.title": "Un flux de travail simple",
+  "playbook.objections.title": "Répondre sans claims non supportés",
+  "playbook.caseStudies.title": "Utiliser les preuves clients prudemment",
+  "playbook.dnc.title": "Vérifier la suppression avant contact",
+  "playbook.practice.title": "Cinq scénarios rapides sans IA",
+  "playbook.progress.title": "Readiness légère",
   "dnc.eyebrow": "Sécurité commerciale",
   "dnc.title": "Vérification Ne pas contacter",
   "dnc.description":
@@ -223,6 +548,112 @@ const portuguese: Record<UiTextKey, string> = {
     "Um espaço focado para aprender Signal, qualificar contas e criar mensagens outbound para o mercado dos EUA.",
   "home.openPlaybook": "Abrir playbook Signal",
   "home.adminShortcuts": "Atalhos admin",
+  "workflow.eyebrow": "Fluxo de vendas",
+  "workflow.sourceBacked": "Apenas com fontes",
+  "workflow.approvedKnowledge": "Apenas conhecimento aprovado",
+  "workflow.draftOnly": "Apenas rascunho",
+  "workflow.quickBrief": "Brief rápido",
+  "workflow.quickReplyBrief": "Brief de resposta",
+  "workflow.quickQuestion": "Pergunta rápida",
+  "workflow.generatedMessage": "Mensagem gerada",
+  "workflow.generatedResponse": "Resposta gerada",
+  "workflow.strategy": "Estratégia",
+  "workflow.answer": "Resposta",
+  "workflow.guidance": "Orientação",
+  "workflow.subjectLines": "Assuntos",
+  "workflow.basedOn": "Baseado em",
+  "workflow.recommendedMessage": "Mensagem recomendada",
+  "workflow.recommendedReply": "Resposta recomendada",
+  "workflow.fullEmail": "Email completo",
+  "workflow.shorterVersion": "Versão curta",
+  "workflow.shorterAlternative": "Alternativa curta",
+  "workflow.cta": "CTA",
+  "workflow.angleAndSignals": "Ângulo e sinais",
+  "workflow.sourcesAndSafety": "Fontes e segurança",
+  "workflow.advancedOptionalDetails": "Detalhes opcionais avançados",
+  "workflow.advancedOptionalContext": "Contexto opcional avançado",
+  "workflow.advancedAccountContext": "Contexto avançado da conta",
+  "workflow.generate": "Gerar",
+  "workflow.copy": "Copiar",
+  "workflow.copied": "Copiado",
+  "workflow.generateEmail": "Gerar email",
+  "workflow.generateReply": "Gerar resposta",
+  "workflow.buildSequence": "Criar sequência",
+  "workflow.askSignalBrain": "Perguntar ao Signal Brain",
+  "workflow.drafting": "Gerando...",
+  "workflow.building": "Criando...",
+  "workflow.answering": "Respondendo...",
+  "workflow.choose": "Escolher...",
+  "workflow.otherManual": "Outro / inserir manualmente",
+  "workflow.enterManually": "Inserir manualmente",
+  "workflow.company": "Empresa",
+  "workflow.website": "Site",
+  "workflow.firstNameOptional": "Nome (opcional)",
+  "workflow.firstName": "Nome",
+  "workflow.buyerRole": "Função do comprador",
+  "workflow.fitIcp": "Fit / ICP",
+  "workflow.industry": "Indústria",
+  "workflow.reasonForOutreach": "Motivo do contato",
+  "workflow.tone": "Tom",
+  "workflow.emailLength": "Tamanho do email",
+  "workflow.length": "Tamanho",
+  "workflow.channel": "Canal",
+  "workflow.type": "Tipo",
+  "workflow.market": "Mercado",
+  "workflow.currentVendor": "Ferramenta atual",
+  "workflow.paidSearchContext": "Contexto de paid search",
+  "workflow.internalNotes": "Notas internas",
+  "workflow.contextNotes": "Notas de contexto",
+  "workflow.prospectMessage": "Mensagem do prospect",
+  "workflow.steps": "Etapas",
+  "workflow.duration": "Duração",
+  "workflow.useCaseStudy": "Usar case relevante se disponível",
+  "workflow.create.title": "Criar mensagem",
+  "workflow.create.description": "Escolha os dados básicos, gere um primeiro rascunho curto e refine.",
+  "workflow.create.empty": "Gere um rascunho e edite intro, dor, solução e CTA antes de enviar.",
+  "workflow.sequence.title": "Criar sequência",
+  "workflow.sequence.description": "Crie uma sequência curta do mesmo brief, sem começar do zero.",
+  "workflow.sequence.empty": "Crie uma sequência e edite assunto, corpo e CTA antes de copiar.",
+  "workflow.reply.title": "Responder prospect",
+  "workflow.reply.description": "Cole a mensagem, escolha função e tom, depois gere uma resposta cuidadosa.",
+  "workflow.reply.placeholder": "Cole aqui a mensagem do prospect.",
+  "workflow.reply.empty": "Cole a mensagem do prospect e gere uma resposta editável.",
+  "workflow.brain.title": "Perguntar ao Signal Brain",
+  "workflow.brain.description": "Faça uma pergunta específica e receba uma recomendação segura.",
+  "workflow.brain.questionLabel": "O que você quer saber?",
+  "workflow.brain.answerMode": "Modo de resposta",
+  "workflow.brain.empty": "Escolha uma pergunta, adicione contexto só se necessário, e a resposta aparecerá aqui.",
+  "account.title": "Pesquisa de conta",
+  "account.description": "Preencha só o que sabe e receba fit, ângulo e próxima ação.",
+  "account.step1": "Etapa 1: dados da conta",
+  "account.step2": "Etapa 2: sinais de search e organização",
+  "account.step3": "Etapa 3: supressão",
+  "account.step4": "Etapa 4: qualificação",
+  "account.companyName": "Nome da empresa",
+  "account.companyDomain": "Domínio",
+  "account.headquarters": "Sede ou mercado principal",
+  "account.markets": "Mercados ou países",
+  "account.employeeContext": "Contexto de funcionários",
+  "account.companyType": "Tipo de empresa",
+  "account.assess": "Avaliar conta",
+  "playbook.eyebrow": "Playbook Signal",
+  "playbook.title": "Aprenda o produto. Escolha as contas certas. Mantenha a mensagem clara.",
+  "playbook.description": "Guia interno conciso para aprender Signal no mercado dos EUA, qualificar contas e usar evidências com cuidado.",
+  "playbook.learn.title": "O que Signal ajuda as equipes a decidir",
+  "playbook.learn.description": "Use verdades de produto aprovadas para afirmações factuais.",
+  "playbook.learn.details": "Três cenários e limites de segurança",
+  "playbook.icp.title": "ICP Signal aprovado v1",
+  "playbook.icp.description": "Uma boa conta normalmente tem vários sinais. Tamanho sozinho não qualifica.",
+  "playbook.industries.title": "Priorizar segmentos comprovados",
+  "playbook.personas.title": "Mirar ownership, não só senioridade",
+  "playbook.transition.title": "Ajustes práticos para outreach nos EUA",
+  "playbook.qualify.title": "Manter a decisão de fit simples",
+  "playbook.work.title": "Um fluxo operacional",
+  "playbook.objections.title": "Responder sem claims sem suporte",
+  "playbook.caseStudies.title": "Usar evidência de clientes com cuidado",
+  "playbook.dnc.title": "Verificar supressão antes do contato",
+  "playbook.practice.title": "Cinco cenários rápidos sem IA",
+  "playbook.progress.title": "Readiness leve",
   "dnc.eyebrow": "Segurança comercial",
   "dnc.title": "Verificação Não contactar",
   "dnc.description":

@@ -54,7 +54,7 @@ function stripDisallowedCommercialTerms(text: string) {
 
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|serp|google ads|search console|conversion-source|conversion performance/i.test(fact)) {
-    return "Signal helps teams compare paid brand ads with organic results, so they can decide where paid coverage is useful and where it may be wasteful.";
+    return "Signal helps teams compare paid brand ads with organic results, so they can decide where paid coverage is useful and where organic demand may already be doing enough.";
   }
   return fact;
 }
@@ -104,12 +104,21 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     const companyPhrase = input.companyName ? ` for ${input.companyName}` : "";
     const cta =
       input.channel === "LINKEDIN"
-        ? "Would it be useful if I sent two bullets tailored to your setup?"
-        : "Would it be useful if I sent a short note with the two most relevant angles?";
+        ? "I can send the deck and add two bullets on the part most relevant to your setup."
+        : "I can send the deck or a short note with the two most relevant angles.";
 
     const recommendedReply = intents.includes("DECK_REQUEST")
       ? deckReply(input, [primaryFact, secondaryFact].filter(Boolean))
-      : [openingFor(input, intents), primaryFact, secondaryFact, cta].filter(Boolean).join(" ");
+      : [
+          openingFor(input, intents),
+          primaryFact,
+          intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
+            ? "The key is not just seeing whether competitors are present. It is comparing paid coverage with what organic results would likely capture anyway."
+            : secondaryFact,
+          cta,
+        ]
+          .filter(Boolean)
+          .join(" ");
 
     const shorterAlternative = intents.includes("DECK_REQUEST")
       ? [

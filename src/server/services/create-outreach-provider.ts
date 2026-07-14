@@ -96,9 +96,9 @@ function ctaFor(input: CreateOutreachInput) {
 function subjectLinesFor(input: CreateOutreachInput) {
   const company = input.companyName;
   return [
-    `${company} brand-search question`,
-    `Paid + organic at ${company}`,
-    `${company} brand-spend check`,
+    `${company} paid brand question`,
+    `Paid or organic at ${company}?`,
+    `Quick thought on ${company} brand search`,
   ];
 }
 
@@ -140,7 +140,7 @@ function contextLine(input: CreateOutreachInput) {
   }
 
   if (details.some((detail) => /brand demand|paid-search|brand-search|spend/i.test(String(detail)))) {
-    return `I had ${input.companyName} on my list because branded search is one of those channels where spend can look safe, but the real question is whether paid coverage is still adding value.`;
+    return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
   }
 
   return `I had ${input.companyName} on my list because there may be a practical brand-search efficiency question worth checking.`;
@@ -150,14 +150,14 @@ function personaLine(input: CreateOutreachInput) {
   const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
     input.companyContext ?? "",
   )
-    ? " At that scale, even small changes in paid brand coverage can affect budget and reporting."
+    ? " For larger accounts, even small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `The hard part is separating brand clicks worth paying for from demand organic search may already capture.${scaleHint}`;
+  return `The practical question is not whether to run brand search. It is where paid coverage protects demand, and where organic results may already do enough.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps compare paid brand ads with organic results and changes in the search page, so the team can see where coverage is useful and where spend may be wasted.";
+    return "Signal helps compare paid brand ads with organic results and search-page changes, so the team can decide where coverage is useful and where spend may be wasted.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {

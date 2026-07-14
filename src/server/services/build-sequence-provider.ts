@@ -99,9 +99,9 @@ function ctaForStep(stepNumber: number, isFinal: boolean, channel: SequenceStep[
 
 function subjectFor(input: BuildSequenceInput, stepNumber: number, angleLabel: string) {
   const subjects = [
-    `${input.companyName} brand-search question`,
-    `Paid brand at ${input.companyName}`,
-    `${input.companyName}: paid and organic`,
+    `${input.companyName} paid brand question`,
+    `Paid or organic at ${input.companyName}?`,
+    `Quick thought on ${input.companyName} brand search`,
     `Closing the loop`,
     `Close the loop?`,
     `Last note on brand search`,
@@ -134,8 +134,20 @@ function fitSignalForEmail(value?: string) {
 }
 
 function accountContextLine(input: BuildSequenceInput) {
+  const industryHint = (() => {
+    if (!input.industry) {
+      return undefined;
+    }
+    if (/fashion|luxury|retail|e-commerce/i.test(input.industry)) {
+      return "brand demand and paid search often sit close to revenue";
+    }
+    if (/saas|technology|fintech|subscription/i.test(input.industry)) {
+      return "paid brand decisions can affect acquisition efficiency";
+    }
+    return "the paid brand question may be worth validating";
+  })();
   const details = [
-    input.industry ? `the ${input.industry} category` : undefined,
+    industryHint,
     fitSignalForEmail(input.companyContext),
     input.geographyOrMarkets ? `${input.geographyOrMarkets} market context` : undefined,
   ].filter(Boolean);
@@ -144,16 +156,16 @@ function accountContextLine(input: BuildSequenceInput) {
     return "";
   }
 
-  return `I thought ${input.companyName} could be worth a quick brand-search fit check because of ${details.join(" and ")}.`;
+  return `I thought ${input.companyName} could be worth a quick brand-search fit check because ${details.join(" and ")}.`;
 }
 
 function personaPainLine(input: BuildSequenceInput) {
   const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
     input.companyContext ?? "",
   )
-    ? " At that level, even small changes in paid brand coverage can affect budget and reporting."
+    ? " For larger accounts, even small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `For ${input.contactRole}, the hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when search results change enough to make paid coverage worth keeping.${scaleHint}`;
+  return `The hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when search results change enough to make paid coverage worth keeping.${scaleHint}`;
 }
 
 function humanizeFact(fact: string) {

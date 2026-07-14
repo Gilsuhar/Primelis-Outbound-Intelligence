@@ -10,8 +10,10 @@ import {
 } from "lucide-react";
 
 import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
+import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type { SignalBrainMode, SignalBrainResult } from "@/features/ask-signal-brain/types";
 
 const modeOptions: { label: string; value: SignalBrainMode }[] = [
@@ -103,9 +105,11 @@ function SmartField({
 }: SmartFieldProps) {
   const [value, setValue] = useState("");
   const [customValue, setCustomValue] = useState("");
+  const outputLanguage = useOutputLanguage();
   const isCustom = value === "__custom";
   const finalValue = isCustom ? customValue : value;
   const Input = textarea ? "textarea" : "input";
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
   return (
     <label className="block space-y-1 text-sm font-medium text-[#34352e]">
@@ -115,19 +119,19 @@ function SmartField({
         onChange={(event) => setValue(event.target.value)}
         value={value}
       >
-        <option value="">Choose...</option>
+        <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
-        <option value="__custom">Other / enter manually</option>
+        <option value="__custom">{t("workflow.otherManual")}</option>
       </select>
       {isCustom ? (
         <Input
           className="mt-2 min-h-10 w-full rounded-md border border-line bg-white px-3 py-2 text-sm leading-6"
           onChange={(event) => setCustomValue(event.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder === "Enter manually" ? t("workflow.enterManually") : placeholder}
           value={customValue}
         />
       ) : null}
@@ -137,6 +141,8 @@ function SmartField({
 }
 
 export function AskSignalBrainClient() {
+  const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [mode, setMode] = useState<SignalBrainMode>("QUICK_ANSWER");
   const [result, setResult] = useState<SignalBrainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -174,20 +180,20 @@ export function AskSignalBrainClient() {
     <div className="space-y-6">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-olive">
-          Sales workflow
+          {t("workflow.eyebrow")}
         </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <h1 className="font-display text-4xl font-semibold leading-[1.22] text-ink">
-              Ask Signal Brain
+              {t("workflow.brain.title")}
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-              Ask one specific question and get a safe recommendation from approved Signal context.
+              {t("workflow.brain.description")}
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
             <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
-            Approved knowledge only
+            {t("workflow.approvedKnowledge")}
           </div>
         </div>
       </section>
@@ -196,11 +202,11 @@ export function AskSignalBrainClient() {
         <form action={onSubmit} className="space-y-4 rounded-2xl border border-line bg-white p-5">
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Brain aria-hidden="true" className="h-5 w-5 text-olive" />
-            <h2 className="text-lg font-semibold text-ink">Quick question</h2>
+            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickQuestion")}</h2>
           </div>
 
           <SmartField
-            label="What do you want to know?"
+            label={t("workflow.brain.questionLabel")}
             name="question"
             options={questionTemplates}
             placeholder="Write the exact question"
@@ -209,7 +215,7 @@ export function AskSignalBrainClient() {
           />
 
           <label className="block space-y-1 text-sm font-medium text-[#34352e]">
-            Answer mode
+            {t("workflow.brain.answerMode")}
             <select
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
               onChange={(event) => setMode(event.target.value as SignalBrainMode)}
@@ -225,18 +231,18 @@ export function AskSignalBrainClient() {
 
           <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Advanced account context
+              {t("workflow.advancedAccountContext")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <SmartField label="Company" name="companyName" options={[]} />
-              <SmartField label="Website" name="companyWebsite" options={[]} />
+              <SmartField label={t("workflow.company")} name="companyName" options={[]} />
+              <SmartField label={t("workflow.website")} name="companyWebsite" options={[]} />
               <SmartField
-                label="Buyer role"
+                label={t("workflow.buyerRole")}
                 name="contactRole"
                 options={personas.map((persona) => persona.name)}
               />
               <SmartField
-                label="Industry"
+                label={t("workflow.industry")}
                 name="industry"
                 options={industries.map((industry) => industry.name)}
               />
@@ -246,27 +252,27 @@ export function AskSignalBrainClient() {
                 options={companySizeOptions}
               />
               <SmartField
-                label="Geography or markets"
+                label={t("account.markets")}
                 name="geographyOrMarkets"
                 options={marketOptions}
               />
               <SmartField
-                label="Paid-search context"
+                label={t("workflow.paidSearchContext")}
                 name="paidSearchContext"
                 options={paidSearchOptions}
               />
               <SmartField
-                label="Known vendor or tool"
+                label={t("workflow.currentVendor")}
                 name="currentVendor"
                 options={vendorOptions}
               />
               <SmartField
-                label="Observed trigger"
+                label={t("workflow.reasonForOutreach")}
                 name="observedTrigger"
                 options={triggerOptions}
                 textarea
               />
-              <SmartField label="Internal notes" name="internalNotes" options={[]} textarea />
+              <SmartField label={t("workflow.internalNotes")} name="internalNotes" options={[]} textarea />
             </div>
           </details>
 
@@ -278,7 +284,7 @@ export function AskSignalBrainClient() {
 
           <button className="signal-button-primary" disabled={isPending} type="submit">
             <Brain aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Answering..." : "Ask Signal Brain"}
+            {isPending ? t("workflow.answering") : t("workflow.askSignalBrain")}
           </button>
         </form>
 
@@ -286,7 +292,7 @@ export function AskSignalBrainClient() {
           <article className="rounded-2xl border border-line bg-white p-5">
             <div className="mb-3 flex items-center gap-2">
               <FileText aria-hidden="true" className="h-5 w-5 text-olive" />
-              <h2 className="text-lg font-semibold text-ink">Answer</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("workflow.answer")}</h2>
             </div>
             {result ? (
               <div className="space-y-4">
@@ -319,7 +325,7 @@ export function AskSignalBrainClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-[#6f6d5f]">
-                Choose a question, add context only if needed, and the answer will appear here.
+                {t("workflow.brain.empty")}
               </p>
             )}
           </article>
@@ -329,7 +335,7 @@ export function AskSignalBrainClient() {
               <article className="rounded-2xl border border-line bg-white p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <Lightbulb aria-hidden="true" className="h-5 w-5 text-olive" />
-                  <h2 className="text-lg font-semibold text-ink">Guidance</h2>
+                  <h2 className="text-lg font-semibold text-ink">{t("workflow.guidance")}</h2>
                 </div>
                 <p className="text-sm leading-6 text-[#34352e]">{result.reasoningSummary}</p>
                 <p className="mt-3 text-sm font-semibold text-ink">

@@ -17,6 +17,7 @@ import { useOutputLanguage } from "@/components/language-selector";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   BuildSequenceResult,
   SequenceChannel,
@@ -192,9 +193,11 @@ function SmartField({
 }: SmartFieldProps) {
   const [value, setValue] = useState(defaultValue);
   const [customValue, setCustomValue] = useState("");
+  const outputLanguage = useOutputLanguage();
   const isCustom = value === "__custom";
   const finalValue = isCustom ? customValue : value;
   const Input = textarea ? "textarea" : "input";
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
   return (
     <label className="space-y-1 text-sm font-medium text-stone-700">
@@ -204,19 +207,19 @@ function SmartField({
         onChange={(event) => setValue(event.target.value)}
         value={value}
       >
-        <option value="">Choose...</option>
+        <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
-        <option value="__custom">Other / enter manually</option>
+        <option value="__custom">{t("workflow.otherManual")}</option>
       </select>
       {isCustom ? (
         <Input
           className="mt-2 min-h-10 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
           onChange={(event) => setCustomValue(event.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder === "Enter manually" ? t("workflow.enterManually") : placeholder}
           value={customValue}
         />
       ) : null}
@@ -254,6 +257,7 @@ function TextField({
 
 export function BuildSequenceClient() {
   const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
@@ -355,18 +359,18 @@ export function BuildSequenceClient() {
     <div className="space-y-6">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-signal">
-          Sales workflow
+          {t("workflow.eyebrow")}
         </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold text-ink">Build Sequence</h1>
+            <h1 className="text-3xl font-semibold text-ink">{t("workflow.sequence.title")}</h1>
             <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              Build a short sequence from the same quick brief, without starting from a blank page.
+              {t("workflow.sequence.description")}
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
             <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
-            Draft only
+            {t("workflow.draftOnly")}
           </div>
         </div>
       </section>
@@ -379,12 +383,12 @@ export function BuildSequenceClient() {
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <Layers3 aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">Quick brief</h2>
+            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickBrief")}</h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
-              label="Company"
+              label={t("workflow.company")}
               name="companyName"
               onChange={(value) => {
                 setCompanyName(value);
@@ -394,30 +398,30 @@ export function BuildSequenceClient() {
               value={companyName}
             />
             <SmartField
-              label="Buyer role"
+              label={t("workflow.buyerRole")}
               name="contactRole"
               options={personas.map((persona) => persona.name)}
               required
             />
             <SmartField
-              label="Fit / ICP"
+              label={t("workflow.fitIcp")}
               name="companyContext"
               options={companySizeOptions}
               required
             />
             <SmartField
-              label="Industry"
+              label={t("workflow.industry")}
               name="industry"
               options={industries.map((industry) => industry.name)}
             />
             <SmartField
-              label="Reason for outreach"
+              label={t("workflow.reasonForOutreach")}
               name="observedTrigger"
               options={triggerOptions}
               required
             />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Steps
+              {t("workflow.steps")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) =>
@@ -433,7 +437,7 @@ export function BuildSequenceClient() {
               </select>
             </label>
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              Tone
+              {t("workflow.tone")}
               <select
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                 onChange={(event) => setTone(event.target.value as SequenceTone)}
@@ -448,7 +452,7 @@ export function BuildSequenceClient() {
             </label>
             <SmartField
               defaultValue="12 business days"
-              label="Duration"
+              label={t("workflow.duration")}
               name="desiredOverallDuration"
               options={durationOptions}
               required
@@ -457,29 +461,29 @@ export function BuildSequenceClient() {
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Advanced optional details
+              {t("workflow.advancedOptionalDetails")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <TextField
-                label="Website"
+                label={t("workflow.website")}
                 name="companyWebsite"
                 onChange={setCompanyWebsite}
                 value={companyWebsite}
               />
-              <SmartField label="First name" name="contactFirstName" options={[]} />
+              <SmartField label={t("workflow.firstName")} name="contactFirstName" options={[]} />
               <SmartField
-                label="Market"
+                label={t("workflow.market")}
                 name="geographyOrMarkets"
                 options={marketOptions}
               />
-              <SmartField label="Current vendor/tool" name="currentVendor" options={vendorOptions} />
+              <SmartField label={t("workflow.currentVendor")} name="currentVendor" options={vendorOptions} />
               <SmartField
-                label="Paid-search context"
+                label={t("workflow.paidSearchContext")}
                 name="paidSearchContext"
                 options={paidSearchOptions}
               />
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-                Channel
+                {t("workflow.channel")}
                 <select
                   className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                   onChange={(event) => setPrimaryChannel(event.target.value as SequenceChannel)}
@@ -491,7 +495,7 @@ export function BuildSequenceClient() {
                 </select>
               </label>
               <div className="sm:col-span-2">
-                <SmartField label="Internal notes" name="internalNotes" options={[]} textarea />
+                <SmartField label={t("workflow.internalNotes")} name="internalNotes" options={[]} textarea />
               </div>
             </div>
           </details>
@@ -508,7 +512,7 @@ export function BuildSequenceClient() {
             type="submit"
           >
             <Send aria-hidden="true" className="h-4 w-4" />
-            {isPending ? "Building..." : "Build sequence"}
+            {isPending ? t("workflow.building") : t("workflow.buildSequence")}
           </button>
         </form>
 
@@ -516,7 +520,7 @@ export function BuildSequenceClient() {
           <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <FileText aria-hidden="true" className="h-5 w-5 text-signal" />
-              <h2 className="text-lg font-semibold text-ink">Strategy</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("workflow.strategy")}</h2>
             </div>
             {result ? (
               <div className="space-y-3">
@@ -543,7 +547,7 @@ export function BuildSequenceClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">
-                Build a sequence, then edit each subject, body, and CTA before copying.
+                {t("workflow.sequence.empty")}
               </p>
             )}
           </article>

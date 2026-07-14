@@ -17,6 +17,8 @@ import type {
   YesNoUnknown,
 } from "@/features/account-research/types";
 import { industries } from "@/features/playbook/playbook-content";
+import { useOutputLanguage } from "@/components/language-selector";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 
 const yesNoUnknown: Array<{ label: string; value: YesNoUnknown }> = [
   { label: "Unknown", value: "UNKNOWN" },
@@ -181,6 +183,8 @@ function ResultBadge({ result }: { result: string }) {
 }
 
 export function AccountResearchClient() {
+  const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyDomain, setCompanyDomain] = useState("");
   const [result, setResult] = useState<AccountAssessmentResult | null>(null);
@@ -280,14 +284,14 @@ export function AccountResearchClient() {
     <div className="space-y-6">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-olive">
-          Sales workflow
+          {t("workflow.eyebrow")}
         </p>
         <div className="space-y-2">
           <h1 className="font-display text-4xl font-semibold leading-[1.22] text-ink">
-            Account Research
+            {t("account.title")}
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-            Fill only what you know, then get a fit decision, recommended angle, and next action.
+            {t("account.description")}
           </p>
         </div>
       </section>
@@ -297,11 +301,11 @@ export function AccountResearchClient() {
           <section className="space-y-3">
             <div className="flex items-center gap-2 border-b border-line pb-3">
               <Building2 aria-hidden="true" className="h-5 w-5 text-olive" />
-              <h2 className="text-lg font-semibold text-ink">Step 1: Account basics</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("account.step1")}</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
-                Company name
+                {t("account.companyName")}
                 <input
                   className="w-full rounded-md border border-line px-3 py-2 text-sm"
                   name="companyName"
@@ -314,7 +318,7 @@ export function AccountResearchClient() {
                 />
               </label>
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
-                Company domain
+                {t("account.companyDomain")}
                 <input
                   className="w-full rounded-md border border-line px-3 py-2 text-sm"
                   name="companyDomain"
@@ -323,24 +327,24 @@ export function AccountResearchClient() {
                 />
               </label>
               <SmartSelect
-                label="Industry"
+                label={t("workflow.industry")}
                 name="industry"
                 options={industries.map((industry) => industry.name)}
               />
               <SmartSelect
-                label="Headquarters or main market"
+                label={t("account.headquarters")}
                 name="headquartersOrMainMarket"
                 options={marketOptions}
               />
               <SmartSelect
-                label="Markets or countries"
+                label={t("account.markets")}
                 name="marketsOrCountries"
                 options={marketOptions}
               />
               <SmartSelect label="ICP" name="revenueContext" options={revenueOptions} />
-              <SmartSelect label="Employee context" name="employeeContext" options={employeeOptions} />
+              <SmartSelect label={t("account.employeeContext")} name="employeeContext" options={employeeOptions} />
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
-                Company type
+                {t("account.companyType")}
                 <select
                   className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                   name="companyType"
@@ -357,7 +361,7 @@ export function AccountResearchClient() {
 
           <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Step 2: Search and organization signals
+              {t("account.step2")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {[
@@ -392,7 +396,7 @@ export function AccountResearchClient() {
 
           <details className="rounded-xl border border-line bg-cream p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Step 3: Suppression check
+              {t("account.step3")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {[

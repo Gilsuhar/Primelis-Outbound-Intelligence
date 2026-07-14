@@ -13,6 +13,7 @@ import {
   Send,
 } from "lucide-react";
 
+import { useOutputLanguage } from "@/components/language-selector";
 import { EvidenceBadge, SectionHeader, SignalCard, SignalHero } from "@/components/signal-ui";
 import type { ViewerRole } from "@/features/playbook/types";
 import {
@@ -24,6 +25,7 @@ import {
   qualificationChecklist,
   workSteps,
 } from "@/features/playbook/playbook-content";
+import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type { PlaybookData, PlaybookProgressKey, PlaybookProgressState } from "./types";
 
 const sectionLinks = [
@@ -46,10 +48,27 @@ type SectionId = (typeof sectionLinks)[number][0];
 function PlaybookTabs({
   activeSection,
   onChange,
+  translate,
 }: {
   activeSection: SectionId;
   onChange: (section: SectionId) => void;
+  translate: (key: UiTextKey) => string;
 }) {
+  const translatedLabels: Record<SectionId, string> = {
+    learn: "Learn Signal",
+    icp: "Signal ICP",
+    industries: "Industries",
+    personas: "Personas",
+    transition: "US Market",
+    qualify: "Qualify",
+    work: "How to Work",
+    objections: "Objections",
+    "case-studies": "Case Studies",
+    dnc: translate("nav.Do Not Contact"),
+    practice: "Practice",
+    progress: "Progress",
+  };
+
   return (
     <div className="rounded-2xl border border-line bg-cream p-2">
       <div className="flex gap-2 overflow-x-auto">
@@ -65,7 +84,7 @@ function PlaybookTabs({
             onClick={() => onChange(id)}
             type="button"
           >
-            {label}
+            {translatedLabels[id] ?? label}
           </button>
         ))}
       </div>
@@ -177,6 +196,8 @@ export function PlaybookClient({
   data: PlaybookData;
   viewerRole: ViewerRole;
 }) {
+  const outputLanguage = useOutputLanguage();
+  const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [progress, setProgress] = useState<PlaybookProgressState>(emptyProgress);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
   const [activeSection, setActiveSection] = useState<SectionId>("learn");
@@ -192,19 +213,19 @@ export function PlaybookClient({
   return (
     <div className="space-y-8">
       <SignalHero
-        description="A concise internal guide for experienced Primelis sellers learning Signal in the US market. Use it to qualify accounts, choose the right persona, and stay careful with evidence."
-        eyebrow="Signal Playbook"
-        title="Learn the product. Pick the right accounts. Keep the message sharp."
+        description={t("playbook.description")}
+        eyebrow={t("playbook.eyebrow")}
+        title={t("playbook.title")}
       />
 
-      <PlaybookTabs activeSection={activeSection} onChange={setActiveSection} />
+      <PlaybookTabs activeSection={activeSection} onChange={setActiveSection} translate={t} />
 
       <PlaybookSection
-        description="Use approved product truth for factual claims. Treat guidance as internal unless it is explicitly approved for external wording."
+        description={t("playbook.learn.description")}
         eyebrow="A. Learn Signal"
         hidden={activeSection !== "learn"}
         id="learn"
-        title="What Signal helps teams decide"
+        title={t("playbook.learn.title")}
       >
         <div className="grid gap-4 lg:grid-cols-3">
           {data.approvedProductTruth.length > 0 ? (
@@ -229,7 +250,7 @@ export function PlaybookClient({
             />
           )}
         </div>
-        <CompactDetails title="Three scenarios and safety limits">
+        <CompactDetails title={t("playbook.learn.details")}>
           <ul className="space-y-2">
             {[
               "Solo scenario: branded search where paid presence may not be incrementally useful.",
@@ -244,11 +265,11 @@ export function PlaybookClient({
       </PlaybookSection>
 
       <PlaybookSection
-        description="A strong candidate usually has most of these signals. Revenue or company size alone never qualifies an account."
+        description={t("playbook.icp.description")}
         eyebrow="B. Signal ICP"
         hidden={activeSection !== "icp"}
         id="icp"
-        title="Approved Signal ICP v1"
+        title={t("playbook.icp.title")}
       >
         <div className="grid gap-3 md:grid-cols-2">
           <SignalCard title="Core ICP">
@@ -273,7 +294,7 @@ export function PlaybookClient({
         eyebrow="C. Industries"
         hidden={activeSection !== "industries"}
         id="industries"
-        title="Prioritize proven segments first"
+        title={t("playbook.industries.title")}
       >
         <div className="grid gap-3 lg:grid-cols-2">
           {data.industries.map((industry) => (
@@ -309,7 +330,7 @@ export function PlaybookClient({
         eyebrow="D. Personas"
         hidden={activeSection !== "personas"}
         id="personas"
-        title="Target ownership, not title seniority alone"
+        title={t("playbook.personas.title")}
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.personas.map((persona) => (
@@ -355,7 +376,7 @@ export function PlaybookClient({
         eyebrow="E. US Market Transition"
         hidden={activeSection !== "transition"}
         id="transition"
-        title="Practical shifts for US outreach"
+        title={t("playbook.transition.title")}
       >
         <div className="grid gap-4 md:grid-cols-2">
           {[
@@ -377,7 +398,7 @@ export function PlaybookClient({
         eyebrow="F. Qualify an Account"
         hidden={activeSection !== "qualify"}
         id="qualify"
-        title="Keep the fit decision simple"
+        title={t("playbook.qualify.title")}
       >
         <SignalCard title="Checklist">
           <ul className="mt-4 grid gap-2 text-sm leading-6 text-[#5c5a4f] sm:grid-cols-2">
@@ -392,7 +413,7 @@ export function PlaybookClient({
         eyebrow="G. How to Work"
         hidden={activeSection !== "work"}
         id="work"
-        title="One operating flow"
+        title={t("playbook.work.title")}
       >
         <div className="flex flex-wrap gap-2">
           {workSteps.map((step) => (
@@ -407,19 +428,19 @@ export function PlaybookClient({
         <div className="flex flex-wrap gap-3">
           <Link className="signal-button-secondary" href="/do-not-contact">
             <Ban className="h-4 w-4" />
-            Check Do Not Contact
+            {t("home.doNotContact.title")}
           </Link>
           <Link className="signal-button-secondary" href="/create-outreach">
             <Send className="h-4 w-4" />
-            Create Outreach
+            {t("workflow.create.title")}
           </Link>
           <Link className="signal-button-secondary" href="/build-sequence">
             <Layers3 className="h-4 w-4" />
-            Build Sequence
+            {t("workflow.sequence.title")}
           </Link>
           <Link className="signal-button-secondary" href="/reply-to-prospect">
             <MessageSquareReply className="h-4 w-4" />
-            Handle Reply
+            {t("workflow.reply.title")}
           </Link>
         </div>
       </PlaybookSection>
@@ -429,7 +450,7 @@ export function PlaybookClient({
         eyebrow="H. Objections"
         hidden={activeSection !== "objections"}
         id="objections"
-        title="Respond without unsupported claims"
+        title={t("playbook.objections.title")}
       >
         <div className="grid gap-4 md:grid-cols-2">
           {[
@@ -465,7 +486,7 @@ export function PlaybookClient({
         eyebrow="I. Case Studies"
         hidden={activeSection !== "case-studies"}
         id="case-studies"
-        title="Use customer evidence carefully"
+        title={t("playbook.caseStudies.title")}
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.caseStudies.length > 0 ? (
@@ -513,7 +534,7 @@ export function PlaybookClient({
         eyebrow="J. Do Not Contact"
         hidden={activeSection !== "dnc"}
         id="dnc"
-        title="Check suppression before outreach"
+        title={t("playbook.dnc.title")}
       >
         <SignalCard
           description="Use the Do Not Contact list before creating outreach or sequences. The current phase does not connect a CRM or collect external data."
@@ -528,7 +549,7 @@ export function PlaybookClient({
         eyebrow="K. Practice"
         hidden={activeSection !== "practice"}
         id="practice"
-        title="Five quick non-AI scenarios"
+        title={t("playbook.practice.title")}
       >
         <div className="space-y-3">
           {data.practiceScenarios.map((scenario) => (
@@ -574,7 +595,7 @@ export function PlaybookClient({
         eyebrow="L. Progress"
         hidden={activeSection !== "progress"}
         id="progress"
-        title="Lightweight readiness"
+        title={t("playbook.progress.title")}
       >
         <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
           <SignalCard title={`${progressView.completionPercentage}% complete`}>
