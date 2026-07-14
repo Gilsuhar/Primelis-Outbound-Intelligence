@@ -112,16 +112,16 @@ function fitSignalForEmail(value?: string) {
     return undefined;
   }
   if (/\$|revenue|employees|enterprise|multi-market|multi-country/i.test(clean)) {
-    return "enough scale and complexity for brand-search decisions to matter";
+    return "a larger paid-search setup where small brand decisions can affect spend";
   }
   if (/monthly|spend/i.test(clean)) {
-    return "enough branded-search activity for efficiency gains to matter";
+    return "active brand-search spend where efficiency can matter";
   }
   if (/brand demand|paid-search owner/i.test(clean)) {
-    return "likely brand demand and a clear paid-search owner";
+    return "clear brand demand and someone owning paid search";
   }
   if (/validate brand demand|not enough signal|unknown/i.test(clean)) {
-    return "a brand-demand question worth validating before any pitch";
+    return "a brand-demand question worth checking first";
   }
   return clean.toLowerCase();
 }
@@ -137,28 +137,28 @@ function contextDetails(input: CreateOutreachInput) {
 function contextLine(input: CreateOutreachInput) {
   const details = contextDetails(input);
   if (details.length === 0) {
-    return `I had ${input.companyName} on my list for a practical brand-search fit check.`;
+    return `I thought ${input.companyName} could be worth a quick brand-search fit check.`;
   }
 
-  return `I had ${input.companyName} on my list because ${details.join(" and ")} can make brand-search decisions more operational than they look from the outside.`;
+  return `I thought ${input.companyName} could be worth a quick brand-search fit check because of ${details.join(" and ")}.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
   const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
     input.companyContext ?? "",
   )
-    ? " At that level, small brand-search decisions can turn into real budget and measurement questions."
+    ? " At that level, even small changes in paid brand coverage can affect budget and reporting."
     : "";
-  return `For ${input.contactRole}, the pain is usually not launching another report. It is knowing when paid brand coverage is protecting demand, when it is incremental, and when organic demand can carry more of the outcome.${scaleHint}`;
+  return `For ${input.contactRole}, the hard part is knowing when paid brand search is truly needed, when organic results already do enough, and when competitors make it worth staying visible.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps teams separate solo, competitive, and ghost brand-search scenarios before deciding whether to keep, reduce, or pause paid coverage.";
+    return "Signal helps compare paid brand ads with organic results and competitor activity, so the team can decide where to keep coverage and where to reduce wasted spend.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal compares paid brand activity with organic visibility and competitive conditions, so the team can make a clearer decision before changing coverage or spend.";
+    return "Signal compares paid brand ads with organic visibility and competitor activity, so the team can make a clearer decision before changing coverage or spend.";
   }
 
   return fact;

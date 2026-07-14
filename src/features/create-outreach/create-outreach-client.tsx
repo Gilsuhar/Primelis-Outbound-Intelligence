@@ -115,16 +115,16 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
   if (section.label === "PAIN POINT") {
     return [
       section.text,
-      `The practical risk for ${persona} is overpaying for demand the brand may already be capturing organically, especially when competitor pressure changes by market.`,
-      `The useful question is not whether branded search works. It is where it is incremental, where it protects demand, and where it creates avoidable spend.`,
+      `For ${persona}, the practical risk is paying for clicks the brand may already win organically, especially when competitor pressure changes by market.`,
+      `The useful question is simple: where does paid brand search protect revenue, and where is it just adding cost?`,
     ];
   }
 
   if (section.label === "SOLUTION") {
     return [
       section.text,
-      "Signal brings paid brand activity, organic visibility, and competitive pressure into one view so the team can decide where to appear, reduce, or stay out.",
-      "Signal is designed to make the brand-search decision more operational: compare the paid result against organic demand and live SERP conditions before changing spend.",
+      "Signal compares paid brand ads with organic results and competitor activity, so the team can decide where to keep coverage and where to reduce wasted spend.",
+      "Signal helps the team check whether paid brand search is really adding value before changing coverage or spend.",
     ];
   }
 

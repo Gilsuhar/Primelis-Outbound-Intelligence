@@ -248,6 +248,7 @@ describe("Create Outreach service", () => {
         "SOFT CTA",
       ]);
       expect(result.data.recommendedMessage).not.toMatch(/The reason this may fit|For a VP/i);
+      expect(result.data.recommendedMessage).not.toMatch(/\b(solo|ghost|scenario|scenarios)\b/i);
       expect(result.data.recommendedMessage).not.toMatch(/quick discovery|core icp/i);
       expect(result.data.recommendedMessage).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
     }
