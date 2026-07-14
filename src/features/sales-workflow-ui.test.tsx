@@ -76,7 +76,8 @@ describe("Sales workflow UI", () => {
 
     fireEvent.change(screen.getByLabelText("Company name"), { target: { value: "Nike" } });
     expect((screen.getByLabelText("Company domain") as HTMLInputElement).value).toBe("nike.com");
-    expect(screen.getByText(/You will see fit, confidence, suppression status/i)).toBeTruthy();
+    expect(screen.getByText(/You will see the fit decision/i)).toBeTruthy();
+    expect(screen.queryByText("User provided")).toBeNull();
   });
 
   it("keeps Reply and Brain advanced context closed by default", () => {

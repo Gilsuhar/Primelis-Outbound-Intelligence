@@ -34,13 +34,6 @@ const companyTypes: Array<{ label: string; value: CompanyType }> = [
   { label: "Other", value: "OTHER" },
 ];
 
-const factStatusOptions: Array<{ label: string; value: FactStatus }> = [
-  { label: "User provided", value: "USER_PROVIDED" },
-  { label: "Verified", value: "VERIFIED" },
-  { label: "Assumption", value: "ASSUMPTION" },
-  { label: "Unknown", value: "UNKNOWN" },
-];
-
 const marketOptions = [
   "United States",
   "US and Europe",
@@ -107,13 +100,10 @@ function ynu(formData: FormData, key: string): YesNoUnknown {
 function fieldStatus(formData: FormData) {
   return Object.fromEntries(
     statusFields.map((field) => {
-      const value = formData.get(`${field}Status`);
-      return [
-        field,
-        value === "VERIFIED" || value === "ASSUMPTION" || value === "UNKNOWN"
-          ? value
-          : "USER_PROVIDED",
-      ];
+      const value = formData.get(field);
+      const hasSignal =
+        typeof value === "string" && value.trim().length > 0 && value !== "UNKNOWN";
+      return [field, hasSignal ? "USER_PROVIDED" : "UNKNOWN"];
     }),
   ) as Record<string, FactStatus>;
 }
@@ -133,22 +123,6 @@ function SelectYesNoUnknown({ name, label }: { name: string; label: string }) {
         ))}
       </select>
     </label>
-  );
-}
-
-function StatusSelect({ name }: { name: string }) {
-  return (
-    <select
-      aria-label={`${name} fact status`}
-      className="w-full rounded-md border border-line bg-white px-2 py-2 text-xs"
-      name={`${name}Status`}
-    >
-      {factStatusOptions.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -190,7 +164,6 @@ function SmartSelect({
         />
       ) : null}
       <input name={name} type="hidden" value={isCustom ? custom : value} />
-      <StatusSelect name={name} />
     </label>
   );
 }
@@ -314,8 +287,7 @@ export function AccountResearchClient() {
             Account Research
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-            Qualify an account from manual inputs only. Separate verified facts, assumptions, and
-            unknowns before choosing a persona, angle, and next action.
+            Fill only what you know, then get a fit decision, recommended angle, and next action.
           </p>
         </div>
       </section>
@@ -399,10 +371,7 @@ export function AccountResearchClient() {
                 ],
                 ["meaningfulPaidSearchInvestment", "Meaningful Paid Search investment"],
               ].map(([name, label]) => (
-                <div className="space-y-2" key={name}>
-                  <SelectYesNoUnknown label={label} name={name} />
-                  <StatusSelect name={name} />
-                </div>
+                <SelectYesNoUnknown label={label} name={name} key={name} />
               ))}
               {[
                 ["knownPaidSearchOwner", "Known Paid Search owner"],
@@ -416,7 +385,6 @@ export function AccountResearchClient() {
                     className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                     name={name}
                   />
-                  <StatusSelect name={name} />
                 </label>
               ))}
             </div>
@@ -433,10 +401,7 @@ export function AccountResearchClient() {
                 ["ownedByAnotherRep", "Owned by another rep"],
                 ["doNotContactStatus", "Do Not Contact status"],
               ].map(([name, label]) => (
-                <div className="space-y-2" key={name}>
-                  <SelectYesNoUnknown label={label} name={name} />
-                  <StatusSelect name={name} />
-                </div>
+                <SelectYesNoUnknown label={label} name={name} key={name} />
               ))}
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
                 Account owner
@@ -751,9 +716,9 @@ export function AccountResearchClient() {
               </div>
             ) : (
               <p className="text-sm leading-6 text-[#6f6d5f]">
-                Fill the basics, choose what you know from the dropdowns, then click Assess
-                account. You will see fit, confidence, suppression status, recommended persona,
-                angle, missing information, and the next workflow to use.
+                Fill the basics, choose only what you know, then click Assess account. You will see
+                the fit decision, recommended persona, angle, missing information, and the next
+                workflow to use.
               </p>
             )}
           </article>
