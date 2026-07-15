@@ -684,6 +684,40 @@ export function BuildSequenceClient() {
                 {t("workflow.sequence.empty")}
               </p>
             )}
+            <div className="mt-4 rounded-md border border-line bg-[#f8f5ef] p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-ink">HubSpot export</p>
+                  <p className="mt-1 text-sm leading-5 text-stone-600">
+                    {result
+                      ? "Send this sequence to HubSpot as a company note and review task."
+                      : "Build a sequence first, then send it to HubSpot from here."}
+                  </p>
+                </div>
+                <button
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-signal px-3 text-sm font-semibold text-white transition hover:bg-[#1d4e5f] disabled:cursor-not-allowed disabled:bg-stone-300"
+                  disabled={!result || hubSpotStatus.state === "sending"}
+                  onClick={pushToHubSpot}
+                  type="button"
+                >
+                  <Send aria-hidden="true" className="h-4 w-4" />
+                  {hubSpotStatus.state === "sending" ? "Sending..." : "Send to HubSpot"}
+                </button>
+              </div>
+              {hubSpotStatus.state !== "idle" ? (
+                <p
+                  className={`mt-3 rounded-md px-3 py-2 text-sm ${
+                    hubSpotStatus.state === "success"
+                      ? "bg-[#eef8ed] text-[#2f6f3a]"
+                      : hubSpotStatus.state === "error"
+                        ? "bg-[#fff4ef] text-[#9a3f24]"
+                        : "bg-white text-stone-700"
+                  }`}
+                >
+                  {hubSpotStatus.message}
+                </p>
+              ) : null}
+            </div>
           </article>
 
           {result ? (
@@ -712,29 +746,7 @@ export function BuildSequenceClient() {
                     )}
                     {copiedKey === "sequence-all" ? "Copied" : "Copy all"}
                   </button>
-                  <button
-                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-md bg-signal px-3 text-xs font-semibold text-white transition hover:bg-[#1d4e5f] disabled:cursor-not-allowed disabled:bg-stone-300"
-                    disabled={hubSpotStatus.state === "sending"}
-                    onClick={pushToHubSpot}
-                    type="button"
-                  >
-                    <Send aria-hidden="true" className="h-3.5 w-3.5" />
-                    {hubSpotStatus.state === "sending" ? "Sending..." : "Send to HubSpot"}
-                  </button>
                 </div>
-                {hubSpotStatus.state !== "idle" ? (
-                  <p
-                    className={`mb-3 rounded-md px-3 py-2 text-sm ${
-                      hubSpotStatus.state === "success"
-                        ? "bg-[#eef8ed] text-[#2f6f3a]"
-                        : hubSpotStatus.state === "error"
-                          ? "bg-[#fff4ef] text-[#9a3f24]"
-                          : "bg-[#f8f5ef] text-stone-700"
-                    }`}
-                  >
-                    {hubSpotStatus.message}
-                  </p>
-                ) : null}
                 <div className="space-y-3">
                   {displayedSteps.map((step) => (
                     <section className="rounded-md border border-line p-3" key={step.stepNumber}>
