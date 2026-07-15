@@ -170,6 +170,80 @@ function WarningLabel({ text }: { text: string }) {
   );
 }
 
+type WinningLibraryId = "email" | "linkedin" | "reply";
+
+const winningLibraries: Array<{
+  id: WinningLibraryId;
+  title: string;
+  subtitle: string;
+  stepLabels: string[];
+}> = [
+  {
+    id: "email",
+    title: "Email sequence library",
+    subtitle: "Subjects, first touch, follow-up, proof angle, and close-loop examples.",
+    stepLabels: ["Subject", "Email 1", "Email 2", "Email 3", "Close"],
+  },
+  {
+    id: "linkedin",
+    title: "LinkedIn message library",
+    subtitle: "Connection request, after-connect notes, comment follow-up, and quick chat asks.",
+    stepLabels: ["Request", "After connect 1", "After connect 2", "Comment follow-up"],
+  },
+  {
+    id: "reply",
+    title: "Reply handling library",
+    subtitle: "Short responses for deck requests, existing vendors, and common objections.",
+    stepLabels: ["Deck request", "Existing vendor", "No competitors", "Close"],
+  },
+];
+
+function messageLibraryId(channel: string): WinningLibraryId {
+  if (channel === "Email") return "email";
+  if (channel === "LinkedIn") return "linkedin";
+  return "reply";
+}
+
+function messageStepLabel(title: string, libraryId: WinningLibraryId) {
+  const lowerTitle = title.toLowerCase();
+
+  if (libraryId === "email") {
+    if (lowerTitle.includes("subject")) return "Subject";
+    if (lowerTitle.includes("first touch")) return "Email 1";
+    if (lowerTitle.includes("optimize")) return "Email 2";
+    if (lowerTitle.includes("incrementality")) return "Email 3";
+    if (lowerTitle.includes("close")) return "Close";
+    return "Email example";
+  }
+
+  if (libraryId === "linkedin") {
+    if (lowerTitle.includes("comment")) return "Comment follow-up";
+    if (lowerTitle.includes("first touch")) return "Connection request";
+    if (lowerTitle.includes("ultra short")) return "After connect 1";
+    if (lowerTitle.includes("two-outcome") || lowerTitle.includes("quick chat")) {
+      return "After connect 2";
+    }
+    if (lowerTitle.includes("proof") || lowerTitle.includes("paid strategy")) {
+      return "After connect 3";
+    }
+    return "LinkedIn example";
+  }
+
+  if (lowerTitle.includes("deck")) return "Deck request";
+  if (lowerTitle.includes("vendor")) return "Existing vendor";
+  if (lowerTitle.includes("competitors")) return "No competitors";
+  if (lowerTitle.includes("legacy")) return "Rewrite old wording";
+  return "Reply example";
+}
+
+function messageDisplayTitle(title: string) {
+  return title
+    .replace(/^Email subject - /, "")
+    .replace(/^After connect - /, "")
+    .replace(/^LinkedIn /, "")
+    .replace(/^Email /, "");
+}
+
 function ProgressToggle({
   label,
   checked,
@@ -207,9 +281,16 @@ export function PlaybookClient({
   const [progress, setProgress] = useState<PlaybookProgressState>(emptyProgress);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
   const [activeSection, setActiveSection] = useState<SectionId>("learn");
+  const [activeWinningLibrary, setActiveWinningLibrary] = useState<WinningLibraryId>("email");
   const progressView = useMemo(
     () => calculateProgress(progress, viewerRole),
     [progress, viewerRole],
+  );
+  const activeWinningLibraryConfig = winningLibraries.find(
+    (library) => library.id === activeWinningLibrary,
+  );
+  const activeWinningMessages = winningMessages.filter(
+    (message) => messageLibraryId(message.channel) === activeWinningLibrary,
   );
 
   function toggleProgress(key: PlaybookProgressKey) {
@@ -452,12 +533,110 @@ export function PlaybookClient({
       </PlaybookSection>
 
       <PlaybookSection
-        description="Copy patterns that should guide generated outreach and human edits. Use placeholders carefully and verify account facts before sending."
+        description="Start with the channel, choose the step, then copy a proven pattern. Evidence is available below without crowding the page."
         eyebrow="H. Winning Messages"
         hidden={activeSection !== "winning-messages"}
         id="winning-messages"
         title="Winning messages library"
       >
+        <div className="grid gap-3 md:grid-cols-3">
+          {winningLibraries.map((library) => (
+            <button
+              aria-pressed={activeWinningLibrary === library.id}
+              className={[
+                "rounded-2xl border p-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive",
+                activeWinningLibrary === library.id
+                  ? "border-lime bg-lime text-ink shadow-soft"
+                  : "border-line bg-cream text-[#5c5a4f] hover:text-ink",
+              ].join(" ")}
+              key={library.id}
+              onClick={() => setActiveWinningLibrary(library.id)}
+              type="button"
+            >
+              <span className="block text-base font-semibold text-ink">{library.title}</span>
+              <span className="mt-2 block text-sm leading-5">{library.subtitle}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                {activeWinningLibraryConfig?.title}
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-ink">Copy-ready patterns</h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                {activeWinningLibraryConfig?.subtitle}
+              </p>
+            </div>
+            <WarningLabel text={`${activeWinningMessages.length} examples`} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {activeWinningLibraryConfig?.stepLabels.map((label) => (
+              <span
+                className="rounded-full border border-line bg-cream px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-3">
+            {activeWinningMessages.map((item) => (
+              <details className="rounded-xl border border-line bg-cream" key={item.title}>
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
+                  <span>
+                    <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
+                      {messageStepLabel(item.title, activeWinningLibrary)}
+                    </span>
+                    <span className="mt-2 block text-base font-semibold text-ink">
+                      {messageDisplayTitle(item.title)}
+                    </span>
+                    <span className="mt-1 block text-sm leading-5 text-[#6f6d5f]">
+                      {item.useWhen}
+                    </span>
+                  </span>
+                  <ChevronDown aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-[#6f6d5f]" />
+                </summary>
+                <div className="space-y-4 border-t border-line p-4 pt-4">
+                  {"subject" in item && item.subject ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                        Subject
+                      </p>
+                      <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
+                        {item.subject}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Message
+                    </p>
+                    <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
+                      {item.message}
+                    </pre>
+                  </div>
+                  <details className="rounded-xl border border-line bg-white p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-ink">
+                      Why this works
+                    </summary>
+                    <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
+                  </details>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+
+        <details className="rounded-2xl border border-line bg-cream p-5">
+          <summary className="cursor-pointer text-base font-semibold text-ink">
+            Evidence, rules, and raw examples
+          </summary>
+          <div className="mt-4 space-y-6">
         <div className="mb-6 rounded-2xl border border-line bg-white p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
@@ -700,6 +879,8 @@ export function PlaybookClient({
             );
           })}
         </div>
+          </div>
+        </details>
       </PlaybookSection>
 
       <PlaybookSection
