@@ -5,6 +5,7 @@ import type {
   CreateOutreachResult,
   OutreachKnowledgeRecord,
 } from "@/features/create-outreach/types";
+import type { DoNotContactRecord } from "@/features/do-not-contact/types";
 
 import { DeterministicOutreachProvider } from "./create-outreach-provider";
 import { generateCreateOutreach, type CreateOutreachPersistence } from "./create-outreach-service";
@@ -43,7 +44,11 @@ function knowledge(overrides: Partial<OutreachKnowledgeRecord>): OutreachKnowled
   };
 }
 
-function persistence(records: OutreachKnowledgeRecord[], actorRole = "SALES_USER") {
+function persistence(
+  records: OutreachKnowledgeRecord[],
+  actorRole = "SALES_USER",
+  suppressionRecords: DoNotContactRecord[] = [],
+) {
   const persisted: Array<{
     creatorId: string;
     request: CreateOutreachInput;
@@ -51,6 +56,7 @@ function persistence(records: OutreachKnowledgeRecord[], actorRole = "SALES_USER
   }> = [];
   const adapter: CreateOutreachPersistence = {
     getActor: async (actorId) => ({ id: actorId, role: actorRole }),
+    getSuppressionRecords: async () => suppressionRecords,
     retrieveEligibleKnowledge: async (input) =>
       records.filter(
         (record) =>
@@ -70,6 +76,38 @@ function persistence(records: OutreachKnowledgeRecord[], actorRole = "SALES_USER
 }
 
 describe("Create Outreach service", () => {
+  it("blocks outreach generation when the account is in suppression", async () => {
+    const suppression: DoNotContactRecord = {
+      id: "suppression-apollo",
+      companyName: "Zenleads Inc. DBA Apollo.io",
+      domain: "apollo.io",
+      status: "EXISTING_CUSTOMER",
+      reason: "Existing Signal customer.",
+    };
+    const { adapter, persisted } = persistence(
+      [knowledge({ id: "product-truth" })],
+      "SALES_USER",
+      [suppression],
+    );
+
+    const result = await generateCreateOutreach(
+      {
+        ...baseInput,
+        companyName: "Apollo",
+        companyWebsite: "apollo.io",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("SUPPRESSION_BLOCKED");
+      expect(result.message).toContain("Do not create outreach");
+      expect(result.message).toContain("Zenleads Inc. DBA Apollo.io");
+    }
+    expect(persisted).toEqual([]);
+  });
+
   it("retrieves only approved eligible knowledge from the persistence boundary", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),

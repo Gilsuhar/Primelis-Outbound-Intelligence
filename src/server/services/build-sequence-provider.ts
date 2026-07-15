@@ -60,31 +60,6 @@ function cleanSelection(value?: string) {
     .trim();
 }
 
-function openingFor(input: BuildSequenceInput) {
-  const trigger = cleanSelection(input.observedTrigger);
-  const company = input.companyName;
-
-  if (!trigger) {
-    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
-  }
-  if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
-  }
-  if (/competitors/i.test(trigger)) {
-    return `I noticed a possible paid-brand question at ${company}.`;
-  }
-  if (/efficiency|brand-spend/i.test(trigger)) {
-    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
-  }
-  if (/multi-market|governance|control/i.test(trigger)) {
-    return `I thought ${company} may have a useful cross-market brand-search control question.`;
-  }
-  if (/growth|acquisition/i.test(trigger)) {
-    return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
-  }
-  return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
-}
-
 function ctaForPurpose(
   purpose: SequenceStep["purpose"],
   stepNumber: number,
@@ -103,9 +78,9 @@ function ctaForPurpose(
       : "Worth comparing notes?";
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you already have a way to spot that in real time?",
-    PROBLEM_FRAMING: "Is this already something your team checks?",
-    METHODOLOGY_DIFFERENTIATION: "Worth a quick look at how you test this today?",
+    FIRST_TOUCH_RELEVANCE: "Do you already have a way to do that?",
+    PROBLEM_FRAMING: "Do you have visibility into when this happens?",
+    METHODOLOGY_DIFFERENTIATION: "Worth a quick look at how you manage this today?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Want the short version of how another team approached this?",
     TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
@@ -119,8 +94,8 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
   const company = input.companyName;
   const subjects: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: `${company} paid brand question`,
-    PROBLEM_FRAMING: `Paid brand when nobody is bidding`,
-    METHODOLOGY_DIFFERENTIATION: `Paid brand vs organic at ${company}`,
+    PROBLEM_FRAMING: `When brand clicks are already yours`,
+    METHODOLOGY_DIFFERENTIATION: `Lower bids without losing coverage`,
     ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
     SOCIAL_PROOF: `A practical paid-brand example`,
     TECHNICAL_CLARIFICATION: `Paid brand methodology`,
@@ -132,52 +107,6 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 
 function connectionRequestFor(input: BuildSequenceInput) {
   return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${input.companyName}. Open to connecting?`;
-}
-
-function fitSignalForEmail(value?: string) {
-  const clean = cleanSelection(value);
-  if (!clean) {
-    return undefined;
-  }
-  if (/\$|revenue|employees|enterprise|multi-market|multi-country/i.test(clean)) {
-    return "a larger paid-search setup where small brand decisions can affect spend";
-  }
-  if (/monthly|spend/i.test(clean)) {
-    return "active brand-search spend where efficiency can matter";
-  }
-  if (/brand demand|paid-search owner/i.test(clean)) {
-    return "clear brand demand and someone owning paid search";
-  }
-  if (/validate brand demand|not enough signal|unknown/i.test(clean)) {
-    return "a brand-demand question worth checking first";
-  }
-  return clean.toLowerCase();
-}
-
-function accountContextLine(input: BuildSequenceInput) {
-  const industryHint = (() => {
-    if (!input.industry) {
-      return undefined;
-    }
-    if (/fashion|luxury|retail|e-commerce/i.test(input.industry)) {
-      return "brand demand and paid search often sit close to revenue";
-    }
-    if (/saas|technology|fintech|subscription/i.test(input.industry)) {
-      return "paid brand decisions can affect acquisition efficiency";
-    }
-    return "the paid brand question may be worth validating";
-  })();
-  const details = [
-    industryHint,
-    fitSignalForEmail(input.companyContext),
-    input.geographyOrMarkets ? `${input.geographyOrMarkets} market context` : undefined,
-  ].filter(Boolean);
-
-  if (details.length === 0) {
-    return "";
-  }
-
-  return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
 }
 
 function roleFriendlyPhrase(input: BuildSequenceInput) {
@@ -195,26 +124,6 @@ function roleFriendlyPhrase(input: BuildSequenceInput) {
     return "for an e-commerce team";
   }
   return "for the team owning brand search";
-}
-
-function simpleAccountReason(input: BuildSequenceInput) {
-  const company = input.companyName;
-  const context = cleanSelection(input.companyContext ?? "") ?? "";
-  const industry = input.industry ?? "";
-  const paidContext = input.paidSearchContext ?? "";
-  if (/brand demand|paid-search owner/i.test(context)) {
-    return `Quick question on ${company}: how do you decide when branded ads are still needed, especially when nobody else is bidding?`;
-  }
-  if (/\$|revenue|employees|enterprise|multi-market/i.test(context)) {
-    return `For a brand at ${company}'s scale, the small paid-brand decisions can quietly become real budget.`;
-  }
-  if (/runs branded-search ads|active/i.test(paidContext)) {
-    return `I noticed ${company} may have active brand search, which is where paid and organic should be checked together.`;
-  }
-  if (/fashion|luxury|retail|e-commerce/i.test(industry)) {
-    return `In categories with strong brand demand, paid-brand results can look great even when some clicks would have come organically.`;
-  }
-  return `Quick question on ${company}: how do you decide when branded ads are still needed, and when organic would have captured the click anyway?`;
 }
 
 function humanizeFact(fact: string) {
@@ -246,29 +155,26 @@ function bodyForPurpose({
   secondaryFact: string;
 }) {
   const trigger = input.observedTrigger.trim();
-  const opening = openingFor(input);
-  const context = accountContextLine(input);
-  const accountReason = simpleAccountReason(input);
   const rolePhrase = roleFriendlyPhrase(input);
   const simpleSecondaryFact = humanizeFact(secondaryFact);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      accountReason || context || opening,
-      "We built Signal to pause or lower branded ads when there is no real competition, and keep coverage when it is actually protecting demand.",
+      `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`,
+      "Signal can automatically pause or lower those ads when paid coverage is not changing the outcome, then bring coverage back when competition returns.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The tricky part is that branded campaigns can look efficient because the person already wanted the brand.",
-      `That makes the real decision ${rolePhrase}: where do you need paid coverage, and where are you just buying a click organic would have won?`,
+      "The tricky part is that brand campaigns can look strong in reports because the person already wanted the brand, even when some clicks would have happened through organic anyway.",
+      `That makes the real decision ${rolePhrase}: where paid coverage is protecting demand, and where it is just adding cost.`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "The simple version: check who is bidding, where your organic result sits, and how much you need to bid to stay covered.",
-      "If nobody is bidding, reduce or pause. If competitors show up, protect the top position without overpaying.",
+      "The simple approach is to watch the search page, not only the campaign report.",
+      "When nobody is bidding, reduce or pause. When competitors appear, keep the top position but lower the bid to the minimum needed.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -279,9 +185,9 @@ function bodyForPurpose({
     SOCIAL_PROOF: [
       greeting(input),
       "",
-      "There is customer evidence behind this, but I would keep it as context rather than making it the whole pitch.",
+      "One reason this tends to land: it is not a generic cost-cutting conversation.",
       simpleSecondaryFact,
-      "The practical takeaway is the same: separate useful paid coverage from spend that is no longer changing the outcome.",
+      "The practical takeaway is to keep coverage where it protects demand, and stop overpaying where organic is already doing the work.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
@@ -299,7 +205,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       "I will close the loop after this note.",
-      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you safely stop paying for the click?",
+      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you stop paying for clicks you would have captured anyway?",
     ],
   };
 

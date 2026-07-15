@@ -18,6 +18,11 @@ import {
   type OutreachKnowledgeRecord,
   type OutreachSourceReference,
 } from "@/features/create-outreach/types";
+import {
+  mergeDefaultSuppressionRecords,
+  searchDoNotContactRecords,
+} from "@/features/do-not-contact/do-not-contact-policy";
+import type { DoNotContactRecord, SuppressionSearchResult } from "@/features/do-not-contact/types";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -53,6 +58,7 @@ type Row = Record<string, unknown>;
 
 export type CreateOutreachPersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
+  getSuppressionRecords(): Promise<DoNotContactRecord[]>;
   retrieveEligibleKnowledge(input: CreateOutreachInput): Promise<OutreachKnowledgeRecord[]>;
   persistDraft(input: {
     creatorId: string;
@@ -95,6 +101,44 @@ function sanitizeOutput(text: string) {
     /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
     "commercial details",
   );
+}
+
+function cleanSuppressionQuery(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+}
+
+function findBlockedSuppressionMatch(
+  records: DoNotContactRecord[],
+  input: CreateOutreachInput,
+): SuppressionSearchResult | undefined {
+  const queries = Array.from(
+    new Set(
+      [input.companyName, input.companyWebsite]
+        .map(cleanSuppressionQuery)
+        .filter((query) => query.length > 0),
+    ),
+  );
+
+  for (const query of queries) {
+    const blocked = searchDoNotContactRecords(records, query).find((match) => match.blocked);
+    if (blocked) {
+      return blocked;
+    }
+  }
+  return undefined;
+}
+
+function suppressionBlockMessage(match: SuppressionSearchResult) {
+  const { record } = match;
+  const status = record.status.replaceAll("_", " ").toLowerCase();
+  const domain = record.domain ? ` (${record.domain})` : "";
+  const reason = record.reason ? ` Reason: ${record.reason}` : "";
+  return `Do not create outreach for this account. ${record.companyName}${domain} is in Do Not Contact / customer suppression as ${status}.${reason} Use it only as internal context or social proof, not as a target account.`;
 }
 
 function mapKnowledgeRow(row: Row): OutreachKnowledgeRecord {
@@ -229,6 +273,24 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
     return row ? { id: asString(row.id), role: asString(row.role) } : null;
   }
 
+  async getSuppressionRecords() {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "companyName", domain, status, "accountOwner", reason, notes, "lastContactDate"::text AS "lastContactDate"
+      FROM "SuppressionRecord"
+    `;
+    const records = rows.map((row) => ({
+      id: asString(row.id),
+      companyName: asString(row.companyName),
+      domain: asString(row.domain) || undefined,
+      status: asString(row.status) as DoNotContactRecord["status"],
+      owner: asString(row.accountOwner) || undefined,
+      reason: asString(row.reason) || undefined,
+      notes: asString(row.notes) || undefined,
+      lastContactDate: asString(row.lastContactDate) || undefined,
+    }));
+    return mergeDefaultSuppressionRecords(records);
+  }
+
   async retrieveEligibleKnowledge(input: CreateOutreachInput) {
     const knowledgeRows = await this.client.$queryRaw<Row[]>`
       SELECT
@@ -361,6 +423,12 @@ export async function generateCreateOutreach(
   const actor = await persistence.getActor(creatorId);
   if (!actor || !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role)) {
     return err("FORBIDDEN", "Only authorized sales or knowledge users can create outreach drafts.");
+  }
+
+  const suppressionRecords = await persistence.getSuppressionRecords();
+  const blockedMatch = findBlockedSuppressionMatch(suppressionRecords, input);
+  if (blockedMatch) {
+    return err("SUPPRESSION_BLOCKED", suppressionBlockMessage(blockedMatch));
   }
 
   const provider = dependencies.provider ?? createOutreachAiProvider();
