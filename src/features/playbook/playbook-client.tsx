@@ -25,6 +25,7 @@ import {
   outreachReplyEvidence,
   qualificationChecklist,
   teamProspectReplyEvidence,
+  winningMessageGroups,
   winningMessages,
   workSteps,
 } from "@/features/playbook/playbook-content";
@@ -627,44 +628,77 @@ export function PlaybookClient({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {winningMessages.map((item) => (
-            <details className="rounded-2xl border border-line bg-cream p-5" key={item.title}>
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-                <span>
-                  <span className="block text-lg font-semibold text-ink">{item.title}</span>
-                  <span className="mt-1 block text-sm text-[#6f6d5f]">{item.useWhen}</span>
-                </span>
-                <WarningLabel text={item.channel} />
-              </summary>
-              <div className="mt-4 space-y-4 border-t border-line pt-4">
-                {"subject" in item && item.subject ? (
+        <div className="space-y-6">
+          {winningMessageGroups.map((group) => {
+            const groupMessages = winningMessages.filter((item) =>
+              group.channels.includes(item.channel),
+            );
+
+            return (
+              <div className="rounded-2xl border border-line bg-white p-5" key={group.label}>
+                <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                      Subject
+                      {group.label} examples
                     </p>
-                    <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
-                      {item.subject}
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                      {group.description}
                     </p>
                   </div>
-                ) : null}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                    Message
-                  </p>
-                  <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
-                    {item.message}
-                  </pre>
+                  <WarningLabel text={`${groupMessages.length} unique examples`} />
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                    Why it works
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {groupMessages.map((item) => (
+                    <details
+                      className="rounded-2xl border border-line bg-cream p-5"
+                      key={item.title}
+                    >
+                      <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+                        <span>
+                          <span className="block text-lg font-semibold text-ink">
+                            {item.title}
+                          </span>
+                          <span className="mt-1 block text-sm text-[#6f6d5f]">
+                            {item.useWhen}
+                          </span>
+                        </span>
+                        <WarningLabel text={item.channel} />
+                      </summary>
+                      <div className="mt-4 space-y-4 border-t border-line pt-4">
+                        {"subject" in item && item.subject ? (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                              Subject
+                            </p>
+                            <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
+                              {item.subject}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                            Message
+                          </p>
+                          <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
+                            {item.message}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                            Why it works
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">
+                            {item.whyItWorks}
+                          </p>
+                        </div>
+                      </div>
+                    </details>
+                  ))}
                 </div>
               </div>
-            </details>
-          ))}
+            );
+          })}
         </div>
       </PlaybookSection>
 

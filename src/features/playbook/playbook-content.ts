@@ -516,8 +516,8 @@ export const winningMessages = [
       "It preserves historical learning from Cross Brand sequences while keeping customer-facing language consistent with the current Signal name.",
   },
   {
-    title: "After connect - no competitor angle",
-    useWhen: "After a LinkedIn connection when you want the proven direct opener.",
+    title: "After connect - two-outcome explainer",
+    useWhen: "After a LinkedIn connection when you need to explain both pause and bid-lowering outcomes.",
     channel: "LinkedIn",
     message:
       "Thanks for connecting, {{firstName}}! We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nAlternatively, the CPC algorithm lowers the bid to the minimum needed for branded ads to appear at the top of Google searches.\n\nDo you already have a way to do that?",
@@ -551,15 +551,6 @@ export const winningMessages = [
       "Hi {{firstName}} - thanks for connecting. How do you handle branded ads at {{company}} when no competitors are bidding on your brand?\n\nWe built a tool that scans Google and Bing search results in real time. When no competitors are present, it auto-pauses branded ads or lowers bids to the minimum needed to maintain the top position.\n\nWorth a quick chat?",
     whyItWorks:
       "It is direct, easy to understand, and asks for a small next step without over-explaining.",
-  },
-  {
-    title: "After connect - organic click angle",
-    useWhen: "After a LinkedIn connection when the strongest hook is wasted paid brand clicks.",
-    channel: "LinkedIn",
-    message:
-      "Thanks for connecting, {{firstName}}! We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nAlternatively, the CPC algorithm lowers the bid to the minimum needed for branded ads to appear at the top of Google searches.\n\nDo you already have a way to do that?",
-    whyItWorks:
-      "It makes the value concrete: get the organic click when paid coverage is not needed.",
   },
   {
     title: "After connect - ultra short",
@@ -634,6 +625,33 @@ export const winningMessages = [
       "Hi {{firstName}},\n\nI’ll close the loop after this note.\n\nIf paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?\n\nIf this is not relevant, no problem at all.",
     whyItWorks:
       "It closes politely while leaving a clear reason to re-open the conversation later.",
+  },
+];
+
+type WinningMessageChannel = (typeof winningMessages)[number]["channel"];
+
+export const winningMessageGroups: Array<{
+  label: string;
+  description: string;
+  channels: WinningMessageChannel[];
+}> = [
+  {
+    label: "Email",
+    description:
+      "Use for sequenced outbound. Keep each step distinct: first touch, context, proof or method, then close-loop.",
+    channels: ["Email"],
+  },
+  {
+    label: "LinkedIn",
+    description:
+      "Use after a connection, comment, or visible trigger. Shorter, more direct, and less formal than email.",
+    channels: ["LinkedIn"],
+  },
+  {
+    label: "Reply handling",
+    description:
+      "Use when the prospect already answered. Reply to the question first, then guide the next step.",
+    channels: ["LinkedIn / Email", "Email / LinkedIn"],
   },
 ] as const;
 

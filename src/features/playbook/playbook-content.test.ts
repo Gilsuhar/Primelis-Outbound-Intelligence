@@ -10,6 +10,7 @@ import {
   personas,
   practiceScenarios,
   teamProspectReplyEvidence,
+  winningMessageGroups,
   winningMessages,
 } from "./playbook-content";
 
@@ -62,6 +63,14 @@ describe("Signal Playbook content", () => {
 
   it("includes a compact winning messages library", () => {
     expect(winningMessages.length).toBeGreaterThanOrEqual(16);
+    expect(winningMessageGroups.map((group) => group.label)).toEqual([
+      "Email",
+      "LinkedIn",
+      "Reply handling",
+    ]);
+    expect(new Set(winningMessages.map((message) => message.message)).size).toBe(
+      winningMessages.length,
+    );
     expect(outreachReplyEvidence.relatedReplyRows).toBe(179);
     expect(outreachReplyEvidence.currentProductName).toContain("Signal");
     expect(outreachReplyEvidence.strongestTemplateClusters.map((cluster) => cluster.label)).toContain(
@@ -72,7 +81,7 @@ describe("Signal Playbook content", () => {
       "Email subject - deactivating branded ads",
     );
     expect(winningMessages.map((message) => message.title)).toContain(
-      "After connect - quick chat",
+      "After connect - two-outcome explainer",
     );
     expect(winningMessages.map((message) => message.title)).toContain(
       "LinkedIn comment follow-up",
