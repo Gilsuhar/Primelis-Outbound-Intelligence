@@ -103,9 +103,9 @@ function ctaForPurpose(
       : "Worth comparing notes?";
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Worth a quick compare against how you decide this today?",
-    PROBLEM_FRAMING: "Is this something your team is already trying to separate?",
-    METHODOLOGY_DIFFERENTIATION: "Worth pressure-testing your current method against this?",
+    FIRST_TOUCH_RELEVANCE: "Do you already have a way to spot that in real time?",
+    PROBLEM_FRAMING: "Is this already something your team checks?",
+    METHODOLOGY_DIFFERENTIATION: "Worth a quick look at how you test this today?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Want the short version of how another team approached this?",
     TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
@@ -119,8 +119,8 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
   const company = input.companyName;
   const subjects: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: `${company} paid brand question`,
-    PROBLEM_FRAMING: `When paid brand looks too good`,
-    METHODOLOGY_DIFFERENTIATION: `A cleaner brand-search test`,
+    PROBLEM_FRAMING: `Paid brand when nobody is bidding`,
+    METHODOLOGY_DIFFERENTIATION: `Paid brand vs organic at ${company}`,
     ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
     SOCIAL_PROOF: `A practical paid-brand example`,
     TECHNICAL_CLARIFICATION: `Paid brand methodology`,
@@ -203,18 +203,18 @@ function simpleAccountReason(input: BuildSequenceInput) {
   const industry = input.industry ?? "";
   const paidContext = input.paidSearchContext ?? "";
   if (/brand demand|paid-search owner/i.test(context)) {
-    return `I had ${company} on my list because it looks like the kind of account where brand search is worth checking, not assuming.`;
+    return `Quick question on ${company}: how do you decide when branded ads are still needed, especially when nobody else is bidding?`;
   }
   if (/\$|revenue|employees|enterprise|multi-market/i.test(context)) {
-    return `I had ${company} on my list because larger brand accounts can lose budget in small paid-brand decisions.`;
+    return `For a brand at ${company}'s scale, the small paid-brand decisions can quietly become real budget.`;
   }
   if (/runs branded-search ads|active/i.test(paidContext)) {
-    return `I had ${company} on my list because active brand search is usually worth reviewing with paid and organic together.`;
+    return `I noticed ${company} may have active brand search, which is where paid and organic should be checked together.`;
   }
   if (/fashion|luxury|retail|e-commerce/i.test(industry)) {
-    return `I had ${company} on my list because brand demand can make paid-search results look stronger than the real incremental value.`;
+    return `In categories with strong brand demand, paid-brand results can look great even when some clicks would have come organically.`;
   }
-  return `I had ${company} on my list for a quick brand-search fit check.`;
+  return `Quick question on ${company}: how do you decide when branded ads are still needed, and when organic would have captured the click anyway?`;
 }
 
 function humanizeFact(fact: string) {
@@ -256,21 +256,19 @@ function bodyForPurpose({
       greeting(input),
       "",
       accountReason || context || opening,
-      "The question is not whether branded search is good or bad. It is which paid clicks still change the outcome.",
-      "Signal helps compare paid ads, organic results, and search-page changes before deciding where spend is still useful.",
+      "We built Signal to pause or lower branded ads when there is no real competition, and keep coverage when it is actually protecting demand.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The tricky part is that brand campaigns often look efficient in reports because the customer was already searching for the brand.",
-      `That makes the real decision ${rolePhrase}: protect the coverage that matters, and stop paying for demand organic would likely capture anyway.`,
-      "That is the gap Signal is meant to make easier to see.",
+      "The tricky part is that branded campaigns can look efficient because the person already wanted the brand.",
+      `That makes the real decision ${rolePhrase}: where do you need paid coverage, and where are you just buying a click organic would have won?`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "A simple way to test this is to look at three things together: paid coverage, organic visibility, and who else is showing up on the search page.",
-      "If paid coverage is protecting demand, keep it. If organic is already carrying the result, reduce the waste. If competitors appear, protect the position.",
+      "The simple version: check who is bidding, where your organic result sits, and how much you need to bid to stay covered.",
+      "If nobody is bidding, reduce or pause. If competitors show up, protect the top position without overpaying.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -301,7 +299,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       "I will close the loop after this note.",
-      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?",
+      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you safely stop paying for the click?",
     ],
   };
 
