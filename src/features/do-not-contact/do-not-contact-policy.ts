@@ -1,6 +1,8 @@
 import type { DoNotContactRecord, SuppressionSearchResult } from "./types";
+import { hubspotSuppressionRecords } from "./hubspot-suppression-records";
 
 export const emptySuppressionRecords: DoNotContactRecord[] = [];
+export const defaultSuppressionRecords: DoNotContactRecord[] = hubspotSuppressionRecords;
 
 const blockedStatuses = new Set([
   "EXISTING_CUSTOMER",
@@ -36,4 +38,14 @@ export function searchDoNotContactRecords(
       label: blocked ? "Blocked" : "Allowed with review",
     };
   });
+}
+
+export function mergeDefaultSuppressionRecords(records: DoNotContactRecord[]) {
+  const existingKeys = new Set(
+    records.map((record) => (record.domain ?? record.companyName).trim().toLowerCase()),
+  );
+  const missingDefaults = defaultSuppressionRecords.filter(
+    (record) => !existingKeys.has((record.domain ?? record.companyName).trim().toLowerCase()),
+  );
+  return [...records, ...missingDefaults];
 }

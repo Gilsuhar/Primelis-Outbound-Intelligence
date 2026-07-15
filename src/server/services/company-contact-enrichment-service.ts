@@ -14,8 +14,11 @@ import {
   normalizeDomain,
   validatePublicCompanyUrl,
 } from "@/features/connected-research/url-safety";
+import {
+  mergeDefaultSuppressionRecords,
+  searchDoNotContactRecords,
+} from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
-import { searchDoNotContactRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import {
@@ -81,7 +84,7 @@ export class PrismaCompanyContactPersistence implements CompanyContactPersistenc
       SELECT id, "companyName", domain, status, "accountOwner", reason, notes, "lastContactDate"::text AS "lastContactDate"
       FROM "SuppressionRecord"
     `;
-    return rows.map((row) => ({
+    const records = rows.map((row) => ({
       id: asString(row.id),
       companyName: asString(row.companyName),
       domain: asString(row.domain) || undefined,
@@ -91,6 +94,7 @@ export class PrismaCompanyContactPersistence implements CompanyContactPersistenc
       notes: asString(row.notes) || undefined,
       lastContactDate: asString(row.lastContactDate) || undefined,
     }));
+    return mergeDefaultSuppressionRecords(records);
   }
 
   async persistEnrichment({

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { searchDoNotContactRecords } from "./do-not-contact-policy";
+import {
+  defaultSuppressionRecords,
+  mergeDefaultSuppressionRecords,
+  searchDoNotContactRecords,
+} from "./do-not-contact-policy";
 import type { DoNotContactRecord } from "./types";
 
 const records: DoNotContactRecord[] = [
@@ -38,5 +42,34 @@ describe("Do Not Contact policy", () => {
         label: "Allowed with review",
       },
     ]);
+  });
+
+  it("includes HubSpot Signal customer and opportunity suppression records", () => {
+    expect(defaultSuppressionRecords.length).toBeGreaterThan(60);
+    expect(searchDoNotContactRecords(defaultSuppressionRecords, "deel.com")[0]).toMatchObject({
+      blocked: true,
+      record: {
+        companyName: "Deel, Inc.",
+        status: "EXISTING_CUSTOMER",
+      },
+    });
+    expect(searchDoNotContactRecords(defaultSuppressionRecords, "birkenstock")[0]).toMatchObject({
+      blocked: true,
+      record: {
+        status: "ACTIVE_OPPORTUNITY",
+      },
+    });
+  });
+
+  it("merges default suppression records without duplicating imported records", () => {
+    const merged = mergeDefaultSuppressionRecords([
+      {
+        id: "existing-deel",
+        companyName: "Deel",
+        domain: "deel.com",
+        status: "EXISTING_CUSTOMER",
+      },
+    ]);
+    expect(merged.filter((record) => record.domain === "deel.com")).toHaveLength(1);
   });
 });

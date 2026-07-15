@@ -14,6 +14,7 @@ import {
   type AccountResearchInput,
 } from "@/features/account-research/types";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
+import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { err, ok } from "./result";
@@ -90,7 +91,7 @@ export class PrismaAccountResearchPersistence implements AccountResearchPersiste
       SELECT id, "companyName", domain, status, "accountOwner", reason, notes, "lastContactDate"::text AS "lastContactDate"
       FROM "SuppressionRecord"
     `;
-    return rows.map((row) => ({
+    const records = rows.map((row) => ({
       id: asString(row.id),
       companyName: asString(row.companyName),
       domain: asString(row.domain) || undefined,
@@ -100,6 +101,7 @@ export class PrismaAccountResearchPersistence implements AccountResearchPersiste
       notes: asString(row.notes) || undefined,
       lastContactDate: asString(row.lastContactDate) || undefined,
     }));
+    return mergeDefaultSuppressionRecords(records);
   }
 
   async persistAssessment({
