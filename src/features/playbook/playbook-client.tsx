@@ -23,6 +23,7 @@ import {
   emptyProgress,
   evidenceDescriptions,
   qualificationChecklist,
+  winningMessages,
   workSteps,
 } from "@/features/playbook/playbook-content";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
@@ -36,6 +37,7 @@ const sectionLinks = [
   ["transition", "US Market"],
   ["qualify", "Qualify"],
   ["work", "How to Work"],
+  ["winning-messages", "Winning Messages"],
   ["objections", "Objections"],
   ["case-studies", "Case Studies"],
   ["dnc", "Do Not Contact"],
@@ -62,6 +64,7 @@ function PlaybookTabs({
     transition: "US Market",
     qualify: "Qualify",
     work: "How to Work",
+    "winning-messages": "Winning Messages",
     objections: "Objections",
     "case-studies": "Case Studies",
     dnc: translate("nav.Do Not Contact"),
@@ -446,8 +449,56 @@ export function PlaybookClient({
       </PlaybookSection>
 
       <PlaybookSection
+        description="Copy patterns that should guide generated outreach and human edits. Use placeholders carefully and verify account facts before sending."
+        eyebrow="H. Winning Messages"
+        hidden={activeSection !== "winning-messages"}
+        id="winning-messages"
+        title="Winning messages library"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          {winningMessages.map((item) => (
+            <details className="rounded-2xl border border-line bg-cream p-5" key={item.title}>
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+                <span>
+                  <span className="block text-lg font-semibold text-ink">{item.title}</span>
+                  <span className="mt-1 block text-sm text-[#6f6d5f]">{item.useWhen}</span>
+                </span>
+                <WarningLabel text={item.channel} />
+              </summary>
+              <div className="mt-4 space-y-4 border-t border-line pt-4">
+                {"subject" in item && item.subject ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Subject
+                    </p>
+                    <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
+                      {item.subject}
+                    </p>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Message
+                  </p>
+                  <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
+                    {item.message}
+                  </pre>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Why it works
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
+                </div>
+              </div>
+            </details>
+          ))}
+        </div>
+      </PlaybookSection>
+
+      <PlaybookSection
         description="Competitor language stays cautious. Restricted wording is not send-ready proof."
-        eyebrow="H. Objections"
+        eyebrow="I. Objections"
         hidden={activeSection !== "objections"}
         id="objections"
         title={t("playbook.objections.title")}
@@ -483,7 +534,7 @@ export function PlaybookClient({
 
       <PlaybookSection
         description="Case studies retain their review and usage state. Do not treat restricted stories as universally approved."
-        eyebrow="I. Case Studies"
+        eyebrow="J. Case Studies"
         hidden={activeSection !== "case-studies"}
         id="case-studies"
         title={t("playbook.caseStudies.title")}
@@ -531,7 +582,7 @@ export function PlaybookClient({
       </PlaybookSection>
 
       <PlaybookSection
-        eyebrow="J. Do Not Contact"
+        eyebrow="K. Do Not Contact"
         hidden={activeSection !== "dnc"}
         id="dnc"
         title={t("playbook.dnc.title")}
@@ -546,7 +597,7 @@ export function PlaybookClient({
 
       <PlaybookSection
         description="Write or choose an answer, reveal guidance, and mark practice complete."
-        eyebrow="K. Practice"
+        eyebrow="L. Practice"
         hidden={activeSection !== "practice"}
         id="practice"
         title={t("playbook.practice.title")}
@@ -592,7 +643,7 @@ export function PlaybookClient({
 
       <PlaybookSection
         description="No time tracking, behavioral monitoring, or productivity scoring."
-        eyebrow="L. Progress"
+        eyebrow="M. Progress"
         hidden={activeSection !== "progress"}
         id="progress"
         title={t("playbook.progress.title")}

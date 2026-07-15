@@ -7,6 +7,7 @@ import {
   evidenceDescriptions,
   industries,
   practiceScenarios,
+  winningMessages,
 } from "./playbook-content";
 
 describe("Signal Playbook content", () => {
@@ -44,5 +45,15 @@ describe("Signal Playbook content", () => {
       "deck-request",
       "timing-objection",
     ]);
+  });
+
+  it("includes a compact winning messages library", () => {
+    expect(winningMessages.length).toBeGreaterThanOrEqual(5);
+    expect(winningMessages.map((message) => message.title)).toContain("Deck request reply");
+    expect(
+      winningMessages.some((message) =>
+        message.message.includes("where paid brand coverage is still needed"),
+      ),
+    ).toBe(true);
   });
 });

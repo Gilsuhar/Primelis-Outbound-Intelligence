@@ -252,6 +252,65 @@ export const practiceScenarios: PracticeScenario[] = [
   },
 ];
 
+export const winningMessages = [
+  {
+    title: "LinkedIn first touch",
+    useWhen: "You want a short opener before asking for a meeting.",
+    channel: "LinkedIn",
+    message:
+      "Hi {{firstName}} - quick question on {{company}} brand search. How do you decide when paid brand coverage is still needed versus when organic already does enough?",
+    whyItWorks:
+      "It asks a real operational question, avoids a pitch, and gives the buyer an easy way to reply.",
+  },
+  {
+    title: "Email first touch",
+    useWhen: "You have a plausible fit but no verified account research yet.",
+    channel: "Email",
+    subject: "{{company}} paid brand question",
+    message:
+      "Hi {{firstName}},\n\nI had {{company}} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nThe question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.\n\nWorth comparing how you decide this today?",
+    whyItWorks:
+      "It uses a specific business tension instead of category labels, seniority labels, or internal ICP language.",
+  },
+  {
+    title: "Deck request reply",
+    useWhen: "The prospect asks for a deck, overview, one-pager, or more info.",
+    channel: "LinkedIn / Email",
+    message:
+      "Yes, happy to send it. I’ll keep it focused on your paid-brand question, not a generic overview.\n\nShort version: Signal is useful when the team wants to know where paid brand coverage is still needed and where organic results may already be doing enough.\n\nI can send the deck and add two bullets most relevant to your setup.",
+    whyItWorks:
+      "It answers the request first, keeps control of the narrative, and avoids dumping a generic pitch.",
+  },
+  {
+    title: "No competitors bidding",
+    useWhen: "The prospect asks how Signal handles brand ads when no competitors are present.",
+    channel: "LinkedIn / Email",
+    message:
+      "Good question. If no competitors are bidding, I would not automatically keep or pause brand ads.\n\nI would first compare paid coverage with organic results to see whether the paid clicks are changing the outcome.\n\nSignal helps make that check practical by showing when paid brand is protecting demand and when organic may already be carrying it.",
+    whyItWorks:
+      "It does not expose internal terms like solo or ghost. It explains the decision in buyer language.",
+  },
+  {
+    title: "Existing vendor reply",
+    useWhen: "The prospect says they already use a tool, agency, or internal process.",
+    channel: "LinkedIn / Email",
+    message:
+      "That makes sense. I would not frame this as replacing what you already use.\n\nThe useful question is whether your current setup clearly shows when paid brand is still needed versus when organic would have captured the demand anyway.\n\nWorth comparing how you decide that today?",
+    whyItWorks:
+      "It avoids attacking the current setup and shifts the conversation to decision quality.",
+  },
+  {
+    title: "Low-pressure close",
+    useWhen: "Final touch or after light silence.",
+    channel: "Email",
+    subject: "Closing the loop",
+    message:
+      "Hi {{firstName}},\n\nI’ll close the loop after this note.\n\nIf paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?\n\nIf this is not relevant, no problem at all.",
+    whyItWorks:
+      "It closes politely while leaving a clear reason to re-open the conversation later.",
+  },
+] as const;
+
 export const progressLabels: Record<keyof PlaybookProgressState, string> = {
   learnSignal: "Learn Signal reviewed",
   icp: "ICP reviewed",
