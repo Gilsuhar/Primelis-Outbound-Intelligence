@@ -112,7 +112,7 @@ function CompactDetails({
   children: React.ReactNode;
 }) {
   return (
-    <details className="rounded-2xl border border-line bg-cream p-4">
+    <details className="group rounded-2xl border border-line bg-cream p-4 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
         <span>
           {eyebrow ? (
@@ -124,13 +124,31 @@ function CompactDetails({
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {badge}
-          <ChevronDown aria-hidden="true" className="h-4 w-4 text-[#6f6d5f]" />
+          <span className="hidden rounded-full border border-line bg-white px-2 py-1 text-xs font-semibold text-[#5c5a4f] transition group-hover:border-lime group-hover:text-ink sm:inline-flex">
+            Open
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="h-4 w-4 text-[#6f6d5f] transition group-open:rotate-180"
+          />
         </span>
       </summary>
       <div className="mt-4 border-t border-line pt-4 text-sm leading-6 text-[#5c5a4f]">
         {children}
       </div>
     </details>
+  );
+}
+
+function OpenDetailsHint({ label = "Open details" }: { label?: string }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-[#5c5a4f] transition group-hover:border-lime group-hover:text-ink">
+      {label}
+      <ChevronDown
+        aria-hidden="true"
+        className="h-3.5 w-3.5"
+      />
+    </span>
   );
 }
 
@@ -535,7 +553,10 @@ export function PlaybookClient({
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.personas.map((persona) => (
-            <details className="rounded-2xl border border-line bg-white p-5" key={persona.name}>
+            <details
+              className="group rounded-2xl border border-line bg-white p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+              key={persona.name}
+            >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
                 <span>
                   <span className="block text-lg font-semibold text-ink">{persona.name}</span>
@@ -543,7 +564,7 @@ export function PlaybookClient({
                     {persona.tier.replace("_", " ")}
                   </span>
                 </span>
-                <ChevronDown aria-hidden="true" className="h-4 w-4 text-[#6f6d5f]" />
+                <OpenDetailsHint label="Open" />
               </summary>
               <div className="mt-4 space-y-3 text-sm leading-6 text-[#5c5a4f]">
                 <p>
@@ -691,7 +712,10 @@ export function PlaybookClient({
           </div>
           <div className="mt-5 grid gap-3">
             {replyBackedSequenceSteps.map((step) => (
-              <details className="rounded-xl border border-line bg-cream" key={step.step}>
+              <details
+                className="group rounded-xl border border-line bg-cream transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+                key={step.step}
+              >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
                   <span>
                     <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
@@ -704,7 +728,7 @@ export function PlaybookClient({
                       Outreach reply source: {step.replyStep}
                     </span>
                   </span>
-                  <ChevronDown aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-[#6f6d5f]" />
+                  <OpenDetailsHint />
                 </summary>
                 <div className="grid gap-3 border-t border-line p-4 md:grid-cols-2">
                   <div>
@@ -801,7 +825,10 @@ export function PlaybookClient({
           <div className="mt-5 grid gap-3">
             {activeWinningMessages.length > 0 ? (
               activeWinningMessages.map((item) => (
-              <details className="rounded-xl border border-line bg-cream" key={item.title}>
+              <details
+                className="group rounded-xl border border-line bg-cream transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+                key={item.title}
+              >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
                   <span>
                     <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
@@ -814,7 +841,7 @@ export function PlaybookClient({
                       {item.useWhen}
                     </span>
                   </span>
-                  <ChevronDown aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-[#6f6d5f]" />
+                  <OpenDetailsHint />
                 </summary>
                 <div className="space-y-4 border-t border-line p-4 pt-4">
                   {"subject" in item && item.subject ? (
@@ -835,9 +862,10 @@ export function PlaybookClient({
                       {item.message}
                     </pre>
                   </div>
-                  <details className="rounded-xl border border-line bg-white p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-ink">
-                      Why this works
+                  <details className="group rounded-xl border border-line bg-white p-3 transition hover:border-lime open:border-lime">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                      <span>Why this works</span>
+                      <OpenDetailsHint label="Open" />
                     </summary>
                     <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
                   </details>
@@ -853,9 +881,10 @@ export function PlaybookClient({
           </div>
         </div>
 
-        <details className="rounded-2xl border border-line bg-cream p-5">
-          <summary className="cursor-pointer text-base font-semibold text-ink">
-            Evidence, rules, and raw examples
+        <details className="group rounded-2xl border border-line bg-cream p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-ink">
+            <span>Evidence, rules, and raw examples</span>
+            <OpenDetailsHint />
           </summary>
           <div className="mt-4 space-y-6">
         <div className="mb-6 rounded-2xl border border-line bg-white p-5">
@@ -945,9 +974,10 @@ export function PlaybookClient({
             </div>
           </div>
 
-          <details className="mt-4 rounded-xl border border-line bg-cream p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Account examples from relevant replies
+          <details className="group mt-4 rounded-xl border border-line bg-cream p-4 transition hover:border-lime open:border-lime">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+              <span>Account examples from relevant replies</span>
+              <OpenDetailsHint label="Open" />
             </summary>
             <div className="mt-3 flex flex-wrap gap-2">
               {outreachReplyEvidence.replyingAccountExamples.map((account) => (
@@ -1155,30 +1185,35 @@ export function PlaybookClient({
 
                 return (
                   <details
-                    className="overflow-hidden rounded-2xl border border-line bg-white"
+                    className="group overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
                     key={record.id}
                   >
-                    {preview ? (
-                      <Image
-                        alt={preview.imageAlt}
-                        className="aspect-[16/9] w-full border-b border-line object-cover object-top"
-                        height={800}
-                        src={preview.imageSrc}
-                        width={1400}
-                      />
-                    ) : null}
-                    <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-5">
-                      <h3 className="text-lg font-semibold text-ink">{record.title}</h3>
-                      <WarningLabel
-                        text={
-                          record.usageScope === "EMAIL_AND_LINKEDIN" ||
-                          record.usageScope === "PUBLIC_MARKETING"
-                            ? "Verify before external use"
-                            : record.usageScope === "SALES_REPLY_ONLY"
-                              ? "Reply use only"
-                              : "Internal use only"
-                        }
-                      />
+                    <summary className="cursor-pointer list-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
+                      {preview ? (
+                        <Image
+                          alt={preview.imageAlt}
+                          className="aspect-[16/9] w-full border-b border-line object-cover object-top transition group-hover:scale-[1.01]"
+                          height={800}
+                          src={preview.imageSrc}
+                          width={1400}
+                        />
+                      ) : null}
+                      <div className="flex flex-wrap items-start justify-between gap-3 p-5">
+                        <h3 className="text-lg font-semibold text-ink">{record.title}</h3>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <WarningLabel
+                            text={
+                              record.usageScope === "EMAIL_AND_LINKEDIN" ||
+                              record.usageScope === "PUBLIC_MARKETING"
+                                ? "Verify before external use"
+                                : record.usageScope === "SALES_REPLY_ONLY"
+                                  ? "Reply use only"
+                                  : "Internal use only"
+                            }
+                          />
+                          <OpenDetailsHint />
+                        </span>
+                      </div>
                     </summary>
                     <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
                       <p>{record.industries.join(", ") || "Industry not tagged"}</p>
@@ -1199,19 +1234,24 @@ export function PlaybookClient({
               })}
               {missingSupplementalCaseStudies.map((caseStudy) => (
                 <details
-                  className="overflow-hidden rounded-2xl border border-line bg-white"
+                  className="group overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
                   key={caseStudy.match}
                 >
-                  <Image
-                    alt={caseStudy.imageAlt}
-                    className="aspect-[16/9] w-full border-b border-line object-cover object-top"
-                    height={800}
-                    src={caseStudy.imageSrc}
-                    width={1400}
-                  />
-                  <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-5">
-                    <h3 className="text-lg font-semibold text-ink">{caseStudy.title}</h3>
-                    <WarningLabel text="Internal use only" />
+                  <summary className="cursor-pointer list-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
+                    <Image
+                      alt={caseStudy.imageAlt}
+                      className="aspect-[16/9] w-full border-b border-line object-cover object-top transition group-hover:scale-[1.01]"
+                      height={800}
+                      src={caseStudy.imageSrc}
+                      width={1400}
+                    />
+                    <div className="flex flex-wrap items-start justify-between gap-3 p-5">
+                      <h3 className="text-lg font-semibold text-ink">{caseStudy.title}</h3>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <WarningLabel text="Internal use only" />
+                        <OpenDetailsHint />
+                      </span>
+                    </div>
                   </summary>
                   <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
                     <p>{caseStudy.industry}</p>
@@ -1258,9 +1298,13 @@ export function PlaybookClient({
       >
         <div className="space-y-3">
           {data.practiceScenarios.map((scenario) => (
-            <details className="rounded-2xl border border-line bg-cream p-5" key={scenario.id}>
-              <summary className="cursor-pointer list-none text-lg font-semibold text-ink">
-                {scenario.title}
+            <details
+              className="group rounded-2xl border border-line bg-cream p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+              key={scenario.id}
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-lg font-semibold text-ink">
+                <span>{scenario.title}</span>
+                <OpenDetailsHint />
               </summary>
               <p className="mt-3 text-sm leading-6 text-[#5c5a4f]">{scenario.prompt}</p>
               <label className="mt-3 block text-sm font-semibold text-ink">
@@ -1276,9 +1320,10 @@ export function PlaybookClient({
                   value={practiceAnswers[scenario.id] ?? ""}
                 />
               </label>
-              <details className="mt-3 rounded-xl bg-white p-3">
-                <summary className="cursor-pointer text-sm font-semibold text-olive">
-                  Reveal guidance
+              <details className="group mt-3 rounded-xl border border-line bg-white p-3 transition hover:border-lime open:border-lime">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-olive">
+                  <span>Reveal guidance</span>
+                  <OpenDetailsHint label="Open" />
                 </summary>
                 <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{scenario.guidance}</p>
               </details>
