@@ -811,7 +811,7 @@ export function PlaybookClient({
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
                 {outreachReplyEvidence.copyRules.map((rule) => (
-                  <li key={rule}>• {rule}</li>
+                  <li key={rule}>- {rule}</li>
                 ))}
               </ul>
             </div>
@@ -835,7 +835,7 @@ export function PlaybookClient({
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
                 {outreachReplyEvidence.stepLearning.map((rule) => (
-                  <li key={rule}>ג€¢ {rule}</li>
+                  <li key={rule}>- {rule}</li>
                 ))}
               </ul>
             </div>
@@ -845,7 +845,7 @@ export function PlaybookClient({
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
                 {outreachReplyEvidence.titleLearning.map((rule) => (
-                  <li key={rule}>ג€¢ {rule}</li>
+                  <li key={rule}>- {rule}</li>
                 ))}
               </ul>
             </div>
@@ -907,7 +907,7 @@ export function PlaybookClient({
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
                 {teamProspectReplyEvidence.copyRules.map((rule) => (
-                  <li key={rule}>• {rule}</li>
+                  <li key={rule}>- {rule}</li>
                 ))}
               </ul>
             </div>

@@ -659,6 +659,17 @@ export const winningMessages = [
       "The CSV shows Step 3 generated strong replies from context follow-ups. This version adds a clear reason without repeating the first touch.",
   },
   {
+    title: "Email 2A - Google cannot automate this",
+    useWhen:
+      "Worked follow-up style. Use when you want to explain the concrete platform gap behind the first-touch question.",
+    channel: "Email",
+    subject: "Re: deactivating branded ads",
+    message:
+      "Hi {{firstName}},\n\nFor context, Google does not offer an easy way to automatically pause or adjust branded ads when no competitors are bidding.\n\nAs a result, many teams end up paying for clicks that could have been captured organically or at a much lower CPC.\n\nHere is an example of this showing up when I searched for {{company}}:\n\n[Insert search example or screenshot if available]\n\nDo you have visibility into when this happens?\n\nBest,",
+    whyItWorks:
+      "This is close to the working email the team used: it explains the platform limitation, the wasted-click problem, and asks for visibility instead of forcing a meeting.",
+  },
+  {
     title: "Email 3 - proof or method",
     useWhen:
       "Reply-backed Step 4 pattern. Use when the buyer needs to understand the method before taking a meeting.",
@@ -670,6 +681,17 @@ export const winningMessages = [
       "The reply export shows video and methodology templates still created replies. This keeps the method plain and buyer-friendly.",
   },
   {
+    title: "Email 3A - solo bidding explanation",
+    useWhen:
+      "Use after the buyer understands the problem and needs a clearer explanation of what Signal actually does.",
+    channel: "Email",
+    subject: "Re: branded search at {{company}}",
+    message:
+      "Hi {{firstName}},\n\nGoogle does not provide an automated way to pause or down-bid branded ads when no competitors are bidding.\n\nAs a result, most brands keep paying for clicks they would have received organically.\n\nSignal identifies these moments and can automatically reduce or pause bids until competition returns, while preserving brand coverage and performance.\n\nIt uses historical CTR and full brand coverage, organic plus paid, to calculate a blended view of performance and adjust bids in real time.\n\nDo you currently have a way to detect and manage this?",
+    whyItWorks:
+      "This keeps the stronger technical explanation from the old CrossBrand copy, but rewrites it to Signal and removes unnecessary internal naming.",
+  },
+  {
     title: "Email 4 - lower CPC angle",
     useWhen:
       "Reply-backed Step 5 pattern. Use with paid-search owners when the angle is not only pausing ads, but lowering bids intelligently.",
@@ -679,6 +701,17 @@ export const winningMessages = [
       "Hi {{firstName}},\n\nOne other angle: this is not always about turning brand ads off.\n\nIn some cases the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.\n\nThat is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.\n\nIs this something your team already checks regularly?",
     whyItWorks:
       "The data shows later-step replies from lower-CPC and more-context templates. This gives the sequence a new angle instead of another version of the same email.",
+  },
+  {
+    title: "Email 4A - competitive CPC optimization",
+    useWhen:
+      "Use later in the sequence when the buyer may think Signal is only useful when no competitors are bidding.",
+    channel: "Email",
+    subject: "Re: optimize branded ads",
+    message:
+      "Hi {{firstName}},\n\nOne more point: Signal can also help when competitors are bidding.\n\nIn those cases, the goal is not to pause. It is to adjust CPC intelligently based on CTR and conversion signals, so the team stays covered without overspending.\n\nSo the use case is not only reducing waste when there is no competition. It is also keeping branded search efficient when the market gets more competitive.\n\nOpen to a quick discussion?",
+    whyItWorks:
+      "This is based on the working follow-up that explained competitive scenarios. It prevents the buyer from thinking the product only handles no-competitor cases.",
   },
   {
     title: "Email close loop - still useful",
