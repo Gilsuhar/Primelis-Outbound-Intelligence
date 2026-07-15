@@ -179,7 +179,7 @@ function bodyVariants(step: SequenceStep, company: string) {
   if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
     return [
       step.messageBody,
-      `${firstLine}\n\nThe method I would test is simple: look at paid coverage, organic visibility, and competitor presence together before changing bids.\n\nThen the decision becomes practical: keep coverage, reduce waste, or protect the position.`,
+      `${firstLine}\n\nThe method I would test is simple: look at paid ads, organic results, and who else is bidding before changing bids.\n\nThen the decision becomes practical: stay live, lower CPC, or pause until the page changes.`,
       `${firstLine}\n\nInstead of another dashboard, the useful output is a decision: where paid brand still protects revenue, and where it can be reduced without losing the outcome.`,
     ];
   }
@@ -227,8 +227,8 @@ function ctaVariants(step: SequenceStep) {
   const byPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       step.cta,
-      "Worth comparing how you decide this today?",
-      "Open to a quick check?",
+      "Do you already track this today?",
+      "Is this something your team checks today?",
     ],
     PROBLEM_FRAMING: [
       step.cta,
@@ -253,7 +253,7 @@ function ctaVariants(step: SequenceStep) {
     TECHNICAL_CLARIFICATION: [
       step.cta,
       "Would a simple method breakdown help?",
-      "Worth comparing how you test this today?",
+      "Do you already test this before changing bids?",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
       step.cta,
@@ -267,6 +267,59 @@ function ctaVariants(step: SequenceStep) {
     ],
   };
   return byPurpose[step.purpose].filter(Boolean);
+}
+
+function normalizedLine(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sequenceQuality(steps: SequenceStep[]) {
+  const issues: string[] = [];
+  const wins: string[] = [];
+  const subjects = steps.map((step) => normalizedLine(step.subjectLine ?? "")).filter(Boolean);
+  const ctas = steps.map((step) => normalizedLine(step.cta ?? "")).filter(Boolean);
+  const bodyText = steps.map((step) => step.messageBody).join("\n").toLowerCase();
+  const uniquePurposes = new Set(steps.map((step) => step.purpose));
+
+  if (new Set(subjects).size < subjects.length) {
+    issues.push("One subject repeats. Regenerate one subject before using the sequence.");
+  } else if (subjects.length > 0) {
+    wins.push("Subjects are varied.");
+  }
+
+  if (new Set(ctas).size < Math.min(ctas.length, 3)) {
+    issues.push("CTAs are too similar. Each step should ask in a slightly different way.");
+  } else if (ctas.length > 0) {
+    wins.push("CTAs are varied.");
+  }
+
+  if ((bodyText.match(/\bcompare|comparing\b/g)?.length ?? 0) > 2) {
+    issues.push("The sequence leans too hard on compare. Swap one CTA for detect, check, or automate.");
+  }
+
+  if ((bodyText.match(/\bbrand(ed)? search\b/g)?.length ?? 0) > 8) {
+    issues.push("Brand-search wording repeats a lot. Add one line about organic demand or bid control.");
+  }
+
+  if (uniquePurposes.size >= Math.min(steps.length, 3)) {
+    wins.push("Steps have distinct jobs.");
+  } else {
+    issues.push("Steps are not distinct enough. Regenerate one body or CTA.");
+  }
+
+  if (steps.some((step) => step.purpose === "BREAKUP_CLOSE_LOOP" || step.purpose === "LOW_PRESSURE_FOLLOW_UP")) {
+    wins.push("Includes a low-pressure close.");
+  }
+
+  return {
+    status: issues.length === 0 ? "Strong sequence" : "Needs cleanup",
+    issues,
+    wins: wins.slice(0, 4),
+  };
 }
 
 type SmartFieldProps = {
@@ -384,6 +437,7 @@ export function BuildSequenceClient() {
       messageBody: stepBodyDrafts[step.stepNumber] ?? step.messageBody,
       cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
     })) ?? [];
+  const quality = result ? sequenceQuality(displayedSteps) : null;
 
   async function copyText(key: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -678,6 +732,35 @@ export function BuildSequenceClient() {
                   </div>
                 </div>
                 <p className="text-sm leading-6 text-stone-700">{result.angleRationale}</p>
+                {quality ? (
+                  <div className="rounded-lg border border-line bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink">Sequence quality</p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          quality.issues.length === 0
+                            ? "bg-[#eef8ed] text-[#2f6f3a]"
+                            : "bg-[#fff7e8] text-[#8a5a2b]"
+                        }`}
+                      >
+                        {quality.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {quality.issues.length > 0
+                        ? quality.issues.map((issue) => (
+                            <p className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]" key={issue}>
+                              {issue}
+                            </p>
+                          ))
+                        : quality.wins.map((win) => (
+                            <p className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]" key={win}>
+                              {win}
+                            </p>
+                          ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">

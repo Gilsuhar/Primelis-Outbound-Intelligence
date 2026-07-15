@@ -124,8 +124,8 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
   if (section.label === "SOLUTION") {
     return [
       section.text,
-      "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.",
-      "Signal helps teams see when branded ads are still protecting demand and when organic visibility or lower bids can cover the same intent.",
+      "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.",
+      "Signal helps teams see when paid brand is still protecting demand, and when the click would likely come organically anyway.",
     ];
   }
 
@@ -134,6 +134,44 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
     "Curious how you currently evaluate this?",
     "Curious how your team decides when branded bids can safely come down?",
   ];
+}
+
+function countMatches(text: string, pattern: RegExp) {
+  return text.match(pattern)?.length ?? 0;
+}
+
+function draftQuality(fullEmail: string, cta: string) {
+  const text = `${fullEmail}\n${cta}`.toLowerCase();
+  const issues: string[] = [];
+  const wins: string[] = [];
+
+  if (countMatches(text, /\bcompare|comparing\b/g) > 1) {
+    issues.push("Uses compare too often. Vary the CTA before sending.");
+  } else {
+    wins.push("CTA language is not repetitive.");
+  }
+
+  if (countMatches(text, /\bpaid coverage\b/g) > 2 || countMatches(text, /\bcoverage\b/g) > 5) {
+    issues.push("Mentions coverage too often. Swap one line for organic demand or wasted spend.");
+  } else {
+    wins.push("No obvious keyword repetition.");
+  }
+
+  if (!/(organic|unnecessary spend|wasted spend|not changing the outcome|incremental|lower bids|pause)/i.test(text)) {
+    issues.push("Needs a clearer buyer pain: organic capture, wasted spend, or bid control.");
+  } else {
+    wins.push("Has a clear buyer pain.");
+  }
+
+  if (/\b(worth a quick compare|open to a quick compare)\b/i.test(cta)) {
+    issues.push("CTA is too generic. Use a concrete question instead.");
+  }
+
+  return {
+    status: issues.length === 0 ? "Ready to send" : "Needs one quick edit",
+    issues,
+    wins: wins.slice(0, 3),
+  };
 }
 
 function OptionalSelect({
@@ -252,6 +290,7 @@ export function CreateOutreachClient() {
     })) ?? [];
   const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
   const displayedFullEmail = displayedSections.map((section) => section.text).join("\n\n");
+  const quality = result ? draftQuality(displayedFullEmail, result.cta) : null;
 
   async function copyText(key: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -688,6 +727,35 @@ export function CreateOutreachClient() {
                   </p>
                   <p className="mt-2 text-sm text-stone-700">{result.cta}</p>
                 </div>
+                {quality ? (
+                  <div className="rounded-lg border border-line bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink">Draft quality</p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          quality.issues.length === 0
+                            ? "bg-[#eef8ed] text-[#2f6f3a]"
+                            : "bg-[#fff7e8] text-[#8a5a2b]"
+                        }`}
+                      >
+                        {quality.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {quality.issues.length > 0
+                        ? quality.issues.map((issue) => (
+                            <p className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]" key={issue}>
+                              {issue}
+                            </p>
+                          ))
+                        : quality.wins.map((win) => (
+                            <p className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]" key={win}>
+                              {win}
+                            </p>
+                          ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="text-sm leading-6 text-stone-600">

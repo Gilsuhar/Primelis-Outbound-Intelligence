@@ -220,11 +220,11 @@ function personaLine(input: CreateOutreachInput) {
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
+    return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
+    return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
 
   return fact;
@@ -263,7 +263,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const roleLine = personaLine(input);
     const factLine =
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
-        ? "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced."
+        ? "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes."
         : humanizeProductFact(primaryFact);
     const proofLine = caseStudyLine(records);
     const emailSections = [

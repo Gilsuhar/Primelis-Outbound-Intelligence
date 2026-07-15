@@ -166,7 +166,7 @@ describe("Reply to Prospect service", () => {
       expect(result.data.detectedIntent).toContain("DECK_REQUEST");
       expect(result.data.recommendedReply).toMatch(/Yes, happy to send/i);
       expect(result.data.recommendedReply).toMatch(/deck/i);
-      expect(result.data.recommendedReply).toMatch(/two bullets|relevant to your setup/i);
+      expect(result.data.recommendedReply).toMatch(/two bullets|match your setup/i);
       expect(result.data.recommendedReply).not.toMatch(
         /\b(Solo|Competitive|Ghost|SERP|conversion-source|Google Search Console|reduce bids)\b/i,
       );
@@ -223,9 +223,10 @@ describe("Reply to Prospect service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.detectedIntent).toContain("EXISTING_VENDOR");
-      expect(result.data.recommendedReply).toMatch(/Revvim is a relevant setup/i);
-      expect(result.data.recommendedReply).toMatch(/pause when nobody is bidding/i);
-      expect(result.data.recommendedReply).toMatch(/automated|manually/i);
+      expect(result.data.recommendedReply).toMatch(/Revvim is a serious setup/i);
+      expect(result.data.recommendedReply).toMatch(/broader than pausing brand ads/i);
+      expect(result.data.recommendedReply).toMatch(/lower CPC when other advertisers are present/i);
+      expect(result.data.recommendedReply).toMatch(/already covered/i);
       expect(result.data.recommendedReply).not.toMatch(/replace|replacing/i);
       expect(result.data.recommendedReply).not.toMatch(/better than|weaker than/i);
     }

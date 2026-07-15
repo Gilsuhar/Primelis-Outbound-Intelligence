@@ -111,10 +111,10 @@ function connectionRequestFor(input: BuildSequenceInput) {
 
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
+    return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
   if (/paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(fact)) {
-    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
+    return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
   return fact;
 }

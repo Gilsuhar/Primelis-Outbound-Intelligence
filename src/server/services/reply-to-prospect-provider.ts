@@ -63,16 +63,16 @@ function deckReply(input: ReplyToProspectInput, facts: string[]) {
   const opener =
     input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
   const companyLine = input.companyName
-    ? `I will keep it focused on the ${input.companyName} question, not a generic overview.`
-    : "I will keep it focused, not a generic overview.";
+    ? `I will keep it focused on the ${input.companyName} paid-brand question, not a generic overview.`
+    : "I will keep it focused on the paid-brand question, not a generic overview.";
   const usefulLine =
     facts[0] && !/not have enough/i.test(facts[0])
-      ? "Short version: Signal is useful when the team wants to know where paid brand coverage is still needed and where organic results may already be doing enough."
-      : "Short version: it is about deciding where paid brand coverage is still needed and where organic results may already be doing enough.";
+      ? "The short version is simple: when nobody else is bidding, Signal helps decide whether branded ads should stay live, come down, or pause until competition returns."
+      : "The short version is simple: when nobody else is bidding, Signal helps decide whether branded ads should stay live, come down, or pause until competition returns.";
   const cta =
     input.channel === "LINKEDIN"
-      ? "I can send the deck and add two bullets most relevant to your setup."
-      : "I can send the deck and add two bullets most relevant to your setup.";
+      ? "I can send the deck with two bullets that match your setup."
+      : "I can send the deck with two bullets that match your setup.";
 
   return [opener, companyLine, usefulLine, cta].join(" ");
 }
@@ -119,15 +119,23 @@ function methodologyReply(input: ReplyToProspectInput) {
 
 function existingVendorReply(input: ReplyToProspectInput) {
   const vendor = detectedVendor(input.prospectMessage);
-  const opener = vendor === "your current setup" ? "That makes sense." : `That makes sense - ${vendor} is a relevant setup.`;
+  const opener = vendor === "your current setup" ? "That makes sense." : `That makes sense - ${vendor} is a serious setup.`;
+  if (vendor === "Revvim") {
+    const answer =
+      input.desiredLength === "SHORT"
+        ? "The gap I would check is broader than pausing brand ads when nobody else is bidding: can it also lower CPC when other advertisers are present, while keeping you covered?"
+        : "The gap I would check is broader than pausing brand ads when nobody else is bidding. Signal is also built for the moments when other advertisers are present: how low can CPC go while you stay covered, using paid and organic visibility together instead of paid search alone?";
+    const cta = "Is that already covered on your side?";
+    return [opener, answer, cta].join(" ");
+  }
   const answer =
     vendor === "Auction Insights"
-      ? "The question I would ask is whether you can act on those conditions automatically: pause brand coverage when nobody is bidding, lower CPC when coverage is still needed, and protect the top position when competitors appear."
-      : "The useful question is whether the current setup can turn the brand-search decision into an action: pause when nobody is bidding, lower bids when you only need coverage, and protect the top position when competitors appear.";
+      ? "The gap I would check is whether those signals turn into action automatically: pause when nobody else is bidding, lower CPC when coverage is still needed, and bring coverage back when the page changes."
+      : "The gap I would check is narrower: when nobody else is bidding, can the system safely lower or pause branded ads without losing the click, then bring coverage back when the page changes?";
   const cta =
     input.channel === "LINKEDIN"
-      ? "Do you already have that decision automated, or is it still reviewed manually?"
-      : "Do you already have that decision automated, or is it still reviewed manually?";
+      ? "Do you already automate that part, or is it still a manual review?"
+      : "Do you already automate that part, or is it still a manual review?";
   return [opener, answer, cta].join(" ");
 }
 
@@ -156,8 +164,8 @@ function timingReply(input: ReplyToProspectInput) {
 function defaultReply(input: ReplyToProspectInput, intents: ProspectIntent[], primaryFact: string, secondaryFact: string) {
   const cta =
     input.channel === "LINKEDIN"
-      ? "Worth comparing notes?"
-      : "Worth a quick compare against how you decide this today?";
+      ? "Do you already track this today?"
+      : "Is this something your team already checks?";
   const bridge = intentBridge(intents);
 
   return [
@@ -220,7 +228,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     const shorterAlternative = intents.includes("DECK_REQUEST")
       ? [
           input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
-          "I will keep it focused on your paid-brand question and add two relevant bullets.",
+          "I will keep it focused on the paid-brand question and add two relevant bullets.",
         ].join(" ")
       : intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
         ? [
@@ -232,9 +240,13 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
           ? [
               detectedVendor(input.prospectMessage) === "your current setup"
                 ? "Makes sense."
-                : `Makes sense - ${detectedVendor(input.prospectMessage)} is a relevant setup.`,
-              "The question is whether the decision is automated: pause when nobody is bidding, lower bids when coverage is needed, and protect the top spot when competitors appear.",
-              "Is that already automated on your side?",
+                : `Makes sense - ${detectedVendor(input.prospectMessage)} is a serious setup.`,
+              detectedVendor(input.prospectMessage) === "Revvim"
+                ? "The gap I would check is whether it also lowers CPC when other advertisers are present, while keeping you covered."
+                : "The gap I would check is whether you can lower or pause brand ads when nobody else is bidding, then bring coverage back when the page changes.",
+              detectedVendor(input.prospectMessage) === "Revvim"
+                ? "Is that already covered on your side?"
+                : "Is that already automated on your side?",
             ].join(" ")
       : [
           openingFor(input, intents),
@@ -242,7 +254,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
             ? humanizeFact(trimSentences(facts[0], 1))
             : "I can only answer from approved Signal material.",
           input.channel === "LINKEDIN"
-            ? "Worth comparing notes?"
+            ? "Do you already track this today?"
             : "Happy to send two tailored bullets.",
         ]
           .filter(Boolean)

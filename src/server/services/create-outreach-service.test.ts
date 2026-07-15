@@ -309,7 +309,7 @@ describe("Create Outreach service", () => {
       expect(result.data.recommendedMessage).toMatch(/brand|branded/i);
       expect(result.data.recommendedMessage).toContain("Hi there,");
       expect(result.data.recommendedMessage).toContain("unnecessary spend");
-      expect(result.data.recommendedMessage).toContain("organic visibility");
+      expect(result.data.recommendedMessage).toContain("lower or pause branded ads");
       expect(result.data.recommendedMessage).toContain("Curious how you currently evaluate this at Nike?");
       expect(result.data.emailSections.map((section) => section.label)).toEqual([
         "INTRO",
