@@ -308,7 +308,8 @@ describe("Create Outreach service", () => {
       expect(result.data.recommendedMessage).toContain("Nike");
       expect(result.data.recommendedMessage).toMatch(/brand|branded/i);
       expect(result.data.recommendedMessage).toContain("Hi there,");
-      expect(result.data.recommendedMessage).toContain("Worth comparing how you decide this today?");
+      expect(result.data.recommendedMessage).toContain("Worth comparing how you handle this today?");
+      expect(result.data.recommendedMessage).toContain("nobody else is bidding");
       expect(result.data.recommendedMessage).toMatch(/spend|coverage|organic/i);
       expect(result.data.emailSections.map((section) => section.label)).toEqual([
         "INTRO",

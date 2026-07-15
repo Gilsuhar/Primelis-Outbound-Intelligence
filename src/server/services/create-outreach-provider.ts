@@ -66,16 +66,16 @@ function triggerPhrase(input: CreateOutreachInput) {
   const company = input.companyName;
 
   if (!trigger) {
-    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
+    return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
   }
   if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `I had ${company} on my list and wanted to sanity-check one brand-search question.`;
+    return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a possible paid-brand question at ${company}.`;
+    return `I noticed a paid-brand question at ${company}: what happens when competitors are not bidding?`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
-    return `I thought there may be a brand-spend efficiency question worth checking at ${company}.`;
+    return `I thought there may be a paid-brand efficiency question worth checking at ${company}.`;
   }
   if (/multi-market|governance|control/i.test(trigger)) {
     return `I thought ${company} may have a useful cross-market brand-search question.`;
@@ -88,12 +88,12 @@ function triggerPhrase(input: CreateOutreachInput) {
 
 function ctaFor(input: CreateOutreachInput) {
   if (input.channel === "LINKEDIN") {
-    return "Open to comparing notes?";
+    return "Do you already have a way to do that?";
   }
   if (input.desiredTone === "DIRECT") {
-    return "Worth a quick compare against how you decide this today?";
+    return "Do you already have a way to do that?";
   }
-  return "Worth comparing how you decide this today?";
+  return "Worth comparing how you handle this today?";
 }
 
 function subjectLinesFor(input: CreateOutreachInput) {
@@ -115,8 +115,8 @@ function subjectLinesFor(input: CreateOutreachInput) {
   }
   return [
     `${company} paid brand question`,
-    `Paid or organic at ${company}?`,
-    `Quick thought on ${company} brand search`,
+    `When nobody is bidding on ${company}`,
+    `Quick thought on ${company} branded ads`,
   ];
 }
 
@@ -154,14 +154,14 @@ function contextDetails(input: CreateOutreachInput) {
 function contextLine(input: CreateOutreachInput) {
   const details = contextDetails(input);
   if (details.length === 0) {
-    return `I had ${input.companyName} on my list because brand search is one of those places where spend can keep running even when organic may already capture part of the demand.`;
+    return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
   }
 
   if (details.some((detail) => /brand demand|paid-search|brand-search|spend/i.test(String(detail)))) {
-    return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
+    return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
   }
 
-  return `I had ${input.companyName} on my list because there may be a practical paid-brand question worth checking.`;
+  return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
 }
 
 function personaLine(input: CreateOutreachInput) {
@@ -172,24 +172,24 @@ function personaLine(input: CreateOutreachInput) {
     ? " At that scale, small changes in paid brand coverage can affect budget and reporting."
     : "";
   if (/cmo|chief/i.test(role)) {
-    return `The hard part is not whether brand ads perform. It is whether the team can see where paid coverage is protecting demand, and where it may be spending on demand the brand would capture anyway.${scaleHint}`;
+    return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
   }
   if (/growth|acquisition/i.test(role)) {
-    return `The practical question is whether paid brand is helping acquisition efficiency, or whether part of that budget is buying clicks that would have arrived through organic results anyway.${scaleHint}`;
+    return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
   }
   if (/paid search|sem|performance/i.test(role)) {
-    return `The practical question is not whether to run brand search. It is where paid coverage protects demand, and where organic results can carry more of the outcome.${scaleHint}`;
+    return `The practical question is not whether branded ads are useful. It is knowing when to keep them live, when to lower bids, and when organic can do the work.${scaleHint}`;
   }
-  return `The practical question is not whether to run brand search. It is which paid clicks are still worth buying, and which ones organic results would likely capture anyway.${scaleHint}`;
+  return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
+    return "Signal can automatically pause or lower branded ads when paid coverage is not changing the outcome, then bring coverage back when competition returns.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
+    return "Signal watches paid coverage, organic presence, and competitor activity so the team can decide when to pause, lower bids, or protect the top position.";
   }
 
   return fact;
@@ -228,7 +228,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const roleLine = personaLine(input);
     const factLine =
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
-        ? "Signal is used to compare paid brand activity with organic visibility and live competitive conditions before changing spend."
+        ? "Signal helps teams compare branded ads with organic results and competitor activity before deciding whether to keep, lower, or pause paid coverage."
         : humanizeProductFact(primaryFact);
     const proofLine = caseStudyLine(records);
     const emailSections = [
