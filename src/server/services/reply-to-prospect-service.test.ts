@@ -206,6 +206,31 @@ describe("Reply to Prospect service", () => {
     }
   });
 
+  it("handles Revvim existing-vendor replies without generic replacement language", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        channel: "LINKEDIN",
+        prospectMessage: "We already work with Revvim",
+        desiredTone: "DIRECT",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("EXISTING_VENDOR");
+      expect(result.data.recommendedReply).toMatch(/Revvim is a relevant setup/i);
+      expect(result.data.recommendedReply).toMatch(/pause when nobody is bidding/i);
+      expect(result.data.recommendedReply).toMatch(/automated|manually/i);
+      expect(result.data.recommendedReply).not.toMatch(/replace|replacing/i);
+      expect(result.data.recommendedReply).not.toMatch(/better than|weaker than/i);
+    }
+  });
+
   it("returns source references and persists generated drafts separately", async () => {
     const { adapter, persisted } = persistence([knowledge({ id: "knowledge-1" })]);
 

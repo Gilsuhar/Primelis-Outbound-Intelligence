@@ -90,6 +90,20 @@ function intentBridge(intents: ProspectIntent[]) {
   return undefined;
 }
 
+function detectedVendor(message: string) {
+  const text = message.toLowerCase();
+  if (/\brevvim\b/.test(text)) {
+    return "Revvim";
+  }
+  if (/\badthena\b/.test(text)) {
+    return "Adthena";
+  }
+  if (/\bauction insights\b/.test(text)) {
+    return "Auction Insights";
+  }
+  return "your current setup";
+}
+
 function methodologyReply(input: ReplyToProspectInput) {
   const opener = "Good question.";
   const answer =
@@ -104,13 +118,16 @@ function methodologyReply(input: ReplyToProspectInput) {
 }
 
 function existingVendorReply(input: ReplyToProspectInput) {
-  const opener = "That makes sense.";
+  const vendor = detectedVendor(input.prospectMessage);
+  const opener = vendor === "your current setup" ? "That makes sense." : `That makes sense - ${vendor} is a relevant setup.`;
   const answer =
-    "I would not frame this as replacing what you already use. The useful question is whether your current setup clearly shows when paid brand is still needed versus when organic would have captured the demand anyway.";
+    vendor === "Auction Insights"
+      ? "The question I would ask is whether you can act on those conditions automatically: pause brand coverage when nobody is bidding, lower CPC when coverage is still needed, and protect the top position when competitors appear."
+      : "The useful question is whether the current setup can turn the brand-search decision into an action: pause when nobody is bidding, lower bids when you only need coverage, and protect the top position when competitors appear.";
   const cta =
     input.channel === "LINKEDIN"
-      ? "Worth comparing how you decide that today?"
-      : "Worth comparing how you decide that today?";
+      ? "Do you already have that decision automated, or is it still reviewed manually?"
+      : "Do you already have that decision automated, or is it still reviewed manually?";
   return [opener, answer, cta].join(" ");
 }
 
@@ -211,6 +228,14 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
             "I would first check whether paid brand clicks are changing the outcome or whether organic would already capture that demand.",
             "Happy to send the simple version.",
           ].join(" ")
+        : intents.includes("EXISTING_VENDOR")
+          ? [
+              detectedVendor(input.prospectMessage) === "your current setup"
+                ? "Makes sense."
+                : `Makes sense - ${detectedVendor(input.prospectMessage)} is a relevant setup.`,
+              "The question is whether the decision is automated: pause when nobody is bidding, lower bids when coverage is needed, and protect the top spot when competitors appear.",
+              "Is that already automated on your side?",
+            ].join(" ")
       : [
           openingFor(input, intents),
           facts[0]
