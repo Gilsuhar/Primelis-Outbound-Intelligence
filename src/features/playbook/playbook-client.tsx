@@ -22,6 +22,7 @@ import {
   coreIcpSignals,
   emptyProgress,
   evidenceDescriptions,
+  outreachReplyEvidence,
   qualificationChecklist,
   winningMessages,
   workSteps,
@@ -455,6 +456,75 @@ export function PlaybookClient({
         id="winning-messages"
         title="Winning messages library"
       >
+        <div className="mb-6 rounded-2xl border border-line bg-white p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Outreach reply evidence
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-ink">
+                Signal and legacy Cross Brand replies
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                {outreachReplyEvidence.scope}
+              </p>
+            </div>
+            <WarningLabel text={`${outreachReplyEvidence.relatedReplyRows} relevant replies`} />
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {outreachReplyEvidence.strongestSubjectClusters.map((cluster) => (
+              <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-semibold text-ink">{cluster.label}</p>
+                  <WarningLabel text={`${cluster.replyRows} replies`} />
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border border-line bg-cream p-4 lg:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Copy rules
+              </p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                {outreachReplyEvidence.copyRules.map((rule) => (
+                  <li key={rule}>• {rule}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-line bg-cream p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Product naming
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[#34352e]">
+                {outreachReplyEvidence.currentProductName}
+              </p>
+              <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
+                {outreachReplyEvidence.limitation}
+              </p>
+            </div>
+          </div>
+
+          <details className="mt-4 rounded-xl border border-line bg-cream p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Account examples from relevant replies
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {outreachReplyEvidence.replyingAccountExamples.map((account) => (
+                <span
+                  className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                  key={account}
+                >
+                  {account}
+                </span>
+              ))}
+            </div>
+          </details>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
           {winningMessages.map((item) => (
             <details className="rounded-2xl border border-line bg-cream p-5" key={item.title}>

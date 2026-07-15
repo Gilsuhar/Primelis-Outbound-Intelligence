@@ -252,7 +252,114 @@ export const practiceScenarios: PracticeScenario[] = [
   },
 ];
 
+export const outreachReplyEvidence = {
+  source: "Outreach mailing export, July 15 2026",
+  scope:
+    "Filtered to replied mailings related to Signal, legacy Cross Brand, branded ads, branded search, brand incrementality, and brand visibility.",
+  limitation:
+    "The export includes reply metadata, subjects, accounts, and timing, but not the reply body. Use it to learn which angles created replies, not to quote prospect language.",
+  currentProductName:
+    "Use Signal as the current product name. Treat Cross Brand / Cross-Brand as legacy evidence for the same product.",
+  relatedReplyRows: 123,
+  strongestSubjectClusters: [
+    {
+      label: "Deactivating branded ads",
+      replyRows: 68,
+      useFor:
+        "Direct first touches about turning off or lowering branded ads when no competitors are bidding.",
+    },
+    {
+      label: "Optimize branded ad spend / visibility",
+      replyRows: 25,
+      useFor:
+        "More executive or finance-friendly wording when the buyer may care about waste, control, and reporting.",
+    },
+    {
+      label: "Brand incrementality",
+      replyRows: 12,
+      useFor:
+        "Performance-marketing buyers who already understand the paid versus organic measurement problem.",
+    },
+    {
+      label: "Legacy Cross Brand",
+      replyRows: 12,
+      useFor:
+        "Historical proof that the same product angle worked, but rewrite external wording to Signal.",
+    },
+  ],
+  replyingAccountExamples: [
+    "Plus500",
+    "American Airlines",
+    "Airbyte",
+    "MGM Resorts",
+    "The Knot",
+    "TeePublic",
+    "Taboola",
+    "Nayax",
+    "Ancestry",
+    "Priceline",
+    "The North Face",
+    "Checkr",
+    "QuillBot",
+    "HiBob",
+    "Stitch Fix",
+    "AppFolio",
+    "On",
+  ],
+  copyRules: [
+    "Lead with the buyer's branded-search decision, not an internal category or ICP label.",
+    "Use plain language: no competitors bidding, pause ads, lower bids, stay on top, avoid overspending.",
+    "Keep Signal as the product name even when the historical sequence used Cross Brand.",
+    "Do not cite exact meeting counts or customer savings unless the account owner confirms the approved proof.",
+    "When a prospect engaged from LinkedIn, mention the visible trigger before explaining Signal.",
+  ],
+};
+
 export const winningMessages = [
+  {
+    title: "Email subject - deactivating branded ads",
+    useWhen:
+      "Use this subject family when the buyer is likely responsible for paid search or branded campaigns.",
+    channel: "Email",
+    subject: "deactivating branded ads",
+    message:
+      "Hi {{firstName}},\n\nQuick question on {{company}} brand search. How do you decide when branded ads should stay live versus when organic would have captured the click anyway?\n\nSignal helps teams monitor the search results and adjust branded coverage when competitors are not bidding, instead of paying for clicks that may not add value.\n\nWorth comparing how you handle this today?",
+    whyItWorks:
+      "The Outreach export shows this was the strongest reply-generating subject cluster for the Signal/Cross Brand use case.",
+  },
+  {
+    title: "Email subject - optimize branded ad spend",
+    useWhen:
+      "Use this when the buyer may care more about budget control than the mechanics of pausing ads.",
+    channel: "Email",
+    subject: "optimize branded ad spend",
+    message:
+      "Hi {{firstName}},\n\nI had {{company}} on my list because branded search can look efficient while still hiding wasted spend.\n\nSignal helps compare paid coverage with organic results and live competitor activity, so teams can decide where branded ads are protecting demand and where bids can be reduced.\n\nWorth a quick compare?",
+    whyItWorks:
+      "This keeps the same proven angle but frames it in budget language for performance and finance-sensitive buyers.",
+  },
+  {
+    title: "Email subject - brand incrementality",
+    useWhen:
+      "Use this for sophisticated performance marketers who already think about paid versus organic incrementality.",
+    channel: "Email",
+    subject: "brand incrementality",
+    message:
+      "Hi {{firstName}},\n\nHow are you measuring whether {{company}} branded search is incremental when competitors are not present?\n\nSignal helps teams look at paid coverage, organic results, and search-page changes together, so the decision is not just based on paid-search efficiency in isolation.\n\nOpen to comparing notes?",
+    whyItWorks:
+      "The export shows incrementality language created replies, but it should be reserved for buyers who will understand the term.",
+  },
+  {
+    title: "Legacy Cross Brand - rewrite to Signal",
+    useWhen:
+      "Use this when adapting old Cross Brand outreach that worked into the current Signal product language.",
+    channel: "Email / LinkedIn",
+    subject: "{{company}} x Signal",
+    message:
+      "Hi {{firstName}},\n\nI noticed the old Cross Brand angle worked well for similar accounts, but the current product name is Signal.\n\nFor external messaging, rewrite the idea as: Signal helps teams decide when branded ads should run, pause, or bid lower based on live competitor activity and organic coverage.\n\nDo not send Cross Brand wording unless the account owner explicitly wants legacy language.",
+    whyItWorks:
+      "It preserves historical learning from Cross Brand sequences while keeping customer-facing language consistent with the current Signal name.",
+  },
   {
     title: "After connect - no competitor angle",
     useWhen: "After a LinkedIn connection when you want the proven direct opener.",

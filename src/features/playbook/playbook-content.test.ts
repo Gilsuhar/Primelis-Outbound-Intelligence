@@ -6,6 +6,7 @@ import {
   emptyProgress,
   evidenceDescriptions,
   industries,
+  outreachReplyEvidence,
   practiceScenarios,
   winningMessages,
 } from "./playbook-content";
@@ -48,7 +49,12 @@ describe("Signal Playbook content", () => {
   });
 
   it("includes a compact winning messages library", () => {
-    expect(winningMessages.length).toBeGreaterThanOrEqual(12);
+    expect(winningMessages.length).toBeGreaterThanOrEqual(16);
+    expect(outreachReplyEvidence.relatedReplyRows).toBe(123);
+    expect(outreachReplyEvidence.currentProductName).toContain("Signal");
+    expect(winningMessages.map((message) => message.title)).toContain(
+      "Email subject - deactivating branded ads",
+    );
     expect(winningMessages.map((message) => message.title)).toContain(
       "After connect - quick chat",
     );
