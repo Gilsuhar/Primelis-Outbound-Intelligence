@@ -85,28 +85,49 @@ function openingFor(input: BuildSequenceInput) {
   return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
 }
 
-function ctaForStep(stepNumber: number, isFinal: boolean, channel: SequenceStep["channel"]) {
+function ctaForPurpose(
+  purpose: SequenceStep["purpose"],
+  stepNumber: number,
+  isFinal: boolean,
+  channel: SequenceStep["channel"],
+) {
   if (isFinal) {
     return "If this is not relevant, I can close the loop here.";
   }
   if (channel === "LINKEDIN") {
-    return stepNumber === 1 ? "Open to connecting?" : "Worth comparing notes?";
+    if (stepNumber === 1) {
+      return "Open to connecting?";
+    }
+    return purpose === "METHODOLOGY_DIFFERENTIATION"
+      ? "Worth pressure-testing the approach?"
+      : "Worth comparing notes?";
   }
-  return stepNumber === 1
-    ? "Worth a quick compare against how you decide this today?"
-    : "Worth comparing notes?";
+  const ctas: Record<SequenceStep["purpose"], string> = {
+    FIRST_TOUCH_RELEVANCE: "Worth a quick compare against how you decide this today?",
+    PROBLEM_FRAMING: "Is this something your team is already trying to separate?",
+    METHODOLOGY_DIFFERENTIATION: "Worth pressure-testing your current method against this?",
+    ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
+    SOCIAL_PROOF: "Want the short version of how another team approached this?",
+    TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
+    LOW_PRESSURE_FOLLOW_UP: "Worth revisiting later if this is on the roadmap?",
+    BREAKUP_CLOSE_LOOP: "If this is not relevant, I can close the loop here.",
+  };
+  return ctas[purpose];
 }
 
-function subjectFor(input: BuildSequenceInput, stepNumber: number) {
-  const subjects = [
-    `${input.companyName} paid brand question`,
-    `Paid brand vs organic at ${input.companyName}`,
-    `A practical brand-search check`,
-    `Closing the loop`,
-    `Close the loop?`,
-    `Last note on brand search`,
-  ];
-  return subjects[stepNumber - 1] ?? `Thought for ${input.companyName}`;
+function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"], stepNumber: number) {
+  const company = input.companyName;
+  const subjects: Record<SequenceStep["purpose"], string> = {
+    FIRST_TOUCH_RELEVANCE: `${company} paid brand question`,
+    PROBLEM_FRAMING: `When paid brand looks too good`,
+    METHODOLOGY_DIFFERENTIATION: `A cleaner brand-search test`,
+    ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
+    SOCIAL_PROOF: `A practical paid-brand example`,
+    TECHNICAL_CLARIFICATION: `Paid brand methodology`,
+    LOW_PRESSURE_FOLLOW_UP: `Quick follow-up on ${company}`,
+    BREAKUP_CLOSE_LOOP: `Closing the loop`,
+  };
+  return subjects[purpose] ?? `Thought for ${company} ${stepNumber}`;
 }
 
 function connectionRequestFor(input: BuildSequenceInput) {
@@ -159,20 +180,41 @@ function accountContextLine(input: BuildSequenceInput) {
   return `I had ${input.companyName} on my list because brand search can look safe from the outside, while the real question is where paid coverage is still adding value.`;
 }
 
-function personaPainLine(input: BuildSequenceInput) {
+function roleFriendlyPhrase(input: BuildSequenceInput) {
   const role = input.contactRole.toLowerCase();
-  const scaleHint = /\$|revenue|employees|enterprise|multi-market|monthly|spend/i.test(
-    input.companyContext ?? "",
-  )
-    ? " At that scale, small changes in paid brand coverage can affect budget and reporting."
-    : "";
-  if (/growth|acquisition/i.test(role)) {
-    return `The practical question is whether paid brand is helping acquisition efficiency, or whether part of that budget is buying clicks organic would have captured anyway.${scaleHint}`;
+  if (/paid search|sem|ppc/.test(role)) {
+    return "for a paid-search team";
   }
-  if (/cmo|chief/i.test(role)) {
-    return `The hard part is visibility: where paid coverage protects demand, and where it may be spending on demand the brand would capture anyway.${scaleHint}`;
+  if (/performance|growth|acquisition/.test(role)) {
+    return "for a performance team";
   }
-  return `The practical question is not whether to run brand search. It is where paid coverage protects demand, and where organic results can carry more of the outcome.${scaleHint}`;
+  if (/cmo|chief|vp marketing/.test(role)) {
+    return "for a marketing leader";
+  }
+  if (/e-?commerce|digital/.test(role)) {
+    return "for an e-commerce team";
+  }
+  return "for the team owning brand search";
+}
+
+function simpleAccountReason(input: BuildSequenceInput) {
+  const company = input.companyName;
+  const context = cleanSelection(input.companyContext ?? "") ?? "";
+  const industry = input.industry ?? "";
+  const paidContext = input.paidSearchContext ?? "";
+  if (/brand demand|paid-search owner/i.test(context)) {
+    return `I had ${company} on my list because it looks like the kind of account where brand search is worth checking, not assuming.`;
+  }
+  if (/\$|revenue|employees|enterprise|multi-market/i.test(context)) {
+    return `I had ${company} on my list because larger brand accounts can lose budget in small paid-brand decisions.`;
+  }
+  if (/runs branded-search ads|active/i.test(paidContext)) {
+    return `I had ${company} on my list because active brand search is usually worth reviewing with paid and organic together.`;
+  }
+  if (/fashion|luxury|retail|e-commerce/i.test(industry)) {
+    return `I had ${company} on my list because brand demand can make paid-search results look stronger than the real incremental value.`;
+  }
+  return `I had ${company} on my list for a quick brand-search fit check.`;
 }
 
 function humanizeFact(fact: string) {
@@ -196,69 +238,70 @@ function bodyForPurpose({
   input,
   purpose,
   channel,
-  primaryFact,
   secondaryFact,
 }: {
   input: BuildSequenceInput;
   purpose: SequenceStep["purpose"];
   channel: SequenceStep["channel"];
-  primaryFact: string;
   secondaryFact: string;
 }) {
   const trigger = input.observedTrigger.trim();
   const opening = openingFor(input);
   const context = accountContextLine(input);
-  const simplePrimaryFact = humanizeFact(primaryFact);
+  const accountReason = simpleAccountReason(input);
+  const rolePhrase = roleFriendlyPhrase(input);
   const simpleSecondaryFact = humanizeFact(secondaryFact);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      context || opening,
-      personaPainLine(input),
-      simplePrimaryFact,
+      accountReason || context || opening,
+      "The question is not whether branded search is good or bad. It is which paid clicks still change the outcome.",
+      "Signal helps compare paid ads, organic results, and search-page changes before deciding where spend is still useful.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The awkward part with brand search is that performance can look strong even when some paid clicks may not be adding much.",
-      "The harder question is where paid coverage is protecting demand, and where organic results would have captured part of the demand anyway.",
-      simpleSecondaryFact,
+      "The tricky part is that brand campaigns often look efficient in reports because the customer was already searching for the brand.",
+      `That makes the real decision ${rolePhrase}: protect the coverage that matters, and stop paying for demand organic would likely capture anyway.`,
+      "That is the gap Signal is meant to make easier to see.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "The comparison I would suggest is practical: what happens across paid coverage, organic results, and the search page before changing spend.",
-      "That gives the team a cleaner way to decide where coverage is needed and where budget may be doing less work.",
+      "A simple way to test this is to look at three things together: paid coverage, organic visibility, and who else is showing up on the search page.",
+      "If paid coverage is protecting demand, keep it. If organic is already carrying the result, reduce the waste. If competitors appear, protect the position.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
       "",
-      `${input.companyName} context I would use carefully: ${cleanSelection(trigger) ?? trigger}`,
-      "I would treat that as a light hypothesis, not a claim. The useful next step is simply to validate whether paid brand is still doing work organic cannot do.",
+      `The only assumption I would make about ${input.companyName} is a light one: ${cleanSelection(trigger) ?? trigger}.`,
+      "I would not pitch that as proof. I would use it as a reason to check whether paid brand is still doing work organic cannot do.",
     ],
     SOCIAL_PROOF: [
       greeting(input),
       "",
-      `There is approved customer evidence available for this channel, but I would use it only as supporting context rather than the whole pitch.`,
+      "There is customer evidence behind this, but I would keep it as context rather than making it the whole pitch.",
       simpleSecondaryFact,
+      "The practical takeaway is the same: separate useful paid coverage from spend that is no longer changing the outcome.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
       "",
-      `A useful question may be how the team compares paid brand ads with organic results before deciding what to change.`,
-      simpleSecondaryFact,
+      "The methodology question is straightforward: before lowering or pausing anything, compare paid ads with organic results and search-page conditions.",
+      "That keeps the conversation away from generic cost-cutting and focused on where paid coverage is actually needed.",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
       greeting(input),
       "",
-      `Wanted to keep this narrow. If paid brand efficiency is on the radar at ${input.companyName}, it may be worth a quick check.`,
+      `Wanted to keep this narrow. If paid-brand efficiency is on the radar at ${input.companyName}, it may be worth a quick check.`,
+      "If it is not a current priority, no problem.",
     ],
     BREAKUP_CLOSE_LOOP: [
       greeting(input),
       "",
       "I will close the loop after this note.",
-      "If paid brand efficiency becomes a priority later, the useful starting point is a quick look at where paid coverage is helping and where organic already does enough.",
+      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?",
     ],
   };
 
@@ -321,7 +364,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       const stepNumber = index + 1;
       const channel = channelForStep(input.primaryChannel, index);
       const isFinal = stepNumber === input.sequenceLength;
-      const cta = ctaForStep(stepNumber, isFinal, channel);
+      const cta = ctaForPurpose(purpose, stepNumber, isFinal, channel);
       return {
         stepNumber,
         channel,
@@ -334,14 +377,13 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
               : "LinkedIn keeps the touch lighter and different from the email copy."
             : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`) +
           " Account context is user-provided until verified.",
-        subjectLine: channel === "EMAIL" ? subjectFor(input, stepNumber) : undefined,
+        subjectLine: channel === "EMAIL" ? subjectFor(input, purpose, stepNumber) : undefined,
         connectionRequest:
           channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input) : undefined,
         messageBody: bodyForPurpose({
           input,
           purpose,
           channel,
-          primaryFact,
           secondaryFact: caseStudyFacts[0] ?? secondaryFact,
         }),
         cta,

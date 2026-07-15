@@ -113,12 +113,45 @@ function variantIndex(current: number, length: number) {
 }
 
 function subjectVariants(step: SequenceStep, company: string) {
-  return [
-    step.subjectLine ?? "",
-    `${company} brand-search question`,
-    `Paid brand at ${company}`,
-    `${company}: paid and organic`,
-  ].filter(Boolean);
+  const byPurpose: Record<SequenceStep["purpose"], string[]> = {
+    FIRST_TOUCH_RELEVANCE: [
+      step.subjectLine ?? "",
+      `${company} paid brand question`,
+      `Quick thought on ${company} brand search`,
+    ],
+    PROBLEM_FRAMING: [
+      step.subjectLine ?? "",
+      "When paid brand looks too good",
+      `Paid brand waste at ${company}?`,
+    ],
+    METHODOLOGY_DIFFERENTIATION: [
+      step.subjectLine ?? "",
+      "A cleaner brand-search test",
+      `How to check paid brand at ${company}`,
+    ],
+    ACCOUNT_SPECIFIC_OBSERVATION: [
+      step.subjectLine ?? "",
+      `${company}: one brand-search check`,
+      `A narrow question for ${company}`,
+    ],
+    SOCIAL_PROOF: [
+      step.subjectLine ?? "",
+      "A practical paid-brand example",
+      `Relevant paid-brand example`,
+    ],
+    TECHNICAL_CLARIFICATION: [
+      step.subjectLine ?? "",
+      "Paid brand methodology",
+      `One way to test brand search`,
+    ],
+    LOW_PRESSURE_FOLLOW_UP: [
+      step.subjectLine ?? "",
+      `Quick follow-up on ${company}`,
+      "Worth revisiting later?",
+    ],
+    BREAKUP_CLOSE_LOOP: [step.subjectLine ?? "", "Closing the loop", "Last note on paid brand"],
+  };
+  return byPurpose[step.purpose].filter(Boolean);
 }
 
 function bodyVariants(step: SequenceStep, company: string) {
@@ -127,32 +160,56 @@ function bodyVariants(step: SequenceStep, company: string) {
   if (step.purpose === "FIRST_TOUCH_RELEVANCE") {
     return [
       step.messageBody,
-      `${firstLine}\n\nI thought ${company} could be worth a quick brand-search fit check.\n\nThe question is simple: where is paid brand coverage still helping, and where are organic results already doing enough?`,
-      `${firstLine}\n\nI had ${company} on my list because brand search can quietly become expensive when the team cannot separate useful coverage from wasted spend.`,
+      `${firstLine}\n\nI had ${company} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nWorth checking where paid coverage is still useful and where organic already does enough.`,
+      `${firstLine}\n\nQuick thought on ${company}: brand search is usually not a yes/no channel. The useful question is which coverage protects demand and which spend is no longer doing much work.`,
     ];
   }
 
   if (step.purpose === "PROBLEM_FRAMING") {
     return [
       step.messageBody,
-      `${firstLine}\n\nA common issue is paying for brand clicks the company may already win organically.\n\nThe useful question is where paid brand search protects demand, and where it just adds cost.`,
-      `${firstLine}\n\nThe risk is not running paid brand ads. The risk is not knowing which part is actually doing work.`,
+      `${firstLine}\n\nThe awkward part is that branded campaigns often look efficient because the person already wanted the brand.\n\nThat makes it hard to know what paid search protected, and what organic would have captured anyway.`,
+      `${firstLine}\n\nThe risk is not running paid brand. The risk is treating every brand click as equally valuable, even when organic results may already be carrying part of the demand.`,
     ];
   }
 
   if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
     return [
       step.messageBody,
-      `${firstLine}\n\nThe comparison I would suggest is simple: paid brand ads, organic results, and search-result changes in one view.\n\nThat makes it easier to decide where to keep coverage and where to reduce wasted spend.`,
-      `${firstLine}\n\nInstead of another report, the useful view is a practical decision: keep, reduce, or test paid brand coverage based on what organic results can already carry.`,
+      `${firstLine}\n\nThe method I would test is simple: look at paid coverage, organic visibility, and competitor presence together before changing bids.\n\nThen the decision becomes practical: keep coverage, reduce waste, or protect the position.`,
+      `${firstLine}\n\nInstead of another dashboard, the useful output is a decision: where paid brand still protects revenue, and where it can be reduced without losing the outcome.`,
+    ];
+  }
+
+  if (step.purpose === "ACCOUNT_SPECIFIC_OBSERVATION") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nI would keep the ${company} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is waste.`,
+      `${firstLine}\n\nFor ${company}, I would frame this as a quick validation rather than a pitch: is paid coverage needed everywhere, or only when organic and competitor conditions make it useful?`,
+    ];
+  }
+
+  if (step.purpose === "SOCIAL_PROOF") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nThere are customer examples behind this, but I would use them carefully.\n\nThe useful takeaway is not the logo. It is the decision pattern: separate useful paid coverage from spend that is not changing the result.`,
+      `${firstLine}\n\nI can share a short example if useful, but the main point is practical: this is about deciding where brand spend still earns its place.`,
+    ];
+  }
+
+  if (step.purpose === "TECHNICAL_CLARIFICATION") {
+    return [
+      step.messageBody,
+      `${firstLine}\n\nThe check does not need to be complicated: compare paid brand ads, organic results, and search-page conditions before changing coverage.\n\nThat keeps the discussion away from generic cost-cutting and focused on evidence.`,
+      `${firstLine}\n\nThe clean version is: do not pause blindly, and do not keep coverage blindly. Test where paid brand changes the outcome.`,
     ];
   }
 
   if (step.purpose === "BREAKUP_CLOSE_LOOP") {
     return [
       step.messageBody,
-      `${firstLine}\n\nI will close the loop after this note.\n\nIf paid brand efficiency becomes a priority later, the useful starting point is a quick look at where paid coverage is helping and where organic results already do enough.`,
-      `${firstLine}\n\nLast note from me. If this is not relevant now, no problem at all.`,
+      `${firstLine}\n\nI will close the loop after this note.\n\nIf paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?`,
+      `${firstLine}\n\nLast note from me. If this is not relevant now, no problem at all. I only reached out because this is often hard to see from standard brand-search reporting.`,
     ];
   }
 
@@ -164,12 +221,49 @@ function bodyVariants(step: SequenceStep, company: string) {
 }
 
 function ctaVariants(step: SequenceStep) {
-  return [
-    step.cta,
-    "Worth comparing how you decide this today?",
-    "Open to a quick look at whether this is relevant?",
-    "If this is not useful, I can close the loop here.",
-  ];
+  const byPurpose: Record<SequenceStep["purpose"], string[]> = {
+    FIRST_TOUCH_RELEVANCE: [
+      step.cta,
+      "Worth comparing how you decide this today?",
+      "Open to a quick check?",
+    ],
+    PROBLEM_FRAMING: [
+      step.cta,
+      "Is this something your team is already trying to separate?",
+      "Worth seeing if this is relevant?",
+    ],
+    METHODOLOGY_DIFFERENTIATION: [
+      step.cta,
+      "Worth pressure-testing your current method against this?",
+      "Would a two-point methodology view help?",
+    ],
+    ACCOUNT_SPECIFIC_OBSERVATION: [
+      step.cta,
+      "Would it be useful to check whether this applies at your scale?",
+      "Worth a quick sanity check?",
+    ],
+    SOCIAL_PROOF: [
+      step.cta,
+      "Want the short version of the example?",
+      "Should I send the relevant example?",
+    ],
+    TECHNICAL_CLARIFICATION: [
+      step.cta,
+      "Would a simple method breakdown help?",
+      "Worth comparing how you test this today?",
+    ],
+    LOW_PRESSURE_FOLLOW_UP: [
+      step.cta,
+      "Worth revisiting later if this becomes a priority?",
+      "Should I leave this for now?",
+    ],
+    BREAKUP_CLOSE_LOOP: [
+      step.cta,
+      "If this is not relevant, I can close the loop here.",
+      "No worries if this is not a priority.",
+    ],
+  };
+  return byPurpose[step.purpose].filter(Boolean);
 }
 
 type SmartFieldProps = {
@@ -294,6 +388,12 @@ export function BuildSequenceClient() {
     return [step.subjectLine, step.connectionRequest, step.messageBody, step.cta]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  function fullSequenceText() {
+    return displayedSteps
+      .map((step) => `Step ${step.stepNumber} - ${step.delay}\n${fullStepText(step)}`)
+      .join("\n\n---\n\n");
   }
 
   function regenerateSubject(step: SequenceStep) {
@@ -555,9 +655,29 @@ export function BuildSequenceClient() {
           {result ? (
             <>
               <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <CalendarDays aria-hidden="true" className="h-5 w-5 text-signal" />
-                  <h2 className="text-lg font-semibold text-ink">Timeline</h2>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays aria-hidden="true" className="h-5 w-5 text-signal" />
+                      <h2 className="text-lg font-semibold text-ink">Timeline</h2>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-stone-600">
+                      This run stays editable below. Regenerate one subject, body, or CTA without
+                      rebuilding the whole sequence.
+                    </p>
+                  </div>
+                  <button
+                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-md border border-line bg-white px-3 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                    onClick={() => copyText("sequence-all", fullSequenceText())}
+                    type="button"
+                  >
+                    {copiedKey === "sequence-all" ? (
+                      <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                    )}
+                    {copiedKey === "sequence-all" ? "Copied" : "Copy all"}
+                  </button>
                 </div>
                 <div className="space-y-3">
                   {displayedSteps.map((step) => (
