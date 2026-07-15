@@ -12,7 +12,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
+import {
+  generateBuildSequenceAction,
+  pushSequenceToHubSpotAction,
+} from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
@@ -368,6 +371,10 @@ export function BuildSequenceClient() {
     {},
   );
   const [stepCtaVariantIndexes, setStepCtaVariantIndexes] = useState<Record<number, number>>({});
+  const [hubSpotStatus, setHubSpotStatus] = useState<{
+    state: "idle" | "sending" | "success" | "error";
+    message?: string;
+  }>({ state: "idle" });
   const [isPending, startTransition] = useTransition();
 
   const displayedSteps =
@@ -452,6 +459,33 @@ export function BuildSequenceClient() {
       setStepBodyVariantIndexes({});
       setStepSubjectVariantIndexes({});
       setStepCtaVariantIndexes({});
+    });
+  }
+
+  function pushToHubSpot() {
+    if (!result) return;
+    setHubSpotStatus({ state: "sending", message: "Sending to HubSpot..." });
+    startTransition(async () => {
+      const response = await pushSequenceToHubSpotAction({
+        companyName,
+        companyWebsite,
+        overallStrategy: result.overallStrategy,
+        selectedAngle: result.selectedAngle,
+        persona: result.personaEmphasis.persona,
+        steps: displayedSteps,
+        safetyNotes: result.safetyNotes,
+        sourceTitles: result.sourceReferences.map((source) => source.title),
+      });
+
+      if (!response.ok) {
+        setHubSpotStatus({ state: "error", message: response.message });
+        return;
+      }
+
+      setHubSpotStatus({
+        state: "success",
+        message: "Sent to HubSpot as a company note and review task.",
+      });
     });
   }
 
@@ -678,7 +712,29 @@ export function BuildSequenceClient() {
                     )}
                     {copiedKey === "sequence-all" ? "Copied" : "Copy all"}
                   </button>
+                  <button
+                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-md bg-signal px-3 text-xs font-semibold text-white transition hover:bg-[#1d4e5f] disabled:cursor-not-allowed disabled:bg-stone-300"
+                    disabled={hubSpotStatus.state === "sending"}
+                    onClick={pushToHubSpot}
+                    type="button"
+                  >
+                    <Send aria-hidden="true" className="h-3.5 w-3.5" />
+                    {hubSpotStatus.state === "sending" ? "Sending..." : "Send to HubSpot"}
+                  </button>
                 </div>
+                {hubSpotStatus.state !== "idle" ? (
+                  <p
+                    className={`mb-3 rounded-md px-3 py-2 text-sm ${
+                      hubSpotStatus.state === "success"
+                        ? "bg-[#eef8ed] text-[#2f6f3a]"
+                        : hubSpotStatus.state === "error"
+                          ? "bg-[#fff4ef] text-[#9a3f24]"
+                          : "bg-[#f8f5ef] text-stone-700"
+                    }`}
+                  >
+                    {hubSpotStatus.message}
+                  </p>
+                ) : null}
                 <div className="space-y-3">
                   {displayedSteps.map((step) => (
                     <section className="rounded-md border border-line p-3" key={step.stepNumber}>
