@@ -393,6 +393,64 @@ export const outreachReplyEvidence = {
   ],
 };
 
+export const replyBackedSequenceSteps = [
+  {
+    step: "Email 1",
+    replyStep: "Step #2",
+    replyRows: 51,
+    bestSubjects: ["deactivating branded ads", "Primelis - Intro", "{{company}} x Primelis - Intro"],
+    repliedTemplates: [
+      "Email 1A - Auto Disable Branded Ads",
+      "Email 1B - Auto Disable Branded Ads",
+      "Email 1A - General paid ads",
+    ],
+    role:
+      "Open with one direct branded-search question. Do not over-explain Signal in the first message.",
+  },
+  {
+    step: "Email 2",
+    replyStep: "Step #3",
+    replyRows: 38,
+    bestSubjects: ["Re: deactivating branded ads", "Re: optimize branded ad spend"],
+    repliedTemplates: [
+      "Email 2A - General paid ads for context",
+      "Email 2B - General paid ads for context",
+    ],
+    role:
+      "Add business context: paid brand can look efficient in reports while still creating avoidable spend.",
+  },
+  {
+    step: "Email 3",
+    replyStep: "Step #4",
+    replyRows: 20,
+    bestSubjects: ["Re: brand incrementality", "Re: optimize branded ads"],
+    repliedTemplates: ["Email 3A - Video", "Email 3 Video 1A - All", "Email 3B - Video"],
+    role:
+      "Add proof, method, or a short visual explanation. Keep it concrete and avoid technical jargon.",
+  },
+  {
+    step: "Email 4",
+    replyStep: "Step #5",
+    replyRows: 29,
+    bestSubjects: ["Re: deactivating branded ads", "lower branded cpc"],
+    repliedTemplates: [
+      "Email 4A - more context with image",
+      "Email 4 - Auto Lower CPC on Branded Ads",
+    ],
+    role:
+      "Vary the angle: lower CPC, keep top position, or reduce coverage only when competitors are absent.",
+  },
+  {
+    step: "Close loop",
+    replyStep: "Step #6",
+    replyRows: 21,
+    bestSubjects: ["Re: Primelis - Intro", "Re: deactivating branded ads"],
+    repliedTemplates: ["Last email", "keep ads up 4A Steve"],
+    role:
+      "Close politely. The last email still produced replies, so it should not sound like a throwaway.",
+  },
+] as const;
+
 export const teamProspectReplyEvidence = {
   source: "Team prospect export, July 15 2026",
   scope:
@@ -588,6 +646,59 @@ export const winningMessages = [
       "Hi {{firstName}},\n\nI had {{company}} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nThe question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.\n\nWorth comparing how you decide this today?",
     whyItWorks:
       "It uses a specific business tension instead of category labels, seniority labels, or internal ICP language.",
+  },
+  {
+    title: "Email 2 - context follow-up",
+    useWhen:
+      "Reply-backed Step 3 pattern. Use when the first email did not get an answer and you need to add context, not repeat the opener.",
+    channel: "Email",
+    subject: "Re: {{company}} paid brand question",
+    message:
+      "Hi {{firstName}},\n\nThe reason I ask is that branded campaigns can look efficient in reports even when some paid clicks may not be changing the outcome.\n\nThe practical check is simple: when no competitors are bidding, does paid coverage still protect demand, or would organic have captured most of it anyway?\n\nSignal helps teams make that decision with search-page visibility, organic coverage, and bid control in one place.\n\nWorth comparing how you handle this today?",
+    whyItWorks:
+      "The CSV shows Step 3 generated strong replies from context follow-ups. This version adds a clear reason without repeating the first touch.",
+  },
+  {
+    title: "Email 3 - proof or method",
+    useWhen:
+      "Reply-backed Step 4 pattern. Use when the buyer needs to understand the method before taking a meeting.",
+    channel: "Email",
+    subject: "Re: brand search at {{company}}",
+    message:
+      "Hi {{firstName}},\n\nA useful way to look at this is not paid versus organic in theory, but what is happening on the search page at the moment of the search.\n\nIf competitors are present, paid coverage may be protecting demand. If they are absent, the question becomes whether the paid click is still adding value.\n\nThat is the decision Signal is built to make easier.\n\nOpen to a quick compare?",
+    whyItWorks:
+      "The reply export shows video and methodology templates still created replies. This keeps the method plain and buyer-friendly.",
+  },
+  {
+    title: "Email 4 - lower CPC angle",
+    useWhen:
+      "Reply-backed Step 5 pattern. Use with paid-search owners when the angle is not only pausing ads, but lowering bids intelligently.",
+    channel: "Email",
+    subject: "Re: lower branded CPC",
+    message:
+      "Hi {{firstName}},\n\nOne other angle: this is not always about turning brand ads off.\n\nIn some cases the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.\n\nThat is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.\n\nIs this something your team already checks regularly?",
+    whyItWorks:
+      "The data shows later-step replies from lower-CPC and more-context templates. This gives the sequence a new angle instead of another version of the same email.",
+  },
+  {
+    title: "Email close loop - still useful",
+    useWhen:
+      "Reply-backed Step 6 pattern. Use as the last note because the exports show late-step replies were meaningful.",
+    channel: "Email",
+    subject: "Closing the loop",
+    message:
+      "Hi {{firstName}},\n\nI will close the loop after this note.\n\nIf branded-search efficiency becomes a priority later, the useful starting point is straightforward: where is paid coverage protecting demand, and where is it only adding cost?\n\nIf this is not relevant right now, no problem at all.",
+    whyItWorks:
+      "The reply export shows Step 6 and last-email templates still produced replies. The close should be polite, specific, and easy to ignore without pressure.",
+  },
+  {
+    title: "LinkedIn connection request",
+    useWhen: "Send as the connection request before pitching. Keep it shorter than a normal LinkedIn message.",
+    channel: "LinkedIn",
+    message:
+      "Hi {{firstName}}, quick question on {{company}} brand search. Curious how your team decides when paid brand coverage is still needed versus when organic already does enough.",
+    whyItWorks:
+      "It asks a relevant operational question before pitching and gives the buyer a clear reason to accept.",
   },
   {
     title: "Deck request reply",

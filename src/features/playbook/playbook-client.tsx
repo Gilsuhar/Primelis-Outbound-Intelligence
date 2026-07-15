@@ -24,6 +24,7 @@ import {
   evidenceDescriptions,
   outreachReplyEvidence,
   qualificationChecklist,
+  replyBackedSequenceSteps,
   teamProspectReplyEvidence,
   winningMessageGroups,
   winningMessages,
@@ -210,6 +211,10 @@ function messageStepLabel(title: string, libraryId: WinningLibraryId) {
   if (libraryId === "email") {
     if (lowerTitle.includes("subject")) return "Subject";
     if (lowerTitle.includes("first touch")) return "Email 1";
+    if (lowerTitle.includes("email 2")) return "Email 2";
+    if (lowerTitle.includes("email 3")) return "Email 3";
+    if (lowerTitle.includes("email 4")) return "Email 4";
+    if (lowerTitle.includes("close loop")) return "Close";
     if (lowerTitle.includes("optimize")) return "Email 2";
     if (lowerTitle.includes("incrementality")) return "Email 3";
     if (lowerTitle.includes("close")) return "Close";
@@ -217,6 +222,7 @@ function messageStepLabel(title: string, libraryId: WinningLibraryId) {
   }
 
   if (libraryId === "linkedin") {
+    if (lowerTitle.includes("connection request")) return "Connection request";
     if (lowerTitle.includes("comment")) return "Comment follow-up";
     if (lowerTitle.includes("first touch")) return "Connection request";
     if (lowerTitle.includes("ultra short")) return "After connect 1";
@@ -557,6 +563,76 @@ export function PlaybookClient({
               <span className="mt-2 block text-sm leading-5">{library.subtitle}</span>
             </button>
           ))}
+        </div>
+
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Reply-backed sequence
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-ink">
+                Build sequences from the steps that actually got replies
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                The CSV exports include subjects, replied templates, and replied steps. They do not
+                include full sent bodies, so use this as the proven order and angle map.
+              </p>
+            </div>
+            <WarningLabel text={`${outreachReplyEvidence.relatedReplyRows} reply rows`} />
+          </div>
+          <div className="mt-5 grid gap-3">
+            {replyBackedSequenceSteps.map((step) => (
+              <details className="rounded-xl border border-line bg-cream" key={step.step}>
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
+                  <span>
+                    <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
+                      {step.step} · {step.replyRows} replies
+                    </span>
+                    <span className="mt-2 block text-base font-semibold text-ink">
+                      {step.role}
+                    </span>
+                    <span className="mt-1 block text-sm text-[#6f6d5f]">
+                      Outreach reply source: {step.replyStep}
+                    </span>
+                  </span>
+                  <ChevronDown aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-[#6f6d5f]" />
+                </summary>
+                <div className="grid gap-3 border-t border-line p-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Subjects that got replies
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {step.bestSubjects.map((subject) => (
+                        <span
+                          className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                          key={subject}
+                        >
+                          {subject}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Replied template names
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {step.repliedTemplates.map((template) => (
+                        <span
+                          className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                          key={template}
+                        >
+                          {template}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            ))}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-line bg-white p-5">
