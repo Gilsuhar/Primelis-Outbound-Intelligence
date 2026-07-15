@@ -48,7 +48,10 @@ describe("Signal Playbook content", () => {
   });
 
   it("includes a compact winning messages library", () => {
-    expect(winningMessages.length).toBeGreaterThanOrEqual(5);
+    expect(winningMessages.length).toBeGreaterThanOrEqual(10);
+    expect(winningMessages.map((message) => message.title)).toContain(
+      "After connect - quick chat",
+    );
     expect(winningMessages.map((message) => message.title)).toContain("Deck request reply");
     expect(
       winningMessages.some((message) =>

@@ -254,6 +254,51 @@ export const practiceScenarios: PracticeScenario[] = [
 
 export const winningMessages = [
   {
+    title: "After connect - brand question with proof",
+    useWhen: "After a LinkedIn connection when you want a stronger message with light proof.",
+    channel: "LinkedIn",
+    message:
+      "Thanks for connecting, {{firstName}}! How are you currently handling branded search at {{company}} when no competitors are bidding?\n\nWe built a tool that automatically pauses those ads or lowers bids to the minimum needed to stay at the top.\n\nThis approach has helped teams reduce branded search costs while maintaining performance.\n\nHow are you currently monitoring these patterns in real time?",
+    whyItWorks:
+      "It starts with a direct buyer question, explains the mechanism simply, and ends with a practical monitoring question.",
+  },
+  {
+    title: "After connect - quick chat",
+    useWhen: "After a LinkedIn connection when you want the shortest direct version.",
+    channel: "LinkedIn",
+    message:
+      "Hi {{firstName}} - thanks for connecting. How do you handle branded ads at {{company}} when no competitors are bidding on your brand?\n\nWe built a tool that scans Google and Bing search results in real time. When no competitors are present, it auto-pauses branded ads or lowers bids to the minimum needed to maintain the top position.\n\nWorth a quick chat?",
+    whyItWorks:
+      "It is direct, easy to understand, and asks for a small next step without over-explaining.",
+  },
+  {
+    title: "After connect - organic click angle",
+    useWhen: "After a LinkedIn connection when the strongest hook is wasted paid brand clicks.",
+    channel: "LinkedIn",
+    message:
+      "Thanks for connecting, {{firstName}}! We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nAlternatively, the CPC algorithm lowers the bid to the minimum needed for branded ads to appear at the top of Google searches.\n\nDo you already have a way to do that?",
+    whyItWorks:
+      "It makes the value concrete: get the organic click when paid coverage is not needed.",
+  },
+  {
+    title: "After connect - ultra short",
+    useWhen: "After a LinkedIn connection when you want one clean idea and one question.",
+    channel: "LinkedIn",
+    message:
+      "Thanks for connecting, {{firstName}}. We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nDo you already have a way to do that?",
+    whyItWorks:
+      "It is extremely short and keeps the buyer focused on one decision.",
+  },
+  {
+    title: "After connect - paid strategy angle",
+    useWhen: "After a LinkedIn connection with a paid search or performance stakeholder.",
+    channel: "LinkedIn",
+    message:
+      "{{firstName}}, noticed you are involved with paid strategy at {{company}}. Quick question: how do you handle branded ads when no one is bidding on your brand?\n\nWe built a tool that pauses them when there is no competition or adjusts bids to the lowest level needed to stay on top, without overspending.\n\nWorth a quick chat?",
+    whyItWorks:
+      "It anchors to the person's likely responsibility and keeps the product explanation simple.",
+  },
+  {
     title: "LinkedIn first touch",
     useWhen: "You want a short opener before asking for a meeting.",
     channel: "LinkedIn",
