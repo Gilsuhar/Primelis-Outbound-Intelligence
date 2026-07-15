@@ -183,12 +183,83 @@ const caseStudyPreviews = [
     imageSrc: "/case-studies/apollo-signal-case-study.png",
     imageAlt: "Apollo.io Signal case study preview",
   },
+  {
+    match: "crocs",
+    imageSrc: "/case-studies/crocs-signal-case-study.png",
+    imageAlt: "Crocs Signal case study preview",
+  },
+  {
+    match: "zoominfo",
+    imageSrc: "/case-studies/zoominfo-signal-case-study.png",
+    imageAlt: "ZoomInfo Signal case study preview",
+  },
+  {
+    match: "polène",
+    imageSrc: "/case-studies/polene-signal-case-study.png",
+    imageAlt: "Polene Signal case study preview",
+  },
+  {
+    match: "polene",
+    imageSrc: "/case-studies/polene-signal-case-study.png",
+    imageAlt: "Polene Signal case study preview",
+  },
+  {
+    match: "tag heuer",
+    imageSrc: "/case-studies/tag-heuer-signal-case-study.png",
+    imageAlt: "TAG Heuer Signal case study preview",
+  },
+  {
+    match: "chloé",
+    imageSrc: "/case-studies/chloe-signal-case-study.png",
+    imageAlt: "Chloe Signal case study preview",
+  },
+  {
+    match: "chloe",
+    imageSrc: "/case-studies/chloe-signal-case-study.png",
+    imageAlt: "Chloe Signal case study preview",
+  },
+  {
+    match: "copa",
+    imageSrc: "/case-studies/copa-airlines-signal-case-study.png",
+    imageAlt: "Copa Airlines Signal performance report preview",
+  },
 ] as const;
 
 function findCaseStudyPreview(title: string) {
   const normalizedTitle = title.toLowerCase();
   return caseStudyPreviews.find((preview) => normalizedTitle.includes(preview.match));
 }
+
+const supplementalCaseStudies = [
+  {
+    match: "apollo",
+    title: "Apollo.io reduces blended CPC while increasing conversion rate",
+    imageSrc: "/case-studies/apollo-signal-case-study.png",
+    imageAlt: "Apollo.io Signal case study preview",
+    industry: "SaaS",
+    metrics: [
+      ["Blended CPC", "-43% North America data"],
+      ["Cumulative savings", "$1M+"],
+      ["Conversion rate", "+14% aggregated across all markets"],
+    ],
+    source: "Case Study Signal AppsFlyer / Apollo.io PDF",
+    persona: "Paid Acquisition, Paid Search, Performance Marketing",
+  },
+  {
+    match: "copa",
+    title: "Copa Airlines decreases blended CPC while flight purchases increase",
+    imageSrc: "/case-studies/copa-airlines-signal-case-study.png",
+    imageAlt: "Copa Airlines Signal performance report preview",
+    industry: "Airlines and Travel",
+    metrics: [
+      ["Blended CPC", "-75% from $0.20 to $0.05"],
+      ["Blended CTR", "Stable at 75.4% since activation"],
+      ["Flight purchases", "+15% vs February and +22% vs March 2024"],
+    ],
+    source: "Copa Airlines Cross-Brand Performance Report 04/03/2025",
+    persona: "Paid Search, Performance Marketing, Travel growth teams",
+  },
+] as const;
 
 type WinningLibraryId = "email" | "linkedin" | "reply";
 
@@ -321,8 +392,9 @@ export function PlaybookClient({
     return messageStepLabel(message.title, activeWinningLibrary) === activeWinningStep;
   });
   const winningStepLabels = ["All", ...(activeWinningLibraryConfig?.stepLabels ?? [])];
-  const hasApolloCaseStudy = data.caseStudies.some((record) =>
-    record.title.toLowerCase().includes("apollo"),
+  const missingSupplementalCaseStudies = supplementalCaseStudies.filter(
+    (caseStudy) =>
+      !data.caseStudies.some((record) => record.title.toLowerCase().includes(caseStudy.match)),
   );
 
   function selectWinningLibrary(libraryId: WinningLibraryId) {
@@ -1125,37 +1197,34 @@ export function PlaybookClient({
                   </details>
                 );
               })}
-              {!hasApolloCaseStudy ? (
-                <details className="overflow-hidden rounded-2xl border border-line bg-white">
+              {missingSupplementalCaseStudies.map((caseStudy) => (
+                <details
+                  className="overflow-hidden rounded-2xl border border-line bg-white"
+                  key={caseStudy.match}
+                >
                   <Image
-                    alt="Apollo.io Signal case study preview"
+                    alt={caseStudy.imageAlt}
                     className="aspect-[16/9] w-full border-b border-line object-cover object-top"
                     height={800}
-                    src="/case-studies/apollo-signal-case-study.png"
+                    src={caseStudy.imageSrc}
                     width={1400}
                   />
                   <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-5">
-                    <h3 className="text-lg font-semibold text-ink">
-                      Apollo.io reduces blended CPC while increasing conversion rate
-                    </h3>
+                    <h3 className="text-lg font-semibold text-ink">{caseStudy.title}</h3>
                     <WarningLabel text="Internal use only" />
                   </summary>
                   <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
-                    <p>SaaS</p>
-                    <p>
-                      <strong>Blended CPC:</strong> -43% North America data
-                    </p>
-                    <p>
-                      <strong>Cumulative savings:</strong> $1M+
-                    </p>
-                    <p>
-                      <strong>Conversion rate:</strong> +14% aggregated across all markets
-                    </p>
-                    <p>Source: Case Study Signal AppsFlyer / Apollo.io PDF</p>
-                    <p>Best-fit persona: Paid Acquisition, Paid Search, Performance Marketing</p>
+                    <p>{caseStudy.industry}</p>
+                    {caseStudy.metrics.map(([label, value]) => (
+                      <p key={label}>
+                        <strong>{label}:</strong> {value}
+                      </p>
+                    ))}
+                    <p>Source: {caseStudy.source}</p>
+                    <p>Best-fit persona: {caseStudy.persona}</p>
                   </div>
                 </details>
-              ) : null}
+              ))}
             </>
           ) : (
             <SignalCard
