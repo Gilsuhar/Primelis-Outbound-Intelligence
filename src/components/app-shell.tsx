@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut, Menu, ShieldCheck } from "lucide-react";
 
 import type { UserRole } from "@/features/knowledge/types";
 import { signOutAction } from "@/app/auth/actions";
@@ -120,7 +120,32 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="mx-auto mt-4 max-w-6xl space-y-6 lg:mt-8">
+        <details className="mx-auto mt-3 max-w-6xl rounded-2xl border border-line bg-white p-2 shadow-soft lg:hidden [&>summary::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
+            <span className="inline-flex items-center gap-2">
+              <Menu aria-hidden="true" className="h-4 w-4 text-olive" />
+              Menu
+            </span>
+            <span className="text-xs font-medium text-[#6f6d5f]">Open tools</span>
+          </summary>
+          <div className="mt-2 space-y-5 border-t border-line pt-4">
+            <NavigationSection
+              label={translateUi("nav.sales", language)}
+              items={navigation.sales}
+              language={language}
+            />
+            {navigation.admin.length > 0 ? (
+              <NavigationSection
+                label={translateUi("nav.admin", language)}
+                items={navigation.admin}
+                language={language}
+                muted
+              />
+            ) : null}
+          </div>
+        </details>
+
+        <div className="mx-auto mt-4 hidden max-w-6xl space-y-6 lg:mt-8 lg:block">
           <NavigationSection
             label={translateUi("nav.sales", language)}
             items={navigation.sales}

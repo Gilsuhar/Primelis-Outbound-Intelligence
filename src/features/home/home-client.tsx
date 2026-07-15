@@ -115,15 +115,14 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
 
       <section
         aria-label="Mobile workspace"
-        className="grid grid-cols-[clamp(4.75rem,23vw,6rem)_minmax(0,1fr)] items-start gap-2.5 overflow-x-hidden sm:gap-3 lg:hidden"
+        className="space-y-3 overflow-x-hidden lg:hidden"
       >
         <div
           aria-label="Workspace tools"
-          className="sticky top-[calc(env(safe-area-inset-top)+0.75rem)] self-start rounded-2xl border border-line bg-white p-1.5 shadow-soft"
+          className="rounded-2xl border border-line bg-white p-1.5 shadow-soft"
           role="tablist"
         >
-          <div className="relative">
-            <div className="max-h-[23rem] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin] sm:max-h-[28rem]">
+          <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none]">
             {mobileWorkspaceActions.map((action) => {
               const Icon = action.icon;
               const isActive = action.href === activeMobileHref;
@@ -134,7 +133,7 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
                   aria-current={isActive ? "page" : undefined}
                   aria-selected={isActive}
                   className={[
-                    "flex min-h-[68px] w-full flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-[12px] font-semibold leading-[1.15] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive sm:text-[13px]",
+                    "flex min-h-[62px] min-w-[76px] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-center text-[12px] font-semibold leading-[1.15] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive sm:min-w-[92px] sm:text-[13px]",
                     isActive
                       ? "bg-lime text-ink shadow-soft ring-1 ring-[#d8ec42]"
                       : "bg-transparent text-[#6f6d5f] hover:bg-cream hover:text-ink",
@@ -152,31 +151,26 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
                 </button>
               );
             })}
-            </div>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-white to-white/0"
-            />
           </div>
         </div>
 
         <article
           aria-labelledby={`mobile-tab-${activeMobileAction.href.replaceAll("/", "-") || "home"}`}
-          className="h-auto min-h-0 min-w-0 self-start rounded-2xl border border-line bg-cream p-3.5 shadow-soft sm:p-4"
+          className="h-auto min-h-0 min-w-0 rounded-2xl border border-line bg-cream p-4 shadow-soft"
           id="mobile-workspace-panel"
           role="tabpanel"
         >
-          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-lime text-ink sm:h-11 sm:w-11">
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-lime text-ink">
             <ActiveMobileIcon aria-hidden="true" className="h-5 w-5" />
           </span>
-          <h2 className="text-lg font-semibold leading-tight text-ink sm:text-xl">
+          <h2 className="text-xl font-semibold leading-tight text-ink">
             {translateUi(activeMobileAction.titleKey, language)}
           </h2>
-          <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#6f6d5f] sm:text-sm sm:leading-6">
+          <p className="mt-2 line-clamp-2 max-w-md text-sm leading-6 text-[#6f6d5f]">
             {translateUi(activeMobileAction.descriptionKey, language)}
           </p>
           <Link
-            className="mt-4 inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-full bg-signal px-3.5 py-2 text-[13px] font-semibold text-white shadow-soft transition hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive sm:px-4 sm:text-sm"
+            className="mt-4 inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
             href={activeMobileAction.href}
           >
             {translateUi("home.openTool", language)}
