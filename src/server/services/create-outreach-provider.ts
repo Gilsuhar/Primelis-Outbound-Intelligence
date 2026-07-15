@@ -61,9 +61,36 @@ function cleanSelection(value?: string) {
     .trim();
 }
 
+function companyForCopy(company: string) {
+  const cleaned = company.trim();
+  if (!cleaned) {
+    return "this account";
+  }
+  const knownBrands: Record<string, string> = {
+    adidas: "Adidas",
+    apollo: "Apollo",
+    databricks: "Databricks",
+    dynatrace: "Dynatrace",
+    nike: "Nike",
+    semrush: "Semrush",
+    stripe: "Stripe",
+  };
+  const normalized = cleaned.toLowerCase();
+  if (knownBrands[normalized]) {
+    return knownBrands[normalized];
+  }
+  if (cleaned === cleaned.toLowerCase()) {
+    return cleaned
+      .split(/\s+/)
+      .map((part) => (part ? `${part[0].toUpperCase()}${part.slice(1)}` : part))
+      .join(" ");
+  }
+  return cleaned;
+}
+
 function triggerPhrase(input: CreateOutreachInput) {
   const trigger = cleanSelection(input.observedTrigger);
-  const company = input.companyName;
+  const company = companyForCopy(input.companyName);
 
   if (!trigger) {
     return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
@@ -72,7 +99,7 @@ function triggerPhrase(input: CreateOutreachInput) {
     return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a paid-brand question at ${company}: what happens when competitors are not bidding?`;
+    return `I noticed a paid-brand question at ${company}: what happens when nobody else is bidding?`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
     return `I thought there may be a paid-brand efficiency question worth checking at ${company}.`;
@@ -87,17 +114,24 @@ function triggerPhrase(input: CreateOutreachInput) {
 }
 
 function ctaFor(input: CreateOutreachInput) {
+  const company = companyForCopy(input.companyName);
   if (input.channel === "LINKEDIN") {
     return "Do you already have a way to do that?";
   }
   if (input.desiredTone === "DIRECT") {
-    return "Do you already have a way to do that?";
+    return "Do you already track this today?";
   }
-  return "Worth comparing how you handle this today?";
+  if (input.desiredTone === "WARM") {
+    return `Is this something your team looks at today?`;
+  }
+  if (input.desiredTone === "EXECUTIVE") {
+    return `Is reducing wasted branded spend on the radar at ${company}?`;
+  }
+  return `Curious how you currently evaluate this at ${company}?`;
 }
 
 function subjectLinesFor(input: CreateOutreachInput) {
-  const company = input.companyName;
+  const company = companyForCopy(input.companyName);
   const role = input.contactRole.toLowerCase();
   if (/growth|acquisition/i.test(role)) {
     return [
@@ -121,7 +155,7 @@ function subjectLinesFor(input: CreateOutreachInput) {
 }
 
 function connectionRequestFor(input: CreateOutreachInput) {
-  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${companyForCopy(input.companyName)}. Open to connecting?`;
 }
 
 function fitSignalForEmail(value?: string) {
@@ -152,16 +186,17 @@ function contextDetails(input: CreateOutreachInput) {
 }
 
 function contextLine(input: CreateOutreachInput) {
+  const company = companyForCopy(input.companyName);
   const details = contextDetails(input);
   if (details.length === 0) {
-    return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
+    return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
   }
 
   if (details.some((detail) => /brand demand|paid-search|brand-search|spend/i.test(String(detail)))) {
-    return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
+    return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
   }
 
-  return `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`;
+  return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
@@ -172,24 +207,24 @@ function personaLine(input: CreateOutreachInput) {
     ? " At that scale, small changes in paid brand coverage can affect budget and reporting."
     : "";
   if (/cmo|chief/i.test(role)) {
-    return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
+    return `The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.${scaleHint}`;
   }
   if (/growth|acquisition/i.test(role)) {
-    return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
+    return `The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.${scaleHint}`;
   }
   if (/paid search|sem|performance/i.test(role)) {
-    return `The practical question is not whether branded ads are useful. It is knowing when to keep them live, when to lower bids, and when organic can do the work.${scaleHint}`;
+    return `The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.${scaleHint}`;
   }
-  return `The tricky part is that branded campaigns can look efficient in reports because the buyer already wanted the brand, even when organic would have captured the click anyway.${scaleHint}`;
+  return `The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.${scaleHint}`;
 }
 
 function humanizeProductFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal can automatically pause or lower branded ads when paid coverage is not changing the outcome, then bring coverage back when competition returns.";
+    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
   }
 
   if (/paid.*organic|organic.*paid|serp|competitive/i.test(fact)) {
-    return "Signal watches paid coverage, organic presence, and competitor activity so the team can decide when to pause, lower bids, or protect the top position.";
+    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
   }
 
   return fact;
@@ -228,7 +263,7 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const roleLine = personaLine(input);
     const factLine =
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
-        ? "Signal helps teams compare branded ads with organic results and competitor activity before deciding whether to keep, lower, or pause paid coverage."
+        ? "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced."
         : humanizeProductFact(primaryFact);
     const proofLine = caseStudyLine(records);
     const emailSections = [

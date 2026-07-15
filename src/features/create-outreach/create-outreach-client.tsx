@@ -116,23 +116,23 @@ function sectionVariants(section: OutreachEmailSection, result: CreateOutreachRe
   if (section.label === "PAIN POINT") {
     return [
       section.text,
-      `The practical risk is paying for clicks the brand may already win organically, especially when competitor pressure changes by market.`,
-      `The useful question is simple: where does paid brand search protect revenue, and where is it just adding cost?`,
+      "The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.",
+      "The practical risk is keeping branded coverage live because the reports look efficient, even when some of those clicks may not need to be paid for.",
     ];
   }
 
   if (section.label === "SOLUTION") {
     return [
       section.text,
-      "Signal compares paid brand ads with organic results and competitor activity, so the team can decide where to keep coverage and where to reduce wasted spend.",
-      "Signal helps the team check whether paid brand search is really adding value before changing coverage or spend.",
+      "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.",
+      "Signal helps teams see when branded ads are still protecting demand and when organic visibility or lower bids can cover the same intent.",
     ];
   }
 
   return [
     section.text,
-    "Worth a quick look at how you make that decision today?",
-    "Open to comparing notes on your current brand-search approach?",
+    "Curious how you currently evaluate this?",
+    "Curious how your team decides when branded bids can safely come down?",
   ];
 }
 
@@ -141,16 +141,22 @@ function OptionalSelect({
   label,
   options,
   required = false,
+  value,
+  onChange,
 }: {
   name: string;
   label: string;
   options: string[];
   required?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
-  const [value, setValue] = useState("");
+  const [internalValue, setInternalValue] = useState("");
   const [custom, setCustom] = useState("");
   const outputLanguage = useOutputLanguage();
-  const isCustom = value === "__custom";
+  const selectedValue = value ?? internalValue;
+  const setSelectedValue = onChange ?? setInternalValue;
+  const isCustom = selectedValue === "__custom";
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
   return (
@@ -158,8 +164,8 @@ function OptionalSelect({
       {label}
       <select
         className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-        onChange={(event) => setValue(event.target.value)}
-        value={value}
+        onChange={(event) => setSelectedValue(event.target.value)}
+        value={selectedValue}
       >
         <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
@@ -177,7 +183,7 @@ function OptionalSelect({
           value={custom}
         />
       ) : null}
-      <input name={name} required={required} type="hidden" value={isCustom ? custom : value} />
+      <input name={name} required={required} type="hidden" value={isCustom ? custom : selectedValue} />
     </label>
   );
 }
@@ -214,6 +220,16 @@ export function CreateOutreachClient() {
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
+  const [contactFirstName, setContactFirstName] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [companyContext, setCompanyContext] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [observedTrigger, setObservedTrigger] = useState("");
+  const [geographyOrMarkets, setGeographyOrMarkets] = useState("");
+  const [currentVendor, setCurrentVendor] = useState("");
+  const [paidSearchContext, setPaidSearchContext] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const [useCaseStudy, setUseCaseStudy] = useState(false);
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
   const [messageType, setMessageType] = useState<OutreachMessageType>("FIRST_TOUCH");
   const [tone, setTone] = useState<OutreachTone>("CONSULTATIVE");
@@ -348,16 +364,43 @@ export function CreateOutreachClient() {
               onChange={setCompanyWebsite}
               value={companyWebsite}
             />
-            <TextField label={t("workflow.firstNameOptional")} name="contactFirstName" />
+            <TextField
+              label={t("workflow.firstNameOptional")}
+              name="contactFirstName"
+              onChange={setContactFirstName}
+              value={contactFirstName}
+            />
             <OptionalSelect
               label={t("workflow.buyerRole")}
               name="contactRole"
+              onChange={setContactRole}
               options={personas.map((persona) => persona.name)}
               required
+              value={contactRole}
             />
-            <OptionalSelect label={t("workflow.fitIcp")} name="companyContext" options={companySizeOptions} required />
-            <OptionalSelect label={t("workflow.industry")} name="industry" options={industries.map((industry) => industry.name)} />
-            <OptionalSelect label={t("workflow.reasonForOutreach")} name="observedTrigger" options={triggerOptions} required />
+            <OptionalSelect
+              label={t("workflow.fitIcp")}
+              name="companyContext"
+              onChange={setCompanyContext}
+              options={companySizeOptions}
+              required
+              value={companyContext}
+            />
+            <OptionalSelect
+              label={t("workflow.industry")}
+              name="industry"
+              onChange={setIndustry}
+              options={industries.map((industry) => industry.name)}
+              value={industry}
+            />
+            <OptionalSelect
+              label={t("workflow.reasonForOutreach")}
+              name="observedTrigger"
+              onChange={setObservedTrigger}
+              options={triggerOptions}
+              required
+              value={observedTrigger}
+            />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               {t("workflow.tone")}
               <select
@@ -389,7 +432,9 @@ export function CreateOutreachClient() {
             <label className="flex items-center gap-2 rounded-md border border-line bg-[#f8f5ef] px-3 py-2 text-sm font-medium text-stone-700 sm:col-span-2">
               <input
                 className="h-4 w-4 rounded border-line text-signal"
+                checked={useCaseStudy}
                 name="useCaseStudy"
+                onChange={(event) => setUseCaseStudy(event.target.checked)}
                 type="checkbox"
               />
               {t("workflow.useCaseStudy")}
@@ -401,9 +446,27 @@ export function CreateOutreachClient() {
               {t("workflow.advancedOptionalDetails")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <OptionalSelect label={t("workflow.market")} name="geographyOrMarkets" options={marketOptions} />
-              <OptionalSelect label={t("workflow.currentVendor")} name="currentVendor" options={vendorOptions} />
-              <OptionalSelect label={t("workflow.paidSearchContext")} name="paidSearchContext" options={paidSearchOptions} />
+              <OptionalSelect
+                label={t("workflow.market")}
+                name="geographyOrMarkets"
+                onChange={setGeographyOrMarkets}
+                options={marketOptions}
+                value={geographyOrMarkets}
+              />
+              <OptionalSelect
+                label={t("workflow.currentVendor")}
+                name="currentVendor"
+                onChange={setCurrentVendor}
+                options={vendorOptions}
+                value={currentVendor}
+              />
+              <OptionalSelect
+                label={t("workflow.paidSearchContext")}
+                name="paidSearchContext"
+                onChange={setPaidSearchContext}
+                options={paidSearchOptions}
+                value={paidSearchContext}
+              />
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
                 {t("workflow.channel")}
                 <select
@@ -432,6 +495,8 @@ export function CreateOutreachClient() {
                 <textarea
                   className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm"
                   name="internalNotes"
+                  onChange={(event) => setInternalNotes(event.target.value)}
+                  value={internalNotes}
                 />
               </label>
             </div>

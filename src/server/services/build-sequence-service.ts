@@ -249,7 +249,7 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
   }
   if (input.currentVendor) {
     limitations.add(
-      "Named vendor context is user-provided; no unsupported competitor claims were used.",
+      "Named vendor context is user-provided; no unsupported vendor claims were used.",
     );
   }
   if (!records.some((record) => record.type === "CASE_STUDY")) {
@@ -272,13 +272,13 @@ function safetyNotes(input: BuildSequenceInput, records: SequenceKnowledgeRecord
     .filter(Boolean)
     .join(" ");
   if (containsCompetitorClaim(combined)) {
-    notes.add("Competitor-specific claims were excluded unless approved and source-backed.");
+    notes.add("Vendor-specific claims were excluded unless approved and source-backed.");
   }
   if (containsCommercialTerms(combined)) {
     notes.add("Pricing, POC, trial, discount, and commercial-offer language was blocked.");
   }
   if (records.every((record) => record.type !== "OBJECTION")) {
-    notes.add("Competitor objection records were not used.");
+    notes.add("Vendor objection records were not used.");
   }
   return Array.from(notes);
 }

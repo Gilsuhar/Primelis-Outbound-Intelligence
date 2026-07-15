@@ -74,17 +74,17 @@ function ctaForPurpose(
       return "Open to connecting?";
     }
     return purpose === "METHODOLOGY_DIFFERENTIATION"
-      ? "Worth pressure-testing the approach?"
-      : "Worth comparing notes?";
+      ? "Do you already track this?"
+      : "Is this on your radar?";
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you already have a way to do that?",
-    PROBLEM_FRAMING: "Do you have visibility into when this happens?",
-    METHODOLOGY_DIFFERENTIATION: "Worth a quick look at how you manage this today?",
+    FIRST_TOUCH_RELEVANCE: "Do you already track this today?",
+    PROBLEM_FRAMING: "Is this something your team checks regularly?",
+    METHODOLOGY_DIFFERENTIATION: "Would that be useful to see?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Want the short version of how another team approached this?",
     TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
-    LOW_PRESSURE_FOLLOW_UP: "Worth revisiting later if this is on the roadmap?",
+    LOW_PRESSURE_FOLLOW_UP: "Should I leave this for later?",
     BREAKUP_CLOSE_LOOP: "If this is not relevant, I can close the loop here.",
   };
   return ctas[purpose];
@@ -109,29 +109,12 @@ function connectionRequestFor(input: BuildSequenceInput) {
   return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${input.companyName}. Open to connecting?`;
 }
 
-function roleFriendlyPhrase(input: BuildSequenceInput) {
-  const role = input.contactRole.toLowerCase();
-  if (/paid search|sem|ppc/.test(role)) {
-    return "for a paid-search team";
-  }
-  if (/performance|growth|acquisition/.test(role)) {
-    return "for a performance team";
-  }
-  if (/cmo|chief|vp marketing/.test(role)) {
-    return "for a marketing leader";
-  }
-  if (/e-?commerce|digital/.test(role)) {
-    return "for an e-commerce team";
-  }
-  return "for the team owning brand search";
-}
-
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
-    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
+    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
   }
   if (/paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(fact)) {
-    return "Signal helps compare paid coverage with organic results and search-page changes, so the team can decide where brand spend is still useful and where it may be waste.";
+    return "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely be reduced.";
   }
   return fact;
 }
@@ -155,26 +138,25 @@ function bodyForPurpose({
   secondaryFact: string;
 }) {
   const trigger = input.observedTrigger.trim();
-  const rolePhrase = roleFriendlyPhrase(input);
   const simpleSecondaryFact = humanizeFact(secondaryFact);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Quick question on ${input.companyName}: how do you handle branded ads when nobody else is bidding on your brand?`,
-      "Signal can automatically pause or lower those ads when paid coverage is not changing the outcome, then bring coverage back when competition returns.",
+      `I had ${input.companyName} on my list because branded search can look healthy in reports even when some paid clicks are not changing the outcome.`,
+      "The question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The tricky part is that brand campaigns can look strong in reports because the person already wanted the brand, even when some clicks would have happened through organic anyway.",
-      `That makes the real decision ${rolePhrase}: where paid coverage is protecting demand, and where it is just adding cost.`,
+      "The part that is easy to miss is quiet branded terms where nobody else is bidding.",
+      "Reports can still show efficient conversions, but the spend may be buying demand you already own.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "The simple approach is to watch the search page, not only the campaign report.",
-      "When nobody is bidding, reduce or pause. When competitors appear, keep the top position but lower the bid to the minimum needed.",
+      "A useful way to look at this is not paid or organic in theory, but what is happening on the search page at the moment of the search.",
+      "If other advertisers are present, paid coverage may be protecting demand. If they are absent, the question becomes whether the paid click is still adding value.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -192,7 +174,7 @@ function bodyForPurpose({
     TECHNICAL_CLARIFICATION: [
       greeting(input),
       "",
-      "The methodology question is straightforward: before lowering or pausing anything, compare paid ads with organic results and search-page conditions.",
+      "The methodology question is straightforward: before lowering or pausing anything, check paid ads, organic results, and search-page conditions together.",
       "That keeps the conversation away from generic cost-cutting and focused on where paid coverage is actually needed.",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
