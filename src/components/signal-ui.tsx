@@ -22,15 +22,15 @@ export function SignalHero({
     <section
       className={[
         "overflow-hidden rounded-[20px] border border-line bg-gradient-to-br from-[#F1F3C8] via-[#E2E8A8] to-[#C8D189] shadow-signal",
-        compactOnMobile ? "p-4 sm:p-8" : "p-6 sm:p-8",
+        compactOnMobile ? "p-3.5 sm:p-8" : "p-6 sm:p-8",
       ].join(" ")}
     >
-      <div className={["max-w-3xl", compactOnMobile ? "space-y-3 sm:space-y-4" : "space-y-4"].join(" ")}>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4f6624]">{eyebrow}</p>
+      <div className={["max-w-3xl", compactOnMobile ? "space-y-2.5 sm:space-y-4" : "space-y-4"].join(" ")}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4f6624] sm:text-xs sm:tracking-[0.2em]">{eyebrow}</p>
         <h1
           className={[
-            "overflow-visible pb-2 font-display font-semibold leading-[1.16] text-ink sm:pb-3 sm:leading-[1.22]",
-            compactOnMobile ? "text-3xl sm:text-5xl" : "text-4xl sm:text-5xl",
+            "overflow-visible pb-1 font-display font-semibold leading-[1.1] text-ink sm:pb-3 sm:leading-[1.22]",
+            compactOnMobile ? "text-[1.95rem] sm:text-5xl" : "text-4xl sm:text-5xl",
           ].join(" ")}
         >
           {title}
@@ -38,13 +38,19 @@ export function SignalHero({
         <p
           className={[
             "max-w-2xl text-[#34352e]",
-            compactOnMobile ? "text-sm leading-6 sm:text-base sm:leading-7" : "text-base leading-7",
+            compactOnMobile ? "text-[13px] leading-5 sm:text-base sm:leading-7" : "text-base leading-7",
           ].join(" ")}
         >
           {description}
         </p>
         {action ? (
-          <Link className="signal-button-primary" href={action.href}>
+          <Link
+            className={[
+              "signal-button-primary",
+              compactOnMobile ? "mt-1 px-3.5 py-2 text-[13px] sm:px-4 sm:py-[0.7rem] sm:text-sm" : "",
+            ].join(" ")}
+            href={action.href}
+          >
             {action.label}
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Link>

@@ -84,7 +84,7 @@ export function LanguageSelector() {
       <button
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="inline-flex h-10 items-center gap-3 rounded-full border border-line bg-white px-4 text-xs font-semibold text-ink shadow-sm transition hover:border-[#cfc7b8] hover:bg-[#fbfaf6]"
+        className="inline-flex h-9 items-center gap-2.5 rounded-full border border-line bg-white px-3 text-xs font-semibold text-ink shadow-sm transition hover:border-[#cfc7b8] hover:bg-[#fbfaf6] sm:h-10 sm:gap-3 sm:px-4"
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >

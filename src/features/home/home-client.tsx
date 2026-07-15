@@ -44,42 +44,49 @@ const primaryActions = [
 
 const mobileWorkspaceActions = [
   {
+    mobileLabel: "Playbook",
     titleKey: "home.learnSignal.title",
     descriptionKey: "home.learnSignal.description",
     href: "/playbook",
     icon: BookOpen,
   },
   {
+    mobileLabel: "Outreach",
     titleKey: "home.createOutreach.title",
     descriptionKey: "home.createOutreach.description",
     href: "/create-outreach",
     icon: Send,
   },
   {
+    mobileLabel: "Research",
     titleKey: "home.accountResearch.title",
     descriptionKey: "home.accountResearch.description",
     href: "/account-research",
     icon: Building2,
   },
   {
+    mobileLabel: "Sequence",
     titleKey: "home.buildSequence.title",
     descriptionKey: "home.buildSequence.description",
     href: "/build-sequence",
     icon: Layers3,
   },
   {
+    mobileLabel: "Reply",
     titleKey: "home.replyToProspect.title",
     descriptionKey: "home.replyToProspect.description",
     href: "/reply-to-prospect",
     icon: MessageSquareReply,
   },
   {
+    mobileLabel: "DNC",
     titleKey: "home.doNotContact.title",
     descriptionKey: "home.doNotContact.description",
     href: "/do-not-contact",
     icon: Ban,
   },
   {
+    mobileLabel: "Signal Brain",
     titleKey: "home.askSignalBrain.title",
     descriptionKey: "home.askSignalBrain.description",
     href: "/ask-signal-brain",
@@ -97,7 +104,7 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
   const ActiveMobileIcon = activeMobileAction.icon;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <SignalHero
         action={{ href: "/playbook", label: translateUi("home.openPlaybook", language) }}
         compactOnMobile
@@ -108,14 +115,15 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
 
       <section
         aria-label="Mobile workspace"
-        className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3 overflow-x-hidden lg:hidden"
+        className="grid grid-cols-[clamp(4.75rem,23vw,6rem)_minmax(0,1fr)] items-start gap-2.5 overflow-x-hidden sm:gap-3 lg:hidden"
       >
         <div
           aria-label="Workspace tools"
-          className="sticky top-[calc(env(safe-area-inset-top)+0.75rem)] max-h-[calc(100svh-env(safe-area-inset-top)-1.5rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-white p-1.5 shadow-soft"
+          className="sticky top-[calc(env(safe-area-inset-top)+0.75rem)] self-start rounded-2xl border border-line bg-white p-1.5 shadow-soft"
           role="tablist"
         >
-          <div className="space-y-1">
+          <div className="relative">
+            <div className="max-h-[23rem] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin] sm:max-h-[28rem]">
             {mobileWorkspaceActions.map((action) => {
               const Icon = action.icon;
               const isActive = action.href === activeMobileHref;
@@ -126,10 +134,10 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
                   aria-current={isActive ? "page" : undefined}
                   aria-selected={isActive}
                   className={[
-                    "flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-2 text-center text-[11px] font-semibold leading-tight transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive",
+                    "flex min-h-[68px] w-full flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-[12px] font-semibold leading-[1.15] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive sm:text-[13px]",
                     isActive
-                      ? "border-[#d8ec42] bg-lime text-ink shadow-soft"
-                      : "border-transparent bg-transparent text-[#6f6d5f] hover:border-line hover:bg-cream hover:text-ink",
+                      ? "bg-lime text-ink shadow-soft ring-1 ring-[#d8ec42]"
+                      : "bg-transparent text-[#6f6d5f] hover:bg-cream hover:text-ink",
                   ].join(" ")}
                   id={`mobile-tab-${action.href.replaceAll("/", "-") || "home"}`}
                   key={action.href}
@@ -138,32 +146,37 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
                   type="button"
                 >
                   <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
-                  <span className="max-w-full break-words">
-                    {translateUi(action.titleKey, language)}
+                  <span className="line-clamp-2 max-w-full overflow-hidden">
+                    {action.mobileLabel}
                   </span>
                 </button>
               );
             })}
+            </div>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-white to-white/0"
+            />
           </div>
         </div>
 
         <article
           aria-labelledby={`mobile-tab-${activeMobileAction.href.replaceAll("/", "-") || "home"}`}
-          className="min-w-0 rounded-2xl border border-line bg-cream p-4 shadow-soft"
+          className="h-auto min-h-0 min-w-0 self-start rounded-2xl border border-line bg-cream p-3.5 shadow-soft sm:p-4"
           id="mobile-workspace-panel"
           role="tabpanel"
         >
-          <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-lime text-ink">
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-lime text-ink sm:h-11 sm:w-11">
             <ActiveMobileIcon aria-hidden="true" className="h-5 w-5" />
           </span>
-          <h2 className="text-xl font-semibold leading-tight text-ink">
+          <h2 className="text-lg font-semibold leading-tight text-ink sm:text-xl">
             {translateUi(activeMobileAction.titleKey, language)}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-[#6f6d5f]">
+          <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#6f6d5f] sm:text-sm sm:leading-6">
             {translateUi(activeMobileAction.descriptionKey, language)}
           </p>
           <Link
-            className="mt-5 inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
+            className="mt-4 inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-full bg-signal px-3.5 py-2 text-[13px] font-semibold text-white shadow-soft transition hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive sm:px-4 sm:text-sm"
             href={activeMobileAction.href}
           >
             {translateUi("home.openTool", language)}
@@ -185,11 +198,11 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
       </section>
 
       {showAdmin ? (
-        <section className="rounded-2xl border border-line bg-white p-5">
+        <section className="rounded-2xl border border-line bg-white p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-olive">
             {translateUi("home.adminShortcuts", language)}
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-3">
             {adminNavigation.map((item) => {
               const Icon = item.icon;
 

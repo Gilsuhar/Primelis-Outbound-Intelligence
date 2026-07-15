@@ -138,8 +138,8 @@ export function AppShell({
       </aside>
 
       <main className="min-w-0 flex-1 lg:pl-72">
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-10 lg:py-6">
-          <div className="mb-5 flex justify-end">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-5 lg:px-10 lg:py-6">
+          <div className="mb-3 flex justify-end sm:mb-5">
             <LanguageSelector />
           </div>
           {children}
