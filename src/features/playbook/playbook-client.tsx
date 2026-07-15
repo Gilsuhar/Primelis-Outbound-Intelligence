@@ -189,7 +189,7 @@ const winningLibraries: Array<{
     id: "linkedin",
     title: "LinkedIn message library",
     subtitle: "Connection request, after-connect notes, comment follow-up, and quick chat asks.",
-    stepLabels: ["Request", "After connect 1", "After connect 2", "Comment follow-up"],
+    stepLabels: ["Connection request", "After connect 1", "After connect 2", "Comment follow-up"],
   },
   {
     id: "reply",
@@ -288,6 +288,7 @@ export function PlaybookClient({
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
   const [activeSection, setActiveSection] = useState<SectionId>("learn");
   const [activeWinningLibrary, setActiveWinningLibrary] = useState<WinningLibraryId>("email");
+  const [activeWinningStep, setActiveWinningStep] = useState("All");
   const progressView = useMemo(
     () => calculateProgress(progress, viewerRole),
     [progress, viewerRole],
@@ -295,9 +296,22 @@ export function PlaybookClient({
   const activeWinningLibraryConfig = winningLibraries.find(
     (library) => library.id === activeWinningLibrary,
   );
-  const activeWinningMessages = winningMessages.filter(
-    (message) => messageLibraryId(message.channel) === activeWinningLibrary,
-  );
+  const activeWinningMessages = winningMessages.filter((message) => {
+    if (messageLibraryId(message.channel) !== activeWinningLibrary) return false;
+    if (activeWinningStep === "All") return true;
+    return messageStepLabel(message.title, activeWinningLibrary) === activeWinningStep;
+  });
+  const winningStepLabels = ["All", ...(activeWinningLibraryConfig?.stepLabels ?? [])];
+
+  function selectWinningLibrary(libraryId: WinningLibraryId) {
+    setActiveWinningLibrary(libraryId);
+    setActiveWinningStep("All");
+  }
+
+  function selectWinningStep(libraryId: WinningLibraryId, stepLabel: string) {
+    setActiveWinningLibrary(libraryId);
+    setActiveWinningStep(stepLabel);
+  }
 
   function toggleProgress(key: PlaybookProgressKey) {
     setProgress((current) => ({ ...current, [key]: !current[key] }));
@@ -556,7 +570,7 @@ export function PlaybookClient({
                   : "border-line bg-cream text-[#5c5a4f] hover:text-ink",
               ].join(" ")}
               key={library.id}
-              onClick={() => setActiveWinningLibrary(library.id)}
+              onClick={() => selectWinningLibrary(library.id)}
               type="button"
             >
               <span className="block text-base font-semibold text-ink">{library.title}</span>
@@ -630,6 +644,13 @@ export function PlaybookClient({
                     </div>
                   </div>
                 </div>
+                <button
+                  className="mx-4 mb-4 inline-flex min-h-9 items-center justify-center rounded-full border border-line bg-white px-3 text-xs font-semibold text-olive transition hover:border-lime hover:bg-lime hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
+                  onClick={() => selectWinningStep("email", step.step === "Close loop" ? "Close" : step.step)}
+                  type="button"
+                >
+                  Show matching {step.step} patterns
+                </button>
               </details>
             ))}
           </div>
@@ -649,19 +670,43 @@ export function PlaybookClient({
             <WarningLabel text={`${activeWinningMessages.length} examples`} />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {activeWinningLibraryConfig?.stepLabels.map((label) => (
-              <span
-                className="rounded-full border border-line bg-cream px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+          <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Winning message steps">
+            {winningStepLabels.map((label) => {
+              const matchingCount =
+                label === "All"
+                  ? winningMessages.filter(
+                      (message) => messageLibraryId(message.channel) === activeWinningLibrary,
+                    ).length
+                  : winningMessages.filter(
+                      (message) =>
+                        messageLibraryId(message.channel) === activeWinningLibrary &&
+                        messageStepLabel(message.title, activeWinningLibrary) === label,
+                    ).length;
+
+              return (
+              <button
+                aria-selected={activeWinningStep === label}
+                className={[
+                  "min-h-9 rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive",
+                  activeWinningStep === label
+                    ? "border-lime bg-lime text-ink shadow-soft"
+                    : "border-line bg-cream text-[#5c5a4f] hover:text-ink",
+                ].join(" ")}
                 key={label}
+                onClick={() => setActiveWinningStep(label)}
+                role="tab"
+                type="button"
               >
                 {label}
-              </span>
-            ))}
+                <span className="ml-1 text-[10px] opacity-70">{matchingCount}</span>
+              </button>
+              );
+            })}
           </div>
 
           <div className="mt-5 grid gap-3">
-            {activeWinningMessages.map((item) => (
+            {activeWinningMessages.length > 0 ? (
+              activeWinningMessages.map((item) => (
               <details className="rounded-xl border border-line bg-cream" key={item.title}>
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
                   <span>
@@ -704,7 +749,13 @@ export function PlaybookClient({
                   </details>
                 </div>
               </details>
-            ))}
+              ))
+            ) : (
+              <div className="rounded-xl border border-line bg-cream p-4 text-sm leading-6 text-[#5c5a4f]">
+                No saved pattern for this step yet. Add one from a winning sequence or use the
+                reply-backed map above to draft it.
+              </div>
+            )}
           </div>
         </div>
 
