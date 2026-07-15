@@ -59,6 +59,13 @@ describe("Do Not Contact policy", () => {
         status: "ACTIVE_OPPORTUNITY",
       },
     });
+    expect(searchDoNotContactRecords(defaultSuppressionRecords, "Apollo")[0]).toMatchObject({
+      blocked: true,
+      record: {
+        companyName: "Zenleads Inc. DBA Apollo.io",
+        status: "EXISTING_CUSTOMER",
+      },
+    });
   });
 
   it("merges default suppression records without duplicating imported records", () => {

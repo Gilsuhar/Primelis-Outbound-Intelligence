@@ -20,6 +20,11 @@ import {
   type SequenceSourceReference,
   type SequenceStep,
 } from "@/features/build-sequence/types";
+import {
+  mergeDefaultSuppressionRecords,
+  searchDoNotContactRecords,
+} from "@/features/do-not-contact/do-not-contact-policy";
+import type { DoNotContactRecord, SuppressionSearchResult } from "@/features/do-not-contact/types";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -77,6 +82,7 @@ type Row = Record<string, unknown>;
 
 export type BuildSequencePersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
+  getSuppressionRecords(): Promise<DoNotContactRecord[]>;
   retrieveEligibleKnowledge(input: BuildSequenceInput): Promise<SequenceKnowledgeRecord[]>;
   persistDraft(input: {
     creatorId: string;
@@ -142,6 +148,44 @@ function mapKnowledgeRow(row: Row): SequenceKnowledgeRecord {
 
 function allowedKnowledgeChannels(input: BuildSequenceInput) {
   return channelsForSequence(input.primaryChannel);
+}
+
+function cleanSuppressionQuery(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+}
+
+function findBlockedSuppressionMatch(
+  records: DoNotContactRecord[],
+  input: BuildSequenceInput,
+): SuppressionSearchResult | undefined {
+  const queries = Array.from(
+    new Set(
+      [input.companyName, input.companyWebsite]
+        .map(cleanSuppressionQuery)
+        .filter((query) => query.length > 0),
+    ),
+  );
+
+  for (const query of queries) {
+    const blocked = searchDoNotContactRecords(records, query).find((match) => match.blocked);
+    if (blocked) {
+      return blocked;
+    }
+  }
+  return undefined;
+}
+
+function suppressionBlockMessage(match: SuppressionSearchResult) {
+  const { record } = match;
+  const status = record.status.replaceAll("_", " ").toLowerCase();
+  const domain = record.domain ? ` (${record.domain})` : "";
+  const reason = record.reason ? ` Reason: ${record.reason}` : "";
+  return `Do not build a sequence for this account. ${record.companyName}${domain} is in Do Not Contact / customer suppression as ${status}.${reason} Use it only as internal context or social proof, not as a target account.`;
 }
 
 function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
@@ -346,6 +390,24 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
     return row ? { id: asString(row.id), role: asString(row.role) } : null;
   }
 
+  async getSuppressionRecords() {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "companyName", domain, status, "accountOwner", reason, notes, "lastContactDate"::text AS "lastContactDate"
+      FROM "SuppressionRecord"
+    `;
+    const records = rows.map((row) => ({
+      id: asString(row.id),
+      companyName: asString(row.companyName),
+      domain: asString(row.domain) || undefined,
+      status: asString(row.status) as DoNotContactRecord["status"],
+      owner: asString(row.accountOwner) || undefined,
+      reason: asString(row.reason) || undefined,
+      notes: asString(row.notes) || undefined,
+      lastContactDate: asString(row.lastContactDate) || undefined,
+    }));
+    return mergeDefaultSuppressionRecords(records);
+  }
+
   async retrieveEligibleKnowledge(input: BuildSequenceInput) {
     const rows = await this.client.$queryRaw<Row[]>`
       SELECT
@@ -473,6 +535,12 @@ export async function generateBuildSequence(
   const actor = await persistence.getActor(creatorId);
   if (!actor || !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role)) {
     return err("FORBIDDEN", "Only authorized sales or knowledge users can build sequences.");
+  }
+
+  const suppressionRecords = await persistence.getSuppressionRecords();
+  const blockedMatch = findBlockedSuppressionMatch(suppressionRecords, input);
+  if (blockedMatch) {
+    return err("SUPPRESSION_BLOCKED", suppressionBlockMessage(blockedMatch));
   }
 
   const provider = dependencies.provider ?? createBuildSequenceAiProvider();

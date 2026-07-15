@@ -5,6 +5,7 @@ import type {
   BuildSequenceResult,
   SequenceKnowledgeRecord,
 } from "@/features/build-sequence/types";
+import type { DoNotContactRecord } from "@/features/do-not-contact/types";
 
 import { DeterministicBuildSequenceProvider } from "./build-sequence-provider";
 import { generateBuildSequence, type BuildSequencePersistence } from "./build-sequence-service";
@@ -69,7 +70,11 @@ function isFixtureEligible(record: SequenceKnowledgeRecord, input: BuildSequence
   );
 }
 
-function persistence(records: SequenceKnowledgeRecord[], actorRole = "SALES_USER") {
+function persistence(
+  records: SequenceKnowledgeRecord[],
+  actorRole = "SALES_USER",
+  suppressionRecords: DoNotContactRecord[] = [],
+) {
   const persisted: Array<{
     creatorId: string;
     request: BuildSequenceInput;
@@ -77,6 +82,7 @@ function persistence(records: SequenceKnowledgeRecord[], actorRole = "SALES_USER
   }> = [];
   const adapter: BuildSequencePersistence = {
     getActor: async (actorId) => ({ id: actorId, role: actorRole }),
+    getSuppressionRecords: async () => suppressionRecords,
     retrieveEligibleKnowledge: async (input) =>
       records.filter((record) => isFixtureEligible(record, input)),
     persistDraft: async (draft) => {
@@ -88,6 +94,36 @@ function persistence(records: SequenceKnowledgeRecord[], actorRole = "SALES_USER
 }
 
 describe("Build Sequence service", () => {
+  it("blocks sequence generation when the account is in suppression", async () => {
+    const suppression: DoNotContactRecord = {
+      id: "apollo-customer",
+      companyName: "Zenleads Inc. DBA Apollo.io",
+      domain: "apollo.io",
+      status: "EXISTING_CUSTOMER",
+      reason: "Existing Signal customer.",
+    };
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })], "SALES_USER", [
+      suppression,
+    ]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Apollo",
+        companyWebsite: undefined,
+      },
+      { persistence: adapter },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      code: "SUPPRESSION_BLOCKED",
+      message:
+        "Do not build a sequence for this account. Zenleads Inc. DBA Apollo.io (apollo.io) is in Do Not Contact / customer suppression as existing customer. Reason: Existing Signal customer. Use it only as internal context or social proof, not as a target account.",
+    });
+    expect(persisted).toEqual([]);
+  });
+
   it("retrieves only approved eligible knowledge from the persistence boundary", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
