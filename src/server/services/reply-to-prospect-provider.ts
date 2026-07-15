@@ -60,17 +60,21 @@ function humanizeFact(fact: string) {
 }
 
 function deckReply(input: ReplyToProspectInput, facts: string[]) {
-  const opener = input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
-  const context = input.companyName
-    ? `I will keep the deck focused on the ${input.companyName} angle instead of sending a generic overview.`
-    : "I will keep the deck focused and practical instead of sending a generic overview.";
+  const opener =
+    input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
+  const companyLine = input.companyName
+    ? `I will keep it focused on the ${input.companyName} question, not a generic overview.`
+    : "I will keep it focused, not a generic overview.";
   const usefulLine =
     facts[0] && !/not have enough/i.test(facts[0])
-      ? humanizeFact(trimSentences(facts[0], 1))
-      : "The short version: it helps teams decide when paid brand coverage is actually needed, and when organic results may already be doing enough.";
-  const cta = "I can also add two bullets on the part most relevant to your setup.";
+      ? "Short version: Signal is useful when the team wants to know where paid brand coverage is still needed and where organic results may already be doing enough."
+      : "Short version: it is about deciding where paid brand coverage is still needed and where organic results may already be doing enough.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "I can send the deck and add two bullets most relevant to your setup."
+      : "I can send the deck and add two bullets most relevant to your setup.";
 
-  return [opener, context, usefulLine, cta].join(" ");
+  return [opener, companyLine, usefulLine, cta].join(" ");
 }
 
 function intentBridge(intents: ProspectIntent[]) {
@@ -84,6 +88,70 @@ function intentBridge(intents: ProspectIntent[]) {
     return "No problem. The only reason I reached out is that paid brand can quietly become hard to judge from campaign metrics alone.";
   }
   return undefined;
+}
+
+function methodologyReply(input: ReplyToProspectInput) {
+  const opener = "Good question.";
+  const answer =
+    "If no competitors are bidding, I would not automatically keep or pause brand ads. I would first compare paid coverage with organic results to see whether the paid clicks are changing the outcome.";
+  const product =
+    "Signal helps make that check practical by showing when paid brand is protecting demand and when organic may already be carrying it.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Happy to send the simple version."
+      : "Happy to send the simple version if useful.";
+  return [opener, answer, product, cta].join(" ");
+}
+
+function existingVendorReply(input: ReplyToProspectInput) {
+  const opener = "That makes sense.";
+  const answer =
+    "I would not frame this as replacing what you already use. The useful question is whether your current setup clearly shows when paid brand is still needed versus when organic would have captured the demand anyway.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Worth comparing how you decide that today?"
+      : "Worth comparing how you decide that today?";
+  return [opener, answer, cta].join(" ");
+}
+
+function notInterestedReply(input: ReplyToProspectInput) {
+  const opener = "Totally understood.";
+  const reason =
+    "I reached out because paid brand can be hard to judge from campaign metrics alone, but no need to force it if it is not a priority.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "I can close the loop here."
+      : "I can close the loop here.";
+  return [opener, reason, cta].join(" ");
+}
+
+function timingReply(input: ReplyToProspectInput) {
+  const opener = "Makes sense.";
+  const answer =
+    "If timing is not right now, the useful thing to park is the question itself: where is paid brand protecting demand, and where is it just adding cost?";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Want me to follow up later?"
+      : "Want me to follow up later, or should I close the loop?";
+  return [opener, answer, cta].join(" ");
+}
+
+function defaultReply(input: ReplyToProspectInput, intents: ProspectIntent[], primaryFact: string, secondaryFact: string) {
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Worth comparing notes?"
+      : "Worth a quick compare against how you decide this today?";
+  const bridge = intentBridge(intents);
+
+  return [
+    openingFor(input, intents),
+    bridge,
+    primaryFact,
+    !bridge && secondaryFact ? secondaryFact : "",
+    cta,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export class DeterministicReplyProvider implements ReplyAiProvider {
@@ -112,29 +180,37 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
       ? humanizeFact(trimSentences(stripDisallowedCommercialTerms(facts[1]), 1))
       : "";
     const companyPhrase = input.companyName ? ` for ${input.companyName}` : "";
-    const cta =
-      input.channel === "LINKEDIN"
-        ? "Worth comparing notes?"
-        : "Worth a quick compare against how you decide this today?";
-    const bridge = intentBridge(intents);
 
-    const recommendedReply = intents.includes("DECK_REQUEST")
-      ? deckReply(input, [primaryFact, secondaryFact].filter(Boolean))
-      : [
-          openingFor(input, intents),
-          bridge,
-          primaryFact,
-          !bridge && secondaryFact ? secondaryFact : "",
-          cta,
-        ]
-          .filter(Boolean)
-          .join(" ");
+    const recommendedReply = (() => {
+      if (intents.includes("DECK_REQUEST")) {
+        return deckReply(input, [primaryFact, secondaryFact].filter(Boolean));
+      }
+      if (intents.includes("NOT_INTERESTED")) {
+        return notInterestedReply(input);
+      }
+      if (intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")) {
+        return methodologyReply(input);
+      }
+      if (intents.includes("TIMING")) {
+        return timingReply(input);
+      }
+      if (intents.includes("EXISTING_VENDOR")) {
+        return existingVendorReply(input);
+      }
+      return defaultReply(input, intents, primaryFact, secondaryFact);
+    })();
 
     const shorterAlternative = intents.includes("DECK_REQUEST")
       ? [
           input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
-          "I will keep it focused on when paid brand coverage is useful and where organic may already be doing enough.",
+          "I will keep it focused on your paid-brand question and add two relevant bullets.",
         ].join(" ")
+      : intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
+        ? [
+            "Good question.",
+            "I would first check whether paid brand clicks are changing the outcome or whether organic would already capture that demand.",
+            "Happy to send the simple version.",
+          ].join(" ")
       : [
           openingFor(input, intents),
           facts[0]

@@ -166,9 +166,11 @@ describe("Reply to Prospect service", () => {
       expect(result.data.detectedIntent).toContain("DECK_REQUEST");
       expect(result.data.recommendedReply).toMatch(/Yes, happy to send/i);
       expect(result.data.recommendedReply).toMatch(/deck/i);
+      expect(result.data.recommendedReply).toMatch(/two bullets|relevant to your setup/i);
       expect(result.data.recommendedReply).not.toMatch(
         /\b(Solo|Competitive|Ghost|SERP|conversion-source|Google Search Console|reduce bids)\b/i,
       );
+      expect(result.data.recommendedReply).not.toMatch(/Would it be useful if/i);
       expect(result.data.recommendedReply.length).toBeLessThan(420);
     }
   });
