@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Ban,
@@ -171,6 +172,24 @@ function WarningLabel({ text }: { text: string }) {
   );
 }
 
+const caseStudyPreviews = [
+  {
+    match: "appsflyer",
+    imageSrc: "/case-studies/appsflyer-signal-case-study.png",
+    imageAlt: "AppsFlyer Signal case study preview",
+  },
+  {
+    match: "apollo",
+    imageSrc: "/case-studies/apollo-signal-case-study.png",
+    imageAlt: "Apollo.io Signal case study preview",
+  },
+] as const;
+
+function findCaseStudyPreview(title: string) {
+  const normalizedTitle = title.toLowerCase();
+  return caseStudyPreviews.find((preview) => normalizedTitle.includes(preview.match));
+}
+
 type WinningLibraryId = "email" | "linkedin" | "reply";
 
 const winningLibraries: Array<{
@@ -302,6 +321,9 @@ export function PlaybookClient({
     return messageStepLabel(message.title, activeWinningLibrary) === activeWinningStep;
   });
   const winningStepLabels = ["All", ...(activeWinningLibraryConfig?.stepLabels ?? [])];
+  const hasApolloCaseStudy = data.caseStudies.some((record) =>
+    record.title.toLowerCase().includes("apollo"),
+  );
 
   function selectWinningLibrary(libraryId: WinningLibraryId) {
     setActiveWinningLibrary(libraryId);
@@ -1055,37 +1077,86 @@ export function PlaybookClient({
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {data.caseStudies.length > 0 ? (
-            data.caseStudies.map((record) => (
-              <details className="rounded-2xl border border-line bg-white p-5" key={record.id}>
-                <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-ink">{record.title}</h3>
-                  <WarningLabel
-                    text={
-                      record.usageScope === "EMAIL_AND_LINKEDIN" ||
-                      record.usageScope === "PUBLIC_MARKETING"
-                        ? "Verify before external use"
-                        : record.usageScope === "SALES_REPLY_ONLY"
-                          ? "Reply use only"
-                        : "Internal use only"
-                    }
+            <>
+              {data.caseStudies.map((record) => {
+                const preview = findCaseStudyPreview(record.title);
+
+                return (
+                  <details
+                    className="overflow-hidden rounded-2xl border border-line bg-white"
+                    key={record.id}
+                  >
+                    {preview ? (
+                      <Image
+                        alt={preview.imageAlt}
+                        className="aspect-[16/9] w-full border-b border-line object-cover object-top"
+                        height={800}
+                        src={preview.imageSrc}
+                        width={1400}
+                      />
+                    ) : null}
+                    <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-5">
+                      <h3 className="text-lg font-semibold text-ink">{record.title}</h3>
+                      <WarningLabel
+                        text={
+                          record.usageScope === "EMAIL_AND_LINKEDIN" ||
+                          record.usageScope === "PUBLIC_MARKETING"
+                            ? "Verify before external use"
+                            : record.usageScope === "SALES_REPLY_ONLY"
+                              ? "Reply use only"
+                              : "Internal use only"
+                        }
+                      />
+                    </summary>
+                    <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
+                      <p>{record.industries.join(", ") || "Industry not tagged"}</p>
+                      {record.metrics.map((metric) => (
+                        <p key={metric.id}>
+                          <strong>{metric.metricName}:</strong> {metric.value} {metric.unit ?? ""}
+                        </p>
+                      ))}
+                      <p>
+                        Source:{" "}
+                        {record.sources.map((source) => source.title).join(", ") ||
+                          "Source relationship retained"}
+                      </p>
+                      <p>Best-fit persona: {record.personas.join(", ") || "Verify before use"}</p>
+                    </div>
+                  </details>
+                );
+              })}
+              {!hasApolloCaseStudy ? (
+                <details className="overflow-hidden rounded-2xl border border-line bg-white">
+                  <Image
+                    alt="Apollo.io Signal case study preview"
+                    className="aspect-[16/9] w-full border-b border-line object-cover object-top"
+                    height={800}
+                    src="/case-studies/apollo-signal-case-study.png"
+                    width={1400}
                   />
-                </summary>
-                <div className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
-                  <p>{record.industries.join(", ") || "Industry not tagged"}</p>
-                  {record.metrics.map((metric) => (
-                    <p key={metric.id}>
-                      <strong>{metric.metricName}:</strong> {metric.value} {metric.unit ?? ""}
+                  <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-5">
+                    <h3 className="text-lg font-semibold text-ink">
+                      Apollo.io reduces blended CPC while increasing conversion rate
+                    </h3>
+                    <WarningLabel text="Internal use only" />
+                  </summary>
+                  <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
+                    <p>SaaS</p>
+                    <p>
+                      <strong>Blended CPC:</strong> -43% North America data
                     </p>
-                  ))}
-                  <p>
-                    Source:{" "}
-                    {record.sources.map((source) => source.title).join(", ") ||
-                      "Source relationship retained"}
-                  </p>
-                  <p>Best-fit persona: {record.personas.join(", ") || "Verify before use"}</p>
-                </div>
-              </details>
-            ))
+                    <p>
+                      <strong>Cumulative savings:</strong> $1M+
+                    </p>
+                    <p>
+                      <strong>Conversion rate:</strong> +14% aggregated across all markets
+                    </p>
+                    <p>Source: Case Study Signal AppsFlyer / Apollo.io PDF</p>
+                    <p>Best-fit persona: Paid Acquisition, Paid Search, Performance Marketing</p>
+                  </div>
+                </details>
+              ) : null}
+            </>
           ) : (
             <SignalCard
               description="No imported case studies were available from the configured database. Do not invent customer evidence."

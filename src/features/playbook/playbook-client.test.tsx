@@ -64,7 +64,7 @@ describe("Playbook route content", () => {
     expect(screen.getAllByText("Exploratory").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Case Studies" }));
-    expect(screen.getByText("Internal use only")).toBeTruthy();
+    expect(screen.getAllByText("Internal use only").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Progress" }));
     expect(screen.getByText("Manager approval (manager only)")).toBeTruthy();
