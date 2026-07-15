@@ -269,33 +269,83 @@ export const practiceScenarios: PracticeScenario[] = [
 ];
 
 export const outreachReplyEvidence = {
-  source: "Outreach mailing export, July 15 2026",
+  source: "Outreach sequence reply and mailing exports, July 15 2026",
   scope:
-    "Filtered to replied mailings related to Signal, legacy Cross Brand, branded ads, branded search, brand incrementality, and brand visibility.",
+    "Filtered to replied sequence rows and mailings related to Signal, legacy Cross Brand, branded ads, branded search, brand incrementality, and brand visibility.",
   limitation:
-    "The export includes reply metadata, subjects, accounts, and timing, but not the reply body. Use it to learn which angles created replies, not to quote prospect language.",
+    "The exports include reply metadata, subjects, templates, accounts, personas, and timing, but not the prospect reply body. Use them to learn which angles created replies, not to quote prospect language.",
   currentProductName:
     "Use Signal as the current product name. Treat Cross Brand / Cross-Brand as legacy evidence for the same product.",
-  relatedReplyRows: 123,
+  relatedReplyRows: 179,
   strongestSubjectClusters: [
     {
       label: "Deactivating branded ads",
-      replyRows: 68,
+      replyRows: 67,
       useFor:
         "Direct first touches about turning off or lowering branded ads when no competitors are bidding.",
     },
     {
+      label: "Primelis intro / company x Primelis",
+      replyRows: 58,
+      useFor:
+        "Simple intro-style emails still worked when paired with a relevant brand-search angle. Keep them short and account-specific.",
+    },
+    {
       label: "Optimize branded ad spend / visibility",
-      replyRows: 25,
+      replyRows: 19,
       useFor:
         "More executive or finance-friendly wording when the buyer may care about waste, control, and reporting.",
     },
     {
-      label: "Brand incrementality",
-      replyRows: 12,
+      label: "Brand incrementality / branded search spend",
+      replyRows: 7,
       useFor:
         "Performance-marketing buyers who already understand the paid versus organic measurement problem.",
     },
+    {
+      label: "Lower branded CPC",
+      replyRows: 5,
+      useFor:
+        "Use this with paid-search specialists when the hook is bid reduction rather than pausing ads.",
+    },
+  ],
+  strongestTemplateClusters: [
+    {
+      label: "General paid ads for context",
+      replyRows: 26,
+      useFor:
+        "Follow-up emails that explain the business context without repeating the first-touch pitch.",
+    },
+    {
+      label: "Auto Disable Branded Ads",
+      replyRows: 29,
+      useFor:
+        "Direct messages about pausing branded ads when no competitors are present.",
+    },
+    {
+      label: "Last email / close loop",
+      replyRows: 18,
+      useFor:
+        "Polite final touches. Do not skip close-loop emails; replies came from later sequence steps too.",
+    },
+    {
+      label: "Video / more context",
+      replyRows: 24,
+      useFor:
+        "Use after the first touch when the prospect needs a concrete explanation or example.",
+    },
+  ],
+  stepLearning: [
+    "Step 2 produced the most replies in the new export, so the first follow-up must add new context instead of repeating the opener.",
+    "Steps 3-6 also produced meaningful replies, so the sequence should vary the angle across context, proof, methodology, and close-loop.",
+    "Keep the first email direct, then use follow-ups to explain why paid brand can look efficient while still wasting spend.",
+  ],
+  titleLearning: [
+    "CMO and senior marketing leaders replied, but they need business language: waste, visibility, control, and staying covered only when needed.",
+    "Paid search and paid media specialists replied to direct mechanics: no competitors bidding, lower CPC, pause ads, and stay on top.",
+    "Digital, growth, and performance leaders replied when the message tied branded search to acquisition efficiency and reporting.",
+  ],
+  legacyLearning: [
     {
       label: "Legacy Cross Brand",
       replyRows: 12,
@@ -321,10 +371,22 @@ export const outreachReplyEvidence = {
     "Stitch Fix",
     "AppFolio",
     "On",
+    "SAP",
+    "Stripe",
+    "QuickBooks",
+    "Dialpad",
+    "Culture Amp",
+    "Costco Wholesale",
+    "Docusign",
+    "Squarespace",
+    "Kohl's",
+    "SharkNinja",
   ],
   copyRules: [
     "Lead with the buyer's branded-search decision, not an internal category or ICP label.",
     "Use plain language: no competitors bidding, pause ads, lower bids, stay on top, avoid overspending.",
+    "Do not let follow-ups repeat the opener; Step 2 should add context, Step 3 should add proof or method, and the last email should close the loop.",
+    "For senior marketing leaders, translate bid mechanics into business language: wasted spend, visibility, control, and reporting.",
     "Keep Signal as the product name even when the historical sequence used Cross Brand.",
     "Do not cite exact meeting counts or customer savings unless the account owner confirms the approved proof.",
     "When a prospect engaged from LinkedIn, mention the visible trigger before explaining Signal.",

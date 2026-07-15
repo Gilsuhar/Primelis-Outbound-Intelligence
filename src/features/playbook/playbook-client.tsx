@@ -485,6 +485,18 @@ export function PlaybookClient({
             ))}
           </div>
 
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {outreachReplyEvidence.strongestTemplateClusters.map((cluster) => (
+              <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-semibold text-ink">{cluster.label}</p>
+                  <WarningLabel text={`${cluster.replyRows} replies`} />
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
+              </div>
+            ))}
+          </div>
+
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <div className="rounded-xl border border-line bg-cream p-4 lg:col-span-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
@@ -506,6 +518,29 @@ export function PlaybookClient({
               <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
                 {outreachReplyEvidence.limitation}
               </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-line bg-cream p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Sequence rules from replies
+              </p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                {outreachReplyEvidence.stepLearning.map((rule) => (
+                  <li key={rule}>ג€¢ {rule}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-line bg-cream p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Persona language
+              </p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                {outreachReplyEvidence.titleLearning.map((rule) => (
+                  <li key={rule}>ג€¢ {rule}</li>
+                ))}
+              </ul>
             </div>
           </div>
 

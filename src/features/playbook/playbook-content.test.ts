@@ -62,8 +62,12 @@ describe("Signal Playbook content", () => {
 
   it("includes a compact winning messages library", () => {
     expect(winningMessages.length).toBeGreaterThanOrEqual(16);
-    expect(outreachReplyEvidence.relatedReplyRows).toBe(123);
+    expect(outreachReplyEvidence.relatedReplyRows).toBe(179);
     expect(outreachReplyEvidence.currentProductName).toContain("Signal");
+    expect(outreachReplyEvidence.strongestTemplateClusters.map((cluster) => cluster.label)).toContain(
+      "Auto Disable Branded Ads",
+    );
+    expect(outreachReplyEvidence.stepLearning.join(" ")).toContain("Step 2");
     expect(winningMessages.map((message) => message.title)).toContain(
       "Email subject - deactivating branded ads",
     );
