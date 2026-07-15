@@ -16,6 +16,7 @@ import {
 
 import { useOutputLanguage } from "@/components/language-selector";
 import { EvidenceBadge, SectionHeader, SignalCard, SignalHero } from "@/components/signal-ui";
+import { inferCaseStudyIndustries } from "@/features/knowledge/case-study-industry-tags";
 import type { ViewerRole } from "@/features/playbook/types";
 import {
   calculateProgress,
@@ -1182,6 +1183,10 @@ export function PlaybookClient({
             <>
               {data.caseStudies.map((record) => {
                 const preview = findCaseStudyPreview(record.title);
+                const displayIndustries =
+                  record.industries.length > 0
+                    ? record.industries
+                    : inferCaseStudyIndustries(record.title);
 
                 return (
                   <details
@@ -1216,7 +1221,7 @@ export function PlaybookClient({
                       </div>
                     </summary>
                     <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
-                      <p>{record.industries.join(", ") || "Industry not tagged"}</p>
+                      <p>{displayIndustries.join(", ") || "Industry needs review"}</p>
                       {record.metrics.map((metric) => (
                         <p key={metric.id}>
                           <strong>{metric.metricName}:</strong> {metric.value} {metric.unit ?? ""}

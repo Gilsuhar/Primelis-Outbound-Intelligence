@@ -4,6 +4,7 @@ import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 import type {
   ApprovalStatus,
   ChannelTag,
+  CaseStudyFixture,
   ClaimFixture,
   GeneratedDraft,
   KnowledgeItemFixture,
@@ -14,6 +15,7 @@ import type {
   SourceType,
   UserRole,
 } from "@/features/knowledge/types";
+import { withInferredCaseStudyIndustries } from "@/features/knowledge/case-study-industry-tags";
 import { submitGeneratedDraftForReview } from "@/features/generated-drafts/generated-draft-service";
 import { applyStatusTransition, type ReviewAction } from "@/features/review/status-transition";
 import { createLocalSubmission, parseTagList } from "@/lib/validation/add-knowledge";
@@ -369,18 +371,20 @@ export class PrismaPersistenceAdapter implements PersistenceRepositories {
       return rows.map((row: unknown) => {
         const caseStudy = row as Row;
 
-        return {
+        const mappedCaseStudy: CaseStudyFixture = {
           id: asString(caseStudy.id),
           title: asString(caseStudy.title),
           companyName: asString(caseStudy.companyName),
           approvalStatus: asStatus(caseStudy.approvalStatus),
           sourceIds: [],
-          industries: [],
+          industries: asStringArray(caseStudy.industries),
           personas: [],
           approvedExternalWording: asOptionalString(caseStudy.approvedExternalWording),
           usageRestrictions: asOptionalString(caseStudy.usageRestrictions),
           internalNotes: asOptionalString(caseStudy.internalNotes),
         };
+
+        return withInferredCaseStudyIndustries(mappedCaseStudy);
       });
     },
   };
