@@ -202,6 +202,22 @@ export const personas: PersonaPlaybookEntry[] = [
     doNotPrioritizeWhen: "They focus on site merchandising without acquisition ownership.",
   },
   {
+    name: "Brand Marketing or Brand Leadership",
+    tier: "TIER_2",
+    caresAbout: "Brand protection, visibility, market consistency, and avoiding wasteful coverage.",
+    relevance:
+      "Team reply data shows Brand and Brand Marketing leaders also respond when the angle is simple and tied to brand control.",
+    bestAngle:
+      "Brand visibility and spend control: protect the brand when needed, avoid paying when organic coverage is enough.",
+    suitableCta: "Worth seeing whether this should sit with your paid media or brand team?",
+    commonObjection: "Paid media owns this.",
+    secondaryStakeholder: "Paid Search or Performance Marketing owner",
+    prioritizeWhen:
+      "The prospect owns brand marketing, brand paid media, regional brand, or cross-market brand governance.",
+    doNotPrioritizeWhen:
+      "They focus only on creative, communications, or employer brand with no media responsibility.",
+  },
+  {
     name: "CMO or VP Marketing",
     tier: "TIER_3",
     caresAbout: "Governance, visibility, and consistency across markets.",
@@ -312,6 +328,83 @@ export const outreachReplyEvidence = {
     "Keep Signal as the product name even when the historical sequence used Cross Brand.",
     "Do not cite exact meeting counts or customer savings unless the account owner confirms the approved proof.",
     "When a prospect engaged from LinkedIn, mention the visible trigger before explaining Signal.",
+  ],
+};
+
+export const teamProspectReplyEvidence = {
+  source: "Team prospect export, July 15 2026",
+  scope:
+    "All 82 exported prospects were in Replied - Email stage. The useful non-duplicate learning is persona and industry fit, not message copy.",
+  limitation:
+    "The file does not include sent message bodies or prospect reply bodies. Use it to prioritize who to target and how to frame the angle.",
+  relatedBrandOrPaidMediaProspects: 20,
+  personaLearning: [
+    {
+      label: "Paid media and paid search owners",
+      examples: [
+        "Vice President, Paid Media",
+        "Global Paid Media Lead",
+        "Paid Search Head",
+        "Manager, Paid Search",
+        "Senior Manager, Paid Media & Analytics",
+      ],
+      guidance:
+        "Keep as the cleanest operational target when the message is about bids, competitors, and branded-search efficiency.",
+    },
+    {
+      label: "Brand and brand marketing leaders",
+      examples: [
+        "Chief Brand Officer",
+        "Corporate Brand Head",
+        "Director, Brand Marketing",
+        "Senior Director & Head of Global Brand",
+        "Manager, Brand Growth and Partnerships",
+      ],
+      guidance:
+        "Use brand-control language instead of paid-search jargon: visibility, waste, no competitors bidding, and staying covered only when needed.",
+    },
+    {
+      label: "Growth and demand generation",
+      examples: [
+        "Growth Marketing Manager, Paid Media",
+        "Senior Director, Growth Marketing",
+        "Director, Demand Generation",
+        "Senior VP, Growth Marketing",
+      ],
+      guidance:
+        "Use efficiency and acquisition language. Avoid over-technical bid mechanics unless they ask.",
+    },
+  ],
+  industryLearning: [
+    "Security Software",
+    "CRM Software",
+    "Software / SaaS",
+    "Telephony and Wireless",
+    "Retail",
+    "ERP Software",
+    "Manufacturing",
+    "Financial Software",
+    "Airlines and Travel",
+  ],
+  accountExamples: [
+    "HubSpot",
+    "Tenable",
+    "Stripe",
+    "Wrike",
+    "Dialpad",
+    "QuickBooks",
+    "Sephora",
+    "Lacoste",
+    "Mercedes-Benz USA",
+    "Delta",
+    "M&T Bank",
+    "Culture Amp",
+  ],
+  copyRules: [
+    "If the title includes Brand, lead with control and visibility, not incrementality.",
+    "If the title includes Paid Search or Paid Media, lead with no competitors bidding, pausing ads, and lowering bids.",
+    "If the title includes Growth or Demand Generation, lead with wasted spend and acquisition efficiency.",
+    "Do not assume a Brand leader owns bids. Ask whether this sits with paid media or brand.",
   ],
 };
 

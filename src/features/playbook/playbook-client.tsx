@@ -24,6 +24,7 @@ import {
   evidenceDescriptions,
   outreachReplyEvidence,
   qualificationChecklist,
+  teamProspectReplyEvidence,
   winningMessages,
   workSteps,
 } from "@/features/playbook/playbook-content";
@@ -523,6 +524,72 @@ export function PlaybookClient({
               ))}
             </div>
           </details>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-line bg-white p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Team reply prospect evidence
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-ink">
+                Who replied across the team
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                {teamProspectReplyEvidence.scope}
+              </p>
+            </div>
+            <WarningLabel
+              text={`${teamProspectReplyEvidence.relatedBrandOrPaidMediaProspects} brand / paid media matches`}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {teamProspectReplyEvidence.personaLearning.map((persona) => (
+              <div className="rounded-xl border border-line bg-cream p-4" key={persona.label}>
+                <p className="font-semibold text-ink">{persona.label}</p>
+                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{persona.guidance}</p>
+                <div className="mt-3 space-y-1 text-xs leading-5 text-[#6f6d5f]">
+                  {persona.examples.map((example) => (
+                    <p key={example}>• {example}</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-line bg-cream p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Copy rules by persona
+              </p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                {teamProspectReplyEvidence.copyRules.map((rule) => (
+                  <li key={rule}>• {rule}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-line bg-cream p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                Useful account and industry signals
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[...teamProspectReplyEvidence.industryLearning, ...teamProspectReplyEvidence.accountExamples].map(
+                  (item) => (
+                    <span
+                      className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                      key={item}
+                    >
+                      {item}
+                    </span>
+                  ),
+                )}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
+                {teamProspectReplyEvidence.limitation}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">

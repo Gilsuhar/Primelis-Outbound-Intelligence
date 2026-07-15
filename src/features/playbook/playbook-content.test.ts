@@ -7,7 +7,9 @@ import {
   evidenceDescriptions,
   industries,
   outreachReplyEvidence,
+  personas,
   practiceScenarios,
+  teamProspectReplyEvidence,
   winningMessages,
 } from "./playbook-content";
 
@@ -35,6 +37,16 @@ describe("Signal Playbook content", () => {
   it("protects manager approval by role", () => {
     expect(canManagerApprove("SALES_USER")).toBe(false);
     expect(canManagerApprove("KNOWLEDGE_ADMIN")).toBe(true);
+  });
+
+  it("includes team reply persona learning", () => {
+    expect(personas.map((persona) => persona.name)).toContain(
+      "Brand Marketing or Brand Leadership",
+    );
+    expect(teamProspectReplyEvidence.relatedBrandOrPaidMediaProspects).toBe(20);
+    expect(teamProspectReplyEvidence.personaLearning.map((persona) => persona.label)).toContain(
+      "Brand and brand marketing leaders",
+    );
   });
 
   it("keeps practice simple and non-AI", () => {
