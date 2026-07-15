@@ -254,6 +254,25 @@ export const practiceScenarios: PracticeScenario[] = [
 
 export const winningMessages = [
   {
+    title: "After connect - no competitor angle",
+    useWhen: "After a LinkedIn connection when you want the proven direct opener.",
+    channel: "LinkedIn",
+    message:
+      "Thanks for connecting, {{firstName}}! We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nAlternatively, the CPC algorithm lowers the bid to the minimum needed for branded ads to appear at the top of Google searches.\n\nDo you already have a way to do that?",
+    whyItWorks:
+      "It is simple, specific, and explains the two outcomes without using internal product language.",
+  },
+  {
+    title: "LinkedIn comment follow-up",
+    useWhen:
+      "After someone comments on a relevant LinkedIn post and you want to connect the comment to the Signal use case.",
+    channel: "LinkedIn",
+    message:
+      "Hi {{firstName}}, saw your comment on {{postAuthor}}'s post and thought you might find this interesting.\n\nWe built a tool that automatically pauses branded ads when no competitors are bidding, or lowers bids to the minimum needed to stay on top without overspending.\n\nDo you already have a way to do that?",
+    whyItWorks:
+      "It gives a clear reason for reaching out, then turns the comment into a practical question instead of a generic pitch.",
+  },
+  {
     title: "After connect - brand question with proof",
     useWhen: "After a LinkedIn connection when you want a stronger message with light proof.",
     channel: "LinkedIn",
