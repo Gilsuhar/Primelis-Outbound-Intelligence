@@ -223,6 +223,16 @@ const caseStudyPreviews = [
     imageAlt: "Polene Signal case study preview",
   },
   {
+    match: "sandro",
+    imageSrc: "/case-studies/sandro-signal-case-study.png",
+    imageAlt: "Sandro Signal case study preview",
+  },
+  {
+    match: "dior",
+    imageSrc: "/case-studies/dior-signal-case-study.png",
+    imageAlt: "Dior Signal case study preview",
+  },
+  {
     match: "tag heuer",
     imageSrc: "/case-studies/tag-heuer-signal-case-study.png",
     imageAlt: "TAG Heuer Signal case study preview",
@@ -277,6 +287,33 @@ const supplementalCaseStudies = [
     ],
     source: "Copa Airlines Cross-Brand Performance Report 04/03/2025",
     persona: "Paid Search, Performance Marketing, Travel growth teams",
+  },
+  {
+    match: "sandro",
+    title: "Sandro reduces ad cost while organic traffic grows",
+    imageSrc: "/case-studies/sandro-signal-case-study.png",
+    imageAlt: "Sandro Signal case study preview",
+    industry: "Fashion and Luxury",
+    metrics: [
+      ["Ad cost", "-50% at equal performance"],
+      ["Average CPC", "-40%"],
+      ["Organic traffic", "+52%"],
+    ],
+    source: "Sandro Signal use case",
+    persona: "Paid Search, Performance Marketing, Digital Marketing",
+  },
+  {
+    match: "dior",
+    title: "Dior reduces branded media cost while maintaining performance",
+    imageSrc: "/case-studies/dior-signal-case-study.png",
+    imageAlt: "Dior Signal case study preview",
+    industry: "Fashion and Luxury",
+    metrics: [
+      ["Ad cost", "-54% at equal performance"],
+      ["Average CPC", "-60%"],
+    ],
+    source: "Dior Signal use case",
+    persona: "Paid Search, Performance Marketing, Luxury digital teams",
   },
 ] as const;
 
