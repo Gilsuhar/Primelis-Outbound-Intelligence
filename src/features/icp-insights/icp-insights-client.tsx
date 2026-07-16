@@ -4,6 +4,7 @@ import { BarChart3, Database, ExternalLink, ShieldAlert, Target, UsersRound } fr
 import { hubspotIcpSnapshot } from "./hubspot-icp-insights";
 
 const maxShare = Math.max(...hubspotIcpSnapshot.segments.map((segment) => segment.share));
+const maxTitleShare = Math.max(...hubspotIcpSnapshot.titleInsights.map((title) => title.share));
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
@@ -24,8 +25,9 @@ export function IcpInsightsClient() {
           <div>
             <h1 className="font-display text-4xl font-semibold text-ink">Signal ICP Insights</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-              Learn which account segments are already converting into Signal and legacy Cross Brand
-              opportunities, then use that evidence to choose better targets and sharper angles.
+              See which titles and industries are already showing up in Signal and legacy Cross Brand
+              meetings, advanced opportunities, and customer records, then use that evidence to choose better
+              targets.
             </p>
           </div>
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold text-[#6f6d5f]">
@@ -39,6 +41,126 @@ export function IcpInsightsClient() {
         {hubspotIcpSnapshot.stageMetrics.map((metric) => (
           <MetricCard detail={metric.detail} key={metric.label} label={metric.label} value={metric.value} />
         ))}
+      </section>
+
+      <section className="rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-5">
+        <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-olive">Title ranking</p>
+            <h2 className="mt-1 text-2xl font-semibold text-ink">Who actually turns into meetings and opportunities</h2>
+          </div>
+          <p className="max-w-xl text-sm leading-6 text-[#6f6d5f]">
+            Based on {hubspotIcpSnapshot.contactSample.count} HubSpot contacts associated with advanced
+            Signal / Cross Brand deals. Use this as the targeting order before writing outreach.
+          </p>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {hubspotIcpSnapshot.titleInsights.map((title) => (
+            <article className="rounded-2xl border border-line bg-cream p-4" key={title.titleGroup}>
+              <div className="grid gap-3 lg:grid-cols-[260px_1fr] lg:items-start">
+                <div>
+                  <span className="rounded-full bg-lime px-2 py-1 text-xs font-semibold text-ink">
+                    #{title.rank} · {title.contacts} contacts · {title.share}%
+                  </span>
+                  <h3 className="mt-3 font-semibold leading-6 text-ink">{title.titleGroup}</h3>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                    <div
+                      aria-label={`${title.titleGroup}: ${title.share}%`}
+                      className="h-full rounded-full bg-lime"
+                      style={{ width: `${Math.max(10, (title.share / maxTitleShare) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Best industries
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {title.strongestIndustries.map((industry) => (
+                        <span
+                          className="rounded-full border border-line bg-white px-2 py-1 text-xs font-medium text-[#6f6d5f]"
+                          key={industry}
+                        >
+                          {industry}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[#34352e]">{title.whatItMeans}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                      Example titles
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {title.exampleTitles.map((example) => (
+                        <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-ink" key={example}>
+                          {example}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-sm font-medium leading-6 text-ink">{title.targetingRule}</p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-5">
+        <div className="flex items-start gap-3 border-b border-line pb-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime text-ink">
+            <Target aria-hidden="true" className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-olive">Industry × title fit</p>
+            <h2 className="mt-1 text-2xl font-semibold text-ink">Which titles to target by industry</h2>
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[820px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-[0.14em] text-[#6f6d5f]">
+                <th className="py-3 pr-4 font-semibold">Industry</th>
+                <th className="px-4 py-3 font-semibold">Best titles</th>
+                <th className="px-4 py-3 font-semibold">Why it works</th>
+                <th className="px-4 py-3 font-semibold">Examples</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hubspotIcpSnapshot.industryTitleFit.map((fit) => (
+                <tr className="border-b border-line align-top last:border-b-0" key={fit.industry}>
+                  <td className="py-4 pr-4 font-semibold text-ink">{fit.industry}</td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {fit.bestTitles.map((title) => (
+                        <span className="rounded-full bg-cream px-2 py-1 text-xs font-medium text-ink" key={title}>
+                          {title}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 leading-6 text-[#34352e]">{fit.meetingSignal}</td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {fit.examples.map((example) => (
+                        <span
+                          className="rounded-full border border-line bg-cream px-2 py-1 text-xs font-medium text-[#6f6d5f]"
+                          key={example}
+                        >
+                          {example}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-5">

@@ -14,10 +14,33 @@ export type IcpStageMetric = {
   detail: string;
 };
 
+export type IcpTitleInsight = {
+  rank: number;
+  titleGroup: string;
+  contacts: number;
+  share: number;
+  strongestIndustries: string[];
+  exampleTitles: string[];
+  whatItMeans: string;
+  targetingRule: string;
+};
+
+export type IcpIndustryTitleFit = {
+  industry: string;
+  bestTitles: string[];
+  meetingSignal: string;
+  examples: string[];
+};
+
 export const hubspotIcpSnapshot = {
   pulledAt: "2026-07-16",
   sourceNote:
-    "HubSpot read-only snapshot. Direct Meeting Events require connector reauthorization, so this view uses accessible Signal/Cross Brand deal records, meeting-booked deal fields, and customer/opportunity suppression records.",
+    "HubSpot read-only snapshot. Direct Meeting Events require connector reauthorization, so this view uses accessible Signal/Cross Brand deal records, associated contacts, meeting-booked deal fields, and customer/opportunity suppression records.",
+  contactSample: {
+    count: 71,
+    description:
+      "Associated contacts from a 48-deal advanced Signal / Cross Brand sample. Use as a directional ICP signal until Meeting Events are reauthorized.",
+  },
   hubspotSearches: [
     {
       label: "Signal deal matches",
@@ -57,11 +80,161 @@ export const hubspotIcpSnapshot = {
       detail: "Signal deals in Intro booked, SQL, POA, proposal, negotiation, or closed-won stages.",
     },
     {
+      label: "Associated contacts analyzed",
+      value: "71",
+      detail: "Contacts attached to the advanced Signal / Cross Brand deal sample, used for title ranking.",
+    },
+    {
       label: "Meeting-booked Signal deals",
       value: "14",
       detail: "Deals where HubSpot exposes the meeting-booked property without Meeting Event permissions.",
     },
   ] satisfies IcpStageMetric[],
+  titleInsights: [
+    {
+      rank: 1,
+      titleGroup: "Manager / Senior Manager: paid media, growth, acquisition, digital",
+      contacts: 30,
+      share: 42,
+      strongestIndustries: ["Retail / e-commerce", "Fashion and luxury", "Gaming", "Travel"],
+      exampleTitles: [
+        "Growth Marketing Manager",
+        "Performance Marketing Manager",
+        "Senior Paid Acquisition Manager",
+        "Traffic Acquisition Manager",
+      ],
+      whatItMeans:
+        "The most responsive layer is hands-on ownership. These people feel the budget, reporting, and bid-control problem directly.",
+      targetingRule:
+        "Default first target when the account has clear paid-search activity. Keep the message practical and ask how they decide when branded ads should stay live.",
+    },
+    {
+      rank: 2,
+      titleGroup: "Director / Senior Director: performance, digital, e-commerce, marketing",
+      contacts: 13,
+      share: 18,
+      strongestIndustries: ["SaaS / software", "Fashion and luxury", "Home and services"],
+      exampleTitles: [
+        "Director of Performance Marketing",
+        "Senior Director, Digital & CRM",
+        "Ecommerce Director",
+        "Paid Media Director",
+      ],
+      whatItMeans:
+        "Directors care less about button-level mechanics and more about whether the team can prove incrementality and avoid waste.",
+      targetingRule:
+        "Use a sharper business framing: brand search can look efficient while hiding unnecessary spend. Avoid over-explaining the product.",
+    },
+    {
+      rank: 3,
+      titleGroup: "Head / Lead / VP: digital, growth, paid media, e-commerce",
+      contacts: 10,
+      share: 14,
+      strongestIndustries: ["Luxury portfolios", "B2B SaaS", "Multi-brand retail"],
+      exampleTitles: [
+        "Global Head of Paid Media",
+        "Head of Digital Marketing",
+        "VP of Ecommerce",
+        "Growth Marketing Lead",
+      ],
+      whatItMeans:
+        "This layer responds when the account has multi-market, multi-brand, or strategic ownership complexity.",
+      targetingRule:
+        "Lead with control and visibility across markets. Do not make it sound like a small bid-management trick.",
+    },
+    {
+      rank: 4,
+      titleGroup: "C-level / President / executive",
+      contacts: 6,
+      share: 8,
+      strongestIndustries: ["Enterprise retail", "Consumer brands", "Luxury"],
+      exampleTitles: ["Chief Revenue Officer", "Chief Financial Officer", "COO", "President"],
+      whatItMeans:
+        "Executives appear in the data, but they are not the safest default first target unless there is a warm path or commercial context.",
+      targetingRule:
+        "Use for referrals, expansion, or proof-heavy narratives. For cold outreach, target the operator first.",
+    },
+    {
+      rank: 5,
+      titleGroup: "Specialist / analyst / IC",
+      contacts: 6,
+      share: 8,
+      strongestIndustries: ["Finance", "Travel", "Retail"],
+      exampleTitles: ["Digital Data Analyst", "Digital Growth Specialist", "Performance Marketing"],
+      whatItMeans:
+        "ICs can validate the pain, but may not own budget or vendor decisions.",
+      targetingRule:
+        "Use only when they are clearly close to paid search or analytics. Ask for how the team currently monitors the issue.",
+    },
+    {
+      rank: 6,
+      titleGroup: "Adjacent / non-core roles",
+      contacts: 4,
+      share: 6,
+      strongestIndustries: ["Enterprise groups", "Holding companies"],
+      exampleTitles: ["Procurement", "Finance operations", "Indirect procurement"],
+      whatItMeans:
+        "These contacts show up in complex deals but should not define the outbound ICP.",
+      targetingRule:
+        "Treat as procurement or buying-process stakeholders after a commercial owner is engaged.",
+    },
+    {
+      rank: 7,
+      titleGroup: "Unknown or missing title",
+      contacts: 2,
+      share: 3,
+      strongestIndustries: ["Unclassified"],
+      exampleTitles: ["Missing job title"],
+      whatItMeans:
+        "Useful for CRM cleanup, not targeting guidance.",
+      targetingRule:
+        "Do not use missing-title records to shape outbound messaging.",
+    },
+  ] satisfies IcpTitleInsight[],
+  industryTitleFit: [
+    {
+      industry: "Fashion and luxury",
+      bestTitles: ["Digital / CRM Manager", "E-commerce Director", "Head of Digital", "Paid Media Manager"],
+      meetingSignal:
+        "Luxury accounts show both operator and senior digital ownership. The strongest angle is brand-search control without hurting organic visibility.",
+      examples: ["Dior", "Chloe", "TAG Heuer", "Birkenstock", "Fendi", "LOEWE"],
+    },
+    {
+      industry: "Retail and e-commerce",
+      bestTitles: ["Growth Marketing Manager", "Traffic Acquisition Manager", "Director of Performance Marketing"],
+      meetingSignal:
+        "Retail/e-commerce converts around practical budget waste: when competitors are absent, should paid brand stay live, lower bids, or pause?",
+      examples: ["Crocs", "Stitch Fix", "Catbird", "PlanetArt", "Picard", "SelectBlinds"],
+    },
+    {
+      industry: "SaaS and B2B technology",
+      bestTitles: ["Director of Growth Marketing", "Senior VP Marketing", "Demand Generation / Paid Media"],
+      meetingSignal:
+        "SaaS needs CAC, demo/MQL, and pipeline-efficiency language. Avoid fashion/retail phrasing.",
+      examples: ["AppsFlyer", "Apollo.io", "Similarweb", "Tenable", "Databricks", "Yotpo"],
+    },
+    {
+      industry: "Gaming and apps",
+      bestTitles: ["User Acquisition Manager", "Senior Paid Acquisition Manager", "Marketing Director"],
+      meetingSignal:
+        "UA teams understand bidding and incrementality quickly. Keep examples concrete and avoid generic brand language.",
+      examples: ["Playtika", "Plarium"],
+    },
+    {
+      industry: "Travel and mobility",
+      bestTitles: ["Performance Marketing", "Paid Media", "Acquisition"],
+      meetingSignal:
+        "Travel works when the message is market-by-market and competitor-presence driven.",
+      examples: ["Copa Airlines", "Universal Orlando", "Universal Studios Hollywood", "West Marine"],
+    },
+    {
+      industry: "Financial services",
+      bestTitles: ["Acquisition Manager", "Digital Marketing", "Performance / analytics"],
+      meetingSignal:
+        "The fit is real, but copy must stay cautious: visibility, control, and bid decisions without aggressive savings claims.",
+      examples: ["AXA", "Allianz", "MACIF", "Cofidis", "Boursorama"],
+    },
+  ] satisfies IcpIndustryTitleFit[],
   segments: [
     {
       segment: "Fashion, luxury, and apparel",
