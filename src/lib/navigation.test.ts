@@ -12,6 +12,7 @@ describe("role-based navigation", () => {
       "/",
       "/playbook",
       "/account-research",
+      "/icp-insights",
       "/create-outreach",
       "/build-sequence",
       "/reply-to-prospect",

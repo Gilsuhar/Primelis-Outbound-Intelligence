@@ -7,6 +7,7 @@ export type UiTextKey =
   | "nav.Home"
   | "nav.Signal Playbook"
   | "nav.Account Research"
+  | "nav.ICP Insights"
   | "nav.Create Outreach"
   | "nav.Build Sequence"
   | "nav.Reply to Prospect"
@@ -179,6 +180,7 @@ const english: Record<UiTextKey, string> = {
   "nav.Home": "Home",
   "nav.Signal Playbook": "Signal Playbook",
   "nav.Account Research": "Account Research",
+  "nav.ICP Insights": "ICP Insights",
   "nav.Create Outreach": "Create Outreach",
   "nav.Build Sequence": "Build Sequence",
   "nav.Reply to Prospect": "Reply to Prospect",
@@ -365,6 +367,7 @@ const french: Record<UiTextKey, string> = {
   "nav.Home": "Accueil",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Recherche compte",
+  "nav.ICP Insights": "Insights ICP",
   "nav.Create Outreach": "Créer un message",
   "nav.Build Sequence": "Créer une séquence",
   "nav.Reply to Prospect": "Répondre au prospect",
@@ -545,6 +548,7 @@ const portuguese: Record<UiTextKey, string> = {
   "nav.Home": "Início",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Pesquisa de conta",
+  "nav.ICP Insights": "Insights ICP",
   "nav.Create Outreach": "Criar mensagem",
   "nav.Build Sequence": "Criar sequência",
   "nav.Reply to Prospect": "Responder prospect",

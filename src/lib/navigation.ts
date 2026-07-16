@@ -10,6 +10,7 @@ import {
   Library,
   ListChecks,
   MessageSquareReply,
+  PieChart,
   SearchCheck,
   Send,
   Upload,
@@ -32,6 +33,11 @@ export const salesNavigation = [
     label: "Account Research",
     href: "/account-research",
     icon: Building2,
+  },
+  {
+    label: "ICP Insights",
+    href: "/icp-insights",
+    icon: PieChart,
   },
   {
     label: "Create Outreach",
