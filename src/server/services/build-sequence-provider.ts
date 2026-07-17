@@ -79,12 +79,12 @@ function ctaForPurpose(
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: "Do you already track this today?",
-    PROBLEM_FRAMING: "Is this something your team checks regularly?",
-    METHODOLOGY_DIFFERENTIATION: "Would that be useful to see?",
+    PROBLEM_FRAMING: "Is this already part of your paid-brand review?",
+    METHODOLOGY_DIFFERENTIATION: "Would a simple view of this be useful?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Want the short version of how another team approached this?",
     TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
-    LOW_PRESSURE_FOLLOW_UP: "Should I leave this for later?",
+    LOW_PRESSURE_FOLLOW_UP: "Should I park this for later?",
     BREAKUP_CLOSE_LOOP: "If this is not relevant, I can close the loop here.",
   };
   return ctas[purpose];
@@ -94,7 +94,7 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
   const company = input.companyName;
   const subjects: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: `${company} paid brand question`,
-    PROBLEM_FRAMING: `When brand clicks are already yours`,
+    PROBLEM_FRAMING: `When branded clicks are already yours`,
     METHODOLOGY_DIFFERENTIATION: `Lower bids without losing coverage`,
     ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
     SOCIAL_PROOF: `A practical paid-brand example`,
@@ -144,19 +144,20 @@ function bodyForPurpose({
       greeting(input),
       "",
       `I had ${input.companyName} on my list because branded search can look healthy in reports even when some paid clicks are not changing the outcome.`,
-      "The question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.",
+      "Quick question: how do you handle branded ads when nobody else is bidding?",
+      "Signal looks at paid coverage, organic visibility, and live search-page activity so teams can see when branded ads are protecting demand and when bids can safely come down.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The part that is easy to miss is quiet branded terms where nobody else is bidding.",
-      "Reports can still show efficient conversions, but the spend may be buying demand you already own.",
+      "The tricky part is that branded campaigns can look efficient in reports even when some paid clicks are not changing the outcome.",
+      "The practical check is simple: if no one is bidding on the brand, would organic have captured most of that demand anyway?",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "A useful way to look at this is not paid or organic in theory, but what is happening on the search page at the moment of the search.",
-      "If other advertisers are present, paid coverage may be protecting demand. If they are absent, the question becomes whether the paid click is still adding value.",
+      "A useful way to look at this is not paid or organic in theory. It is what is happening on the search page at the moment of the search.",
+      "If other advertisers are present, paid coverage may be protecting demand. If they are absent, the next move may be lowering bids or pausing until the page changes again.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -187,7 +188,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       "I will close the loop after this note.",
-      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you stop paying for clicks you would have captured anyway?",
+      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you avoid paying for demand the brand already owns?",
     ],
   };
 

@@ -79,7 +79,7 @@ function deckReply(input: ReplyToProspectInput, facts: string[]) {
 
 function intentBridge(intents: ProspectIntent[]) {
   if (intents.includes("EXISTING_VENDOR")) {
-    return "I would not frame this as replacing what you already use. The question is whether you have a clear way to decide when paid brand is still needed versus what organic already captures.";
+    return "I would not position this as a replacement. The useful gap is the decision layer: when to keep paid brand live, when to lower bids, and when organic is already enough.";
   }
   if (intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")) {
     return "I would look at it less as 'are competitors bidding?' and more as 'what would happen if we changed paid coverage?'";
@@ -123,19 +123,19 @@ function existingVendorReply(input: ReplyToProspectInput) {
   if (vendor === "Revvim") {
     const answer =
       input.desiredLength === "SHORT"
-        ? "The gap I would check is broader than pausing brand ads when nobody else is bidding: can it also lower CPC when other advertisers are present, while keeping you covered?"
-        : "The gap I would check is broader than pausing brand ads when nobody else is bidding. Signal is also built for the moments when other advertisers are present: how low can CPC go while you stay covered, using paid and organic visibility together instead of paid search alone?";
-    const cta = "Is that already covered on your side?";
+        ? "The question I would ask is narrower: when the page changes, can you automatically decide whether to pause, lower CPC, or stay covered?"
+        : "The question I would ask is narrower: when the search page changes, can you automatically decide whether to pause, lower CPC, or stay covered without turning it into a manual review? That is usually where paid-brand waste hides.";
+    const cta = "Do you already have that decision automated?";
     return [opener, answer, cta].join(" ");
   }
   const answer =
     vendor === "Auction Insights"
-      ? "The gap I would check is whether those signals turn into action automatically: pause when nobody else is bidding, lower CPC when coverage is still needed, and bring coverage back when the page changes."
-      : "The gap I would check is narrower: when nobody else is bidding, can the system safely lower or pause branded ads without losing the click, then bring coverage back when the page changes?";
+      ? "The gap I would check is whether those signals turn into action: pause when nobody else is bidding, lower CPC when coverage is still needed, and bring coverage back when the page changes."
+      : "The gap I would check is whether your setup moves from insight to action: pause, lower CPC, or stay covered based on what is actually happening on the search page.";
   const cta =
     input.channel === "LINKEDIN"
-      ? "Do you already automate that part, or is it still a manual review?"
-      : "Do you already automate that part, or is it still a manual review?";
+      ? "Is that automated today?"
+      : "Is that automated today, or still reviewed manually?";
   return [opener, answer, cta].join(" ");
 }
 
@@ -165,7 +165,7 @@ function defaultReply(input: ReplyToProspectInput, intents: ProspectIntent[], pr
   const cta =
     input.channel === "LINKEDIN"
       ? "Do you already track this today?"
-      : "Is this something your team already checks?";
+      : "Is this already part of your paid-brand review?";
   const bridge = intentBridge(intents);
 
   return [

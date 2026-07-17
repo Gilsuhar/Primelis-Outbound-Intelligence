@@ -640,14 +640,29 @@ export function PlaybookClient({
       >
         <div className="grid gap-4 md:grid-cols-2">
           {[
-            "Expect titles like VP Performance Marketing, Head of Growth, Director of Demand Generation, SEM Manager, and PPC Lead.",
-            "Use shorter, more direct outreach with a professional but less formal tone.",
-            "Lead with relevance and a specific reason for writing, not company history.",
-            "Use soft, specific CTAs and respect US time zones when scheduling.",
-            "Check whether ownership sits at HQ, regional, or global level before assuming the buyer.",
+            {
+              title: "Target practical owners",
+              body: "Prioritize people who own paid-search outcomes: VP Performance Marketing, Head of Growth, Director Demand Gen, SEM/PPC Lead, Paid Media, or Acquisition.",
+            },
+            {
+              title: "Write like a US seller",
+              body: "Keep it short, plain, and direct. Avoid long context, internal labels, and product vocabulary the buyer would not use.",
+            },
+            {
+              title: "Open with relevance",
+              body: "Start with why this account is worth checking now: brand demand, paid-brand spend, competitors, market complexity, or a visible trigger.",
+            },
+            {
+              title: "Ask one soft question",
+              body: "Use one specific CTA. Good: 'Do you already track this today?' or 'Is this something your team checks?' Avoid repeated 'quick compare' language.",
+            },
+            {
+              title: "Confirm ownership",
+              body: "Before assuming the buyer, check whether paid brand is owned at HQ, regional, agency, digital, growth, or paid-search level.",
+            },
           ].map((item) => (
-            <CompactDetails key={item} title="Guidance">
-              {item}
+            <CompactDetails key={item.title} title={item.title}>
+              {item.body}
             </CompactDetails>
           ))}
         </div>

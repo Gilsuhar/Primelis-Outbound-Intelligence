@@ -224,9 +224,8 @@ describe("Reply to Prospect service", () => {
     if (result.ok) {
       expect(result.data.detectedIntent).toContain("EXISTING_VENDOR");
       expect(result.data.recommendedReply).toMatch(/Revvim is a serious setup/i);
-      expect(result.data.recommendedReply).toMatch(/broader than pausing brand ads/i);
-      expect(result.data.recommendedReply).toMatch(/lower CPC when other advertisers are present/i);
-      expect(result.data.recommendedReply).toMatch(/already covered/i);
+      expect(result.data.recommendedReply).toMatch(/pause, lower CPC, or stay covered/i);
+      expect(result.data.recommendedReply).toMatch(/decision automated/i);
       expect(result.data.recommendedReply).not.toMatch(/replace|replacing/i);
       expect(result.data.recommendedReply).not.toMatch(/better than|weaker than/i);
     }

@@ -282,7 +282,7 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
       expect(result.data.steps[0].messageBody).toMatch(/branded search can look healthy/i);
-      expect(result.data.steps[1].messageBody).toMatch(/demand you already own/i);
+      expect(result.data.steps[1].messageBody).toMatch(/organic have captured most of that demand/i);
       expect(result.data.steps[2].messageBody).toMatch(/close the loop/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
