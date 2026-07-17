@@ -13,6 +13,7 @@ import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
+import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type { SignalBrainMode, SignalBrainResult } from "@/features/ask-signal-brain/types";
 
@@ -181,33 +182,27 @@ export function AskSignalBrainClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-olive">
-          {t("workflow.eyebrow")}
-        </p>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
-            <h1 className="font-display text-4xl font-semibold leading-[1.22] text-ink">
-              {t("workflow.brain.title")}
-            </h1>
-            <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-              {t("workflow.brain.description")}
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
-            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
-            {t("workflow.approvedKnowledge")}
-          </div>
-        </div>
-      </section>
+    <WorkflowPage
+      badge={
+        <WorkflowBadge>
+          <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
+          {t("workflow.approvedKnowledge")}
+        </WorkflowBadge>
+      }
+      description={t("workflow.brain.description")}
+      eyebrow={t("workflow.eyebrow")}
+      title={t("workflow.brain.title")}
+    >
 
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <form action={onSubmit} className="space-y-4 rounded-2xl border border-line bg-white p-5">
-          <div className="flex items-center gap-2 border-b border-line pb-3">
-            <Brain aria-hidden="true" className="h-5 w-5 text-olive" />
-            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickQuestion")}</h2>
-          </div>
+        <form
+          action={onSubmit}
+          className="space-y-4 rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]"
+        >
+          <WorkflowSectionTitle
+            icon={<Brain aria-hidden="true" className="h-5 w-5" />}
+            title={t("workflow.quickQuestion")}
+          />
 
           <SmartField
             label={t("workflow.brain.questionLabel")}
@@ -293,10 +288,12 @@ export function AskSignalBrainClient() {
         </form>
 
         <section className="space-y-4">
-          <article className="rounded-2xl border border-line bg-white p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <FileText aria-hidden="true" className="h-5 w-5 text-olive" />
-              <h2 className="text-lg font-semibold text-ink">{t("workflow.answer")}</h2>
+          <article className="rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]">
+            <div className="mb-3">
+              <WorkflowSectionTitle
+                icon={<FileText aria-hidden="true" className="h-5 w-5" />}
+                title={t("workflow.answer")}
+              />
             </div>
             {result ? (
               <div className="space-y-4">
@@ -445,6 +442,6 @@ export function AskSignalBrainClient() {
           ) : null}
         </section>
       </div>
-    </div>
+    </WorkflowPage>
   );
 }

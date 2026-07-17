@@ -18,6 +18,7 @@ import type {
 } from "@/features/account-research/types";
 import { industries } from "@/features/playbook/playbook-content";
 import { useOutputLanguage } from "@/components/language-selector";
+import { WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 
 const yesNoUnknown: Array<{ label: string; value: YesNoUnknown }> = [
@@ -277,28 +278,22 @@ export function AccountResearchClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-olive">
-          {t("workflow.eyebrow")}
-        </p>
-        <div className="space-y-2">
-          <h1 className="font-display text-4xl font-semibold leading-[1.22] text-ink">
-            {t("account.title")}
-          </h1>
-          <p className="max-w-3xl text-sm leading-6 text-[#6f6d5f]">
-            {t("account.description")}
-          </p>
-        </div>
-      </section>
+    <WorkflowPage
+      description={t("account.description")}
+      eyebrow={t("workflow.eyebrow")}
+      title={t("account.title")}
+    >
 
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <form action={onSubmit} className="space-y-4 rounded-2xl border border-line bg-white p-5">
+        <form
+          action={onSubmit}
+          className="space-y-4 rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]"
+        >
           <section className="space-y-3">
-            <div className="flex items-center gap-2 border-b border-line pb-3">
-              <Building2 aria-hidden="true" className="h-5 w-5 text-olive" />
-              <h2 className="text-lg font-semibold text-ink">{t("account.step1")}</h2>
-            </div>
+            <WorkflowSectionTitle
+              icon={<Building2 aria-hidden="true" className="h-5 w-5" />}
+              title={t("account.step1")}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
                 {t("account.companyName")}
@@ -790,6 +785,6 @@ export function AccountResearchClient() {
           ) : null}
         </section>
       </div>
-    </div>
+    </WorkflowPage>
   );
 }

@@ -11,6 +11,7 @@ import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { personas } from "@/features/playbook/playbook-content";
+import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   ReplyChannel,
@@ -115,35 +116,28 @@ export function ReplyToProspectClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-signal">
-          {t("workflow.eyebrow")}
-        </p>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold text-ink">{t("workflow.reply.title")}</h1>
-            <p className="max-w-3xl text-sm leading-6 text-stone-600">
-              {t("workflow.reply.description")}
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-stone-600">
-            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
-            {t("workflow.approvedKnowledge")}
-          </div>
-        </div>
-      </section>
+    <WorkflowPage
+      badge={
+        <WorkflowBadge>
+          <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#32795d]" />
+          {t("workflow.approvedKnowledge")}
+        </WorkflowBadge>
+      }
+      description={t("workflow.reply.description")}
+      eyebrow={t("workflow.eyebrow")}
+      title={t("workflow.reply.title")}
+    >
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <form
           action={onSubmit}
-          className="space-y-4 rounded-lg border border-line bg-white p-4 shadow-sm"
+          className="space-y-4 rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]"
         >
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
-          <div className="flex items-center gap-2 border-b border-line pb-3">
-            <MessageSquareReply aria-hidden="true" className="h-5 w-5 text-signal" />
-            <h2 className="text-lg font-semibold text-ink">{t("workflow.quickReplyBrief")}</h2>
-          </div>
+          <WorkflowSectionTitle
+            icon={<MessageSquareReply aria-hidden="true" className="h-5 w-5" />}
+            title={t("workflow.quickReplyBrief")}
+          />
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">
             {t("workflow.prospectMessage")}
@@ -242,10 +236,12 @@ export function ReplyToProspectClient() {
         </form>
 
         <section className="space-y-4">
-          <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <FileText aria-hidden="true" className="h-5 w-5 text-signal" />
-              <h2 className="text-lg font-semibold text-ink">{t("workflow.generatedResponse")}</h2>
+          <article className="rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]">
+            <div className="mb-3">
+              <WorkflowSectionTitle
+                icon={<FileText aria-hidden="true" className="h-5 w-5" />}
+                title={t("workflow.generatedResponse")}
+              />
             </div>
             {result ? (
               <div className="space-y-4">
@@ -350,6 +346,6 @@ export function ReplyToProspectClient() {
           ) : null}
         </section>
       </div>
-    </div>
+    </WorkflowPage>
   );
 }
