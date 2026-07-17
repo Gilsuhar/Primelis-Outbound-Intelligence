@@ -125,19 +125,31 @@ export class HubSpotApiClient implements HubSpotPushClient {
     if (!this.token) {
       throw new Error("HUBSPOT_PRIVATE_APP_TOKEN is not configured.");
     }
-    const response = await fetch(`https://api.hubapi.com${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`HubSpot API failed: ${response.status} ${body.slice(0, 300)}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(`https://api.hubapi.com${path}`, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+          ...(init.headers ?? {}),
+        },
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`HubSpot API failed: ${response.status} ${body.slice(0, 300)}`);
+      }
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("HubSpot API timed out. Nothing may have been created - check HubSpot before retrying.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-    return (await response.json()) as T;
   }
 
   async searchCompany({ companyName, domain }: { companyName: string; domain?: string }) {
