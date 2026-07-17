@@ -36,12 +36,16 @@ const questionTemplates = [
 ];
 
 const companySizeOptions = [
-  "$20M-$50M revenue or 100-200 employees",
-  "$50M+ revenue or 200+ employees",
-  "$20K+ monthly branded-search spend",
-  "Enterprise / multi-market account",
-  "Unknown size; qualify first",
+  "Strong fit — confirmed",
+  "Potential fit — validate spend/demand",
+  "Enterprise — qualify",
+  "Insufficient data",
+  "Not a fit",
 ];
+
+const buyerRoleOptions = personas
+  .map((persona) => persona.name)
+  .filter((name) => name !== "Brand Marketing or Brand Leadership");
 
 const marketOptions = [
   "United States",
@@ -239,7 +243,7 @@ export function AskSignalBrainClient() {
               <SmartField
                 label={t("workflow.buyerRole")}
                 name="contactRole"
-                options={personas.map((persona) => persona.name)}
+                options={buyerRoleOptions}
               />
               <SmartField
                 label={t("workflow.industry")}

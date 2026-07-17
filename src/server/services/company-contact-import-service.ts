@@ -130,7 +130,7 @@ function classifyCompanyRow(row: Record<string, string>): Record<string, string>
   let industry = row.industry?.trim() || "";
   let persona = "Head or Director of Paid Search";
   let angle = "Brand-search efficiency";
-  let fit = "Possible fit - validate brand demand first";
+  let fit = "Potential fit — validate spend/demand";
   const notes: string[] = [];
 
   if (
@@ -198,10 +198,10 @@ function classifyCompanyRow(row: Record<string, string>): Record<string, string>
   }
 
   if (/\$?50m|\$?100m|\$?250m|\$?500m|enterprise|1000|5000|10,000|200\+/.test(sizeText)) {
-    fit = "Strong fit - brand demand and paid-search owner";
+    fit = "Strong fit — confirmed";
     notes.push("Size/spend context suggests the account may justify a brand-search check.");
   } else if (/\$?20m|100-200|100\+|mid-market/.test(sizeText)) {
-    fit = "Possible fit - validate brand demand first";
+    fit = "Potential fit — validate spend/demand";
     notes.push("Mid-market signal found; validate branded-search activity first.");
   }
 

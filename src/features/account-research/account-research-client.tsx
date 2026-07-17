@@ -44,12 +44,8 @@ const marketOptions = [
   "Global brand",
 ];
 const revenueOptions = [
-  "Core ICP: brand demand + paid-search ownership",
-  "Possible ICP: validate brand demand first",
-  "Do not target yet: missing paid-search signal",
   "$20M-$50M revenue",
   "$50M+ revenue",
-  "$20K+ monthly branded-search spend",
   "Unknown",
 ];
 const employeeOptions = ["100-200 employees", "200+ employees", "Enterprise team", "Unknown"];

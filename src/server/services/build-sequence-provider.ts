@@ -55,6 +55,9 @@ function cleanSelection(value?: string) {
   return value
     .replace(/^Strong fit\s*-\s*/i, "")
     .replace(/^Possible fit\s*-\s*/i, "")
+    .replace(/^Strong fit\s*—\s*/i, "")
+    .replace(/^Potential fit\s*—\s*/i, "")
+    .replace(/^Enterprise\s*—\s*/i, "")
     .replace(/^Core ICP:\s*/i, "")
     .replace(/^Quick discovery:\s*/i, "")
     .trim();

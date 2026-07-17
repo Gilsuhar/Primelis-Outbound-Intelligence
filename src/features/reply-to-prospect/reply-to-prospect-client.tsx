@@ -32,6 +32,10 @@ const lengthOptions: { label: string; value: ReplyLength }[] = [
   { label: "Detailed", value: "DETAILED" },
 ];
 
+const buyerRoleOptions = personas
+  .map((persona) => persona.name)
+  .filter((name) => name !== "Brand Marketing or Brand Leadership");
+
 function OptionalSelect({
   name,
   label,
@@ -162,7 +166,7 @@ export function ReplyToProspectClient() {
             <OptionalSelect
               label={t("workflow.buyerRole")}
               name="contactRole"
-              options={personas.map((persona) => persona.name)}
+              options={buyerRoleOptions}
             />
           </div>
 
