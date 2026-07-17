@@ -24,6 +24,38 @@ const quickCommands: Array<{ label: string; command: RefinementCommand }> = [
   { label: "Fix safety", command: "FIX_SAFETY" },
 ];
 
+function formatDraftForDisplay(content: string) {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => {
+          if (!item || typeof item !== "object") return "";
+          const step = item as {
+            stepNumber?: number;
+            delay?: string;
+            subjectLine?: string;
+            messageBody?: string;
+            cta?: string;
+          };
+          return [
+            `Step ${step.stepNumber ?? ""}${step.delay ? ` - ${step.delay}` : ""}`.trim(),
+            step.subjectLine,
+            step.messageBody,
+            step.cta,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+        })
+        .filter(Boolean)
+        .join("\n\n---\n\n");
+    }
+  } catch {
+    return content;
+  }
+  return content;
+}
+
 export function DraftRefinementPanel({
   draftId,
   workflow,
@@ -75,6 +107,7 @@ export function DraftRefinementPanel({
       }
       setResult(response.data);
       setManualContent(response.data.currentVersion.generatedContent);
+      setMessage(`Created version ${response.data.currentVersion.versionNumber}.`);
     });
   }
 
@@ -91,6 +124,7 @@ export function DraftRefinementPanel({
         return;
       }
       setResult(response.data as DraftRefinementResult);
+      setMessage(`Saved version ${response.data.currentVersion.versionNumber}.`);
     });
   }
 
@@ -107,6 +141,7 @@ export function DraftRefinementPanel({
       }
       setResult(response.data as DraftRefinementResult);
       setManualContent(response.data.currentVersion.generatedContent);
+      setMessage(`Restored version ${response.data.currentVersion.versionNumber}.`);
     });
   }
 
@@ -122,6 +157,14 @@ export function DraftRefinementPanel({
       <p className="mt-1 text-sm text-[#6f6d5f]">
         Each action creates a new version. No draft is sent or approved automatically.
       </p>
+      {message ? (
+        <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm text-[#34352e]">{message}</p>
+      ) : null}
+      {isPending ? (
+        <p className="mt-3 rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]">
+          Updating the draft...
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {quickCommands.map((item) => (
           <button
@@ -163,7 +206,7 @@ export function DraftRefinementPanel({
               {result.safetyStatus}
             </div>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#34352e]">
-              {current.generatedContent}
+              {formatDraftForDisplay(current.generatedContent)}
             </p>
             {current.safetyFlags.length > 0 ? (
               <ul className="mt-2 space-y-1 text-xs text-[#9a3f24]">
@@ -224,7 +267,6 @@ export function DraftRefinementPanel({
         </details>
       ) : null}
 
-      {message ? <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm">{message}</p> : null}
     </section>
   );
 }

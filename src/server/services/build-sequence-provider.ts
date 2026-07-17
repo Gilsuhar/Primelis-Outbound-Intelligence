@@ -48,6 +48,17 @@ function greeting(input: BuildSequenceInput) {
   return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
 }
 
+function displayCompany(input: BuildSequenceInput) {
+  const company = input.companyName.trim();
+  if (!company) {
+    return "this account";
+  }
+  if (company === company.toLowerCase()) {
+    return company.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  }
+  return company;
+}
+
 function cleanSelection(value?: string) {
   if (!value) {
     return undefined;
@@ -81,9 +92,9 @@ function ctaForPurpose(
       : "Is this on your radar?";
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you already track this today?",
-    PROBLEM_FRAMING: "Is this already part of your paid-brand review?",
-    METHODOLOGY_DIFFERENTIATION: "Would a simple view of this be useful?",
+    FIRST_TOUCH_RELEVANCE: "Do you already have a way to detect that?",
+    PROBLEM_FRAMING: "Do you have visibility into when this happens?",
+    METHODOLOGY_DIFFERENTIATION: "Is this something your team already checks regularly?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Want the short version of how another team approached this?",
     TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
@@ -94,11 +105,11 @@ function ctaForPurpose(
 }
 
 function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"], stepNumber: number) {
-  const company = input.companyName;
+  const company = displayCompany(input);
   const subjects: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: `${company} paid brand question`,
-    PROBLEM_FRAMING: `When branded clicks are already yours`,
-    METHODOLOGY_DIFFERENTIATION: `Lower bids without losing coverage`,
+    FIRST_TOUCH_RELEVANCE: `${company} branded ads question`,
+    PROBLEM_FRAMING: `Re: deactivating branded ads`,
+    METHODOLOGY_DIFFERENTIATION: `Re: lower branded CPC`,
     ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
     SOCIAL_PROOF: `A practical paid-brand example`,
     TECHNICAL_CLARIFICATION: `Paid brand methodology`,
@@ -109,7 +120,7 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 }
 
 function connectionRequestFor(input: BuildSequenceInput) {
-  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${input.companyName}. Open to connecting?`;
+  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${displayCompany(input)}. Open to connecting?`;
 }
 
 function humanizeFact(fact: string) {
@@ -141,31 +152,33 @@ function bodyForPurpose({
   secondaryFact: string;
 }) {
   const trigger = input.observedTrigger.trim();
+  const company = displayCompany(input);
   const simpleSecondaryFact = humanizeFact(secondaryFact);
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `I had ${input.companyName} on my list because branded search can look healthy in reports even when some paid clicks are not changing the outcome.`,
-      "Quick question: how do you handle branded ads when nobody else is bidding?",
-      "Signal looks at paid coverage, organic visibility, and live search-page activity so teams can see when branded ads are protecting demand and when bids can safely come down.",
+      `Quick question on ${company} brand search: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
+      "Signal helps teams monitor search results and adjust branded coverage when other advertisers are not bidding, instead of paying for clicks that may not add value.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "The tricky part is that branded campaigns can look efficient in reports even when some paid clicks are not changing the outcome.",
-      "The practical check is simple: if no one is bidding on the brand, would organic have captured most of that demand anyway?",
+      "For context, Google does not offer an easy way to automatically pause or adjust branded ads when no other advertisers are bidding.",
+      "As a result, many teams keep paying for clicks that could have been captured organically or at a much lower CPC.",
+      `That is the gap I would check at ${company}: can you see when this happens, and act on it without a manual review?`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "A useful way to look at this is not paid or organic in theory. It is what is happening on the search page at the moment of the search.",
-      "If other advertisers are present, paid coverage may be protecting demand. If they are absent, the next move may be lowering bids or pausing until the page changes again.",
+      "One other angle: this is not always about turning brand ads off.",
+      "In some cases, the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.",
+      "That is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
       "",
-      `The only assumption I would make about ${input.companyName} is a light one: ${cleanSelection(trigger) ?? trigger}.`,
+      `The only assumption I would make about ${company} is a light one: ${cleanSelection(trigger) ?? trigger}.`,
       "I would not pitch that as proof. I would use it as a reason to check whether paid brand is still doing work organic cannot do.",
     ],
     SOCIAL_PROOF: [
@@ -191,7 +204,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       "I will close the loop after this note.",
-      "If paid-brand efficiency becomes a priority later, the useful starting point is simple: when nobody is bidding, can you avoid paying for demand the brand already owns?",
+      "If branded-search efficiency becomes a priority later, the useful starting point is straightforward: where is paid coverage protecting demand, and where is it only adding cost?",
     ],
   };
 

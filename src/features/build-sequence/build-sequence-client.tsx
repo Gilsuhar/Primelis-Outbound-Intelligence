@@ -113,31 +113,41 @@ function inferDomain(company: string) {
   return cleaned ? `${cleaned}.com` : "";
 }
 
+function displayCompanyName(company: string) {
+  const trimmed = company.trim();
+  if (!trimmed) return "this account";
+  if (trimmed === trimmed.toLowerCase()) {
+    return trimmed.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  }
+  return trimmed;
+}
+
 function variantIndex(current: number, length: number) {
   return (current + 1) % length;
 }
 
 function subjectVariants(step: SequenceStep, company: string) {
+  const account = displayCompanyName(company);
   const byPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       step.subjectLine ?? "",
-      `${company} paid brand question`,
-      `Quick thought on ${company} brand search`,
+      `${account} branded ads question`,
+      `When nobody is bidding on ${account}`,
     ],
     PROBLEM_FRAMING: [
       step.subjectLine ?? "",
-      "When paid brand looks too good",
-      `Paid brand waste at ${company}?`,
+      "Re: deactivating branded ads",
+      `Paid brand waste at ${account}?`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       step.subjectLine ?? "",
-      "A cleaner brand-search test",
-      `How to check paid brand at ${company}`,
+      "Re: lower branded CPC",
+      "Lower bids without losing coverage",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       step.subjectLine ?? "",
-      `${company}: one brand-search check`,
-      `A narrow question for ${company}`,
+      `${account}: one brand-search check`,
+      `A narrow question for ${account}`,
     ],
     SOCIAL_PROOF: [
       step.subjectLine ?? "",
@@ -151,7 +161,7 @@ function subjectVariants(step: SequenceStep, company: string) {
     ],
     LOW_PRESSURE_FOLLOW_UP: [
       step.subjectLine ?? "",
-      `Quick follow-up on ${company}`,
+      `Quick follow-up on ${account}`,
       "Worth revisiting later?",
     ],
     BREAKUP_CLOSE_LOOP: [step.subjectLine ?? "", "Closing the loop", "Last note on paid brand"],
@@ -161,36 +171,37 @@ function subjectVariants(step: SequenceStep, company: string) {
 
 function bodyVariants(step: SequenceStep, company: string) {
   const firstLine = step.messageBody.split("\n").find(Boolean) ?? "Hi there,";
+  const account = displayCompanyName(company);
 
   if (step.purpose === "FIRST_TOUCH_RELEVANCE") {
     return [
       step.messageBody,
-      `${firstLine}\n\nI had ${company} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nWorth checking where paid coverage is still useful and where organic already does enough.`,
-      `${firstLine}\n\nQuick thought on ${company}: brand search is usually not a yes/no channel. The useful question is which coverage protects demand and which spend is no longer doing much work.`,
+      `${firstLine}\n\nQuick question on ${account} brand search: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?\n\nSignal helps teams monitor search results and adjust branded coverage when other advertisers are not bidding, instead of paying for clicks that may not add value.`,
+      `${firstLine}\n\nI had ${account} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nThe question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.`,
     ];
   }
 
   if (step.purpose === "PROBLEM_FRAMING") {
     return [
       step.messageBody,
-      `${firstLine}\n\nThe awkward part is that branded campaigns often look efficient because the person already wanted the brand.\n\nThat makes it hard to know what paid search protected, and what organic would have captured anyway.`,
-      `${firstLine}\n\nThe risk is not running paid brand. The risk is treating every brand click as equally valuable, even when organic results may already be carrying part of the demand.`,
+      `${firstLine}\n\nFor context, Google does not offer an easy way to automatically pause or adjust branded ads when no other advertisers are bidding.\n\nAs a result, many teams keep paying for clicks that could have been captured organically or at a much lower CPC.\n\nDo you have visibility into when this happens?`,
+      `${firstLine}\n\nGoogle does not provide an automated way to pause or down-bid branded ads when no other advertisers are bidding.\n\nAs a result, most brands keep paying for clicks they would have received organically.\n\nSignal identifies these moments and can reduce or pause bids until competition returns, while preserving brand coverage and performance.`,
     ];
   }
 
   if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
     return [
       step.messageBody,
-      `${firstLine}\n\nThe method I would test is simple: look at paid ads, organic results, and who else is bidding before changing bids.\n\nThen the decision becomes practical: stay live, lower CPC, or pause until the page changes.`,
-      `${firstLine}\n\nInstead of another dashboard, the useful output is a decision: where paid brand still protects revenue, and where it can be reduced without losing the outcome.`,
+      `${firstLine}\n\nOne other angle: this is not always about turning brand ads off.\n\nIn some cases, the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.\n\nThat is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.`,
+      `${firstLine}\n\nA useful way to look at this is what is happening on the search page at the moment of the search.\n\nIf other advertisers are present, paid coverage may be protecting demand. If they are absent, the next move may be lowering bids or pausing until the page changes again.`,
     ];
   }
 
   if (step.purpose === "ACCOUNT_SPECIFIC_OBSERVATION") {
     return [
       step.messageBody,
-      `${firstLine}\n\nI would keep the ${company} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is waste.`,
-      `${firstLine}\n\nFor ${company}, I would frame this as a quick validation rather than a pitch: is paid coverage needed everywhere, or only when organic and competitor conditions make it useful?`,
+      `${firstLine}\n\nI would keep the ${account} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is waste.`,
+      `${firstLine}\n\nFor ${account}, I would frame this as a quick validation rather than a pitch: is paid coverage needed everywhere, or only when organic and search-page conditions make it useful?`,
     ];
   }
 
@@ -229,18 +240,18 @@ function ctaVariants(step: SequenceStep) {
   const byPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       step.cta,
-      "Do you already track this today?",
-      "Is this something your team checks today?",
+      "Do you already have a way to detect that?",
+      "How do you currently catch this?",
     ],
     PROBLEM_FRAMING: [
       step.cta,
-      "Is this something your team is already trying to separate?",
-      "Worth seeing if this is relevant?",
+      "Do you have visibility into when this happens?",
+      "Is this already part of your paid-brand review?",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       step.cta,
-      "Worth pressure-testing your current method against this?",
-      "Would a two-point methodology view help?",
+      "Is this something your team already checks regularly?",
+      "Do you currently have a way to detect and manage this?",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       step.cta,
@@ -265,7 +276,7 @@ function ctaVariants(step: SequenceStep) {
     BREAKUP_CLOSE_LOOP: [
       step.cta,
       "If this is not relevant, I can close the loop here.",
-      "No worries if this is not a priority.",
+      "If this is not relevant right now, no problem at all.",
     ],
   };
   return byPurpose[step.purpose].filter(Boolean);

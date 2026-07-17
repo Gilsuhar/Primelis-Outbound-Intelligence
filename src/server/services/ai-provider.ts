@@ -89,7 +89,9 @@ function shorten(text: string) {
 
 function commandPrefix(command?: RefinementCommand) {
   const labels: Partial<Record<RefinementCommand, string>> = {
+    REGENERATE: "Regenerated version:",
     PERSONALIZE: "More tailored version:",
+    SHORTEN: "Shorter version:",
     LESS_SALESY: "Less salesy version:",
     MORE_DIRECT: "More direct version:",
     WARMER: "Warmer version:",
@@ -103,6 +105,44 @@ function commandPrefix(command?: RefinementCommand) {
   return command ? labels[command] : undefined;
 }
 
+function formatSequenceDraft(content: string, command?: RefinementCommand) {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (!Array.isArray(parsed)) return undefined;
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return "";
+        const step = item as {
+          stepNumber?: number;
+          delay?: string;
+          subjectLine?: string;
+          messageBody?: string;
+          cta?: string;
+        };
+        const body =
+          command === "SHORTEN"
+            ? shorten(stripUnsafeTerms(step.messageBody ?? ""))
+            : stripUnsafeTerms(step.messageBody ?? "");
+        const cta =
+          command === "CHANGE_CTA"
+            ? "Do you already have a way to catch this?"
+            : stripUnsafeTerms(step.cta ?? "");
+        return [
+          `Step ${step.stepNumber ?? ""}${step.delay ? ` - ${step.delay}` : ""}`.trim(),
+          step.subjectLine,
+          body,
+          cta,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+      })
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+  } catch {
+    return undefined;
+  }
+}
+
 function deterministicResponse(request: AiDraftRequest): AiDraftResponse {
   const base =
     request.currentDraft?.trim() ||
@@ -110,8 +150,14 @@ function deterministicResponse(request: AiDraftRequest): AiDraftResponse {
     "I can only draft from approved Signal context and user-provided details.";
   const safeBase = stripUnsafeTerms(base);
   const prefix = commandPrefix(request.command);
+  const formattedSequence =
+    request.workflow === "BUILD_SEQUENCE" && request.currentDraft
+      ? formatSequenceDraft(request.currentDraft, request.command)
+      : undefined;
   const primary =
-    request.command === "SHORTEN"
+    formattedSequence
+      ? [prefix, formattedSequence].filter(Boolean).join("\n\n")
+      : request.command === "SHORTEN"
       ? shorten(safeBase)
       : request.command === "FIX_SAFETY"
         ? stripUnsafeTerms(safeBase)
