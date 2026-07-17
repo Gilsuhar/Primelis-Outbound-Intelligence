@@ -56,6 +56,53 @@ function formatDraftForDisplay(content: string) {
   return content;
 }
 
+function stripUnsafePreviewTerms(content: string) {
+  return content
+    .replace(/\b(pricing|price|discount|trial|poc|proof of concept)\b/gi, "commercial details")
+    .replace(/\bguarantee(?:d|s)?\b/gi, "support")
+    .replace(/\balways reduce\b/gi, "may help evaluate");
+}
+
+function shortenPreview(content: string) {
+  return content
+    .split(/\n{2,}/)
+    .map((block) => {
+      const sentences = block.split(/(?<=[.!?])\s+/).filter(Boolean);
+      return sentences.slice(0, Math.min(2, sentences.length || 1)).join(" ");
+    })
+    .join("\n\n");
+}
+
+function localPreviewForCommand(content: string, command: RefinementCommand, feedback?: string) {
+  const formatted = formatDraftForDisplay(content);
+  if (command === "SHORTEN") {
+    return shortenPreview(formatted);
+  }
+  if (command === "FIX_SAFETY") {
+    return stripUnsafePreviewTerms(formatted);
+  }
+  if (command === "CHANGE_CTA") {
+    return formatted
+      .replace(/Do you already track this today\?/gi, "Do you already have a way to detect that?")
+      .replace(/Worth a quick compare\??/gi, "Do you have visibility into when this happens?")
+      .replace(/Worth comparing how you decide this today\?/gi, "Is this already part of your paid-brand review?")
+      .replace(/Would a simple view of this be useful\?/gi, "Is this something your team already checks regularly?");
+  }
+  if (command === "LESS_SALESY") {
+    return formatted
+      .replace(/quick compare/gi, "short check")
+      .replace(/worth comparing/gi, "is it useful to see")
+      .replace(/pitch/gi, "note")
+      .replace(/salesy/gi, "direct");
+  }
+  if (command === "CUSTOM" && feedback?.trim()) {
+    return `${formatted}\n\nRevision note: ${feedback.trim()}`;
+  }
+  return formatted
+    .replace(/branded search can look healthy in reports/gi, "branded search can look efficient in reports")
+    .replace(/Do you already track this today\?/gi, "Do you already have a way to detect that?");
+}
+
 export function DraftRefinementPanel({
   draftId,
   workflow,
@@ -66,6 +113,7 @@ export function DraftRefinementPanel({
   const [result, setResult] = useState<DraftRefinementResult | null>(null);
   const [customFeedback, setCustomFeedback] = useState("");
   const [manualContent, setManualContent] = useState("");
+  const [livePreview, setLivePreview] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -73,6 +121,7 @@ export function DraftRefinementPanel({
     let active = true;
     setResult(null);
     setManualContent("");
+    setLivePreview("");
     setMessage(null);
     void (async () => {
       const response = await getDraftRefinementStateAction({
@@ -85,7 +134,9 @@ export function DraftRefinementPanel({
         return;
       }
       setResult(response.data);
-      setManualContent(response.data.currentVersion.generatedContent);
+      const formatted = formatDraftForDisplay(response.data.currentVersion.generatedContent);
+      setManualContent(formatted);
+      setLivePreview(formatted);
     })();
     return () => {
       active = false;
@@ -93,7 +144,16 @@ export function DraftRefinementPanel({
   }, [draftId, workflow]);
 
   function refine(command: RefinementCommand) {
-    setMessage(null);
+    const currentContent =
+      manualContent.trim() || result?.currentVersion.generatedContent || livePreview || "";
+    const preview = localPreviewForCommand(currentContent, command, customFeedback);
+    if (preview.trim()) {
+      setLivePreview(preview);
+      setManualContent(preview);
+      setMessage("Preview updated. Saving a version in the background...");
+    } else {
+      setMessage(null);
+    }
     startTransition(async () => {
       const response = await refineDraftVersionAction({
         generatedDraftId: draftId,
@@ -102,11 +162,13 @@ export function DraftRefinementPanel({
         customFeedback: customFeedback || undefined,
       });
       if (!response.ok) {
-        setMessage(response.message);
+        setMessage(`Preview updated locally. Server save failed: ${response.message}`);
         return;
       }
       setResult(response.data);
-      setManualContent(response.data.currentVersion.generatedContent);
+      const formatted = formatDraftForDisplay(response.data.currentVersion.generatedContent);
+      setManualContent(formatted);
+      setLivePreview(formatted);
       setMessage(`Created version ${response.data.currentVersion.versionNumber}.`);
     });
   }
@@ -124,6 +186,7 @@ export function DraftRefinementPanel({
         return;
       }
       setResult(response.data as DraftRefinementResult);
+      setLivePreview(manualContent);
       setMessage(`Saved version ${response.data.currentVersion.versionNumber}.`);
     });
   }
@@ -140,7 +203,9 @@ export function DraftRefinementPanel({
         return;
       }
       setResult(response.data as DraftRefinementResult);
-      setManualContent(response.data.currentVersion.generatedContent);
+      const formatted = formatDraftForDisplay(response.data.currentVersion.generatedContent);
+      setManualContent(formatted);
+      setLivePreview(formatted);
       setMessage(`Restored version ${response.data.currentVersion.versionNumber}.`);
     });
   }
@@ -169,7 +234,7 @@ export function DraftRefinementPanel({
         {quickCommands.map((item) => (
           <button
             className="signal-button-secondary"
-            disabled={isPending}
+            disabled={isPending || (!current && !manualContent.trim())}
             key={item.command}
             onClick={() => refine(item.command)}
             type="button"
@@ -196,6 +261,24 @@ export function DraftRefinementPanel({
       >
         Apply custom feedback
       </button>
+
+      {!current && !message ? (
+        <p className="mt-4 rounded-md bg-cream px-3 py-2 text-sm text-[#6f6d5f]">
+          Loading draft controls...
+        </p>
+      ) : null}
+
+      {livePreview ? (
+        <div className="mt-4 rounded-xl border border-[#dfee7a] bg-[#fbfee8] p-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+            <Wand2 aria-hidden="true" className="h-4 w-4 text-olive" />
+            Live editable preview
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#34352e]">
+            {livePreview}
+          </p>
+        </div>
+      ) : null}
 
       {current ? (
         <div className="mt-4 space-y-3">
