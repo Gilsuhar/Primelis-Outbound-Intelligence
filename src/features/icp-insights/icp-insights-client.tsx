@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BarChart3, Database, ExternalLink, ShieldAlert, Target, UsersRound } from "lucide-react";
 
+import { AnimatedShareBar } from "@/components/animated-share-bar";
+
 import { hubspotIcpSnapshot } from "./hubspot-icp-insights";
 
 const maxShare = Math.max(...hubspotIcpSnapshot.segments.map((segment) => segment.share));
@@ -78,7 +80,7 @@ export function IcpInsightsClient() {
         </div>
 
         <div className="mt-5 grid gap-3">
-          {hubspotIcpSnapshot.titleInsights.map((title) => (
+          {hubspotIcpSnapshot.titleInsights.map((title, index) => (
             <article className="rounded-2xl border border-line bg-cream p-3 sm:p-4" key={title.titleGroup}>
               <div className="grid gap-3 lg:grid-cols-[300px_1fr_auto] lg:items-center">
                 <div className="min-w-0">
@@ -97,13 +99,11 @@ export function IcpInsightsClient() {
                 </div>
 
                 <div className="min-w-0">
-                  <div className="h-2 overflow-hidden rounded-full bg-white">
-                    <div
-                      aria-label={`${title.titleGroup}: ${title.share}%`}
-                      className="h-full rounded-full bg-lime"
-                      style={{ width: `${Math.max(10, (title.share / maxTitleShare) * 100)}%` }}
-                    />
-                  </div>
+                  <AnimatedShareBar
+                    delayMs={index * 90}
+                    label={`${title.titleGroup}: ${title.share}%`}
+                    widthPercent={Math.max(10, (title.share / maxTitleShare) * 100)}
+                  />
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {title.strongestIndustries.slice(0, 3).map((industry) => (
                       <span
@@ -211,7 +211,7 @@ export function IcpInsightsClient() {
         </div>
 
         <div className="mt-5 space-y-4">
-          {hubspotIcpSnapshot.segments.map((segment) => (
+          {hubspotIcpSnapshot.segments.map((segment, index) => (
             <article className="grid gap-3 lg:grid-cols-[220px_1fr] lg:items-center" key={segment.segment}>
               <div>
                 <h3 className="font-semibold text-ink">{segment.segment}</h3>
@@ -220,13 +220,12 @@ export function IcpInsightsClient() {
                 </p>
               </div>
               <div className="min-w-0">
-                <div className="h-3 overflow-hidden rounded-full bg-cream">
-                  <div
-                    aria-label={`${segment.segment}: ${segment.share}%`}
-                    className="h-full rounded-full bg-lime"
-                    style={{ width: `${Math.max(12, (segment.share / maxShare) * 100)}%` }}
-                  />
-                </div>
+                <AnimatedShareBar
+                  delayMs={index * 90}
+                  label={`${segment.segment}: ${segment.share}%`}
+                  trackClassName="h-3 bg-cream"
+                  widthPercent={Math.max(12, (segment.share / maxShare) * 100)}
+                />
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {segment.examples.map((example) => (
                     <span
