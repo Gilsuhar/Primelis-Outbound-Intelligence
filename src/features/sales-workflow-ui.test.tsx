@@ -6,8 +6,23 @@ vi.mock("@/app/ask-signal-brain/actions", () => ({
   askSignalBrainAction: vi.fn(),
 }));
 
+vi.mock("@/app/account-status/actions", () => ({
+  checkAccountStatusAction: vi.fn(async () => ({
+    ok: true,
+    data: {
+      status: "CLEAR",
+      canGenerate: true,
+      confidence: "LOW",
+      matches: [],
+      warnings: [],
+      nextActions: [],
+    },
+  })),
+}));
+
 vi.mock("@/app/build-sequence/actions", () => ({
   generateBuildSequenceAction: vi.fn(),
+  pushSequenceToHubSpotAction: vi.fn(),
 }));
 
 vi.mock("@/app/create-outreach/actions", () => ({
@@ -25,8 +40,16 @@ vi.mock("@/lib/auth/action-actor", () => ({
 
 vi.mock("server-only", () => ({}));
 
+vi.mock("@/features/draft-refinement/draft-refinement-panel", () => ({
+  DraftRefinementPanel: () => <div data-testid="draft-refinement-panel" />,
+}));
+
 import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-brain-client";
-import { BuildSequenceClient } from "@/features/build-sequence/build-sequence-client";
+import {
+  __buildSequenceVariantTest,
+  BuildSequenceClient,
+} from "@/features/build-sequence/build-sequence-client";
+import type { SequenceStep } from "@/features/build-sequence/types";
 import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
 import { ReplyToProspectClient } from "@/features/reply-to-prospect/reply-to-prospect-client";
 import { AccountResearchClient } from "@/features/account-research/account-research-client";
@@ -69,6 +92,33 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Duration")).toBeTruthy();
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
+  });
+
+  it("gives Build Sequence Generate buttons materially different local variants", () => {
+    const step: SequenceStep = {
+      stepNumber: 1,
+      channel: "EMAIL",
+      delay: "Day 0",
+      purpose: "FIRST_TOUCH_RELEVANCE",
+      channelRationale: "Email is selected.",
+      subjectLine: "Nike paid brand question",
+      messageBody:
+        "Hi there,\n\nI had Nike on my list because branded search can look healthy in reports.",
+      cta: "Do you already track this today?",
+      claimsUsed: [],
+      sourceIds: [],
+    };
+
+    const bodyVariants = __buildSequenceVariantTest.bodyVariants(step, "Nike");
+    const ctaVariants = __buildSequenceVariantTest.ctaVariants(step);
+    const subjectVariants = __buildSequenceVariantTest.subjectVariants(step, "Nike");
+
+    expect(bodyVariants).not.toContain(step.messageBody);
+    expect(ctaVariants).not.toContain(step.cta);
+    expect(subjectVariants).not.toContain(step.subjectLine);
+    expect(bodyVariants.join(" ")).toMatch(/captured the click|nobody else is bidding/i);
+    expect(new Set(ctaVariants).size).toBe(ctaVariants.length);
+    expect(__buildSequenceVariantTest.variantIndex(-1, bodyVariants.length)).toBe(0);
   });
 
   it("infers domains in Account Research and explains the result", () => {

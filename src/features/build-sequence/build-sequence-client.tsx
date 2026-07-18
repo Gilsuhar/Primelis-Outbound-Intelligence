@@ -131,41 +131,45 @@ function subjectVariants(step: SequenceStep, company: string) {
   const account = displayCompanyName(company);
   const byPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
-      step.subjectLine ?? "",
       `${account} branded ads question`,
       `When nobody is bidding on ${account}`,
+      `Quick thought on ${account} brand search`,
     ],
     PROBLEM_FRAMING: [
-      step.subjectLine ?? "",
       "Re: deactivating branded ads",
       `Paid brand waste at ${account}?`,
+      "When brand clicks are already yours",
     ],
     METHODOLOGY_DIFFERENTIATION: [
-      step.subjectLine ?? "",
       "Re: lower branded CPC",
       "Lower bids without losing coverage",
+      "Paid brand, without the guesswork",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
-      step.subjectLine ?? "",
       `${account}: one brand-search check`,
       `A narrow question for ${account}`,
+      `${account}: paid brand visibility`,
     ],
     SOCIAL_PROOF: [
-      step.subjectLine ?? "",
       "A practical paid-brand example",
       `Relevant paid-brand example`,
+      "A brand-search example that may help",
     ],
     TECHNICAL_CLARIFICATION: [
-      step.subjectLine ?? "",
       "Paid brand methodology",
       `One way to test brand search`,
+      "How to separate useful brand coverage",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
-      step.subjectLine ?? "",
       `Quick follow-up on ${account}`,
       "Worth revisiting later?",
+      "Leaving this with you",
     ],
-    BREAKUP_CLOSE_LOOP: [step.subjectLine ?? "", "Closing the loop", "Last note on paid brand"],
+    BREAKUP_CLOSE_LOOP: [
+      "Closing the loop",
+      "Last note on paid brand",
+      "Final thought on brand search",
+    ],
   };
   return byPurpose[step.purpose].filter(Boolean);
 }
@@ -176,108 +180,108 @@ function bodyVariants(step: SequenceStep, company: string) {
 
   if (step.purpose === "FIRST_TOUCH_RELEVANCE") {
     return [
-      step.messageBody,
       `${firstLine}\n\nQuick question on ${account} brand search: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?\n\nSignal helps teams monitor search results and adjust branded coverage when other advertisers are not bidding, instead of paying for clicks that may not add value.`,
       `${firstLine}\n\nI had ${account} on my list for one narrow reason: branded search can look healthy in reports even when some paid clicks are not changing the outcome.\n\nThe question is not whether branded search is good or bad. It is where paid coverage still protects demand, and where organic results may already do enough.`,
+      `${firstLine}\n\nHow do you handle branded ads when nobody else is bidding on ${account}?\n\nSignal watches the search page and can lower or pause paid brand coverage when the click would likely come through organic, then bring coverage back when competition returns.`,
     ];
   }
 
   if (step.purpose === "PROBLEM_FRAMING") {
     return [
-      step.messageBody,
       `${firstLine}\n\nFor context, Google does not offer an easy way to automatically pause or adjust branded ads when no other advertisers are bidding.\n\nAs a result, many teams keep paying for clicks that could have been captured organically or at a much lower CPC.\n\nDo you have visibility into when this happens?`,
       `${firstLine}\n\nGoogle does not provide an automated way to pause or down-bid branded ads when no other advertisers are bidding.\n\nAs a result, most brands keep paying for clicks they would have received organically.\n\nSignal identifies these moments and can reduce or pause bids until competition returns, while preserving brand coverage and performance.`,
+      `${firstLine}\n\nThe reporting problem is that paid brand can look efficient even when it is just buying demand the brand already owns.\n\nThe cleaner check is simple: when nobody is bidding against ${account}, does paid coverage still change the outcome?`,
     ];
   }
 
   if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
     return [
-      step.messageBody,
       `${firstLine}\n\nOne other angle: this is not always about turning brand ads off.\n\nIn some cases, the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.\n\nThat is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.`,
       `${firstLine}\n\nA useful way to look at this is what is happening on the search page at the moment of the search.\n\nIf other advertisers are present, paid coverage may be protecting demand. If they are absent, the next move may be lowering bids or pausing until the page changes again.`,
+      `${firstLine}\n\nThe decision should not be “always on” or “always off.”\n\nIt should depend on what the search page shows: competitors, organic coverage, and whether paid brand is still adding something measurable.`,
     ];
   }
 
   if (step.purpose === "ACCOUNT_SPECIFIC_OBSERVATION") {
     return [
-      step.messageBody,
       `${firstLine}\n\nI would keep the ${account} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is waste.`,
       `${firstLine}\n\nFor ${account}, I would frame this as a quick validation rather than a pitch: is paid coverage needed everywhere, or only when organic and search-page conditions make it useful?`,
+      `${firstLine}\n\nI would not assume ${account} has a problem. I would only check the places where brand demand is already strong and paid clicks may not be changing the result.`,
     ];
   }
 
   if (step.purpose === "SOCIAL_PROOF") {
     return [
-      step.messageBody,
       `${firstLine}\n\nThere are customer examples behind this, but I would use them carefully.\n\nThe useful takeaway is not the logo. It is the decision pattern: separate useful paid coverage from spend that is not changing the result.`,
       `${firstLine}\n\nI can share a short example if useful, but the main point is practical: this is about deciding where brand spend still earns its place.`,
+      `${firstLine}\n\nThe examples that work best are not broad savings claims. They show a specific decision: keep paid brand when it protects demand, reduce it when organic already covers the click.`,
     ];
   }
 
   if (step.purpose === "TECHNICAL_CLARIFICATION") {
     return [
-      step.messageBody,
       `${firstLine}\n\nThe check does not need to be complicated: compare paid brand ads, organic results, and search-page conditions before changing coverage.\n\nThat keeps the discussion away from generic cost-cutting and focused on evidence.`,
       `${firstLine}\n\nThe clean version is: do not pause blindly, and do not keep coverage blindly. Test where paid brand changes the outcome.`,
+      `${firstLine}\n\nThe method is to look at the full branded search result, not just paid performance. If organic is already strong and no competitor is present, the bid decision should be different.`,
     ];
   }
 
   if (step.purpose === "BREAKUP_CLOSE_LOOP") {
     return [
-      step.messageBody,
       `${firstLine}\n\nI will close the loop after this note.\n\nIf paid-brand efficiency becomes a priority later, the useful starting point is simple: where is paid coverage protecting demand, and where is it just adding cost?`,
       `${firstLine}\n\nLast note from me. If this is not relevant now, no problem at all. I only reached out because this is often hard to see from standard brand-search reporting.`,
+      `${firstLine}\n\nI will leave this here.\n\nIf the team ever reviews paid-brand efficiency, the first useful question is whether paid clicks are creating demand or just capturing clicks organic already had.`,
     ];
   }
 
   return [
-    step.messageBody,
     `${firstLine}\n\nI wanted to keep this narrow: is paid brand coverage still creating value, or is some of that demand already covered organically?`,
     `${firstLine}\n\nThis may be worth a quick check before making any larger change to brand-search spend.`,
+    `${firstLine}\n\nThe useful starting point is visibility: when the search page changes, should the bid strategy change with it?`,
   ];
 }
 
 function ctaVariants(step: SequenceStep) {
   const byPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
-      step.cta,
       "Do you already have a way to detect that?",
       "How do you currently catch this?",
+      "Is this something you already track today?",
     ],
     PROBLEM_FRAMING: [
-      step.cta,
       "Do you have visibility into when this happens?",
       "Is this already part of your paid-brand review?",
+      "How do you decide when those clicks are still worth paying for?",
     ],
     METHODOLOGY_DIFFERENTIATION: [
-      step.cta,
       "Is this something your team already checks regularly?",
       "Do you currently have a way to detect and manage this?",
+      "Would it help to see where bids could safely come down?",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
-      step.cta,
       "Would it be useful to check whether this applies at your scale?",
       "Worth a quick sanity check?",
+      "Should I send the simple version of the check?",
     ],
     SOCIAL_PROOF: [
-      step.cta,
       "Want the short version of the example?",
       "Should I send the relevant example?",
+      "Would a concrete example be useful?",
     ],
     TECHNICAL_CLARIFICATION: [
-      step.cta,
       "Would a simple method breakdown help?",
       "Do you already test this before changing bids?",
+      "Is this the kind of decision you currently review manually?",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
-      step.cta,
       "Worth revisiting later if this becomes a priority?",
       "Should I leave this for now?",
+      "No issue if this is not on the roadmap right now.",
     ],
     BREAKUP_CLOSE_LOOP: [
-      step.cta,
       "If this is not relevant, I can close the loop here.",
       "If this is not relevant right now, no problem at all.",
+      "I can leave this here if timing is not right.",
     ],
   };
   return byPurpose[step.purpose].filter(Boolean);
@@ -335,6 +339,13 @@ function sequenceQuality(steps: SequenceStep[]) {
     wins: wins.slice(0, 4),
   };
 }
+
+export const __buildSequenceVariantTest = {
+  bodyVariants,
+  ctaVariants,
+  subjectVariants,
+  variantIndex,
+};
 
 type SmartFieldProps = {
   name: string;
@@ -482,21 +493,21 @@ export function BuildSequenceClient() {
 
   function regenerateSubject(step: SequenceStep) {
     const variants = subjectVariants(step, companyName || "this account");
-    const nextIndex = variantIndex(stepSubjectVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    const nextIndex = variantIndex(stepSubjectVariantIndexes[step.stepNumber] ?? -1, variants.length);
     setStepSubjectVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepSubjectDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
   }
 
   function regenerateBody(step: SequenceStep) {
     const variants = bodyVariants(step, companyName || "this account");
-    const nextIndex = variantIndex(stepBodyVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    const nextIndex = variantIndex(stepBodyVariantIndexes[step.stepNumber] ?? -1, variants.length);
     setStepBodyVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepBodyDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
   }
 
   function regenerateCta(step: SequenceStep) {
     const variants = ctaVariants(step);
-    const nextIndex = variantIndex(stepCtaVariantIndexes[step.stepNumber] ?? 0, variants.length);
+    const nextIndex = variantIndex(stepCtaVariantIndexes[step.stepNumber] ?? -1, variants.length);
     setStepCtaVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepCtaDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
   }
