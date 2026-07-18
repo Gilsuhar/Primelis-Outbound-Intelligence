@@ -154,6 +154,44 @@ describe("Phase N draft provider and versioning", () => {
     expect(result.data.versions[0].generatedContent).toContain("approved context");
   });
 
+  it("deterministic refinement commands create materially different copy", async () => {
+    const original =
+      "Hi Sam,\n\nI had Nike on my list because branded search can look efficient while still hiding wasted spend.\n\nSignal helps teams compare paid coverage with organic results, so teams can decide where branded ads are protecting demand.\n\nWorth a quick compare?";
+    const store = persistence({
+      versions: [
+        version({
+          generatedContent: original,
+        }),
+      ],
+    });
+
+    const lessSalesy = await refineDraftVersion(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "CREATE_OUTREACH",
+        command: "LESS_SALESY",
+      },
+      { persistence: store },
+    );
+    const changedCta = await refineDraftVersion(
+      {
+        generatedDraftId: "draft-1",
+        workflow: "CREATE_OUTREACH",
+        command: "CHANGE_CTA",
+      },
+      { persistence: store },
+    );
+
+    expect(lessSalesy.ok).toBe(true);
+    expect(changedCta.ok).toBe(true);
+    if (!lessSalesy.ok || !changedCta.ok) return;
+    expect(lessSalesy.data.currentVersion.generatedContent).not.toBe(original);
+    expect(lessSalesy.data.currentVersion.generatedContent).toMatch(/unnecessary spend|short check/i);
+    expect(changedCta.data.currentVersion.generatedContent).toMatch(
+      /Do you already have a way to catch this|How do you catch this today/i,
+    );
+  });
+
   it("loads the current initial version before any refinement action", async () => {
     const store = persistence({ versions: [version()] });
 

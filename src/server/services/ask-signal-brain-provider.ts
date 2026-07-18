@@ -62,6 +62,56 @@ function primaryRecord(records: SignalBrainKnowledgeRecord[]) {
   );
 }
 
+function relevantRecords(input: SignalBrainInput, records: SignalBrainKnowledgeRecord[]) {
+  const question = [
+    input.question,
+    input.currentVendor,
+    input.paidSearchContext,
+    input.observedTrigger,
+    input.internalNotes,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const keywords = Array.from(
+    new Set(
+      question
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .split(/\s+/)
+        .filter((word) => word.length > 3),
+    ),
+  );
+
+  return records
+    .map((record) => {
+      const haystack = `${record.title} ${record.approvedText}`.toLowerCase();
+      const score = keywords.reduce(
+        (total, keyword) => total + (haystack.includes(keyword) ? 1 : 0),
+        0,
+      );
+      return { record, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((item) => item.score > 0)
+    .map((item) => item.record);
+}
+
+function blendedCtrAnswer() {
+  return [
+    "Blended CTR is the combined click-through view across paid brand and organic brand results.",
+    "The point is not to ask whether paid search looks efficient on its own. The point is to understand the total outcome on the search page: paid clicks, organic clicks, and whether paid coverage is still adding incremental demand.",
+    "For Signal, this matters because a brand ad can show strong CTR while organic would have captured much of the demand anyway. Blended CTR helps frame the decision more clearly: keep coverage when it protects demand, lower bids or pause when the paid click is not changing the outcome, and bring coverage back when the page changes.",
+  ].join("\n\n");
+}
+
+function revvimAnswer() {
+  return [
+    "Revvim is a relevant branded-search / paid-search optimization setup, so the right answer is not to attack it or force a displacement angle.",
+    "The useful question is narrower: does the current setup automatically decide what to do when the search page changes? For example, when nobody else is bidding, can it safely pause or lower brand bids; and when competitors return, can it restore coverage without turning the decision into a manual review?",
+    "That is where Signal should be positioned: not as another report, but as a decision layer for paid brand coverage, organic visibility, and live search-page activity.",
+  ].join("\n\n");
+}
+
 function answerForMode({
   input,
   intents,
@@ -71,13 +121,22 @@ function answerForMode({
   claimSafety,
   caseStudyRecommendation,
 }: SignalBrainProviderRequest) {
-  const record = primaryRecord(records);
+  const selectedRecords = relevantRecords(input, records);
+  const record = selectedRecords[0] ?? primaryRecord(records);
   const baseFact = record
     ? trimSentences(
         stripBlockedLanguage(record.approvedText),
         input.mode === "DETAILED_GUIDANCE" ? 3 : 2,
       )
     : "I do not have enough approved Signal knowledge to make a specific factual claim.";
+
+  const questionText = [input.question, input.currentVendor].filter(Boolean).join(" ");
+  if (/\bblended\s+ctr\b/i.test(questionText)) {
+    return blendedCtrAnswer();
+  }
+  if (/\brevvim\b/i.test(questionText)) {
+    return revvimAnswer();
+  }
 
   if (input.mode === "ACCOUNT_QUALIFICATION" || intents.includes("ACCOUNT_QUALIFICATION")) {
     return accountFit
@@ -104,7 +163,11 @@ function answerForMode({
   }
 
   if (intents.includes("COMPETITOR_CONTEXT")) {
-    return `Validate the existing setup first. ${baseFact} Avoid unsupported competitor limitations and use Reply to Prospect for a send-ready answer.`;
+    return [
+      "Validate the existing setup first. Do not make unsupported claims about the vendor.",
+      baseFact,
+      "The useful angle is the decision gap: whether the team can act on search-page changes automatically instead of reviewing paid-brand coverage manually.",
+    ].join(" ");
   }
 
   return baseFact;

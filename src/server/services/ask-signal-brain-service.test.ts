@@ -283,6 +283,61 @@ describe("Ask Signal Brain service", () => {
     });
   });
 
+  it("answers Revvim questions with positioning instead of a generic product answer", async () => {
+    const { adapter } = persistence([
+      knowledge({
+        id: "revvim-objection",
+        title: "Existing Revvim reply",
+        type: "OBJECTION",
+        approvedText:
+          "Validate Revvim as a relevant setup and focus on whether the paid-brand decision is automated when the search page changes.",
+      }),
+      knowledge({ id: "approved-product" }),
+    ]);
+
+    const result = await askSignalBrain(
+      {
+        ...baseInput,
+        question: "Who is Revvim and how should I explain our strength?",
+        currentVendor: "Revvim",
+        mode: "OBJECTION_GUIDANCE",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.directAnswer).toMatch(/relevant branded-search|serious setup/i);
+    expect(result.data.directAnswer).toMatch(/decision layer|search-page activity|manual review/i);
+    expect(result.data.directAnswer).not.toMatch(/replace|bad|worse/i);
+  });
+
+  it("explains blended CTR in plain Signal language", async () => {
+    const { adapter } = persistence([
+      knowledge({
+        id: "blended-ctr",
+        title: "Blended CTR framework",
+        type: "PRODUCT_TRUTH",
+        approvedText:
+          "Blended CTR combines paid brand and organic brand click-through visibility to understand total search-page outcomes.",
+      }),
+    ]);
+
+    const result = await askSignalBrain(
+      {
+        ...baseInput,
+        question: "Explain blended CTR and why it matters for Signal.",
+        mode: "QUICK_ANSWER",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.directAnswer).toMatch(/combined click-through|paid brand and organic/i);
+    expect(result.data.directAnswer).toMatch(/paid click is not changing the outcome/i);
+  });
+
   it("returns structured errors for invalid input and unauthorized users", async () => {
     const invalid = await askSignalBrain(
       { question: "" },

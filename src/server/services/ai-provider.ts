@@ -87,22 +87,108 @@ function shorten(text: string) {
   return sentences.slice(0, Math.max(1, Math.min(3, sentences.length))).join(" ");
 }
 
-function commandPrefix(command?: RefinementCommand) {
-  const labels: Partial<Record<RefinementCommand, string>> = {
-    REGENERATE: "Regenerated version:",
-    PERSONALIZE: "More tailored version:",
-    SHORTEN: "Shorter version:",
-    LESS_SALESY: "Less salesy version:",
-    MORE_DIRECT: "More direct version:",
-    WARMER: "Warmer version:",
-    CHANGE_ANGLE: "Reframed angle:",
-    ADAPT_PERSONA: "Persona-adapted version:",
-    CHANGE_CTA: "CTA-adjusted version:",
-    REWRITE_SECTION: "Rewritten section:",
-    FIX_SAFETY: "Safer version:",
-    CUSTOM: "Custom revision:",
-  };
-  return command ? labels[command] : undefined;
+function paragraphs(text: string) {
+  return text
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+}
+
+function replaceCtas(text: string) {
+  return text
+    .replace(/Worth a quick compare(?: against how you decide this today)?\?/gi, "Do you already have a way to catch this?")
+    .replace(/Worth a short check\?/gi, "Do you already have a way to catch this?")
+    .replace(/Worth comparing how you decide this today\?/gi, "Do you already track this today?")
+    .replace(/Open to a quick compare\?/gi, "Is this already part of your paid-brand review?")
+    .replace(/Would a simple view of this be useful\?/gi, "Would this be useful to sanity-check?")
+    .replace(/Curious how you currently evaluate this(?: at [A-Z][A-Za-z0-9 .-]+)?\?/gi, "Do you already have visibility into when this happens?")
+    .replace(/Do you already track this today\?/gi, "How do you catch this today?");
+}
+
+function lessSalesy(text: string) {
+  return text
+    .replace(/\bquick compare\b/gi, "short check")
+    .replace(/\bworth comparing\b/gi, "useful to compare")
+    .replace(/\bwe built\b/gi, "Signal is built to")
+    .replace(/\btool\b/gi, "system")
+    .replace(/\bautomatically turns off\b/gi, "can pause")
+    .replace(/\bautomatically pauses\b/gi, "can pause")
+    .replace(/\bwithout overspending\b/gi, "without paying more than needed")
+    .replace(/\bcut waste\b/gi, "avoid unnecessary spend");
+}
+
+function warmer(text: string) {
+  return text
+    .replace(/^Hi there,/i, "Hi there,")
+    .replace(/\bQuick question\b/g, "One quick question")
+    .replace(/\bDo you already\b/g, "Curious if you already")
+    .replace(/\bIf this is not relevant\b/g, "If this is not useful right now");
+}
+
+function regenerateText(text: string, instruction?: string) {
+  const safe = stripUnsafeTerms(text);
+  const blocks = paragraphs(safe);
+  if (blocks.length <= 1) {
+    return [
+      safe.replace(/branded search can look efficient/gi, "brand search can look clean in reports"),
+      instruction ? `\n\nApplied feedback: ${instruction}` : "",
+    ].join("").trim();
+  }
+  const [greeting, ...rest] = blocks;
+  const rewritten = rest.map((block, index) => {
+    if (index === 0) {
+      return block
+        .replace(/I had (.*?) on my list because/gi, "I had $1 on my list for one narrow reason:")
+        .replace(/branded search can look efficient/gi, "brand search can look healthy in reports")
+        .replace(/wasted spend/gi, "unnecessary spend");
+    }
+    if (index === rest.length - 1) {
+      return replaceCtas(block);
+    }
+    return block
+      .replace(/paid coverage with organic results/gi, "paid coverage with organic visibility")
+      .replace(/teams can decide/gi, "teams can see")
+      .replace(/where branded ads are protecting demand/gi, "when branded ads are protecting demand");
+  });
+  return [greeting, ...rewritten, instruction ? `Applied feedback: ${instruction}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function rewriteDraftText(
+  content: string,
+  command?: RefinementCommand,
+  instruction?: string,
+) {
+  const safeBase = stripUnsafeTerms(content);
+  if (command === "SHORTEN") {
+    return paragraphs(safeBase)
+      .map((block) => shorten(block))
+      .join("\n\n");
+  }
+  if (command === "FIX_SAFETY") {
+    return stripUnsafeTerms(safeBase);
+  }
+  if (command === "CHANGE_CTA") {
+    return replaceCtas(safeBase);
+  }
+  if (command === "LESS_SALESY") {
+    return lessSalesy(safeBase);
+  }
+  if (command === "WARMER" || command === "PERSONALIZE") {
+    return warmer(safeBase);
+  }
+  if (command === "MORE_DIRECT") {
+    return safeBase
+      .replace(/\bI thought\b/gi, "I noticed")
+      .replace(/\bwould be worth\b/gi, "is worth")
+      .replace(/\bCurious if\b/gi, "Do")
+      .replace(/\bWould it be useful to\b/gi, "Should we");
+  }
+  if (command === "CUSTOM") {
+    return regenerateText(safeBase, instruction);
+  }
+  return regenerateText(safeBase, instruction);
 }
 
 function formatSequenceDraft(content: string, command?: RefinementCommand) {
@@ -120,12 +206,10 @@ function formatSequenceDraft(content: string, command?: RefinementCommand) {
           cta?: string;
         };
         const body =
-          command === "SHORTEN"
-            ? shorten(stripUnsafeTerms(step.messageBody ?? ""))
-            : stripUnsafeTerms(step.messageBody ?? "");
+          rewriteDraftText(step.messageBody ?? "", command);
         const cta =
           command === "CHANGE_CTA"
-            ? "Do you already have a way to catch this?"
+            ? replaceCtas(step.cta ?? "") || "Do you already have a way to catch this?"
             : stripUnsafeTerms(step.cta ?? "");
         return [
           `Step ${step.stepNumber ?? ""}${step.delay ? ` - ${step.delay}` : ""}`.trim(),
@@ -148,26 +232,16 @@ function deterministicResponse(request: AiDraftRequest): AiDraftResponse {
     request.currentDraft?.trim() ||
     request.context.approvedFacts[0] ||
     "I can only draft from approved Signal context and user-provided details.";
-  const safeBase = stripUnsafeTerms(base);
-  const prefix = commandPrefix(request.command);
   const formattedSequence =
     request.workflow === "BUILD_SEQUENCE" && request.currentDraft
       ? formatSequenceDraft(request.currentDraft, request.command)
       : undefined;
   const primary =
     formattedSequence
-      ? [prefix, formattedSequence].filter(Boolean).join("\n\n")
+      ? formattedSequence
       : request.command === "SHORTEN"
-      ? shorten(safeBase)
-      : request.command === "FIX_SAFETY"
-        ? stripUnsafeTerms(safeBase)
-        : [
-            prefix,
-            safeBase,
-            request.userInstruction ? `Applied feedback: ${request.userInstruction}` : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
+      ? rewriteDraftText(base, "SHORTEN")
+      : rewriteDraftText(base, request.command, request.userInstruction);
 
   return {
     primaryContent: primary,
