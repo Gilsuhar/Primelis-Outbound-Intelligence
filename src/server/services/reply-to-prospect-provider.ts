@@ -59,16 +59,14 @@ function humanizeFact(fact: string) {
   return fact;
 }
 
-function deckReply(input: ReplyToProspectInput, facts: string[]) {
+function deckReply(input: ReplyToProspectInput) {
   const opener =
     input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
   const companyLine = input.companyName
     ? `I will keep it focused on the ${input.companyName} paid-brand question, not a generic overview.`
     : "I will keep it focused on the paid-brand question, not a generic overview.";
   const usefulLine =
-    facts[0] && !/not have enough/i.test(facts[0])
-      ? "The short version is simple: when nobody else is bidding, Signal helps decide whether branded ads should stay live, come down, or pause until competition returns."
-      : "The short version is simple: when nobody else is bidding, Signal helps decide whether branded ads should stay live, come down, or pause until competition returns.";
+    "Short version: Google does not make it easy to pause or down-bid brand ads when no competitors are bidding. Signal catches those moments, lowers or pauses bids when the paid click is not changing the outcome, and restores coverage when competition returns.";
   const cta =
     input.channel === "LINKEDIN"
       ? "I can send the deck with two bullets that match your setup."
@@ -107,9 +105,9 @@ function detectedVendor(message: string) {
 function methodologyReply(input: ReplyToProspectInput) {
   const opener = "Good question.";
   const answer =
-    "If no competitors are bidding, I would not automatically keep or pause brand ads. I would first compare paid coverage with organic results to see whether the paid clicks are changing the outcome.";
+    "If no competitors are bidding, I would not automatically keep or pause brand ads. The first check is whether the paid click is changing the outcome, or whether organic would have captured most of that demand anyway.";
   const product =
-    "Signal helps make that check practical by showing when paid brand is protecting demand and when organic may already be carrying it.";
+    "Signal makes that decision practical by looking at paid coverage, organic visibility, and live search-page activity before bids change.";
   const cta =
     input.channel === "LINKEDIN"
       ? "Happy to send the simple version."
@@ -123,15 +121,15 @@ function existingVendorReply(input: ReplyToProspectInput) {
   if (vendor === "Revvim") {
     const answer =
       input.desiredLength === "SHORT"
-        ? "The question I would ask is narrower: when the page changes, can you automatically decide whether to pause, lower CPC, or stay covered?"
-        : "The question I would ask is narrower: when the search page changes, can you automatically decide whether to pause, lower CPC, or stay covered without turning it into a manual review? That is usually where paid-brand waste hides.";
-    const cta = "Do you already have that decision automated?";
+        ? "The gap I would check is narrower: can the setup decide when to pause, lower CPC, or stay covered as the search page changes?"
+        : "The gap I would check is narrower: when no one is bidding, can the setup pause or lower CPC without losing the click; and when competitors come back, can it restore coverage without turning the decision into a manual review?";
+    const cta = "Is that decision automated already on your side?";
     return [opener, answer, cta].join(" ");
   }
   const answer =
     vendor === "Auction Insights"
       ? "The gap I would check is whether those signals turn into action: pause when nobody else is bidding, lower CPC when coverage is still needed, and bring coverage back when the page changes."
-      : "The gap I would check is whether your setup moves from insight to action: pause, lower CPC, or stay covered based on what is actually happening on the search page.";
+      : "The gap I would check is whether your setup moves from visibility to action: pause, lower CPC, or stay covered based on what is actually happening on the search page.";
   const cta =
     input.channel === "LINKEDIN"
       ? "Is that automated today?"
@@ -164,7 +162,7 @@ function timingReply(input: ReplyToProspectInput) {
 function defaultReply(input: ReplyToProspectInput, intents: ProspectIntent[], primaryFact: string, secondaryFact: string) {
   const cta =
     input.channel === "LINKEDIN"
-      ? "Do you already track this today?"
+      ? "Do you already have a way to catch this?"
       : "Is this already part of your paid-brand review?";
   const bridge = intentBridge(intents);
 
@@ -208,7 +206,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
 
     const recommendedReply = (() => {
       if (intents.includes("DECK_REQUEST")) {
-        return deckReply(input, [primaryFact, secondaryFact].filter(Boolean));
+        return deckReply(input);
       }
       if (intents.includes("NOT_INTERESTED")) {
         return notInterestedReply(input);

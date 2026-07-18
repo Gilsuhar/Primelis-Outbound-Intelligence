@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { AlertTriangle, Check, Copy, FileText, Send, ShieldCheck, Target } from "lucide-react";
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
 import { useOutputLanguage } from "@/components/language-selector";
+import { AccountStatusPanel } from "@/features/account-status/account-status-panel";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
 import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
@@ -32,9 +33,9 @@ const lengths: { label: string; value: OutreachLength }[] = [
 ];
 
 const companySizeOptions = [
-  "Strong fit — confirmed",
-  "Potential fit — validate spend/demand",
-  "Enterprise — qualify",
+  "Strong fit - confirmed",
+  "Potential fit - validate spend/demand",
+  "Enterprise - qualify",
   "Insufficient data",
   "Not a fit",
 ];
@@ -270,6 +271,7 @@ export function CreateOutreachClient() {
   const [paidSearchContext, setPaidSearchContext] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [useCaseStudy, setUseCaseStudy] = useState(false);
+  const [accountStatusOverride, setAccountStatusOverride] = useState(false);
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
   const [messageType, setMessageType] = useState<OutreachMessageType>("FIRST_TOUCH");
   const [tone, setTone] = useState<OutreachTone>("CONSULTATIVE");
@@ -293,6 +295,14 @@ export function CreateOutreachClient() {
   const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
   const displayedFullEmail = displayedSections.map((section) => section.text).join("\n\n");
   const quality = result ? draftQuality(displayedFullEmail, result.cta) : null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const company = params.get("company");
+    const domain = params.get("domain");
+    if (company) setCompanyName(company);
+    if (domain) setCompanyWebsite(domain);
+  }, []);
 
   async function copyText(key: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -320,6 +330,7 @@ export function CreateOutreachClient() {
         desiredLength: length,
         outputLanguage,
         useCaseStudy: formData.get("useCaseStudy") === "on",
+        accountStatusOverride,
         internalNotes: formData.get("internalNotes") || undefined,
       });
 
@@ -388,6 +399,7 @@ export function CreateOutreachClient() {
               onChange={(value) => {
                 setCompanyName(value);
                 setCompanyWebsite(inferDomain(value));
+                setAccountStatusOverride(false);
               }}
               required
               value={companyName}
@@ -395,7 +407,10 @@ export function CreateOutreachClient() {
             <TextField
               label={t("workflow.website")}
               name="companyWebsite"
-              onChange={setCompanyWebsite}
+              onChange={(value) => {
+                setCompanyWebsite(value);
+                setAccountStatusOverride(false);
+              }}
               value={companyWebsite}
             />
             <TextField
@@ -474,6 +489,13 @@ export function CreateOutreachClient() {
               {t("workflow.useCaseStudy")}
             </label>
           </div>
+
+          <AccountStatusPanel
+            companyDomain={companyWebsite}
+            companyName={companyName}
+            onOverrideChange={setAccountStatusOverride}
+            overrideActive={accountStatusOverride}
+          />
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">

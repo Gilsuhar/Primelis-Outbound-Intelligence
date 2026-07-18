@@ -2,7 +2,6 @@ import {
   channelForStep,
   defaultPurposesForLength,
   labelForSequenceAngle,
-  purposeLabels,
 } from "@/features/build-sequence/sequence-policy";
 import type {
   BuildSequenceInput,
@@ -16,6 +15,10 @@ import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider } from "./ai-provider";
+import {
+  displayCompanyName,
+  winningPatternForPurpose,
+} from "./winning-message-engine";
 
 export type BuildSequenceProviderRequest = {
   input: BuildSequenceInput;
@@ -49,14 +52,7 @@ function greeting(input: BuildSequenceInput) {
 }
 
 function displayCompany(input: BuildSequenceInput) {
-  const company = input.companyName.trim();
-  if (!company) {
-    return "this account";
-  }
-  if (company === company.toLowerCase()) {
-    return company.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
-  }
-  return company;
+  return displayCompanyName(input.companyName);
 }
 
 function cleanSelection(value?: string) {
@@ -75,6 +71,7 @@ function cleanSelection(value?: string) {
 }
 
 function ctaForPurpose(
+  input: BuildSequenceInput,
   purpose: SequenceStep["purpose"],
   stepNumber: number,
   isFinal: boolean,
@@ -91,6 +88,10 @@ function ctaForPurpose(
       ? "Do you already track this?"
       : "Is this on your radar?";
   }
+  const pattern = winningPatternForPurpose(input, purpose, stepNumber - 1);
+  if (pattern.cta) {
+    return pattern.cta;
+  }
   const ctas: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: "Do you already have a way to detect that?",
     PROBLEM_FRAMING: "Do you have visibility into when this happens?",
@@ -105,6 +106,10 @@ function ctaForPurpose(
 }
 
 function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"], stepNumber: number) {
+  const pattern = winningPatternForPurpose(input, purpose, stepNumber - 1);
+  if (pattern.subject) {
+    return pattern.subject;
+  }
   const company = displayCompany(input);
   const subjects: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: `${company} branded ads question`,
@@ -145,15 +150,32 @@ function bodyForPurpose({
   purpose,
   channel,
   secondaryFact,
+  ctaIndex,
 }: {
   input: BuildSequenceInput;
   purpose: SequenceStep["purpose"];
   channel: SequenceStep["channel"];
   secondaryFact: string;
+  ctaIndex: number;
 }) {
   const trigger = input.observedTrigger.trim();
   const company = displayCompany(input);
   const simpleSecondaryFact = humanizeFact(secondaryFact);
+  const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
+  const patternBody = pattern.body;
+  if (patternBody && purpose !== "SOCIAL_PROOF") {
+    if (channel === "LINKEDIN") {
+      return stripCommercialTerms(
+        patternBody
+          .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
+          .replace(/\n\n/g, " ")
+          .replace(/\n/g, " ")
+          .trim(),
+      );
+    }
+    return stripCommercialTerms(patternBody);
+  }
+
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
@@ -267,7 +289,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       const stepNumber = index + 1;
       const channel = channelForStep(input.primaryChannel, index);
       const isFinal = stepNumber === input.sequenceLength;
-      const cta = ctaForPurpose(purpose, stepNumber, isFinal, channel);
+      const cta = ctaForPurpose(input, purpose, stepNumber, isFinal, channel);
       return {
         stepNumber,
         channel,
@@ -288,6 +310,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           purpose,
           channel,
           secondaryFact: caseStudyFacts[0] ?? secondaryFact,
+          ctaIndex: index,
         }),
         cta,
         claimsUsed: [
@@ -304,7 +327,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       steps,
       claimsUsed: Array.from(new Set(steps.flatMap((step) => step.claimsUsed))),
       overallStrategy: stripCommercialTerms(
-        `Use ${purposeLabels[purposes[0]]} first, then vary the angle across account relevance, paid and organic search, and a low-pressure close. Keep the sequence concise and anchored to ${emailAngle}.`,
+        `Use reply-backed patterns from the winning-message library: direct first-touch question, Google automation gap, method or lower-CPC angle, then a low-pressure close. Keep the sequence concise and anchored to ${emailAngle}.`,
       ),
     };
   }

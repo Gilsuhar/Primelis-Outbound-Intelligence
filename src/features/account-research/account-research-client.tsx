@@ -8,6 +8,7 @@ import {
   enrichCompanyAndContactsAction,
   researchCompanyWebsiteAction,
 } from "@/app/account-research/actions";
+import { AccountStatusPanel } from "@/features/account-status/account-status-panel";
 import type { CompanyContactEnrichmentResult } from "@/features/company-contact-enrichment/types";
 import type { WebsiteFinding, WebsiteResearchResult } from "@/features/connected-research/types";
 import type {
@@ -105,6 +106,14 @@ function fieldStatus(formData: FormData) {
       return [field, hasSignal ? "USER_PROVIDED" : "UNKNOWN"];
     }),
   ) as Record<string, FactStatus>;
+}
+
+function workflowHref(baseHref: string, companyName: string, companyDomain: string) {
+  if (!companyName.trim() && !companyDomain.trim()) return baseHref;
+  const params = new URLSearchParams();
+  if (companyName.trim()) params.set("company", companyName.trim());
+  if (companyDomain.trim()) params.set("domain", companyDomain.trim());
+  return `${baseHref}?${params.toString()}`;
 }
 
 function SelectYesNoUnknown({ name, label }: { name: string; label: string }) {
@@ -317,6 +326,14 @@ export function AccountResearchClient() {
                   value={companyDomain}
                 />
               </label>
+              <div className="sm:col-span-2">
+                <AccountStatusPanel
+                  companyDomain={companyDomain}
+                  companyName={companyName}
+                  onOverrideChange={() => undefined}
+                  overrideActive={false}
+                />
+              </div>
               <SmartSelect
                 label={t("workflow.industry")}
                 name="industry"
@@ -698,7 +715,11 @@ export function AccountResearchClient() {
                           {link.label}
                         </span>
                       ) : (
-                        <a className="signal-button-secondary" href={link.href} key={link.href}>
+                        <a
+                          className="signal-button-secondary"
+                          href={workflowHref(link.href, companyName, companyDomain)}
+                          key={link.href}
+                        >
                           {link.label}
                         </a>
                       ),

@@ -101,9 +101,8 @@ describe("Create Outreach service", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("SUPPRESSION_BLOCKED");
-      expect(result.message).toContain("Do not create outreach");
-      expect(result.message).toContain("Zenleads Inc. DBA Apollo.io");
+      expect(result.code).toBe("ACCOUNT_STATUS_BLOCKED");
+      expect(result.message).toContain("already marked as a Primelis client");
     }
     expect(persisted).toEqual([]);
   });

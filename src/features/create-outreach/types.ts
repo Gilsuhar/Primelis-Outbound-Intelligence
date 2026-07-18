@@ -37,6 +37,7 @@ export type CreateOutreachInput = {
   desiredLength: OutreachLength;
   outputLanguage?: OutputLanguage;
   useCaseStudy?: boolean;
+  accountStatusOverride?: boolean;
   internalNotes?: string;
   creatorId?: string;
 };

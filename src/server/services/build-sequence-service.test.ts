@@ -115,12 +115,11 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result).toEqual({
-      ok: false,
-      code: "SUPPRESSION_BLOCKED",
-      message:
-        "Do not build a sequence for this account. Zenleads Inc. DBA Apollo.io (apollo.io) is in Do Not Contact / customer suppression as existing customer. Reason: Existing Signal customer. Use it only as internal context or social proof, not as a target account.",
-    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ACCOUNT_STATUS_BLOCKED");
+      expect(result.message).toContain("already marked as a Primelis client");
+    }
     expect(persisted).toEqual([]);
   });
 

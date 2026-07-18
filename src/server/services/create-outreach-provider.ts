@@ -8,6 +8,12 @@ import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider } from "./ai-provider";
+import {
+  compactEmail,
+  displayCompanyName,
+  linkedinPattern,
+  winningPatternForPurpose,
+} from "./winning-message-engine";
 
 export type OutreachProviderRequest = {
   input: CreateOutreachInput;
@@ -64,32 +70,7 @@ function cleanSelection(value?: string) {
     .trim();
 }
 
-function companyForCopy(company: string) {
-  const cleaned = company.trim();
-  if (!cleaned) {
-    return "this account";
-  }
-  const knownBrands: Record<string, string> = {
-    adidas: "Adidas",
-    apollo: "Apollo",
-    databricks: "Databricks",
-    dynatrace: "Dynatrace",
-    nike: "Nike",
-    semrush: "Semrush",
-    stripe: "Stripe",
-  };
-  const normalized = cleaned.toLowerCase();
-  if (knownBrands[normalized]) {
-    return knownBrands[normalized];
-  }
-  if (cleaned === cleaned.toLowerCase()) {
-    return cleaned
-      .split(/\s+/)
-      .map((part) => (part ? `${part[0].toUpperCase()}${part.slice(1)}` : part))
-      .join(" ");
-  }
-  return cleaned;
-}
+const companyForCopy = displayCompanyName;
 
 function triggerPhrase(input: CreateOutreachInput) {
   const trigger = cleanSelection(input.observedTrigger);
@@ -117,6 +98,10 @@ function triggerPhrase(input: CreateOutreachInput) {
 }
 
 function ctaFor(input: CreateOutreachInput) {
+  const pattern = winningPatternForPurpose(input, "FIRST_TOUCH_RELEVANCE");
+  if (pattern.cta) {
+    return pattern.cta;
+  }
   const company = companyForCopy(input.companyName);
   if (input.channel === "LINKEDIN") {
     return "Do you already have a way to do that?";
@@ -136,24 +121,27 @@ function ctaFor(input: CreateOutreachInput) {
 function subjectLinesFor(input: CreateOutreachInput) {
   const company = companyForCopy(input.companyName);
   const role = input.contactRole.toLowerCase();
+  const firstTouch = winningPatternForPurpose(input, "FIRST_TOUCH_RELEVANCE");
+  const context = winningPatternForPurpose(input, "PROBLEM_FRAMING", 1);
+  const method = winningPatternForPurpose(input, "METHODOLOGY_DIFFERENTIATION", 2);
   if (/growth|acquisition/i.test(role)) {
     return [
+      firstTouch.subject,
       `${company} brand search and acquisition efficiency`,
-      `Quick thought on ${company} paid brand`,
-      `Paid brand coverage at ${company}`,
+      context.subject,
     ];
   }
   if (/cmo|chief/i.test(role)) {
     return [
+      firstTouch.subject,
       `${company} brand-search visibility`,
-      `Quick question on paid brand at ${company}`,
-      `Paid vs organic coverage at ${company}`,
+      method.subject,
     ];
   }
   return [
-    `${company} paid brand question`,
+    firstTouch.subject,
     `When nobody is bidding on ${company}`,
-    `Quick thought on ${company} branded ads`,
+    context.subject,
   ];
 }
 
@@ -260,15 +248,19 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
     const primaryFact = productFacts[0]
       ? trimSentences(productFacts[0], input.desiredLength === "DETAILED" ? 2 : 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
-    const cta = ctaFor(input);
-    const context = contextLine(input);
+    const firstTouchPattern = winningPatternForPurpose(input, "FIRST_TOUCH_RELEVANCE");
+    const methodologyPattern = winningPatternForPurpose(input, "METHODOLOGY_DIFFERENTIATION", 1);
+    const cta = firstTouchPattern.cta || ctaFor(input);
     const opening = triggerPhrase(input);
-    const roleLine = personaLine(input);
     const factLine =
       primaryFact === "I do not have enough approved Signal knowledge to make a specific factual claim."
-        ? "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes."
+        ? firstTouchPattern.body.split("\n").filter(Boolean).at(-1) ??
+          "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely come down."
         : humanizeProductFact(primaryFact);
     const proofLine = caseStudyLine(records);
+    const patternParagraphs = firstTouchPattern.body.split(/\n{2,}/).filter(Boolean);
+    const context = patternParagraphs[1] ?? contextLine(input);
+    const roleLine = patternParagraphs[2] ?? personaLine(input);
     const emailSections = [
       {
         label: "INTRO" as const,
@@ -292,20 +284,13 @@ export class DeterministicOutreachProvider implements OutreachAiProvider {
       input.channel === "EMAIL"
         ? emailSections.map((section) => section.text).join("\n\n")
         : [
-            `${input.contactFirstName ? `${input.contactFirstName}, ` : ""}${opening}`,
-            factLine,
-            cta,
+            linkedinPattern(input),
+            input.desiredLength === "DETAILED" ? methodologyPattern.body.replace(/\n+/g, " ") : "",
           ].join(" ");
 
     const shorter =
       input.channel === "EMAIL"
-        ? [
-            greeting(input),
-            "",
-            `${opening} ${trimSentences(factLine, 1)}`,
-            "",
-            cta,
-          ].join("\n")
+        ? compactEmail(firstTouchPattern, input)
         : `${opening} ${cta}`;
 
     return {

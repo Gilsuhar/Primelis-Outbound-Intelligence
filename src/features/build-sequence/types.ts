@@ -47,6 +47,7 @@ export type BuildSequenceInput = {
   desiredTone: SequenceTone;
   desiredOverallDuration: string;
   outputLanguage?: OutputLanguage;
+  accountStatusOverride?: boolean;
   internalNotes?: string;
   creatorId?: string;
 };

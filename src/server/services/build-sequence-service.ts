@@ -20,11 +20,8 @@ import {
   type SequenceSourceReference,
   type SequenceStep,
 } from "@/features/build-sequence/types";
-import {
-  mergeDefaultSuppressionRecords,
-  searchDoNotContactRecords,
-} from "@/features/do-not-contact/do-not-contact-policy";
-import type { DoNotContactRecord, SuppressionSearchResult } from "@/features/do-not-contact/types";
+import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
+import type { DoNotContactRecord } from "@/features/do-not-contact/types";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -32,6 +29,7 @@ import {
   createBuildSequenceAiProvider,
   type BuildSequenceAiProvider,
 } from "./build-sequence-provider";
+import { assertAccountCanGenerate } from "./account-status-service";
 import {
   createInitialDraftVersion,
   PrismaDraftVersionPersistence,
@@ -60,6 +58,7 @@ const buildSequenceSchema = z.object({
   desiredTone: z.enum(sequenceTones),
   desiredOverallDuration: z.string().trim().min(3).max(120),
   outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
+  accountStatusOverride: z.boolean().optional().default(false),
   internalNotes: z.string().trim().max(1200).optional(),
   creatorId: z.string().trim().min(1).optional(),
 });
@@ -150,42 +149,13 @@ function allowedKnowledgeChannels(input: BuildSequenceInput) {
   return channelsForSequence(input.primaryChannel);
 }
 
-function cleanSuppressionQuery(value: string | undefined) {
-  return (value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "");
-}
-
-function findBlockedSuppressionMatch(
-  records: DoNotContactRecord[],
-  input: BuildSequenceInput,
-): SuppressionSearchResult | undefined {
-  const queries = Array.from(
-    new Set(
-      [input.companyName, input.companyWebsite]
-        .map(cleanSuppressionQuery)
-        .filter((query) => query.length > 0),
-    ),
-  );
-
-  for (const query of queries) {
-    const blocked = searchDoNotContactRecords(records, query).find((match) => match.blocked);
-    if (blocked) {
-      return blocked;
-    }
-  }
-  return undefined;
-}
-
-function suppressionBlockMessage(match: SuppressionSearchResult) {
-  const { record } = match;
-  const status = record.status.replaceAll("_", " ").toLowerCase();
-  const domain = record.domain ? ` (${record.domain})` : "";
-  const reason = record.reason ? ` Reason: ${record.reason}` : "";
-  return `Do not build a sequence for this account. ${record.companyName}${domain} is in Do Not Contact / customer suppression as ${status}.${reason} Use it only as internal context or social proof, not as a target account.`;
+function accountStatusPersistence(persistence: BuildSequencePersistence) {
+  return {
+    getActor: persistence.getActor.bind(persistence),
+    getSuppressionRecords: persistence.getSuppressionRecords.bind(persistence),
+    getRecentDrafts: async () => [],
+    getRecentAssessments: async () => [],
+  };
 }
 
 function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
@@ -537,10 +507,17 @@ export async function generateBuildSequence(
     return err("FORBIDDEN", "Only authorized sales or knowledge users can build sequences.");
   }
 
-  const suppressionRecords = await persistence.getSuppressionRecords();
-  const blockedMatch = findBlockedSuppressionMatch(suppressionRecords, input);
-  if (blockedMatch) {
-    return err("SUPPRESSION_BLOCKED", suppressionBlockMessage(blockedMatch));
+  const accountStatus = await assertAccountCanGenerate(
+    {
+      companyName: input.companyName,
+      companyDomain: input.companyWebsite,
+      overrideRequested: input.accountStatusOverride,
+      creatorId,
+    },
+    dependencies.persistence ? { persistence: accountStatusPersistence(persistence) } : {},
+  );
+  if (!accountStatus.ok) {
+    return accountStatus;
   }
 
   const provider = dependencies.provider ?? createBuildSequenceAiProvider();

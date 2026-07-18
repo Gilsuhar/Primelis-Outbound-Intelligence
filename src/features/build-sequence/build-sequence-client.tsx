@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -17,6 +17,7 @@ import {
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
+import { AccountStatusPanel } from "@/features/account-status/account-status-panel";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
@@ -45,9 +46,9 @@ const lengths: { label: string; value: SequenceLength }[] = [
 ];
 
 const companySizeOptions = [
-  "Strong fit — confirmed",
-  "Potential fit — validate spend/demand",
-  "Enterprise — qualify",
+  "Strong fit - confirmed",
+  "Potential fit - validate spend/demand",
+  "Enterprise - qualify",
   "Insufficient data",
   "Not a fit",
 ];
@@ -426,6 +427,7 @@ export function BuildSequenceClient() {
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
+  const [accountStatusOverride, setAccountStatusOverride] = useState(false);
   const [result, setResult] = useState<BuildSequenceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -451,6 +453,14 @@ export function BuildSequenceClient() {
       cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
     })) ?? [];
   const quality = result ? sequenceQuality(displayedSteps) : null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const company = params.get("company");
+    const domain = params.get("domain");
+    if (company) setCompanyName(company);
+    if (domain) setCompanyWebsite(domain);
+  }, []);
 
   async function copyText(key: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -510,6 +520,7 @@ export function BuildSequenceClient() {
         desiredTone: tone,
         desiredOverallDuration: formData.get("desiredOverallDuration"),
         outputLanguage,
+        accountStatusOverride,
         internalNotes: formData.get("internalNotes") || undefined,
       });
 
@@ -587,6 +598,7 @@ export function BuildSequenceClient() {
               onChange={(value) => {
                 setCompanyName(value);
                 setCompanyWebsite(inferDomain(value));
+                setAccountStatusOverride(false);
               }}
               required
               value={companyName}
@@ -653,6 +665,13 @@ export function BuildSequenceClient() {
             />
           </div>
 
+          <AccountStatusPanel
+            companyDomain={companyWebsite}
+            companyName={companyName}
+            onOverrideChange={setAccountStatusOverride}
+            overrideActive={accountStatusOverride}
+          />
+
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
               {t("workflow.advancedOptionalDetails")}
@@ -661,7 +680,10 @@ export function BuildSequenceClient() {
               <TextField
                 label={t("workflow.website")}
                 name="companyWebsite"
-                onChange={setCompanyWebsite}
+                onChange={(value) => {
+                  setCompanyWebsite(value);
+                  setAccountStatusOverride(false);
+                }}
                 value={companyWebsite}
               />
               <SmartField label={t("workflow.firstName")} name="contactFirstName" options={[]} />
