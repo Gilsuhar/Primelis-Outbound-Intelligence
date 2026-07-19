@@ -42,7 +42,7 @@ const buildSequenceSchema = z.object({
   contactFirstName: z.string().trim().max(80).optional(),
   contactRole: z.string().trim().min(1).max(160),
   industry: z.string().trim().max(160).optional(),
-  companyContext: z.string().trim().max(240).optional(),
+  companyContext: z.string().trim().min(1).max(240),
   geographyOrMarkets: z.string().trim().max(240).optional(),
   paidSearchContext: z.string().trim().max(500).optional(),
   currentVendor: z.string().trim().max(160).optional(),
@@ -78,6 +78,17 @@ const sequenceStepSchema = z.object({
 });
 
 type Row = Record<string, unknown>;
+
+const requiredBuildSequenceFieldLabels: Record<string, string> = {
+  companyName: "Company",
+  contactRole: "Buyer role",
+  companyContext: "Fit / ICP",
+  observedTrigger: "Reason for outreach",
+  primaryChannel: "Channel",
+  sequenceLength: "Steps",
+  desiredTone: "Tone",
+  desiredOverallDuration: "Duration",
+};
 
 export type BuildSequencePersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
@@ -496,7 +507,18 @@ export async function generateBuildSequence(
 ) {
   const parsed = buildSequenceSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return err("VALIDATION_ERROR", "Build Sequence input is malformed.");
+    const missingOrInvalidFields = Array.from(
+      new Set(
+        parsed.error.issues.map((issue) => {
+          const field = String(issue.path[0] ?? "");
+          return requiredBuildSequenceFieldLabels[field] ?? field;
+        }),
+      ),
+    ).filter(Boolean);
+    const message = missingOrInvalidFields.length
+      ? `Build Sequence needs: ${missingOrInvalidFields.join(", ")}.`
+      : "Build Sequence input is malformed.";
+    return err("VALIDATION_ERROR", message);
   }
 
   const input = parsed.data;

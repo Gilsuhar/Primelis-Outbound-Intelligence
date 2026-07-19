@@ -109,6 +109,18 @@ OPENAI_API_KEY=""
 OPENAI_MODEL=""
 ```
 
+To enable live OpenAI generation in the application server, set:
+
+```bash
+AI_PROVIDER="openai"
+OPENAI_API_KEY="sk-proj-..."
+OPENAI_MODEL="gpt-5.4-mini"
+```
+
+These values must be configured in the server runtime that hosts the Next.js
+app, such as Vercel environment variables. Keep `OPENAI_API_KEY` server-only:
+do not expose it with a `NEXT_PUBLIC_` prefix and do not commit real secrets.
+
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback, but new
 Supabase projects should use the publishable key from the project Connect dialog.
 

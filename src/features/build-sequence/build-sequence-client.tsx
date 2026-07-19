@@ -101,11 +101,19 @@ const durationOptions = [
 ];
 
 function inferDomain(company: string) {
-  const cleaned = company
+  const hostLike = company
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, "")
     .replace(/^www\./, "")
+    .replace(/\/.*$/, "")
+    .trim();
+
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(hostLike)) {
+    return hostLike;
+  }
+
+  const cleaned = hostLike
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\b(inc|llc|ltd|limited|group|company|co|corp|corporation)\b/g, "")
     .trim()
@@ -340,6 +348,23 @@ function sequenceQuality(steps: SequenceStep[]) {
   };
 }
 
+function formString(formData: FormData, name: string) {
+  const value = formData.get(name);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function missingQuickBriefFields(formData: FormData) {
+  return [
+    ["companyName", "Company"],
+    ["contactRole", "Buyer role"],
+    ["companyContext", "Fit / ICP"],
+    ["observedTrigger", "Reason for outreach"],
+    ["desiredOverallDuration", "Duration"],
+  ]
+    .filter(([name]) => !formString(formData, name))
+    .map(([, label]) => label);
+}
+
 export const __buildSequenceVariantTest = {
   bodyVariants,
   ctaVariants,
@@ -439,6 +464,7 @@ export function BuildSequenceClient() {
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
   const [accountStatusOverride, setAccountStatusOverride] = useState(false);
+  const [accountStatusRefreshKey, setAccountStatusRefreshKey] = useState(0);
   const [result, setResult] = useState<BuildSequenceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -514,30 +540,39 @@ export function BuildSequenceClient() {
 
   function onSubmit(formData: FormData) {
     setError(null);
+    const missingFields = missingQuickBriefFields(formData);
+    if (missingFields.length > 0) {
+      setResult(null);
+      setError(`Complete these fields first: ${missingFields.join(", ")}.`);
+      return;
+    }
     startTransition(async () => {
       const response = await generateBuildSequenceAction({
-        companyName: formData.get("companyName"),
-        companyWebsite: formData.get("companyWebsite") || undefined,
-        contactFirstName: formData.get("contactFirstName") || undefined,
-        contactRole: formData.get("contactRole"),
-        industry: formData.get("industry") || undefined,
-        companyContext: formData.get("companyContext") || undefined,
-        geographyOrMarkets: formData.get("geographyOrMarkets") || undefined,
-        paidSearchContext: formData.get("paidSearchContext") || undefined,
-        currentVendor: formData.get("currentVendor") || undefined,
-        observedTrigger: formData.get("observedTrigger"),
+        companyName: formString(formData, "companyName"),
+        companyWebsite: formString(formData, "companyWebsite") || undefined,
+        contactFirstName: formString(formData, "contactFirstName") || undefined,
+        contactRole: formString(formData, "contactRole"),
+        industry: formString(formData, "industry") || undefined,
+        companyContext: formString(formData, "companyContext") || undefined,
+        geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
+        paidSearchContext: formString(formData, "paidSearchContext") || undefined,
+        currentVendor: formString(formData, "currentVendor") || undefined,
+        observedTrigger: formString(formData, "observedTrigger"),
         primaryChannel,
         sequenceLength,
         desiredTone: tone,
-        desiredOverallDuration: formData.get("desiredOverallDuration"),
+        desiredOverallDuration: formString(formData, "desiredOverallDuration"),
         outputLanguage,
         accountStatusOverride,
-        internalNotes: formData.get("internalNotes") || undefined,
+        internalNotes: formString(formData, "internalNotes") || undefined,
       });
 
       if (!response.ok) {
         setResult(null);
         setError(response.message);
+        if (response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED") {
+          setAccountStatusRefreshKey((current) => current + 1);
+        }
         return;
       }
 
@@ -681,6 +716,7 @@ export function BuildSequenceClient() {
             companyName={companyName}
             onOverrideChange={setAccountStatusOverride}
             overrideActive={accountStatusOverride}
+            refreshKey={accountStatusRefreshKey}
           />
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">

@@ -9,6 +9,7 @@ import type { AccountStatusResult } from "./types";
 type AccountStatusPanelProps = {
   companyName: string;
   companyDomain?: string;
+  refreshKey?: number;
   overrideActive: boolean;
   onOverrideChange: (value: boolean) => void;
 };
@@ -45,6 +46,7 @@ function statusClasses(status: AccountStatusResult) {
 export function AccountStatusPanel({
   companyName,
   companyDomain,
+  refreshKey = 0,
   overrideActive,
   onOverrideChange,
 }: AccountStatusPanelProps) {
@@ -75,7 +77,7 @@ export function AccountStatusPanel({
       });
     }, 450);
     return () => window.clearTimeout(timeout);
-  }, [companyName, companyDomain, queryReady]);
+  }, [companyName, companyDomain, queryReady, refreshKey]);
 
   if (!queryReady) {
     return (

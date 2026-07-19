@@ -383,7 +383,7 @@ describe("Build Sequence service", () => {
     expect(invalid).toEqual({
       ok: false,
       code: "VALIDATION_ERROR",
-      message: "Build Sequence input is malformed.",
+      message: "Build Sequence needs: Company, Buyer role, Fit / ICP, Reason for outreach, Channel, Steps, Tone, Duration.",
     });
     expect(forbidden).toEqual({
       ok: false,
