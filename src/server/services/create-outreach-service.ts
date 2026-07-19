@@ -35,13 +35,28 @@ const createOutreachSchema = z.object({
   companyName: z.string().trim().min(1).max(180),
   companyWebsite: z.string().trim().max(240).optional(),
   contactFirstName: z.string().trim().max(80).optional(),
-  contactRole: z.string().trim().min(1).max(160),
+  contactRole: z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .transform((value) => value || "Head of Performance Marketing"),
   industry: z.string().trim().max(160).optional(),
-  companyContext: z.string().trim().max(240).optional(),
+  companyContext: z
+    .string()
+    .trim()
+    .max(240)
+    .optional()
+    .transform((value) => value || "Potential fit - validate spend/demand"),
   geographyOrMarkets: z.string().trim().max(240).optional(),
   paidSearchContext: z.string().trim().max(500).optional(),
   currentVendor: z.string().trim().max(160).optional(),
-  observedTrigger: z.string().trim().min(5).max(600),
+  observedTrigger: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .transform((value) => value || "Light discovery before pitching Signal"),
   channel: z.enum(outreachChannels),
   messageType: z.enum(outreachMessageTypes),
   desiredTone: z.enum(outreachTones),

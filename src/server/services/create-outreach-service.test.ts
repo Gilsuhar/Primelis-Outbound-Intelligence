@@ -378,6 +378,32 @@ describe("Create Outreach service", () => {
     expect(original).toEqual(knowledge({ id: "stable" }));
   });
 
+  it("fills conservative quick-generate defaults when optional dropdowns are empty", async () => {
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateCreateOutreach(
+      {
+        companyName: "Brex",
+        companyWebsite: "brex.com",
+        contactFirstName: "Moshe",
+        channel: "EMAIL",
+        messageType: "FIRST_TOUCH",
+        desiredTone: "CONSULTATIVE",
+        desiredLength: "STANDARD",
+        creatorId: "seed-sales-user",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(persisted[0].request.contactRole).toBe("Head of Performance Marketing");
+      expect(persisted[0].request.companyContext).toBe("Potential fit - validate spend/demand");
+      expect(persisted[0].request.observedTrigger).toBe("Light discovery before pitching Signal");
+      expect(result.data.recommendedMessage).toContain("Brex");
+    }
+  });
+
   it("uses deterministic fallback without an API key", async () => {
     const provider = new DeterministicOutreachProvider();
 

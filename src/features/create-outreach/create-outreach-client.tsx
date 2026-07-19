@@ -88,6 +88,10 @@ function variantIndex(current: number, length: number) {
   return (current + 1) % length;
 }
 
+function formString(value: FormDataEntryValue | null, fallback = "") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
 function subjectLineVariants(result: CreateOutreachResult, company: string) {
   const angle = result.selectedAngle.replaceAll("_", " ").toLowerCase();
   return [
@@ -272,17 +276,20 @@ export function CreateOutreachClient() {
   function onSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
+      const fallbackRole = "Head of Performance Marketing";
+      const fallbackFit = "Potential fit - validate spend/demand";
+      const fallbackTrigger = "Light discovery before pitching Signal";
       const response = await generateCreateOutreachAction({
-        companyName: formData.get("companyName"),
-        companyWebsite: formData.get("companyWebsite") || undefined,
-        contactFirstName: formData.get("contactFirstName") || undefined,
-        contactRole: formData.get("contactRole"),
-        industry: formData.get("industry") || undefined,
-        companyContext: formData.get("companyContext") || undefined,
-        geographyOrMarkets: formData.get("geographyOrMarkets") || undefined,
-        paidSearchContext: formData.get("paidSearchContext") || undefined,
-        currentVendor: formData.get("currentVendor") || undefined,
-        observedTrigger: formData.get("observedTrigger"),
+        companyName: formString(formData.get("companyName")),
+        companyWebsite: formString(formData.get("companyWebsite")) || undefined,
+        contactFirstName: formString(formData.get("contactFirstName")) || undefined,
+        contactRole: formString(formData.get("contactRole"), fallbackRole),
+        industry: formString(formData.get("industry")) || undefined,
+        companyContext: formString(formData.get("companyContext"), fallbackFit),
+        geographyOrMarkets: formString(formData.get("geographyOrMarkets")) || undefined,
+        paidSearchContext: formString(formData.get("paidSearchContext")) || undefined,
+        currentVendor: formString(formData.get("currentVendor")) || undefined,
+        observedTrigger: formString(formData.get("observedTrigger"), fallbackTrigger),
         channel,
         messageType,
         desiredTone: tone,
@@ -295,7 +302,13 @@ export function CreateOutreachClient() {
 
       if (!response.ok) {
         setResult(null);
-        setError(response.message);
+        setError(
+          response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED"
+            ? `${response.message} Click "Continue with override" above, then generate again.`
+            : response.code === "VALIDATION_ERROR"
+              ? "Add a company name, then generate again. The other fields can be filled automatically."
+              : response.message,
+        );
         return;
       }
 
