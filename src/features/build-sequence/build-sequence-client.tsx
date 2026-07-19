@@ -303,13 +303,17 @@ function normalizedLine(text: string) {
     .trim();
 }
 
-function sequenceQuality(steps: SequenceStep[]) {
+function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
   const issues: string[] = [];
   const wins: string[] = [];
   const subjects = steps.map((step) => normalizedLine(step.subjectLine ?? "")).filter(Boolean);
   const ctas = steps.map((step) => normalizedLine(step.cta ?? "")).filter(Boolean);
   const bodyText = steps.map((step) => step.messageBody).join("\n").toLowerCase();
   const uniquePurposes = new Set(steps.map((step) => step.purpose));
+
+  if (safetyNotes.some((note) => /fallback was used|openai|provider/i.test(note))) {
+    issues.push("OpenAI did not write this sequence. The deterministic fallback was used.");
+  }
 
   if (new Set(subjects).size < subjects.length) {
     issues.push("One subject repeats. Regenerate one subject before using the sequence.");
@@ -485,7 +489,7 @@ export function BuildSequenceClient() {
       messageBody: stepBodyDrafts[step.stepNumber] ?? step.messageBody,
       cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
     })) ?? [];
-  const quality = result ? sequenceQuality(displayedSteps) : null;
+  const quality = result ? sequenceQuality(displayedSteps, result.safetyNotes) : null;
 
   function setOverride(value: boolean) {
     setAccountStatusOverride(value);

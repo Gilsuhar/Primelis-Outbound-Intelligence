@@ -14,7 +14,7 @@ import type {
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
-import { createAiProvider } from "./ai-provider";
+import { createAiProvider, mapAiProviderError } from "./ai-provider";
 import {
   displayCompanyName,
   winningPatternForPurpose,
@@ -438,12 +438,13 @@ export function createBuildSequenceAiProvider(
           overallStrategy: aiResult.changeSummary ?? result.overallStrategy,
           safetyNotes: [...result.safetyNotes, ...aiResult.uncertaintyNotes],
         };
-      } catch {
+      } catch (error) {
+        const failure = mapAiProviderError(error);
         return {
           ...result,
           safetyNotes: [
             ...result.safetyNotes,
-            "AI provider failed safely; deterministic fallback was used.",
+            `${failure.message} Deterministic fallback was used.`,
           ],
         };
       }

@@ -102,5 +102,43 @@ describe("Build Sequence OpenAI provider", () => {
     ]);
     expect(result.steps[0].subjectLine).toBe("Nike paid brand decision");
     expect(result.overallStrategy).toBe("Use a sharper three-step sequence.");
+    const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse(String(requestInit?.body));
+    expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
+  });
+
+  it("shows a specific fallback reason when OpenAI rejects the model", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "missing-model",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        overallStrategy: "Fallback strategy.",
+        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+        angleRationale: "Fallback rationale.",
+        personaEmphasis: {
+          persona: "Performance Marketing",
+          emphasis: "efficiency",
+          rationale: "Owns paid brand.",
+        },
+        detectedAccountSignals: [],
+        safetyNotes: [],
+        knowledgeLimitations: [],
+      },
+    });
+
+    expect(result.safetyNotes.join(" ")).toContain("OpenAI model was not found");
   });
 });

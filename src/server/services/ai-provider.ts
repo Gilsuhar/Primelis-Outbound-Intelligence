@@ -280,6 +280,27 @@ function deterministicResponse(request: AiDraftRequest): AiDraftResponse {
   };
 }
 
+function parseJsonObject(content: string) {
+  const trimmed = content.trim();
+  if (trimmed.startsWith("```")) {
+    const withoutFence = trimmed
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+    return JSON.parse(withoutFence);
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    }
+    throw new Error("MALFORMED_RESPONSE");
+  }
+}
+
 export class DeterministicAiProvider implements AiProvider {
   async getProviderStatus() {
     return status("NOT_CONFIGURED", "Live AI provider is not configured.");
@@ -333,7 +354,7 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
+    const timeout = setTimeout(() => controller.abort(), request.workflow === "BUILD_SEQUENCE" ? 30_000 : 20_000);
     try {
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
@@ -385,7 +406,7 @@ export class OpenAiProvider implements AiProvider {
             },
           ],
           text: { format: { type: "json_object" } },
-          max_output_tokens: 1200,
+          max_output_tokens: request.workflow === "BUILD_SEQUENCE" ? 3600 : 1800,
         }),
       });
       if (response.status === 401 || response.status === 403) {
@@ -395,7 +416,7 @@ export class OpenAiProvider implements AiProvider {
         throw new Error("RATE_LIMITED");
       }
       if (!response.ok) {
-        throw new Error("PROVIDER_ERROR");
+        throw new Error(`PROVIDER_HTTP_${response.status}`);
       }
       const payload = (await response.json()) as {
         output_text?: string;
@@ -409,7 +430,7 @@ export class OpenAiProvider implements AiProvider {
           .filter((text): text is string => Boolean(text))
           .join("\n");
       if (!content) throw new Error("MALFORMED_RESPONSE");
-      return aiDraftResponseSchema.parse(JSON.parse(content));
+      return aiDraftResponseSchema.parse(parseJsonObject(content));
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("TEMPORARILY_UNAVAILABLE");
@@ -445,6 +466,33 @@ export function mapAiProviderError(error: unknown): AiProviderStatusResult {
     return status(
       "TEMPORARILY_UNAVAILABLE",
       "AI provider is temporarily unavailable.",
+      false,
+      "configured-model",
+    );
+  }
+  if (text.includes("PROVIDER_HTTP_400")) {
+    return status(
+      "PROVIDER_ERROR",
+      "OpenAI rejected the request. Check OPENAI_MODEL and the model's JSON response support.",
+      false,
+      "configured-model",
+    );
+  }
+  if (text.includes("PROVIDER_HTTP_404")) {
+    return status(
+      "PROVIDER_ERROR",
+      "OpenAI model was not found for this API key. Check OPENAI_MODEL in Vercel.",
+      false,
+      "configured-model",
+    );
+  }
+  if (text.includes("PROVIDER_HTTP_")) {
+    return status("PROVIDER_ERROR", `OpenAI request failed (${text}).`, false, "configured-model");
+  }
+  if (text.includes("MALFORMED_RESPONSE")) {
+    return status(
+      "PROVIDER_ERROR",
+      "OpenAI returned a response the app could not parse as JSON.",
       false,
       "configured-model",
     );

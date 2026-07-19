@@ -7,7 +7,7 @@ import type {
 } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
-import { createAiProvider } from "./ai-provider";
+import { createAiProvider, mapAiProviderError } from "./ai-provider";
 
 export type ReplyProviderRequest = {
   input: ReplyToProspectInput;
@@ -344,12 +344,13 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
             : result.claimsUsed,
           safetyWarnings: [...result.safetyWarnings, ...aiResult.uncertaintyNotes],
         };
-      } catch {
+      } catch (error) {
+        const failure = mapAiProviderError(error);
         return {
           ...result,
           safetyWarnings: [
             ...result.safetyWarnings,
-            "AI provider failed safely; deterministic fallback was used.",
+            `${failure.message} Deterministic fallback was used.`,
           ],
         };
       }
