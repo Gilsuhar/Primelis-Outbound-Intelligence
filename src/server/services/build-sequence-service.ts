@@ -40,13 +40,28 @@ const buildSequenceSchema = z.object({
   companyName: z.string().trim().min(1).max(180),
   companyWebsite: z.string().trim().max(240).optional(),
   contactFirstName: z.string().trim().max(80).optional(),
-  contactRole: z.string().trim().min(1).max(160),
+  contactRole: z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .transform((value) => value || "Head of Performance Marketing"),
   industry: z.string().trim().max(160).optional(),
-  companyContext: z.string().trim().min(1).max(240),
+  companyContext: z
+    .string()
+    .trim()
+    .max(240)
+    .optional()
+    .transform((value) => value || "Potential fit - validate spend/demand"),
   geographyOrMarkets: z.string().trim().max(240).optional(),
   paidSearchContext: z.string().trim().max(500).optional(),
   currentVendor: z.string().trim().max(160).optional(),
-  observedTrigger: z.string().trim().min(5).max(600),
+  observedTrigger: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .transform((value) => value || "Light discovery before pitching Signal"),
   primaryChannel: z.enum(sequenceChannels),
   sequenceLength: z.union([
     z.literal(3),
@@ -56,7 +71,12 @@ const buildSequenceSchema = z.object({
     z.coerce.number().pipe(z.union([z.literal(3), z.literal(4), z.literal(5), z.literal(6)])),
   ]),
   desiredTone: z.enum(sequenceTones),
-  desiredOverallDuration: z.string().trim().min(3).max(120),
+  desiredOverallDuration: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((value) => value || "12 business days"),
   outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   accountStatusOverride: z.boolean().optional().default(false),
   internalNotes: z.string().trim().max(1200).optional(),

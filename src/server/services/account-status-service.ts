@@ -106,10 +106,10 @@ function statusSeverity(state: AccountStatusState): AccountStatusSeverity {
 }
 
 function canOverrideState(state: AccountStatusState, role: string) {
-  return (
-    role === "KNOWLEDGE_ADMIN" &&
-    (state === "ACTIVE_OPPORTUNITY" || state === "RECENT_OUTREACH")
-  );
+  if (state === "RECENT_OUTREACH") {
+    return role === "SALES_USER" || role === "KNOWLEDGE_ADMIN";
+  }
+  return role === "KNOWLEDGE_ADMIN" && state === "ACTIVE_OPPORTUNITY";
 }
 
 function titleFor(state: AccountStatusState) {

@@ -109,7 +109,34 @@ describe("Account status service", () => {
       expect(result.data.state).toBe("RECENT_OUTREACH");
       expect(result.data.severity).toBe("WARNING");
       expect(result.data.requiresOverride).toBe(true);
+      expect(result.data.canOverride).toBe(true);
     }
+  });
+
+  it("allows sales users to override recent outreach warnings", async () => {
+    const result = await assertAccountCanGenerate(
+      {
+        companyName: "Nike",
+        companyDomain: "nike.com",
+        overrideRequested: true,
+      },
+      {
+        persistence: persistence({
+          actorRole: "SALES_USER",
+          recentDrafts: [
+            {
+              id: "draft-1",
+              workflow: "CREATE_OUTREACH",
+              companyName: "Nike",
+              companyDomain: "nike.com",
+              createdAt: "2026-07-18T08:00:00.000Z",
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
   });
 
   it("returns prior qualification context as clear guidance", async () => {

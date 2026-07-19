@@ -356,10 +356,6 @@ function formString(formData: FormData, name: string) {
 function missingQuickBriefFields(formData: FormData) {
   return [
     ["companyName", "Company"],
-    ["contactRole", "Buyer role"],
-    ["companyContext", "Fit / ICP"],
-    ["observedTrigger", "Reason for outreach"],
-    ["desiredOverallDuration", "Duration"],
   ]
     .filter(([name]) => !formString(formData, name))
     .map(([, label]) => label);
@@ -491,6 +487,13 @@ export function BuildSequenceClient() {
     })) ?? [];
   const quality = result ? sequenceQuality(displayedSteps) : null;
 
+  function setOverride(value: boolean) {
+    setAccountStatusOverride(value);
+    if (value) {
+      setError(null);
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const company = params.get("company");
@@ -551,17 +554,17 @@ export function BuildSequenceClient() {
         companyName: formString(formData, "companyName"),
         companyWebsite: formString(formData, "companyWebsite") || undefined,
         contactFirstName: formString(formData, "contactFirstName") || undefined,
-        contactRole: formString(formData, "contactRole"),
+        contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
         industry: formString(formData, "industry") || undefined,
-        companyContext: formString(formData, "companyContext") || undefined,
+        companyContext: formString(formData, "companyContext") || "Potential fit - validate spend/demand",
         geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
         paidSearchContext: formString(formData, "paidSearchContext") || undefined,
         currentVendor: formString(formData, "currentVendor") || undefined,
-        observedTrigger: formString(formData, "observedTrigger"),
+        observedTrigger: formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
         primaryChannel,
         sequenceLength,
         desiredTone: tone,
-        desiredOverallDuration: formString(formData, "desiredOverallDuration"),
+        desiredOverallDuration: formString(formData, "desiredOverallDuration") || "12 business days",
         outputLanguage,
         accountStatusOverride,
         internalNotes: formString(formData, "internalNotes") || undefined,
@@ -569,7 +572,11 @@ export function BuildSequenceClient() {
 
       if (!response.ok) {
         setResult(null);
-        setError(response.message);
+        setError(
+          response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED"
+            ? `${response.message} Click "Continue with override" above, then build again.`
+            : response.message,
+        );
         if (response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED") {
           setAccountStatusRefreshKey((current) => current + 1);
         }
@@ -653,13 +660,11 @@ export function BuildSequenceClient() {
               label={t("workflow.buyerRole")}
               name="contactRole"
               options={buyerRoleOptions}
-              required
             />
             <SmartField
               label={t("workflow.fitIcp")}
               name="companyContext"
               options={companySizeOptions}
-              required
             />
             <SmartField
               label={t("workflow.industry")}
@@ -670,7 +675,6 @@ export function BuildSequenceClient() {
               label={t("workflow.reasonForOutreach")}
               name="observedTrigger"
               options={triggerOptions}
-              required
             />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               {t("workflow.steps")}
@@ -707,14 +711,13 @@ export function BuildSequenceClient() {
               label={t("workflow.duration")}
               name="desiredOverallDuration"
               options={durationOptions}
-              required
             />
           </div>
 
           <AccountStatusPanel
             companyDomain={companyWebsite}
             companyName={companyName}
-            onOverrideChange={setAccountStatusOverride}
+            onOverrideChange={setOverride}
             overrideActive={accountStatusOverride}
             refreshKey={accountStatusRefreshKey}
           />

@@ -294,6 +294,47 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("builds a sequence with conservative defaults after a recent-outreach override", async () => {
+    const { adapter, persisted } = persistence(
+      [knowledge({ id: "product-truth" })],
+      "SALES_USER",
+    );
+    const recentAwareAdapter = {
+      ...adapter,
+      getRecentDrafts: async () => [
+        {
+          id: "recent-nike",
+          workflow: "CREATE_OUTREACH",
+          companyName: "Nike",
+          companyDomain: "nike.com",
+          createdAt: "2026-07-19T08:00:00.000Z",
+        },
+      ],
+      getRecentAssessments: async () => [],
+    };
+
+    const result = await generateBuildSequence(
+      {
+        companyName: "nike",
+        companyWebsite: "nike.com",
+        primaryChannel: "EMAIL",
+        sequenceLength: 4,
+        desiredTone: "CONSULTATIVE",
+        accountStatusOverride: true,
+        creatorId: "seed-sales-user",
+      },
+      { persistence: recentAwareAdapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps).toHaveLength(4);
+      expect(persisted[0].request.contactRole).toBe("Head of Performance Marketing");
+      expect(persisted[0].request.companyContext).toBe("Potential fit - validate spend/demand");
+      expect(persisted[0].request.observedTrigger).toBe("Light discovery before pitching Signal");
+    }
+  });
+
   it("uses valid delays and a low-pressure final breakup step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 
@@ -383,7 +424,7 @@ describe("Build Sequence service", () => {
     expect(invalid).toEqual({
       ok: false,
       code: "VALIDATION_ERROR",
-      message: "Build Sequence needs: Company, Buyer role, Fit / ICP, Reason for outreach, Channel, Steps, Tone, Duration.",
+      message: "Build Sequence needs: Company, Channel, Steps, Tone.",
     });
     expect(forbidden).toEqual({
       ok: false,
