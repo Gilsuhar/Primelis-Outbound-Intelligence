@@ -305,6 +305,24 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
           workflow: "REPLY_TO_PROSPECT",
           currentDraft: result.recommendedReply,
           context: {
+            brief: {
+              prospectMessage: request.input.prospectMessage,
+              companyName: request.input.companyName,
+              contactRole: request.input.contactRole,
+              channel: request.input.channel,
+              desiredTone: request.input.desiredTone,
+              desiredLength: request.input.desiredLength,
+              contextNotes: request.input.contextNotes,
+              detectedIntent: request.intents,
+            },
+            writingInstructions: [
+              "Answer the prospect's actual question first.",
+              "Sound like a calm senior seller, not support documentation.",
+              "If they mention Adthena, Revvim, Auction Insights, an agency, or Google Ads, do not attack the vendor. Position Signal as the decision layer for paid-brand coverage.",
+              "Keep it short enough to send as-is. No bullets unless the prospect explicitly asked for detail.",
+              "Use one useful distinction: visibility, decision automation, paid vs organic, or when bids can safely come down.",
+              "End with one low-pressure next question.",
+            ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.records.flatMap((record) =>
               record.sourceIds.map((id, index) => ({

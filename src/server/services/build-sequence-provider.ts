@@ -360,16 +360,81 @@ export function createBuildSequenceAiProvider(
       try {
         const aiResult = await provider.generateDraft({
           workflow: "BUILD_SEQUENCE",
-          currentDraft: result.steps.map((step) => step.messageBody).join("\n\n"),
+          currentDraft: result.steps
+            .map((step) =>
+              [
+                `Step ${step.stepNumber} (${step.channel}, ${step.delay}, ${step.purpose})`,
+                step.subjectLine ? `Subject: ${step.subjectLine}` : undefined,
+                step.connectionRequest ? `Connection request: ${step.connectionRequest}` : undefined,
+                step.messageBody,
+                `CTA: ${step.cta}`,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            )
+            .join("\n\n---\n\n"),
           context: {
+            brief: {
+              companyName: request.input.companyName,
+              companyWebsite: request.input.companyWebsite,
+              contactFirstName: request.input.contactFirstName,
+              contactRole: request.input.contactRole,
+              industry: request.input.industry,
+              companyContext: request.input.companyContext,
+              geographyOrMarkets: request.input.geographyOrMarkets,
+              paidSearchContext: request.input.paidSearchContext,
+              currentVendor: request.input.currentVendor,
+              observedTrigger: request.input.observedTrigger,
+              primaryChannel: request.input.primaryChannel,
+              sequenceLength: request.input.sequenceLength,
+              desiredTone: request.input.desiredTone,
+              desiredOverallDuration: request.input.desiredOverallDuration,
+              selectedAngle: result.selectedAngle,
+            },
+            writingInstructions: [
+              "Rewrite every step as a sendable outbound sequence.",
+              "Return sequenceSteps with exactly the same number of steps and the same order as currentDraft.",
+              "Each email body should be 55-100 words. Each LinkedIn body should be 25-55 words.",
+              "Each step must add a new reason, not repeat the same brand-search question.",
+              "Step 1: sharp account-relevant opener. Step 2: problem/gap. Step 3: method or useful contrast. Later steps: proof or low-pressure close.",
+              "Do not use fluffy phrases like checking in, wanted to follow up, hope you are well, thought this might be relevant, or I had the company on my list.",
+              "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",
+              "Keep one soft CTA per step.",
+            ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
+        const aiSteps =
+          aiResult.sequenceSteps?.length === result.steps.length
+            ? result.steps.map((step, index) => {
+                const aiStep = aiResult.sequenceSteps?.[index];
+                if (!aiStep) {
+                  return step;
+                }
+                return {
+                  ...step,
+                  subjectLine:
+                    step.channel === "EMAIL"
+                      ? stripCommercialTerms(aiStep.subjectLine ?? step.subjectLine ?? "")
+                      : undefined,
+                  connectionRequest:
+                    step.channel === "LINKEDIN" && step.stepNumber === 1
+                      ? stripCommercialTerms(aiStep.connectionRequest ?? step.connectionRequest ?? "")
+                      : step.connectionRequest,
+                  messageBody: stripCommercialTerms(aiStep.messageBody),
+                  cta: stripCommercialTerms(aiStep.cta),
+                };
+              })
+            : result.steps;
         return {
           ...result,
+          steps: aiSteps,
+          claimsUsed: aiResult.factualClaimsUsed.length
+            ? aiResult.factualClaimsUsed
+            : result.claimsUsed,
           overallStrategy: aiResult.changeSummary ?? result.overallStrategy,
           safetyNotes: [...result.safetyNotes, ...aiResult.uncertaintyNotes],
         };

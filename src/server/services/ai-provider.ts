@@ -28,6 +28,12 @@ export type AiDraftResponse = {
   shorterAlternative?: string;
   cta?: string;
   subjectLines?: string[];
+  sequenceSteps?: Array<{
+    subjectLine?: string;
+    connectionRequest?: string;
+    messageBody: string;
+    cta: string;
+  }>;
   sourceReferences: string[];
   factualClaimsUsed: string[];
   uncertaintyNotes: string[];
@@ -54,6 +60,17 @@ const aiDraftResponseSchema = z.object({
   shorterAlternative: z.string().trim().max(2500).optional(),
   cta: z.string().trim().max(300).optional(),
   subjectLines: z.array(z.string().trim().max(120)).max(5).optional(),
+  sequenceSteps: z
+    .array(
+      z.object({
+        subjectLine: z.string().trim().max(160).optional(),
+        connectionRequest: z.string().trim().max(300).optional(),
+        messageBody: z.string().trim().min(1).max(1600),
+        cta: z.string().trim().min(1).max(300),
+      }),
+    )
+    .max(8)
+    .optional(),
   sourceReferences: z.array(z.string().trim().max(160)).max(20),
   factualClaimsUsed: z.array(z.string().trim().max(500)).max(20),
   uncertaintyNotes: z.array(z.string().trim().max(500)).max(10),
@@ -354,6 +371,8 @@ export class OpenAiProvider implements AiProvider {
                       shorterAlternative: "string optional",
                       cta: "string optional",
                       subjectLines: "string[] optional",
+                      sequenceSteps:
+                        "optional for BUILD_SEQUENCE only: array of { subjectLine?: string, connectionRequest?: string, messageBody: string, cta: string } in the same order as the requested sequence",
                       sourceReferences: "string[]",
                       factualClaimsUsed: "string[]",
                       uncertaintyNotes: "string[]",
