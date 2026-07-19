@@ -12,7 +12,6 @@ import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/wo
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   CreateOutreachResult,
-  OutreachEmailSection,
   OutreachChannel,
   OutreachLength,
   OutreachMessageType,
@@ -66,11 +65,17 @@ const triggerOptions = [
 ];
 
 function inferDomain(company: string) {
-  const cleaned = company
+  const raw = company
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
+    .replace(/^www\./, "");
+
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\/?$/i.test(raw)) {
+    return raw.replace(/\/$/, "");
+  }
+
+  const cleaned = raw
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\b(inc|llc|ltd|limited|group|company|co|corp|corporation)\b/g, "")
     .trim()
@@ -98,45 +103,6 @@ function subjectLineVariants(result: CreateOutreachResult, company: string) {
       `${company} and ${angle}`,
     ],
   ].filter((group) => group.length > 0);
-}
-
-function sectionVariants(section: OutreachEmailSection, result: CreateOutreachResult) {
-  const companySignal =
-    result.detectedSignals.find((signal) => /company|website/i.test(signal.label))?.detail ??
-    "this account";
-
-  if (section.label === "INTRO") {
-    return [
-      section.text,
-      section.text.replace("I thought", "I noticed").replace("could be worth", "may be worth"),
-      section.text.replace(
-        /I thought .*?could be worth/i,
-        `I had ${companySignal} on my list as a company that could be worth`,
-      ),
-    ];
-  }
-
-  if (section.label === "PAIN POINT") {
-    return [
-      section.text,
-      "The question is whether paid coverage is still creating incremental value, or whether part of that demand would have been captured organically.",
-      "The practical risk is keeping branded coverage live because the reports look efficient, even when some of those clicks may not need to be paid for.",
-    ];
-  }
-
-  if (section.label === "SOLUTION") {
-    return [
-      section.text,
-      "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.",
-      "Signal helps teams see when paid brand is still protecting demand, and when the click would likely come organically anyway.",
-    ];
-  }
-
-  return [
-    section.text,
-    "Curious how you currently evaluate this?",
-    "Curious how your team decides when branded bids can safely come down?",
-  ];
 }
 
 function countMatches(text: string, pattern: RegExp) {
@@ -279,21 +245,14 @@ export function CreateOutreachClient() {
   const [result, setResult] = useState<CreateOutreachResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [sectionDrafts, setSectionDrafts] = useState<Partial<Record<OutreachEmailSection["label"], string>>>({});
-  const [sectionVariantIndexes, setSectionVariantIndexes] = useState<
-    Partial<Record<OutreachEmailSection["label"], number>>
-  >({});
+  const [fullDraft, setFullDraft] = useState<string | null>(null);
   const [subjectDrafts, setSubjectDrafts] = useState<string[] | null>(null);
   const [subjectVariantIndex, setSubjectVariantIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
 
-  const displayedSections =
-    result?.emailSections.map((section) => ({
-      ...section,
-      text: sectionDrafts[section.label] ?? section.text,
-    })) ?? [];
   const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
-  const displayedFullEmail = displayedSections.map((section) => section.text).join("\n\n");
+  const displayedFullEmail =
+    fullDraft ?? result?.emailSections.map((section) => section.text).join("\n\n") ?? "";
   const quality = result ? draftQuality(displayedFullEmail, result.cta) : null;
 
   useEffect(() => {
@@ -341,21 +300,10 @@ export function CreateOutreachClient() {
       }
 
       setResult(response.data);
-      setSectionDrafts({});
-      setSectionVariantIndexes({});
+      setFullDraft(null);
       setSubjectDrafts(null);
       setSubjectVariantIndex(0);
     });
-  }
-
-  function regenerateSection(section: OutreachEmailSection) {
-    if (!result) {
-      return;
-    }
-    const variants = sectionVariants(section, result);
-    const nextIndex = variantIndex(sectionVariantIndexes[section.label] ?? 0, variants.length);
-    setSectionVariantIndexes((current) => ({ ...current, [section.label]: nextIndex }));
-    setSectionDrafts((current) => ({ ...current, [section.label]: variants[nextIndex] }));
   }
 
   function regenerateSubjects() {
@@ -642,35 +590,11 @@ export function CreateOutreachClient() {
                   </div>
                 ) : null}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    {t("workflow.basedOn")}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {result.detectedSignals.slice(0, 5).map((signal) => (
-                      <span
-                        className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-stone-700"
-                        key={`${signal.label}-${signal.detail}`}
-                      >
-                        {signal.label}: {signal.detail}
-                      </span>
-                    ))}
-                    {result.recordsUsed.slice(0, 2).map((record) => (
-                      <span
-                        className="rounded-full border border-line bg-[#f8f5ef] px-3 py-1 text-xs font-medium text-stone-700"
-                        key={record.id}
-                      >
-                        Knowledge: {record.title}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    {t("workflow.recommendedMessage")}
-                  </p>
-                  <div className="mt-2 overflow-hidden rounded-lg border border-line bg-[#f8f5ef]">
-                    <div className="flex items-center justify-between border-b border-line bg-white px-3 py-2">
-                      <span className="text-sm font-semibold text-ink">{t("workflow.fullEmail")}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                      {t("workflow.recommendedMessage")}
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-2">
                       <button
                         className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
                         onClick={() => copyText("full-email", displayedFullEmail)}
@@ -684,55 +608,15 @@ export function CreateOutreachClient() {
                         {copiedKey === "full-email" ? t("workflow.copied") : t("workflow.copy")}
                       </button>
                     </div>
-                    <div className="divide-y divide-line">
-                      {displayedSections.map((section) => (
-                        <div
-                          className="space-y-3 p-3"
-                          key={section.label}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-signal">
-                              {section.label.replace("PAIN POINT", "PAIN")}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                                onClick={() => regenerateSection(section)}
-                                type="button"
-                              >
-                                {t("workflow.generate")}
-                              </button>
-                              <button
-                                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
-                                onClick={() => copyText(section.label, section.text)}
-                                type="button"
-                              >
-                                {copiedKey === section.label ? (
-                                  <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Copy aria-hidden="true" className="h-3.5 w-3.5" />
-                                )}
-                                {copiedKey === section.label ? t("workflow.copied") : t("workflow.copy")}
-                              </button>
-                            </div>
-                          </div>
-                          <textarea
-                            aria-label={`${section.label} text`}
-                            className="min-h-36 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm leading-6 text-ink"
-                            onChange={(event) =>
-                              setSectionDrafts((current) => ({
-                                ...current,
-                                [section.label]: event.target.value,
-                              }))
-                            }
-                            value={section.text}
-                          />
-                        </div>
-                      ))}
-                    </div>
                   </div>
+                  <textarea
+                    aria-label={t("workflow.recommendedMessage")}
+                    className="mt-2 min-h-72 w-full resize-y rounded-lg border border-line bg-white px-4 py-3 text-base leading-7 text-ink shadow-inner outline-none transition focus:border-signal focus:ring-2 focus:ring-[#dce86d]/60"
+                    onChange={(event) => setFullDraft(event.target.value)}
+                    value={displayedFullEmail}
+                  />
                 </div>
-                <div>
+                <div className="rounded-lg border border-line bg-[#fbfaf7] p-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
                     {t("workflow.shorterVersion")}
                   </p>
@@ -740,15 +624,10 @@ export function CreateOutreachClient() {
                     {result.shorterVersion}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-                    {t("workflow.cta")}
-                  </p>
-                  <p className="mt-2 text-sm text-stone-700">{result.cta}</p>
-                </div>
                 {quality ? (
-                  <div className="rounded-lg border border-line bg-white p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <details className="rounded-lg border border-line bg-white p-3">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-ink">Draft quality</p>
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -759,7 +638,8 @@ export function CreateOutreachClient() {
                       >
                         {quality.status}
                       </span>
-                    </div>
+                      </div>
+                    </summary>
                     <div className="mt-3 grid gap-2">
                       {quality.issues.length > 0
                         ? quality.issues.map((issue) => (
@@ -773,7 +653,7 @@ export function CreateOutreachClient() {
                             </p>
                           ))}
                     </div>
-                  </div>
+                  </details>
                 ) : null}
               </div>
             ) : (
@@ -785,11 +665,11 @@ export function CreateOutreachClient() {
 
           {result ? (
             <>
-              <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
+              <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-semibold text-ink">
                   <Target aria-hidden="true" className="h-5 w-5 text-signal" />
-                  <h2 className="text-lg font-semibold text-ink">{t("workflow.angleAndSignals")}</h2>
-                </div>
+                  {t("workflow.angleAndSignals")}
+                </summary>
                 <p className="text-sm font-semibold text-ink">
                   {result.selectedAngle.replaceAll("_", " ").toLowerCase()}
                 </p>
@@ -811,13 +691,13 @@ export function CreateOutreachClient() {
                     </div>
                   ))}
                 </div>
-              </article>
+              </details>
 
-              <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
+              <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-semibold text-ink">
                   <AlertTriangle aria-hidden="true" className="h-5 w-5 text-[#9a6a20]" />
-                  <h2 className="text-lg font-semibold text-ink">{t("workflow.sourcesAndSafety")}</h2>
-                </div>
+                  {t("workflow.sourcesAndSafety")}
+                </summary>
                 <div className="space-y-3">
                   {result.safetyNotes.map((note) => (
                     <p
@@ -844,9 +724,16 @@ export function CreateOutreachClient() {
                     ))}
                   </div>
                 </div>
-              </article>
+              </details>
 
-              <DraftRefinementPanel draftId={result.draftId} workflow="CREATE_OUTREACH" />
+              <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                <summary className="cursor-pointer list-none text-base font-semibold text-ink">
+                  Improve draft
+                </summary>
+                <div className="mt-4">
+                  <DraftRefinementPanel draftId={result.draftId} workflow="CREATE_OUTREACH" />
+                </div>
+              </details>
             </>
           ) : null}
         </section>

@@ -320,13 +320,13 @@ export function winningPatternForPurpose(
     body: [
       hello,
       "",
-      `I had ${company} on my list for one narrow reason: ${industry.pain}`,
+      `When someone searches ${company} by name, how do you decide when branded ads are still changing the outcome?`,
       "",
-      `Quick question: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
+      "That is where brand-search gets tricky: the campaign can look efficient while still hiding unnecessary spend on demand the organic result may have captured anyway.",
       "",
-      buyer.line,
+      buyer.line.replace(/^For a .*?,\s*/i, "").replace(/^this/i, "This"),
       "",
-      "Signal compares paid coverage with organic visibility and live search-page activity, helping teams identify when branded ads are protecting demand and when bids can safely come down.",
+      "Signal gives the team a live view of that decision, so coverage stays on when it protects demand and comes down when it does not.",
     ].join("\n"),
     cta,
     reason:
@@ -336,11 +336,11 @@ export function winningPatternForPurpose(
 
 export function linkedinPattern(context: WinningMessageContext) {
   const company = displayCompanyName(context.companyName);
-  const cta = "Do you already have a way to do that?";
+  const cta = "Do you already have a way to catch that?";
   if (/comment|post|linkedin/i.test(context.observedTrigger ?? "")) {
-    return `Hi ${context.contactFirstName || "there"}, saw your comment and thought you might find this interesting. We built Signal to pause branded ads when no competitors are bidding, or lower bids to the minimum needed to stay on top without overspending. ${cta}`;
+    return `Hi ${context.contactFirstName || "there"}, quick thought from your post: branded search often looks efficient even when organic would have won the click. Signal helps teams see when coverage is actually needed, and when bids can come down. ${cta}`;
   }
-  return `${context.contactFirstName ? `${context.contactFirstName}, ` : ""}quick question on ${company} brand search: how do you decide when paid brand coverage is still needed versus when organic already does enough?`;
+  return `${context.contactFirstName ? `${context.contactFirstName}, ` : ""}quick question on ${company} brand search: how do you decide when paid coverage is still needed versus when organic already does enough?`;
 }
 
 export function compactEmail(pattern: WinningPattern, context: WinningMessageContext) {
@@ -350,9 +350,9 @@ export function compactEmail(pattern: WinningPattern, context: WinningMessageCon
   return [
     hello,
     "",
-    `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`,
+    `When someone searches ${company} by name, how do you decide when branded ads are still changing the outcome?`,
     "",
-    `Signal compares paid coverage with organic visibility and live search-page activity, so teams can see when branded ads are protecting demand and when bids can safely come down.`,
+    `Signal shows when paid brand is protecting demand and when organic likely would have captured the click anyway, so unnecessary spend can come down without losing coverage when the page changes.`,
     "",
     pattern.cta || industry.cta,
   ].join("\n");

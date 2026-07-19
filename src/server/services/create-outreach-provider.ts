@@ -77,22 +77,22 @@ function triggerPhrase(input: CreateOutreachInput) {
   const company = companyForCopy(input.companyName);
 
   if (!trigger) {
-    return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
+    return `When ${company} already ranks organically, how do you decide when branded ads still need to run?`;
   }
   if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `Quick question on ${company}: how do you handle branded ads when nobody else is bidding?`;
+    return `When ${company} owns the organic result, how do you decide when branded ads are still adding anything?`;
   }
   if (/competitors/i.test(trigger)) {
-    return `I noticed a paid-brand question at ${company}: what happens when nobody else is bidding?`;
+    return `When competitors appear and disappear on ${company} brand terms, who decides when coverage should change?`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
-    return `I thought there may be a paid-brand efficiency question worth checking at ${company}.`;
+    return `There may be a paid-brand efficiency question at ${company}: which clicks are protection, and which are just demand you already owned?`;
   }
   if (/multi-market|governance|control/i.test(trigger)) {
-    return `I thought ${company} may have a useful cross-market brand-search question.`;
+    return `For ${company}, the hard part is often not brand search itself but changing coverage market by market without manual checks.`;
   }
   if (/growth|acquisition/i.test(trigger)) {
-    return `I thought ${company}'s growth context could make brand-search efficiency worth a look.`;
+    return `${company}'s growth context makes one question worth isolating: is paid brand improving acquisition, or just buying demand organic would capture?`;
   }
   return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
 }
@@ -341,6 +341,31 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
           workflow: "CREATE_OUTREACH",
           currentDraft: result.recommendedMessage,
           context: {
+            brief: {
+              companyName: request.input.companyName,
+              companyWebsite: request.input.companyWebsite,
+              contactFirstName: request.input.contactFirstName,
+              contactRole: request.input.contactRole,
+              industry: request.input.industry,
+              companyContext: request.input.companyContext,
+              geographyOrMarkets: request.input.geographyOrMarkets,
+              paidSearchContext: request.input.paidSearchContext,
+              currentVendor: request.input.currentVendor,
+              observedTrigger: request.input.observedTrigger,
+              channel: request.input.channel,
+              messageType: request.input.messageType,
+              desiredTone: request.input.desiredTone,
+              desiredLength: request.input.desiredLength,
+            },
+            writingInstructions: [
+              "Write a fresh sendable draft, not a light rewrite of the fallback.",
+              "Lead with the buyer's decision, not with Primelis or Signal.",
+              "Avoid generic lines like 'I had the company on my list', 'worth checking', and 'thought this might be relevant'.",
+              "Make the opening specific enough that it feels written for this account, but do not invent observed facts.",
+              "Use short paragraphs. No bullet list in the prospect-facing draft.",
+              "Keep the product line to one sentence unless the user asked for a detailed draft.",
+              "CTA must ask one practical question about how they decide or monitor this today.",
+            ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
