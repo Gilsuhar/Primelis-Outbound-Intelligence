@@ -145,6 +145,74 @@ function customerFacingAngle(angleLabel: string) {
     .replace(/solo.*ghost/i, "paid brand coverage");
 }
 
+function roleAngle(input: BuildSequenceInput) {
+  const role = input.contactRole.toLowerCase();
+  if (/cmo|chief|vp|head|director/.test(role)) {
+    return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
+  }
+  if (/growth|acquisition|demand/.test(role)) {
+    return "For growth, the sharper question is whether paid brand improves acquisition efficiency or just re-buys existing demand.";
+  }
+  if (/paid search|sem|ppc|performance/.test(role)) {
+    return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
+  }
+  if (/ecommerce|e-commerce|digital/.test(role)) {
+    return "For digital commerce, the useful angle is protecting high-intent brand demand without paying for clicks the site would get anyway.";
+  }
+  return "The practical question is where paid brand is still changing the outcome.";
+}
+
+function toneLine(input: BuildSequenceInput, purpose: SequenceStep["purpose"]) {
+  if (input.desiredTone === "DIRECT") {
+    return purpose === "BREAKUP_CLOSE_LOOP"
+      ? "I will keep this simple and close the loop here."
+      : "The short version: this is about avoiding paid clicks that organic would have won anyway.";
+  }
+  if (input.desiredTone === "EXECUTIVE") {
+    return "The executive version is simple: know when brand spend is protecting revenue, and when it is only adding cost.";
+  }
+  if (input.desiredTone === "WARM") {
+    return "Not assuming this is a problem on your side, but it is often a useful check for brand-heavy search programs.";
+  }
+  return "";
+}
+
+function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"], body: string) {
+  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const hello = blocks[0]?.startsWith("Hi ") ? blocks[0] : greeting(input);
+  const content = blocks[0]?.startsWith("Hi ") ? blocks.slice(1) : blocks;
+  const roleSpecific = roleAngle(input);
+  const toneSpecific = toneLine(input, purpose);
+
+  if (input.desiredTone === "DIRECT") {
+    return stripCommercialTerms(
+      [hello, content[0], toneSpecific || roleSpecific, content.at(-1)]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
+
+  if (input.desiredTone === "EXECUTIVE") {
+    return stripCommercialTerms(
+      [hello, content[0], toneSpecific, roleSpecific, content.at(-1)]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
+
+  if (input.desiredTone === "WARM") {
+    return stripCommercialTerms(
+      [hello, toneSpecific, ...content.slice(0, 2), content.at(-1)]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
+
+  return stripCommercialTerms(
+    [hello, content[0], roleSpecific, ...content.slice(1)].filter(Boolean).join("\n\n"),
+  );
+}
+
 function bodyForPurpose({
   input,
   purpose,
@@ -166,14 +234,14 @@ function bodyForPurpose({
   if (patternBody && purpose !== "SOCIAL_PROOF") {
     if (channel === "LINKEDIN") {
       return stripCommercialTerms(
-        patternBody
+        tailorBody(input, purpose, patternBody)
           .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
           .replace(/\n\n/g, " ")
           .replace(/\n/g, " ")
           .trim(),
       );
     }
-    return stripCommercialTerms(patternBody);
+    return tailorBody(input, purpose, patternBody);
   }
 
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
@@ -230,7 +298,7 @@ function bodyForPurpose({
     ],
   };
 
-  const body = linesByPurpose[purpose].join("\n");
+  const body = tailorBody(input, purpose, linesByPurpose[purpose].join("\n"));
   if (channel === "LINKEDIN") {
     return stripCommercialTerms(
       body
@@ -396,6 +464,9 @@ export function createBuildSequenceAiProvider(
               "Return sequenceSteps with exactly the same number of steps and the same order as currentDraft.",
               "Each email body should be 55-100 words. Each LinkedIn body should be 25-55 words.",
               "Each step must add a new reason, not repeat the same brand-search question.",
+              "The selected buyer role must change the copy: Paid Search gets operational bid/control language, Growth gets CAC/acquisition efficiency, CMO/VP gets budget visibility and business outcome language.",
+              "The selected tone must visibly change the copy: DIRECT is shorter and plainer, WARM is softer and less assumptive, EXECUTIVE removes tactical detail and emphasizes business control.",
+              "Do not reuse the same opening structure across steps. Avoid starting every step with 'When', 'For context', or 'A useful way'.",
               "Step 1: sharp account-relevant opener. Step 2: problem/gap. Step 3: method or useful contrast. Later steps: proof or low-pressure close.",
               "Do not use fluffy phrases like checking in, wanted to follow up, hope you are well, thought this might be relevant, or I had the company on my list.",
               "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",

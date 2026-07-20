@@ -41,12 +41,15 @@ function OptionalSelect({
   name,
   label,
   options,
+  value,
+  onChange,
 }: {
   name: string;
   label: string;
   options: string[];
+  value: string;
+  onChange: (value: string) => void;
 }) {
-  const [value, setValue] = useState("");
   const [custom, setCustom] = useState("");
   const outputLanguage = useOutputLanguage();
   const isCustom = value === "__custom";
@@ -57,7 +60,7 @@ function OptionalSelect({
       {label}
       <select
         className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
         value={value}
       >
         <option value="">{t("workflow.choose")}</option>
@@ -87,22 +90,26 @@ export function ReplyToProspectClient() {
   const [result, setResult] = useState<ReplyToProspectResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [prospectMessage, setProspectMessage] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [contextNotes, setContextNotes] = useState("");
   const [channel, setChannel] = useState<ReplyChannel>("EMAIL");
   const [tone, setTone] = useState<ReplyTone>("CONSULTATIVE");
   const [length, setLength] = useState<ReplyLength>("STANDARD");
 
-  function onSubmit(formData: FormData) {
+  function onSubmit() {
     setError(null);
     startTransition(async () => {
       const response = await generateReplyToProspectAction({
-        prospectMessage: formData.get("prospectMessage"),
-        companyName: formData.get("companyName") || undefined,
-        contactRole: formData.get("contactRole") || undefined,
+        prospectMessage,
+        companyName: companyName || undefined,
+        contactRole: contactRole || undefined,
         channel,
         desiredTone: tone,
         desiredLength: length,
         outputLanguage,
-        contextNotes: formData.get("contextNotes") || undefined,
+        contextNotes: contextNotes || undefined,
       });
 
       if (!response.ok) {
@@ -144,8 +151,10 @@ export function ReplyToProspectClient() {
             <textarea
               className="min-h-40 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
               name="prospectMessage"
+              onChange={(event) => setProspectMessage(event.target.value)}
               placeholder={t("workflow.reply.placeholder")}
               required
+              value={prospectMessage}
             />
           </label>
 
@@ -155,12 +164,16 @@ export function ReplyToProspectClient() {
               <input
                 className="w-full rounded-md border border-line px-3 py-2 text-sm"
                 name="companyName"
+                onChange={(event) => setCompanyName(event.target.value)}
+                value={companyName}
               />
             </label>
             <OptionalSelect
               label={t("workflow.buyerRole")}
               name="contactRole"
+              onChange={setContactRole}
               options={buyerRoleOptions}
+              value={contactRole}
             />
           </div>
 
@@ -215,6 +228,8 @@ export function ReplyToProspectClient() {
               <textarea
                 className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
                 name="contextNotes"
+                onChange={(event) => setContextNotes(event.target.value)}
+                value={contextNotes}
               />
             </label>
           </details>

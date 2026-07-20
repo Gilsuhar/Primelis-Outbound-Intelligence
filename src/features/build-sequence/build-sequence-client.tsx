@@ -660,25 +660,16 @@ export function BuildSequenceClient() {
               required
               value={companyName}
             />
+            <SmartField label={t("workflow.firstName")} name="contactFirstName" options={[]} />
             <SmartField
               label={t("workflow.buyerRole")}
               name="contactRole"
               options={buyerRoleOptions}
             />
             <SmartField
-              label={t("workflow.fitIcp")}
-              name="companyContext"
-              options={companySizeOptions}
-            />
-            <SmartField
               label={t("workflow.industry")}
               name="industry"
               options={industries.map((industry) => industry.name)}
-            />
-            <SmartField
-              label={t("workflow.reasonForOutreach")}
-              name="observedTrigger"
-              options={triggerOptions}
             />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               {t("workflow.steps")}
@@ -740,11 +731,20 @@ export function BuildSequenceClient() {
                 }}
                 value={companyWebsite}
               />
-              <SmartField label={t("workflow.firstName")} name="contactFirstName" options={[]} />
               <SmartField
                 label={t("workflow.market")}
                 name="geographyOrMarkets"
                 options={marketOptions}
+              />
+              <SmartField
+                label={t("workflow.fitIcp")}
+                name="companyContext"
+                options={companySizeOptions}
+              />
+              <SmartField
+                label={t("workflow.reasonForOutreach")}
+                name="observedTrigger"
+                options={triggerOptions}
               />
               <SmartField label={t("workflow.currentVendor")} name="currentVendor" options={vendorOptions} />
               <SmartField

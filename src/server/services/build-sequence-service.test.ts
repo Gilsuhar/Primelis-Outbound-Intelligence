@@ -335,6 +335,38 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("changes copy when persona and tone change", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const directOperator = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Booking.com",
+        contactRole: "Head of Paid Search",
+        desiredTone: "DIRECT",
+      },
+      { persistence: adapter },
+    );
+    const executiveGrowth = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Booking.com",
+        contactRole: "CMO",
+        desiredTone: "EXECUTIVE",
+      },
+      { persistence: adapter },
+    );
+
+    expect(directOperator.ok).toBe(true);
+    expect(executiveGrowth.ok).toBe(true);
+    if (directOperator.ok && executiveGrowth.ok) {
+      const directBody = directOperator.data.steps[0].messageBody;
+      const executiveBody = executiveGrowth.data.steps[0].messageBody;
+      expect(directBody).not.toBe(executiveBody);
+      expect(directBody).toMatch(/stay covered|lower bids|organic/i);
+      expect(executiveBody).toMatch(/budget control|visibility|business|revenue/i);
+    }
+  });
+
   it("uses valid delays and a low-pressure final breakup step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 
