@@ -289,9 +289,6 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
     async generate(request) {
       const fallback = new DeterministicReplyProvider();
       const result = await fallback.generate(request);
-      if (request.intents.includes("DECK_REQUEST")) {
-        return result;
-      }
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -303,7 +300,6 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
       try {
         const aiResult = await provider.refineDraft({
           workflow: "REPLY_TO_PROSPECT",
-          currentDraft: result.recommendedReply,
           context: {
             brief: {
               prospectMessage: request.input.prospectMessage,
@@ -316,8 +312,10 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               detectedIntent: request.intents,
             },
             writingInstructions: [
+              "Write the reply from scratch from the prospect message, brief, and approved facts. Do not imitate a local template.",
               "Answer the prospect's actual question first.",
               "Sound like a calm senior seller, not support documentation.",
+              "If the prospect asks for a deck, acknowledge it and ask the minimum useful follow-up or offer to send the relevant short material, using only approved facts.",
               "If they mention Adthena, Revvim, Auction Insights, an agency, or Google Ads, do not attack the vendor. Position Signal as the decision layer for paid-brand coverage.",
               "Keep it short enough to send as-is. No bullets unless the prospect explicitly asked for detail.",
               "Use one useful distinction: visibility, decision automation, paid vs organic, or when bids can safely come down.",

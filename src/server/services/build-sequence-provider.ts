@@ -430,19 +430,6 @@ export function createBuildSequenceAiProvider(
       try {
         const aiResult = await provider.generateDraft({
           workflow: "BUILD_SEQUENCE",
-          currentDraft: result.steps
-            .map((step) =>
-              [
-                `Step ${step.stepNumber} (${step.channel}, ${step.delay}, ${step.purpose})`,
-                step.subjectLine ? `Subject: ${step.subjectLine}` : undefined,
-                step.connectionRequest ? `Connection request: ${step.connectionRequest}` : undefined,
-                step.messageBody,
-                `CTA: ${step.cta}`,
-              ]
-                .filter(Boolean)
-                .join("\n"),
-            )
-            .join("\n\n---\n\n"),
           context: {
             brief: {
               companyName: request.input.companyName,
@@ -460,10 +447,17 @@ export function createBuildSequenceAiProvider(
               desiredTone: request.input.desiredTone,
               desiredOverallDuration: request.input.desiredOverallDuration,
               selectedAngle: result.selectedAngle,
+              sequencePlan: result.steps.map((step) => ({
+                stepNumber: step.stepNumber,
+                channel: step.channel,
+                delay: step.delay,
+                purpose: step.purpose,
+                subjectLine: step.subjectLine,
+              })),
             },
             writingInstructions: [
-              "Rewrite every step as a sendable outbound sequence.",
-              "Return sequenceSteps with exactly the same number of steps and the same order as currentDraft.",
+              "Write the sequence from scratch. Do not rewrite or imitate a local template.",
+              "Return sequenceSteps with exactly the same number of steps and the same order as brief.sequencePlan.",
               "Each email body should be 55-100 words. Each LinkedIn body should be 25-55 words.",
               "Each step must add a new reason, not repeat the same brand-search question.",
               "The selected buyer role must change the copy: Paid Search gets operational bid/control language, Growth gets CAC/acquisition efficiency, CMO/VP gets budget visibility and business outcome language.",

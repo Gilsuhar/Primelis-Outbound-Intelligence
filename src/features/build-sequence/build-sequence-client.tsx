@@ -303,6 +303,24 @@ function normalizedLine(text: string) {
     .trim();
 }
 
+function usedDeterministicFallback(notes: string[]) {
+  return notes.some((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(
+      note,
+    ),
+  );
+}
+
+function providerLabel(result: BuildSequenceResult) {
+  if (usedDeterministicFallback(result.safetyNotes)) {
+    return "Fallback sequence - OpenAI did not write this";
+  }
+  if (result.provider.providerName === "openai") {
+    return `OpenAI sequence - ${result.provider.modelName}`;
+  }
+  return "Local sequence";
+}
+
 function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
   const issues: string[] = [];
   const wins: string[] = [];
@@ -311,7 +329,7 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
   const bodyText = steps.map((step) => step.messageBody).join("\n").toLowerCase();
   const uniquePurposes = new Set(steps.map((step) => step.purpose));
 
-  if (safetyNotes.some((note) => /fallback was used|openai|provider/i.test(note))) {
+  if (usedDeterministicFallback(safetyNotes)) {
     issues.push("OpenAI did not write this sequence. The deterministic fallback was used.");
   }
 
@@ -801,6 +819,15 @@ export function BuildSequenceClient() {
             </div>
             {result ? (
               <div className="space-y-3">
+                <p
+                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                    usedDeterministicFallback(result.safetyNotes)
+                      ? "bg-[#fff7e8] text-[#8a5a2b]"
+                      : "bg-[#eef8ed] text-[#2f6f3a]"
+                  }`}
+                >
+                  {providerLabel(result)}
+                </p>
                 <p className="text-sm leading-6 text-stone-700">{result.overallStrategy}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md bg-[#f8f5ef] p-3">

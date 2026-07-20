@@ -113,10 +113,28 @@ function countMatches(text: string, pattern: RegExp) {
   return text.match(pattern)?.length ?? 0;
 }
 
-function draftQuality(fullEmail: string, cta: string) {
+function usedDeterministicFallback(notes: string[]) {
+  return notes.some((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(note));
+}
+
+function providerLabel(result: CreateOutreachResult) {
+  if (usedDeterministicFallback(result.safetyNotes)) {
+    return "Fallback draft - OpenAI did not write this";
+  }
+  if (result.provider.providerName === "openai") {
+    return `OpenAI draft - ${result.provider.modelName}`;
+  }
+  return "Local draft";
+}
+
+function draftQuality(fullEmail: string, cta: string, safetyNotes: string[] = []) {
   const text = `${fullEmail}\n${cta}`.toLowerCase();
   const issues: string[] = [];
   const wins: string[] = [];
+
+  if (usedDeterministicFallback(safetyNotes)) {
+    issues.push("OpenAI did not write this draft. The deterministic fallback was used.");
+  }
 
   if (countMatches(text, /\bcompare|comparing\b/g) > 1) {
     issues.push("Uses compare too often. Vary the CTA before sending.");
@@ -258,7 +276,7 @@ export function CreateOutreachClient() {
   const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
   const displayedFullEmail =
     fullDraft ?? result?.emailSections.map((section) => section.text).join("\n\n") ?? "";
-  const quality = result ? draftQuality(displayedFullEmail, result.cta) : null;
+  const quality = result ? draftQuality(displayedFullEmail, result.cta, result.safetyNotes) : null;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -553,6 +571,15 @@ export function CreateOutreachClient() {
             </div>
             {result ? (
               <div className="space-y-4">
+                <p
+                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                    usedDeterministicFallback(result.safetyNotes)
+                      ? "bg-[#fff7e8] text-[#8a5a2b]"
+                      : "bg-[#eef8ed] text-[#2f6f3a]"
+                  }`}
+                >
+                  {providerLabel(result)}
+                </p>
                 {result.subjectLines.length > 0 ? (
                   <div>
                     <div className="flex items-center justify-between gap-2">

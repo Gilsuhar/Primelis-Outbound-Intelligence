@@ -339,7 +339,6 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
       try {
         const aiResult = await provider.generateDraft({
           workflow: "CREATE_OUTREACH",
-          currentDraft: result.recommendedMessage,
           context: {
             brief: {
               companyName: request.input.companyName,
@@ -358,7 +357,7 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
               desiredLength: request.input.desiredLength,
             },
             writingInstructions: [
-              "Write a fresh sendable draft, not a light rewrite of the fallback.",
+              "Write a fresh sendable draft from the brief and approved facts. Do not imitate a local template.",
               "Lead with the buyer's decision, not with Primelis or Signal.",
               "Avoid generic lines like 'I had the company on my list', 'worth checking', and 'thought this might be relevant'.",
               "Make the opening specific enough that it feels written for this account, but do not invent observed facts.",

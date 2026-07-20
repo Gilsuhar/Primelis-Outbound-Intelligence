@@ -37,6 +37,20 @@ const buyerRoleOptions = personas
   .map((persona) => persona.name)
   .filter((name) => name !== "Brand Marketing or Brand Leadership");
 
+function usedDeterministicFallback(notes: string[]) {
+  return notes.some((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(note));
+}
+
+function providerLabel(result: ReplyToProspectResult) {
+  if (usedDeterministicFallback(result.safetyWarnings)) {
+    return "Fallback draft - OpenAI did not write this";
+  }
+  if (result.provider.providerName === "openai") {
+    return `OpenAI draft - ${result.provider.modelName}`;
+  }
+  return "Local draft";
+}
+
 function OptionalSelect({
   name,
   label,
@@ -260,6 +274,15 @@ export function ReplyToProspectClient() {
             </div>
             {result ? (
               <div className="space-y-4">
+                <p
+                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                    usedDeterministicFallback(result.safetyWarnings)
+                      ? "bg-[#fff7e8] text-[#8a5a2b]"
+                      : "bg-[#eef8ed] text-[#2f6f3a]"
+                  }`}
+                >
+                  {providerLabel(result)}
+                </p>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
                     {t("workflow.recommendedReply")}
