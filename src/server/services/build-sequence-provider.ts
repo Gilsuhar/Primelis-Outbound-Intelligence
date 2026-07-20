@@ -118,6 +118,13 @@ type AiSequenceStep = {
   cta: string;
 };
 
+function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
+  const firstCaseStudy = records.find((record) => record.type === "CASE_STUDY");
+  return records
+    .filter((record) => record.type !== "CASE_STUDY" || record.id === firstCaseStudy?.id)
+    .slice(0, 12);
+}
+
 function normalizeAiStep(step: SequenceStep, aiStep: AiSequenceStep) {
   let messageBody = cleanAiText(aiStep.messageBody, 1600);
   if (messageBody.length < 20) {
@@ -523,6 +530,7 @@ export function createBuildSequenceAiProvider(
     async generate(request) {
       const fallback = new DeterministicBuildSequenceProvider();
       const result = await fallback.generate(request);
+      const promptRecords = recordsForPrompt(request.records);
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -551,7 +559,7 @@ export function createBuildSequenceAiProvider(
               desiredTone: request.input.desiredTone,
               desiredOverallDuration: request.input.desiredOverallDuration,
               selectedAngle: result.selectedAngle,
-              approvedKnowledge: request.records.slice(0, 12).map((record) => ({
+              approvedKnowledge: promptRecords.map((record) => ({
                 title: record.title,
                 type: record.type,
                 approvedText: record.approvedText,
@@ -594,7 +602,7 @@ export function createBuildSequenceAiProvider(
               "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",
               "Keep one soft CTA per step. Never include a question in the final sentence of the body when a separate cta field is returned.",
             ],
-            approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),

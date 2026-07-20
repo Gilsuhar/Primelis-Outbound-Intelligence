@@ -330,7 +330,36 @@ function similarity(a: string, b: string) {
   return intersection / Math.min(aWords.size, bWords.size);
 }
 
-function validateSequenceGeneration(input: BuildSequenceInput, generation: SequenceGeneration) {
+function caseStudyCompanies(records: SequenceKnowledgeRecord[]) {
+  return records
+    .filter((record) => record.type === "CASE_STUDY")
+    .map((record) => {
+      const match = record.approvedText.match(/Case study:\s*([^.]*)\./i);
+      return (match?.[1] ?? record.title.split(/\s+(?:cuts|reduces|lowers|improves|leads)\s+/i)[0])
+        .trim();
+    })
+    .filter((company) => company.length > 1);
+}
+
+function hasMultipleProofCompanies(generation: SequenceGeneration, records: SequenceKnowledgeRecord[]) {
+  const rendered = JSON.stringify({
+    overallStrategy: generation.overallStrategy,
+    claimsUsed: generation.claimsUsed,
+    steps: generation.steps,
+  }).toLowerCase();
+  const mentioned = new Set(
+    caseStudyCompanies(records)
+      .filter((company) => rendered.includes(company.toLowerCase()))
+      .map((company) => company.toLowerCase()),
+  );
+  return mentioned.size > 1;
+}
+
+function validateSequenceGeneration(
+  input: BuildSequenceInput,
+  generation: SequenceGeneration,
+  records: SequenceKnowledgeRecord[] = [],
+) {
   const parsedSteps = z.array(sequenceStepSchema).safeParse(generation.steps);
   if (!parsedSteps.success) {
     return false;
@@ -384,6 +413,9 @@ function validateSequenceGeneration(input: BuildSequenceInput, generation: Seque
     steps: generation.steps,
   });
   if (containsCommercialTerms(rendered) || containsCompetitorClaim(rendered)) {
+    return false;
+  }
+  if (hasMultipleProofCompanies(generation, records)) {
     return false;
   }
   return true;
@@ -674,7 +706,7 @@ export async function generateBuildSequence(
     );
   }
 
-  if (!validateSequenceGeneration(input, generated)) {
+  if (!validateSequenceGeneration(input, generated, records)) {
     return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
   }
 

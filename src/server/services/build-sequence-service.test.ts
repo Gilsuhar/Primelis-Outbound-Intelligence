@@ -229,6 +229,49 @@ describe("Build Sequence service", () => {
     });
   });
 
+  it("rejects sequences that use more than one case-study proof company", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) => ({
+          ...step,
+          messageBody:
+            index === 0
+              ? "Chloé reduced ad cost by 51% while organic traffic increased."
+              : index === 1
+                ? "Crocs reduced branded-search spend by 71%."
+                : step.messageBody,
+        })),
+      };
+    };
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "chloe-proof",
+        title: "Chloé reduces ad cost",
+        type: "CASE_STUDY",
+        approvedText: "Case study: Chloé. Metrics: Ad cost decreased by 51%.",
+      }),
+      knowledge({
+        id: "crocs-proof",
+        title: "Crocs cuts brand bidding costs",
+        type: "CASE_STUDY",
+        approvedText: "Case study: Crocs. Metrics: Total branded search spend decreased by 71%.",
+      }),
+    ]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+  });
+
   it("creates mixed-channel steps that differ meaningfully", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 
