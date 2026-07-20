@@ -311,9 +311,20 @@ function usedDeterministicFallback(notes: string[]) {
   );
 }
 
+function fallbackReason(notes: string[]) {
+  return notes.find((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(
+      note,
+    ),
+  );
+}
+
 function providerLabel(result: BuildSequenceResult) {
   if (usedDeterministicFallback(result.safetyNotes)) {
-    return "Fallback sequence - OpenAI did not write this";
+    const reason = fallbackReason(result.safetyNotes);
+    return reason
+      ? `Fallback sequence - OpenAI did not write this. Reason: ${reason}`
+      : "Fallback sequence - OpenAI did not write this";
   }
   if (result.provider.providerName === "openai") {
     return `OpenAI sequence - ${result.provider.modelName}`;
