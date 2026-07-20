@@ -281,6 +281,9 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
       expect(result.data.steps[0].messageBody).toMatch(/how do you decide when branded ads/i);
+      expect(
+        result.data.steps[0].messageBody.match(/how do you decide when branded ads/gi)?.length,
+      ).toBe(1);
       expect(result.data.steps[1].messageBody).toMatch(/Google does not offer an easy way/i);
       expect(result.data.steps[1].messageBody).toMatch(/captured organically/i);
       expect(result.data.steps[2].messageBody).toMatch(/close the loop/i);

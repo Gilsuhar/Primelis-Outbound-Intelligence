@@ -300,7 +300,7 @@ function bodyForPurpose({
     ],
   };
 
-  const body = tailorBody(input, purpose, linesByPurpose[purpose].join("\n"));
+  const body = tailorBody(input, purpose, linesByPurpose[purpose].join("\n\n"));
   if (channel === "LINKEDIN") {
     return stripCommercialTerms(
       body
