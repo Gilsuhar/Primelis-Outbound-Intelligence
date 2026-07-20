@@ -311,15 +311,17 @@ function bodyForPurpose({
 
   const body = tailorBody(input, purpose, linesByPurpose[purpose].join("\n\n"));
   if (channel === "LINKEDIN") {
-    return stripCommercialTerms(
-      body
+    return stripFallbackPhrases(
+      stripCommercialTerms(
+        body
         .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
         .replace(/\n\n/g, " ")
         .replace(/\n/g, " ")
         .trim(),
+      ),
     );
   }
-  return stripCommercialTerms(body);
+  return stripFallbackPhrases(stripCommercialTerms(body));
 }
 
 function delayFor(stepNumber: number, length: number, desiredOverallDuration: string) {

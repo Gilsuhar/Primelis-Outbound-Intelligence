@@ -286,7 +286,7 @@ describe("Build Sequence service", () => {
       ).toBe(1);
       expect(result.data.steps[1].messageBody).toMatch(/Google does not offer an easy way/i);
       expect(result.data.steps[1].messageBody).toMatch(/captured organically/i);
-      expect(result.data.steps[2].messageBody).toMatch(/close the loop/i);
+      expect(result.data.steps[2].messageBody).toMatch(/not relevant|no problem|later/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
