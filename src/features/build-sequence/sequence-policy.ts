@@ -225,8 +225,8 @@ export function defaultPurposesForLength(
     "LOW_PRESSURE_FOLLOW_UP",
   ];
   const withFinal = base.slice(0, Math.max(length - 1, 0));
-  if (hasEligibleSocialProof && length >= 5) {
-    withFinal[withFinal.length - 1] = "SOCIAL_PROOF";
+  if (hasEligibleSocialProof && length >= 4) {
+    withFinal[1] = "SOCIAL_PROOF";
   }
   const finalPurposes: SequencePurpose[] = [...withFinal, "BREAKUP_CLOSE_LOOP"];
   return finalPurposes.slice(0, length);
