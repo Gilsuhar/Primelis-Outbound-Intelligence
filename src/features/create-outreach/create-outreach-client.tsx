@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Check, Copy, FileText, Send, ShieldCheck, Target } from "lucide-react";
 
 import { generateCreateOutreachAction } from "@/app/create-outreach/actions";
@@ -242,6 +242,7 @@ export function CreateOutreachClient() {
   const [internalNotes, setInternalNotes] = useState("");
   const [useCaseStudy, setUseCaseStudy] = useState(false);
   const [accountStatusOverride, setAccountStatusOverride] = useState(false);
+  const accountStatusOverrideRef = useRef(false);
   const [channel, setChannel] = useState<OutreachChannel>("EMAIL");
   const [messageType, setMessageType] = useState<OutreachMessageType>("FIRST_TOUCH");
   const [tone, setTone] = useState<OutreachTone>("CONSULTATIVE");
@@ -296,7 +297,7 @@ export function CreateOutreachClient() {
         desiredLength: length,
         outputLanguage,
         useCaseStudy: formData.get("useCaseStudy") === "on",
-        accountStatusOverride,
+        accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
         internalNotes: formData.get("internalNotes") || undefined,
       });
 
@@ -360,6 +361,7 @@ export function CreateOutreachClient() {
               onChange={(value) => {
                 setCompanyName(value);
                 setCompanyWebsite(inferDomain(value));
+                accountStatusOverrideRef.current = false;
                 setAccountStatusOverride(false);
               }}
               required
@@ -370,6 +372,7 @@ export function CreateOutreachClient() {
               name="companyWebsite"
               onChange={(value) => {
                 setCompanyWebsite(value);
+                accountStatusOverrideRef.current = false;
                 setAccountStatusOverride(false);
               }}
               value={companyWebsite}
@@ -454,8 +457,13 @@ export function CreateOutreachClient() {
           <AccountStatusPanel
             companyDomain={companyWebsite}
             companyName={companyName}
-            onOverrideChange={setAccountStatusOverride}
+            onOverrideChange={(value) => {
+              accountStatusOverrideRef.current = value;
+              setAccountStatusOverride(value);
+              if (value) setError(null);
+            }}
             overrideActive={accountStatusOverride}
+            submitOnOverride
           />
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">

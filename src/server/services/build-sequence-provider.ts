@@ -147,14 +147,14 @@ function customerFacingAngle(angleLabel: string) {
 
 function roleAngle(input: BuildSequenceInput) {
   const role = input.contactRole.toLowerCase();
+  if (/paid search|sem|ppc|performance/.test(role)) {
+    return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
+  }
   if (/cmo|chief|vp|head|director/.test(role)) {
     return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
   }
   if (/growth|acquisition|demand/.test(role)) {
     return "For growth, the sharper question is whether paid brand improves acquisition efficiency or just re-buys existing demand.";
-  }
-  if (/paid search|sem|ppc|performance/.test(role)) {
-    return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
   }
   if (/ecommerce|e-commerce|digital/.test(role)) {
     return "For digital commerce, the useful angle is protecting high-intent brand demand without paying for clicks the site would get anyway.";
@@ -162,31 +162,27 @@ function roleAngle(input: BuildSequenceInput) {
   return "The practical question is where paid brand is still changing the outcome.";
 }
 
-function toneLine(input: BuildSequenceInput, purpose: SequenceStep["purpose"]) {
-  if (input.desiredTone === "DIRECT") {
-    return purpose === "BREAKUP_CLOSE_LOOP"
-      ? "I will keep this simple and close the loop here."
-      : "The short version: this is about avoiding paid clicks that organic would have won anyway.";
-  }
-  if (input.desiredTone === "EXECUTIVE") {
-    return "The executive version is simple: know when brand spend is protecting revenue, and when it is only adding cost.";
-  }
-  if (input.desiredTone === "WARM") {
-    return "Not assuming this is a problem on your side, but it is often a useful check for brand-heavy search programs.";
-  }
-  return "";
-}
-
 function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"], body: string) {
   const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
   const hello = blocks[0]?.startsWith("Hi ") ? blocks[0] : greeting(input);
   const content = blocks[0]?.startsWith("Hi ") ? blocks.slice(1) : blocks;
   const roleSpecific = roleAngle(input);
-  const toneSpecific = toneLine(input, purpose);
+
+  if (purpose === "BREAKUP_CLOSE_LOOP") {
+    const middle =
+      input.desiredTone === "EXECUTIVE"
+        ? "If paid-brand efficiency becomes relevant later, the useful starting point is budget visibility: where paid coverage protects demand, and where it is only adding cost."
+        : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where organic would have captured the click anyway.";
+    return stripCommercialTerms(
+      [hello, "I will close the loop here.", middle, "If this is not relevant right now, no problem."]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  }
 
   if (input.desiredTone === "DIRECT") {
     return stripCommercialTerms(
-      [hello, content[0], toneSpecific || roleSpecific, content.at(-1)]
+      [hello, content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]
         .filter(Boolean)
         .join("\n\n"),
     );
@@ -194,7 +190,7 @@ function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 
   if (input.desiredTone === "EXECUTIVE") {
     return stripCommercialTerms(
-      [hello, content[0], toneSpecific, roleSpecific, content.at(-1)]
+      [hello, content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]
         .filter(Boolean)
         .join("\n\n"),
     );
@@ -202,7 +198,12 @@ function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 
   if (input.desiredTone === "WARM") {
     return stripCommercialTerms(
-      [hello, toneSpecific, ...content.slice(0, 2), content.at(-1)]
+      [
+        hello,
+        "Not assuming this is already a problem on your side, but it is usually worth a light check for brand-heavy search programs.",
+        content[0],
+        content.at(-1),
+      ]
         .filter(Boolean)
         .join("\n\n"),
     );
@@ -231,7 +232,7 @@ function bodyForPurpose({
   const simpleSecondaryFact = humanizeFact(secondaryFact);
   const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
   const patternBody = pattern.body;
-  if (patternBody && purpose !== "SOCIAL_PROOF") {
+  if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
       return stripCommercialTerms(
         tailorBody(input, purpose, patternBody)
@@ -248,22 +249,23 @@ function bodyForPurpose({
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Quick question on ${company} brand search: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
-      "Signal helps teams monitor search results and adjust branded coverage when other advertisers are not bidding, instead of paying for clicks that may not add value.",
+      `Quick question on ${company}: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
+      "The decision is practical: stay covered when competitors appear, lower bids when CPC is being pushed up, and avoid paying for demand the organic result would already win.",
+      "Signal gives the team a live view of that decision across paid and organic, without turning it into another manual check.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
       "For context, Google does not offer an easy way to automatically pause or adjust branded ads when no other advertisers are bidding.",
       "As a result, many teams keep paying for clicks that could have been captured organically or at a much lower CPC.",
-      `That is the gap I would check at ${company}: can you see when this happens, and act on it without a manual review?`,
+      `That is the gap I would check at ${company}: can the team see those quiet search-page moments and act without a manual review?`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "One other angle: this is not always about turning brand ads off.",
-      "In some cases, the better move is lowering the bid to the minimum needed to stay covered, especially when the search page is quiet and nobody is pushing CPC up.",
-      "That is where Signal can help: keep coverage where it matters, avoid overpaying where it does not.",
+      "A useful way to look at this is not paid and organic in theory, but what is happening on the search page at the moment of the search.",
+      "If other advertisers are present, paid coverage may protect demand. If they are absent, the better move may be lowering bids or pausing until the page changes again.",
+      "Signal is built to make that decision easier without turning it into a manual check every time.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -464,6 +464,7 @@ export function BuildSequenceClient() {
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
   const [accountStatusOverride, setAccountStatusOverride] = useState(false);
+  const accountStatusOverrideRef = useRef(false);
   const [accountStatusRefreshKey, setAccountStatusRefreshKey] = useState(0);
   const [result, setResult] = useState<BuildSequenceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -492,6 +493,7 @@ export function BuildSequenceClient() {
   const quality = result ? sequenceQuality(displayedSteps, result.safetyNotes) : null;
 
   function setOverride(value: boolean) {
+    accountStatusOverrideRef.current = value;
     setAccountStatusOverride(value);
     if (value) {
       setError(null);
@@ -570,7 +572,7 @@ export function BuildSequenceClient() {
         desiredTone: tone,
         desiredOverallDuration: formString(formData, "desiredOverallDuration") || "12 business days",
         outputLanguage,
-        accountStatusOverride,
+        accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
         internalNotes: formString(formData, "internalNotes") || undefined,
       });
 
@@ -655,12 +657,13 @@ export function BuildSequenceClient() {
               onChange={(value) => {
                 setCompanyName(value);
                 setCompanyWebsite(inferDomain(value));
+                accountStatusOverrideRef.current = false;
                 setAccountStatusOverride(false);
               }}
               required
               value={companyName}
             />
-            <SmartField label={t("workflow.firstName")} name="contactFirstName" options={[]} />
+            <TextField label={t("workflow.firstName")} name="contactFirstName" />
             <SmartField
               label={t("workflow.buyerRole")}
               name="contactRole"
@@ -715,6 +718,7 @@ export function BuildSequenceClient() {
             onOverrideChange={setOverride}
             overrideActive={accountStatusOverride}
             refreshKey={accountStatusRefreshKey}
+            submitOnOverride
           />
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
@@ -727,6 +731,7 @@ export function BuildSequenceClient() {
                 name="companyWebsite"
                 onChange={(value) => {
                   setCompanyWebsite(value);
+                  accountStatusOverrideRef.current = false;
                   setAccountStatusOverride(false);
                 }}
                 value={companyWebsite}

@@ -12,6 +12,7 @@ type AccountStatusPanelProps = {
   refreshKey?: number;
   overrideActive: boolean;
   onOverrideChange: (value: boolean) => void;
+  submitOnOverride?: boolean;
 };
 
 function statusClasses(status: AccountStatusResult) {
@@ -49,6 +50,7 @@ export function AccountStatusPanel({
   refreshKey = 0,
   overrideActive,
   onOverrideChange,
+  submitOnOverride = false,
 }: AccountStatusPanelProps) {
   const [status, setStatus] = useState<AccountStatusResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -133,10 +135,16 @@ export function AccountStatusPanel({
                 <button
                   className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-[#f8f5ef]"
                   key={action.label}
-                  onClick={() => onOverrideChange(true)}
+                  onClick={(event) => {
+                    onOverrideChange(true);
+                    if (submitOnOverride) {
+                      const form = event.currentTarget.form;
+                      window.setTimeout(() => form?.requestSubmit(), 0);
+                    }
+                  }}
                   type="button"
                 >
-                  {overrideActive ? "Override enabled" : action.label}
+                  {overrideActive ? "Override enabled" : "Override and continue"}
                 </button>
               ) : action.href ? (
                 <a
