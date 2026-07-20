@@ -41,10 +41,15 @@ function trimSentences(text: string, maxSentences: number) {
 }
 
 function stripCommercialTerms(text: string) {
-  return text.replace(
-    /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
-    "commercial details",
-  );
+  return text
+    .replace(
+      /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
+      "commercial details",
+    )
+    .replace(/\bversus\b/gi, "and")
+    .replace(/\bbetter than\b/gi, "different from")
+    .replace(/\bbeats\b/gi, "differs from")
+    .replace(/\b(adthena|revvim|auction insights)\b/gi, "current tools");
 }
 
 function stripFallbackPhrases(text: string) {

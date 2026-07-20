@@ -151,10 +151,15 @@ function containsCommercialTerms(text: string) {
 }
 
 function sanitizeGeneratedText(text: string) {
-  return text.replace(
-    /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
-    "commercial details",
-  );
+  return text
+    .replace(
+      /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
+      "commercial details",
+    )
+    .replace(/\bversus\b/gi, "and")
+    .replace(/\bbetter than\b/gi, "different from")
+    .replace(/\bbeats\b/gi, "differs from")
+    .replace(/\b(adthena|revvim|auction insights)\b/gi, "current tools");
 }
 
 function mapKnowledgeRow(row: Row): SequenceKnowledgeRecord {
@@ -344,7 +349,9 @@ function validateSequenceGeneration(input: BuildSequenceInput, generation: Seque
   const finalStep = steps[steps.length - 1];
   if (
     finalStep.purpose !== "BREAKUP_CLOSE_LOOP" ||
-    !/close the loop|not relevant|no problem/i.test(`${finalStep.messageBody} ${finalStep.cta}`)
+    !/close the loop|not relevant|no problem|leave this|park this|timing|circle back/i.test(
+      `${finalStep.messageBody} ${finalStep.cta}`,
+    )
   ) {
     return false;
   }
