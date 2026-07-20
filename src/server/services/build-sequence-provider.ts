@@ -61,6 +61,53 @@ function stripFallbackPhrases(text: string) {
     .replace(/If this is not relevant, I can close the loop here\./gi, "If timing is wrong, no need to reply.");
 }
 
+function cleanAiText(text: string, maxLength: number) {
+  return stripFallbackPhrases(stripCommercialTerms(text)).replace(/\s+\n/g, "\n").trim().slice(0, maxLength).trim();
+}
+
+function hasLowPressureClose(text: string) {
+  return /close the loop|not relevant|no problem|leave this|park this|timing|circle back|no need to reply/i.test(
+    text,
+  );
+}
+
+type AiSequenceStep = {
+  subjectLine?: string;
+  connectionRequest?: string;
+  messageBody: string;
+  cta: string;
+};
+
+function normalizeAiStep(step: SequenceStep, aiStep: AiSequenceStep) {
+  let messageBody = cleanAiText(aiStep.messageBody, 1600);
+  if (messageBody.length < 20) {
+    messageBody = step.messageBody;
+  }
+
+  let cta = cleanAiText(aiStep.cta, 220);
+  if (cta.length === 0) {
+    cta = step.cta;
+  }
+
+  if (step.purpose === "BREAKUP_CLOSE_LOOP" && !hasLowPressureClose(`${messageBody} ${cta}`)) {
+    cta = "No need to reply if timing is wrong.";
+  }
+
+  return {
+    ...step,
+    subjectLine:
+      step.channel === "EMAIL"
+        ? cleanAiText(aiStep.subjectLine ?? step.subjectLine ?? "", 160)
+        : undefined,
+    connectionRequest:
+      step.channel === "LINKEDIN" && step.stepNumber === 1
+        ? cleanAiText(aiStep.connectionRequest ?? step.connectionRequest ?? "", 300)
+        : step.connectionRequest,
+    messageBody,
+    cta,
+  };
+}
+
 function greeting(input: BuildSequenceInput) {
   return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
 }
@@ -510,19 +557,7 @@ export function createBuildSequenceAiProvider(
                 if (!aiStep) {
                   return step;
                 }
-                return {
-                  ...step,
-                  subjectLine:
-                    step.channel === "EMAIL"
-                      ? stripCommercialTerms(aiStep.subjectLine ?? step.subjectLine ?? "")
-                      : undefined,
-                  connectionRequest:
-                    step.channel === "LINKEDIN" && step.stepNumber === 1
-                      ? stripCommercialTerms(aiStep.connectionRequest ?? step.connectionRequest ?? "")
-                      : step.connectionRequest,
-                  messageBody: stripFallbackPhrases(stripCommercialTerms(aiStep.messageBody)),
-                  cta: stripFallbackPhrases(stripCommercialTerms(aiStep.cta)),
-                };
+                return normalizeAiStep(step, aiStep);
               })
             : result.steps;
         return {
