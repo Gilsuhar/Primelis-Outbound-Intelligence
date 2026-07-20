@@ -12,6 +12,7 @@ import {
   generateReplyToProspect,
   type ReplyPersistence,
 } from "./reply-to-prospect-service";
+import { detectConversationStage } from "./reply-conversation-stage";
 
 const baseInput: ReplyToProspectInput = {
   prospectMessage: "We already use another tool. How does Signal think about brand search?",
@@ -228,6 +229,47 @@ describe("Reply to Prospect service", () => {
       expect(result.data.recommendedReply).toMatch(/decision automated/i);
       expect(result.data.recommendedReply).not.toMatch(/replace|replacing/i);
       expect(result.data.recommendedReply).not.toMatch(/better than|weaker than/i);
+    }
+  });
+
+  it("uses full LinkedIn thread context and follows up after deck and commercials", async () => {
+    const thread = [
+      "Hi Jack- thanks for connecting, how do you handle branded ads when no competitors are bidding on your brand?",
+      "Do you have a deck I can checkout?",
+      "Hey again Jack, As promised, see attached the deck, which includes an overview of the technology, integration details, NinjaTrader examples, case studies and more.",
+      "I see. Thanks. Whats the fee structure look like? How do the commercials work?",
+      "Hi Jack, Our pricing is outlined on the second to last slide of the presentation. We charge a flat monthly fee based on your brand ad spend. Typically, fintech clients see 30-60% savings, with ROI ranging from 5x to 20x the cost of the technology.",
+      "Hi Jack, would love to hear your thoughts whenever you have a chance.",
+    ].join("\n\n");
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        channel: "LINKEDIN",
+        prospectMessage: thread,
+        companyName: "NinjaTrader",
+        desiredTone: "DIRECT",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(detectConversationStage(thread)).toMatchObject({
+      deckRequestIsOld: true,
+      pricingAlreadyAnswered: true,
+      needsFollowUpAfterCommercials: true,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recommendedReply).toMatch(/fee structure|Signal value|short technical walkthrough|pressure-test/i);
+      expect(result.data.recommendedReply).not.toMatch(/send (the )?deck again|happy to send it|two relevant bullets/i);
+      expect(result.data.safetyWarnings).toEqual(
+        expect.arrayContaining([
+          "Conversation history shows the deck was already sent; do not offer to send it again.",
+          "Conversation history shows commercials were already answered; reply should move toward feedback or a walkthrough.",
+        ]),
+      );
     }
   });
 

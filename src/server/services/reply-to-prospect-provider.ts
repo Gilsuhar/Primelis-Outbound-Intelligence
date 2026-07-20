@@ -8,6 +8,7 @@ import type {
 import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider, mapAiProviderError } from "./ai-provider";
+import { detectConversationStage } from "./reply-conversation-stage";
 
 export type ReplyProviderRequest = {
   input: ReplyToProspectInput;
@@ -60,6 +61,10 @@ function humanizeFact(fact: string) {
 }
 
 function deckReply(input: ReplyToProspectInput) {
+  const stage = detectConversationStage(input.prospectMessage);
+  if (stage.deckRequestIsOld || stage.pricingAlreadyAnswered || stage.needsFollowUpAfterCommercials) {
+    return followUpAfterCommercialsReply(input);
+  }
   const opener =
     input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.";
   const companyLine = input.companyName
@@ -73,6 +78,21 @@ function deckReply(input: ReplyToProspectInput) {
       : "I can send the deck with two bullets that match your setup.";
 
   return [opener, companyLine, usefulLine, cta].join(" ");
+}
+
+function followUpAfterCommercialsReply(input: ReplyToProspectInput) {
+  const nameMatch = input.prospectMessage.match(/\bHi\s+([A-Z][a-z]+)\b|^([A-Z][a-z]+)[,-]/m);
+  const name = nameMatch?.[1] ?? nameMatch?.[2];
+  const opener = name ? `Hi ${name},` : "Hi there,";
+  const line1 =
+    "Wanted to check whether the fee structure and the Signal value were clear after the deck.";
+  const line2 =
+    "The main question is whether branded-search savings at your spend level are worth a short technical walkthrough.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Worth 10 minutes to pressure-test the numbers and three scenarios?"
+      : "Worth 10 minutes to pressure-test the numbers and three scenarios?";
+  return [opener, line1, line2, cta].join(" ");
 }
 
 function intentBridge(intents: ProspectIntent[]) {
@@ -205,6 +225,10 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     const companyPhrase = input.companyName ? ` for ${input.companyName}` : "";
 
     const recommendedReply = (() => {
+      const stage = detectConversationStage(input.prospectMessage);
+      if (stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered) {
+        return followUpAfterCommercialsReply(input);
+      }
       if (intents.includes("DECK_REQUEST")) {
         return deckReply(input);
       }
@@ -303,6 +327,8 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
           context: {
             brief: {
               prospectMessage: request.input.prospectMessage,
+              latestProspectTurn: detectConversationStage(request.input.prospectMessage).lastTurn,
+              conversationStage: detectConversationStage(request.input.prospectMessage),
               companyName: request.input.companyName,
               contactRole: request.input.contactRole,
               channel: request.input.channel,
@@ -324,6 +350,8 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               "Separate verified facts from assumptions in your reasoning. Prospect-facing copy may ask about assumptions, but must not assert unverified details.",
               "Prefer the strongest relevant approvedKnowledge over generic outbound patterns. If approvedKnowledge includes winning-message examples or case studies, borrow the strategic pattern, not the exact wording.",
               "Write the reply from scratch from the prospect message, brief, and approved facts. Do not imitate a local template.",
+              "If the prospectMessage is a full conversation history, answer only the latest prospect turn and respect what has already happened earlier in the thread.",
+              "If a deck was already sent, do not offer to send the deck again. If commercials/pricing were already answered, move toward feedback, a 10-minute walkthrough, or pressure-testing the numbers.",
               "Answer the prospect's actual question first.",
               "Sound like a calm senior seller, not support documentation.",
               "If the prospect asks for a deck, acknowledge it and ask the minimum useful follow-up or offer to send the relevant short material, using only approved facts.",

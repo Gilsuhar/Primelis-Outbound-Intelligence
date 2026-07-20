@@ -21,6 +21,7 @@ import {
   createInitialDraftVersion,
   PrismaDraftVersionPersistence,
 } from "./draft-versioning-service";
+import { detectConversationStage, lastProspectTurn } from "./reply-conversation-stage";
 import { err, ok } from "./result";
 
 const replyInputSchema = z.object({
@@ -81,7 +82,7 @@ function sanitizeGeneratedText(text: string) {
 }
 
 export function classifyProspectMessage(message: string): ProspectIntent[] {
-  const text = message.toLowerCase();
+  const text = lastProspectTurn(message).toLowerCase();
   const intents = new Set<ProspectIntent>();
 
   if (/\b(adthena|revvim|vendor|tool|platform|already use|current provider)\b/.test(text)) {
@@ -177,6 +178,13 @@ function safetyWarningsFor(input: ReplyToProspectInput, records: ReplyKnowledgeR
   }
   if (records.length === 0) {
     warnings.add("No approved eligible Signal knowledge was available for this channel.");
+  }
+  const stage = detectConversationStage(input.prospectMessage);
+  if (stage.deckRequestIsOld) {
+    warnings.add("Conversation history shows the deck was already sent; do not offer to send it again.");
+  }
+  if (stage.pricingAlreadyAnswered) {
+    warnings.add("Conversation history shows commercials were already answered; reply should move toward feedback or a walkthrough.");
   }
   return Array.from(warnings);
 }
