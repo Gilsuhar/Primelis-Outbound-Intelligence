@@ -61,8 +61,31 @@ function stripFallbackPhrases(text: string) {
     .replace(/If this is not relevant, I can close the loop here\./gi, "If timing is wrong, no need to reply.");
 }
 
+function roundPercentages(text: string) {
+  return text.replace(/\b(\d+)\.(\d+)%/g, (_match, whole, decimal) => {
+    const rounded = Number(decimal) >= 5 ? Number(whole) + 1 : Number(whole);
+    return `${rounded}%`;
+  });
+}
+
+function stripTrailingQuestionWhenCtaExists(body: string, cta: string) {
+  if (!cta.trim()) {
+    return body;
+  }
+  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const last = blocks.at(-1);
+  if (!last?.endsWith("?")) {
+    return body;
+  }
+  return blocks.slice(0, -1).join("\n\n").trim() || body;
+}
+
 function cleanAiText(text: string, maxLength: number) {
-  return stripFallbackPhrases(stripCommercialTerms(text)).replace(/\s+\n/g, "\n").trim().slice(0, maxLength).trim();
+  return roundPercentages(stripFallbackPhrases(stripCommercialTerms(text)))
+    .replace(/\s+\n/g, "\n")
+    .trim()
+    .slice(0, maxLength)
+    .trim();
 }
 
 function hasLowPressureClose(text: string) {
@@ -92,6 +115,7 @@ function normalizeAiStep(step: SequenceStep, aiStep: AiSequenceStep) {
   if (step.purpose === "BREAKUP_CLOSE_LOOP" && !hasLowPressureClose(`${messageBody} ${cta}`)) {
     cta = "No need to reply if timing is wrong.";
   }
+  messageBody = stripTrailingQuestionWhenCtaExists(messageBody, cta);
 
   return {
     ...step,
@@ -537,7 +561,11 @@ export function createBuildSequenceAiProvider(
               "Write the sequence from scratch. Do not rewrite or imitate a local template.",
               "Return sequenceSteps with exactly the same number of steps and the same order as brief.sequencePlan.",
               "Each email body should be 45-85 words. Each LinkedIn body should be 25-50 words. Make every email short, clean and strong.",
+              "Write more direct and less poetic. Avoid soft filler like usually, tends to, noisy, drift, playing out, the tradeoff, the difference is, sits in the same place, and carries the same pressure unless the sentence would lose clarity without it.",
+              "Use plain sales language: cost, CPC, organic coverage, competitors, bid changes, savings, revenue, clicks, MQL, SQL. No lyrical or essay-style phrasing.",
               "Each step must add a new reason, not repeat the same brand-search question.",
+              "Round prospect-facing percentages to whole numbers: write 71%, not 71.2%, unless the exact decimal is specifically important.",
+              "If a case-study subject line names an industry, it must match the proof company. Crocs is retail/footwear/ecommerce, not travel. If unsure, write 'customer example' instead of an industry label.",
               "Do not use these fallback phrases or close variants: 'Quick question on', 'For context', 'A useful way to look at this', 'I will close the loop here', 'If this is not relevant, I can close the loop here'.",
               "Do not repeat the same idea in the body and CTA. The final step must close once only.",
               "The selected buyer role must change the copy: Paid Search gets operational bid/control language, Growth gets CAC/acquisition efficiency, CMO/VP gets budget visibility and business outcome language.",
@@ -547,7 +575,7 @@ export function createBuildSequenceAiProvider(
               "Step 1: sharp account-relevant opener. Step 2: proof-backed problem/gap using at most one case study if available. Step 3: unload the technology pitch clearly: Signal monitors Google and Bing search results in real time, detects competitor/no-competitor moments, connects that with Google Ads, Search Console and conversion data, and helps decide when to lower/pause bids or restore coverage. Final step: low-pressure close only.",
               "Do not use fluffy phrases like checking in, wanted to follow up, hope you are well, thought this might be relevant, or I had the company on my list.",
               "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",
-              "Keep one soft CTA per step. Do not include a CTA question inside the body if a separate cta field is returned.",
+              "Keep one soft CTA per step. Never include a question in the final sentence of the body when a separate cta field is returned.",
             ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             sourceReferences: request.sourceReferences,
