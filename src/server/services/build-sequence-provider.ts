@@ -47,6 +47,15 @@ function stripCommercialTerms(text: string) {
   );
 }
 
+function stripFallbackPhrases(text: string) {
+  return text
+    .replace(/Quick question on ([^:]+):/gi, "One narrow paid-brand question for $1:")
+    .replace(/^For context,\s*/gim, "")
+    .replace(/A useful way to look at this is/gi, "The practical read is")
+    .replace(/I will close the loop here\.\s*/gi, "")
+    .replace(/If this is not relevant, I can close the loop here\./gi, "If timing is wrong, no need to reply.");
+}
+
 function greeting(input: BuildSequenceInput) {
   return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
 }
@@ -452,7 +461,6 @@ export function createBuildSequenceAiProvider(
                 channel: step.channel,
                 delay: step.delay,
                 purpose: step.purpose,
-                subjectLine: step.subjectLine,
               })),
             },
             writingInstructions: [
@@ -460,7 +468,10 @@ export function createBuildSequenceAiProvider(
               "Return sequenceSteps with exactly the same number of steps and the same order as brief.sequencePlan.",
               "Each email body should be 55-100 words. Each LinkedIn body should be 25-55 words.",
               "Each step must add a new reason, not repeat the same brand-search question.",
+              "Do not use these fallback phrases or close variants: 'Quick question on', 'For context', 'A useful way to look at this', 'I will close the loop here', 'If this is not relevant, I can close the loop here'.",
+              "Do not repeat the same idea in the body and CTA. The final step must close once only.",
               "The selected buyer role must change the copy: Paid Search gets operational bid/control language, Growth gets CAC/acquisition efficiency, CMO/VP gets budget visibility and business outcome language.",
+              "If buyer role is missing or generic, write for a paid-brand/search leader without pretending to know the exact title.",
               "The selected tone must visibly change the copy: DIRECT is shorter and plainer, WARM is softer and less assumptive, EXECUTIVE removes tactical detail and emphasizes business control.",
               "Do not reuse the same opening structure across steps. Avoid starting every step with 'When', 'For context', or 'A useful way'.",
               "Step 1: sharp account-relevant opener. Step 2: problem/gap. Step 3: method or useful contrast. Later steps: proof or low-pressure close.",
@@ -491,8 +502,8 @@ export function createBuildSequenceAiProvider(
                     step.channel === "LINKEDIN" && step.stepNumber === 1
                       ? stripCommercialTerms(aiStep.connectionRequest ?? step.connectionRequest ?? "")
                       : step.connectionRequest,
-                  messageBody: stripCommercialTerms(aiStep.messageBody),
-                  cta: stripCommercialTerms(aiStep.cta),
+                  messageBody: stripFallbackPhrases(stripCommercialTerms(aiStep.messageBody)),
+                  cta: stripFallbackPhrases(stripCommercialTerms(aiStep.cta)),
                 };
               })
             : result.steps;
