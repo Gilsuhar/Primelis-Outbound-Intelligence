@@ -6,7 +6,10 @@ import type {
   ReplyToProspectResult,
 } from "@/features/reply-to-prospect/types";
 
-import { DeterministicReplyProvider } from "./reply-to-prospect-provider";
+import {
+  DeterministicReplyProvider,
+  enforceReplyConversationStage,
+} from "./reply-to-prospect-provider";
 import {
   classifyProspectMessage,
   generateReplyToProspect,
@@ -263,6 +266,7 @@ describe("Reply to Prospect service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.recommendedReply).toMatch(/fee structure|Signal value|short technical walkthrough|pressure-test/i);
+      expect(result.data.shorterAlternative).toMatch(/pricing\/value tradeoff|pressure-test/i);
       expect(result.data.recommendedReply).not.toMatch(/send (the )?deck again|happy to send it|two relevant bullets/i);
       expect(result.data.safetyWarnings).toEqual(
         expect.arrayContaining([
@@ -271,6 +275,43 @@ describe("Reply to Prospect service", () => {
         ]),
       );
     }
+  });
+
+  it("blocks OpenAI from repeating commercials after they were already answered", async () => {
+    const thread = [
+      "Hi Jack- thanks for connecting, how do you handle branded ads when no competitors are bidding on your brand?",
+      "Do you have a deck I can checkout?",
+      "Hey again Jack, As promised, see attached the deck, which includes an overview of the technology, integration details, NinjaTrader examples, case studies and more.",
+      "I see. Thanks. Whats the fee structure look like? How do the commercials work?",
+      "Hi Jack, Our pricing is outlined on the second to last slide of the presentation. We charge a flat monthly fee based on your brand ad spend. Typically, fintech clients see 30-60% savings, with ROI ranging from 5x to 20x the cost of the technology.",
+      "Hi Jack, would love to hear your thoughts whenever you have a chance.",
+    ].join("\n\n");
+    const input = {
+      ...baseInput,
+      channel: "LINKEDIN" as const,
+      prospectMessage: thread,
+      companyName: "NinjaTrader",
+      desiredTone: "DIRECT" as const,
+      desiredLength: "SHORT" as const,
+    };
+    const fallback = await new DeterministicReplyProvider().generate({
+      input,
+      intents: ["DECK_REQUEST"],
+      records: [knowledge({ id: "product-truth" })],
+      safetyWarnings: [],
+    });
+
+    const guarded = enforceReplyConversationStage(input, fallback, {
+      recommendedReply:
+        "On the commercials: Signal is a flat monthly fee tied to your trailing 12-month brand spend in Google Ads, across the markets you activate.",
+      shorterAlternative:
+        "Thanks for the note. The core idea is simple: compare paid brand coverage with organic results before deciding where spend is still needed. Do you already track this today?",
+    });
+
+    expect(guarded.recommendedReply).toBe(fallback.recommendedReply);
+    expect(guarded.shorterAlternative).toBe(fallback.shorterAlternative);
+    expect(guarded.recommendedReply).not.toMatch(/On the commercials|flat monthly fee|trailing 12-month/i);
+    expect(guarded.shorterAlternative).not.toMatch(/Do you already track this today/i);
   });
 
   it("returns source references and persists generated drafts separately", async () => {

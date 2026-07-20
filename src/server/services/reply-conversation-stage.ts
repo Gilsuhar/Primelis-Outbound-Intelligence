@@ -17,7 +17,7 @@ export function detectConversationStage(message: string) {
     ?.toLowerCase() ?? "";
   const lastTurn = lastProspectTurn(message).toLowerCase();
   const pricingAlreadyAnswered =
-    /\b(fee structure|commercials|pricing|flat monthly fee|prime tier|pro tier|roi|monthly)\b/.test(text);
+    /\b(flat monthly fee|charge a flat monthly fee|trailing 12-month|last 12-month|brand ad spend over the past 12 months|second to last slide|outlined on the second|core tier|pro tier|prime tier|enterprise tier|roi|5x|20x)\b/.test(text);
   const askedThoughtsAfterPricing =
     /would love to hear your thoughts|hear your thoughts|whenever you have a chance/.test(text);
   return {

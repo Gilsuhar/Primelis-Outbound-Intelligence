@@ -95,6 +95,44 @@ function followUpAfterCommercialsReply(input: ReplyToProspectInput) {
   return [opener, line1, line2, cta].join(" ");
 }
 
+function followUpAfterCommercialsShortReply(input: ReplyToProspectInput) {
+  const nameMatch = input.prospectMessage.match(/\bHi\s+([A-Z][a-z]+)\b|^([A-Z][a-z]+)[,-]/m);
+  const name = nameMatch?.[1] ?? nameMatch?.[2];
+  const opener = name ? `Hi ${name},` : "Hi there,";
+  return [
+    opener,
+    "Wanted to see if the pricing/value tradeoff was clear after the deck.",
+    "Worth 10 minutes to pressure-test the savings range against your brand spend?",
+  ].join(" ");
+}
+
+function ignoresAnsweredCommercialsStage(text: string) {
+  return /\b(on the commercials|flat monthly fee|trailing 12-month|based on scale|share of savings|bing can be added|fee structure|core idea is simple|do you already track this today)\b/i.test(
+    text,
+  );
+}
+
+export function enforceReplyConversationStage(
+  input: ReplyToProspectInput,
+  fallback: Pick<ReplyGeneration, "recommendedReply" | "shorterAlternative">,
+  aiReply: Pick<ReplyGeneration, "recommendedReply" | "shorterAlternative">,
+) {
+  const stage = detectConversationStage(input.prospectMessage);
+  const shouldProtectCommercialFollowUp =
+    stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered;
+
+  return {
+    recommendedReply:
+      shouldProtectCommercialFollowUp && ignoresAnsweredCommercialsStage(aiReply.recommendedReply)
+        ? fallback.recommendedReply
+        : aiReply.recommendedReply,
+    shorterAlternative:
+      shouldProtectCommercialFollowUp && ignoresAnsweredCommercialsStage(aiReply.shorterAlternative)
+        ? fallback.shorterAlternative
+        : aiReply.shorterAlternative,
+  };
+}
+
 function intentBridge(intents: ProspectIntent[]) {
   if (intents.includes("EXISTING_VENDOR")) {
     return "I would not position this as a replacement. The useful gap is the decision layer: when to keep paid brand live, when to lower bids, and when organic is already enough.";
@@ -247,7 +285,10 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
       return defaultReply(input, intents, primaryFact, secondaryFact);
     })();
 
-    const shorterAlternative = intents.includes("DECK_REQUEST")
+    const stage = detectConversationStage(input.prospectMessage);
+    const shorterAlternative = stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered
+      ? followUpAfterCommercialsShortReply(input)
+      : intents.includes("DECK_REQUEST")
       ? [
           input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
           "I will keep it focused on the paid-brand question and add two relevant bullets.",
@@ -313,6 +354,7 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
     async generate(request) {
       const fallback = new DeterministicReplyProvider();
       const result = await fallback.generate(request);
+      const stage = detectConversationStage(request.input.prospectMessage);
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -327,8 +369,8 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
           context: {
             brief: {
               prospectMessage: request.input.prospectMessage,
-              latestProspectTurn: detectConversationStage(request.input.prospectMessage).lastTurn,
-              conversationStage: detectConversationStage(request.input.prospectMessage),
+              latestProspectTurn: stage.lastTurn,
+              conversationStage: stage,
               companyName: request.input.companyName,
               contactRole: request.input.contactRole,
               channel: request.input.channel,
@@ -372,10 +414,14 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
-        return {
-          ...result,
+        const guardedReply = enforceReplyConversationStage(request.input, result, {
           recommendedReply: aiResult.primaryContent,
           shorterAlternative: aiResult.shorterAlternative ?? result.shorterAlternative,
+        });
+        return {
+          ...result,
+          recommendedReply: guardedReply.recommendedReply,
+          shorterAlternative: guardedReply.shorterAlternative,
           claimsUsed: aiResult.factualClaimsUsed.length
             ? aiResult.factualClaimsUsed
             : result.claimsUsed,
