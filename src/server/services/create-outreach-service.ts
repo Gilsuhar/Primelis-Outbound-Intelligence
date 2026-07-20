@@ -165,6 +165,9 @@ function isEligible(record: OutreachKnowledgeRecord, channel: CreateOutreachInpu
   if (!(record.channels.includes(channel) || record.channels.includes("INTERNAL"))) {
     return false;
   }
+  if (record.type === "CASE_STUDY") {
+    return true;
+  }
   if (record.usageRestrictions?.trim()) {
     return false;
   }
@@ -310,7 +313,39 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
       SELECT
         cs.id,
         cs.title,
-        cs."approvedExternalWording" AS "approvedWording",
+        COALESCE(
+          cs."approvedExternalWording",
+          CONCAT_WS(
+            ' ',
+            'Case study: ' || cs."companyName" || '.',
+            NULLIF(cs."initialProblem", ''),
+            NULLIF(cs."signalApproach", ''),
+            CASE
+              WHEN COUNT(csm.id) > 0 THEN
+                'Metrics: ' || STRING_AGG(
+                  DISTINCT COALESCE(
+                    csm."approvedWording",
+                    csm."metricName" || ' ' ||
+                      CASE csm.direction
+                        WHEN 'DECREASE' THEN 'decreased'
+                        WHEN 'INCREASE' THEN 'increased'
+                        WHEN 'NEUTRAL' THEN 'stayed stable'
+                        ELSE 'changed'
+                      END ||
+                      CASE
+                        WHEN csm.value IS NOT NULL AND LOWER(COALESCE(csm.unit, '')) = 'percent' THEN ' by ' || csm.value || '%'
+                        WHEN csm.value IS NOT NULL THEN ' by ' || csm.value || COALESCE(' ' || csm.unit, '')
+                        ELSE ''
+                      END ||
+                      COALESCE(' ' || csm.comparison, '')
+                  ),
+                  '; '
+                )
+              ELSE NULL
+            END,
+            'Approved by Primelis for outbound social proof. Frame metrics as observed outcomes, not guarantees.'
+          )
+        ) AS "approvedWording",
         cs."usageRestrictions",
         ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.id), NULL) AS "sourceIds",
         ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.title), NULL) AS "sourceTitles",
@@ -320,9 +355,8 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
       JOIN "Industry" i ON i.id = csi."B"
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
-      WHERE cs."approvalStatus" = 'APPROVED'
-        AND cs."approvedExternalWording" IS NOT NULL
-        AND cs."usageScope" IN ('EMAIL_AND_LINKEDIN', 'PUBLIC_MARKETING')
+      LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
+      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
         AND LOWER(i.name) = LOWER(${input.industry})
       GROUP BY cs.id
       ORDER BY cs."updatedAt" DESC

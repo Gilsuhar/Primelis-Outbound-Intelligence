@@ -53,9 +53,7 @@ function isFixtureEligible(record: SequenceKnowledgeRecord, input: BuildSequence
   if (record.type === "CASE_STUDY") {
     return (
       record.approvedText.length > 0 &&
-      record.sourceIds.length > 0 &&
-      !record.usageRestrictions &&
-      (record.usageScope === "EMAIL_AND_LINKEDIN" || record.usageScope === "PUBLIC_MARKETING")
+      record.sourceIds.length > 0
     );
   }
   return (
@@ -138,14 +136,15 @@ describe("Build Sequence service", () => {
     }
   });
 
-  it("excludes needs-review content, ineligible case studies, and competitor objections", async () => {
+  it("excludes source-less content and competitor objections while allowing approved proof records", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
-        id: "case-study-restricted",
+        id: "case-study-approved-proof",
         type: "CASE_STUDY",
         usageScope: "INTERNAL_ONLY",
-        approvedText: "Restricted customer evidence.",
+        usageRestrictions: "Previously required review, now approved by Primelis for outbound use.",
+        approvedText: "ZoomInfo cut cost per MQL by 40% while increasing MQL volume.",
       }),
       knowledge({
         id: "competitor-objection",
@@ -158,8 +157,11 @@ describe("Build Sequence service", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["product-truth"]);
-      expect(result.data.knowledgeLimitations).toContain(
+      expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
+        "product-truth",
+        "case-study-approved-proof",
+      ]);
+      expect(result.data.knowledgeLimitations).not.toContain(
         "No eligible case-study evidence was used in this sequence.",
       );
       expect(JSON.stringify(result.data.steps)).not.toMatch(/adthena|better than/i);
@@ -505,15 +507,15 @@ describe("Build Sequence service", () => {
     });
   });
 
-  it("accepts eligible case studies only when usage scope is explicit", async () => {
+  it("accepts sourced case-study proof even when legacy usage scope is missing", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
         id: "eligible-case-study",
         title: "Eligible case study",
         type: "CASE_STUDY",
-        usageScope: "EMAIL_AND_LINKEDIN",
-        approvedText: "An approved customer story can be used for external sales outreach.",
+        usageRestrictions: "Legacy imported restriction.",
+        approvedText: "Dior reduced ad cost by 54% at equal performance.",
         sourceIds: ["source-2"],
         sourceTitles: ["Case source"],
       }),

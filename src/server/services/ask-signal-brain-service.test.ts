@@ -70,7 +70,7 @@ describe("Ask Signal Brain service", () => {
     }
   });
 
-  it("excludes ineligible restricted content and competitor claims", async () => {
+  it("excludes competitor claims while allowing sourced case-study proof", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
       knowledge({
@@ -79,9 +79,9 @@ describe("Ask Signal Brain service", () => {
         approvedText: "Adthena is worse than Signal.",
       }),
       knowledge({
-        id: "restricted-case-study",
+        id: "approved-proof-case-study",
         type: "CASE_STUDY",
-        approvedText: "Restricted customer proof.",
+        approvedText: "ZoomInfo reduced cost per MQL by 40%.",
         usageRestrictions: "Do not use externally.",
         usageScope: "INTERNAL_ONLY",
       }),
@@ -99,7 +99,10 @@ describe("Ask Signal Brain service", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["approved"]);
+      expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
+        "approved",
+        "approved-proof-case-study",
+      ]);
       expect(JSON.stringify(result.data)).not.toMatch(/worse than/i);
       expect(result.data.safetyWarnings).toContain(
         "Competitor context should validate the current setup and avoid replacement pressure.",
@@ -189,7 +192,7 @@ describe("Ask Signal Brain service", () => {
     );
   });
 
-  it("enforces case-study restrictions and returns eligible usage scope", async () => {
+  it("returns sourced case-study proof and approved outbound usage guidance", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
       knowledge({
@@ -203,10 +206,10 @@ describe("Ask Signal Brain service", () => {
         sourceTitles: ["Case source"],
       }),
       knowledge({
-        id: "blocked-case-study",
-        title: "Blocked case study",
+        id: "legacy-case-study",
+        title: "Legacy imported case study",
         type: "CASE_STUDY",
-        approvedText: "Blocked proof.",
+        approvedText: "Sandro reduced ad cost by 50% at equal performance.",
         usageRestrictions: "Restricted.",
         usageScope: "INTERNAL_ONLY",
       }),
@@ -227,9 +230,10 @@ describe("Ask Signal Brain service", () => {
         recommendedCaseStudy: "Eligible retail case study",
         eligibleUsageScope: "EMAIL_AND_LINKEDIN",
       });
-      expect(result.data.recordsUsed.map((record) => record.id)).not.toContain(
-        "blocked-case-study",
+      expect(result.data.recordsUsed.map((record) => record.id)).toContain(
+        "legacy-case-study",
       );
+      expect(result.data.caseStudyRecommendation?.externalUseWarning).toContain("Approved by Primelis");
     }
   });
 

@@ -147,6 +147,9 @@ function playbookRecords(): SignalBrainKnowledgeRecord[] {
 }
 
 function isKnowledgeItemEligible(record: SignalBrainKnowledgeRecord) {
+  if (record.type === "CASE_STUDY") {
+    return record.approvedText.trim().length > 0 && record.sourceIds.length > 0;
+  }
   if (!record.approvedText.trim() || record.sourceIds.length === 0) {
     return false;
   }
@@ -172,32 +175,23 @@ function isKnowledgeItemEligible(record: SignalBrainKnowledgeRecord) {
   return true;
 }
 
-function isCaseStudyEligible(record: SignalBrainKnowledgeRecord, input: SignalBrainInput) {
+function isCaseStudyEligible(record: SignalBrainKnowledgeRecord) {
   if (
     record.type !== "CASE_STUDY" ||
     !record.approvedText.trim() ||
-    record.sourceIds.length === 0 ||
-    record.usageRestrictions?.trim()
+    record.sourceIds.length === 0
   ) {
     return false;
   }
-  const externalUseRequested = /\b(outreach|email|linkedin|public|send|deck)\b/i.test(
-    `${input.question} ${input.mode}`,
-  );
-  if (!externalUseRequested) {
-    return Boolean(record.usageScope);
-  }
-  return ["SALES_REPLY_ONLY", "EMAIL_AND_LINKEDIN", "PUBLIC_MARKETING", "DECK_ONLY"].includes(
-    record.usageScope ?? "",
-  );
+  return true;
 }
 
-function isRecordEligible(record: SignalBrainKnowledgeRecord, input: SignalBrainInput) {
+function isRecordEligible(record: SignalBrainKnowledgeRecord) {
   if (record.type === "PLAYBOOK_GUIDANCE") {
     return isKnowledgeItemEligible(record);
   }
   if (record.type === "CASE_STUDY") {
-    return isCaseStudyEligible(record, input);
+    return isCaseStudyEligible(record);
   }
   return isKnowledgeItemEligible(record);
 }
@@ -246,16 +240,6 @@ function safetyWarningsFor(input: SignalBrainInput, records: SignalBrainKnowledg
   if (records.length === 0) {
     warnings.add("No approved eligible Signal knowledge was available.");
   }
-  const restrictedCaseStudies = records.filter(
-    (record) =>
-      record.type === "CASE_STUDY" &&
-      !["EMAIL_AND_LINKEDIN", "PUBLIC_MARKETING"].includes(record.usageScope ?? ""),
-  );
-  if (restrictedCaseStudies.length > 0) {
-    warnings.add(
-      "Some case-study evidence is restricted for external use; review usage scope before sending.",
-    );
-  }
   return Array.from(warnings);
 }
 
@@ -273,14 +257,10 @@ function selectCaseStudyRecommendation(
     whyItFits: `It is the closest eligible approved case study for ${input.industry ?? "the provided context"}.`,
     bestFitIndustry: input.industry ?? "Use only when the industry fit is verified.",
     bestFitPersona: input.contactRole ?? "Paid Search or Performance owner",
-    bestFitObjection: "Use for proof requests only when the usage scope permits it.",
-    eligibleUsageScope: caseStudy.usageScope ?? "Restricted",
+    bestFitObjection: "Use for proof requests when the metric directly supports the buyer concern.",
+    eligibleUsageScope: caseStudy.usageScope ?? "PRIMELIS_APPROVED_OUTBOUND",
     approvedMetrics: caseStudy.metrics ?? [],
-    externalUseWarning: ["EMAIL_AND_LINKEDIN", "PUBLIC_MARKETING"].includes(
-      caseStudy.usageScope ?? "",
-    )
-      ? "Eligible for external use within the selected scope."
-      : "Restricted for external outreach unless a knowledge admin approves that usage.",
+    externalUseWarning: "Approved by Primelis for outbound use; frame metrics as observed outcomes.",
   };
 }
 
@@ -315,7 +295,7 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
     return row ? { id: asString(row.id), role: asString(row.role) } : null;
   }
 
-  async retrieveEligibleKnowledge(input: SignalBrainInput) {
+  async retrieveEligibleKnowledge() {
     const rows = await this.client.$queryRaw<Row[]>`
       SELECT
         ki.id,
@@ -344,7 +324,39 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
         cs.id,
         cs.title,
         'CASE_STUDY' AS type,
-        cs."approvedExternalWording" AS "approvedWording",
+        COALESCE(
+          cs."approvedExternalWording",
+          CONCAT_WS(
+            ' ',
+            'Case study: ' || cs."companyName" || '.',
+            NULLIF(cs."initialProblem", ''),
+            NULLIF(cs."signalApproach", ''),
+            CASE
+              WHEN COUNT(csm.id) > 0 THEN
+                'Metrics: ' || STRING_AGG(
+                  DISTINCT COALESCE(
+                    csm."approvedWording",
+                    csm."metricName" || ' ' ||
+                      CASE csm.direction
+                        WHEN 'DECREASE' THEN 'decreased'
+                        WHEN 'INCREASE' THEN 'increased'
+                        WHEN 'NEUTRAL' THEN 'stayed stable'
+                        ELSE 'changed'
+                      END ||
+                      CASE
+                        WHEN csm.value IS NOT NULL AND LOWER(COALESCE(csm.unit, '')) = 'percent' THEN ' by ' || csm.value || '%'
+                        WHEN csm.value IS NOT NULL THEN ' by ' || csm.value || COALESCE(' ' || csm.unit, '')
+                        ELSE ''
+                      END ||
+                      COALESCE(' ' || csm.comparison, '')
+                  ),
+                  '; '
+                )
+              ELSE NULL
+            END,
+            'Approved by Primelis for outbound social proof. Frame metrics as observed outcomes, not guarantees.'
+          )
+        ) AS "approvedWording",
         cs."signalApproach" AS body,
         cs."initialProblem" AS summary,
         ARRAY['INTERNAL', 'EMAIL', 'LINKEDIN']::"Channel"[] AS channels,
@@ -358,13 +370,13 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
-      WHERE cs."approvalStatus" = 'APPROVED'
+      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
       GROUP BY cs.id
       ORDER BY title ASC
     `;
     const databaseRecords = rows.map(mapKnowledgeRow).filter((record) => {
       if (record.type === "CASE_STUDY") {
-        return isCaseStudyEligible(record, input);
+        return isCaseStudyEligible(record);
       }
       return isKnowledgeItemEligible(record);
     });
@@ -452,7 +464,7 @@ export async function askSignalBrain(
   const provider = dependencies.provider ?? createSignalBrainProvider();
   const intents = classifySignalBrainQuestion(input);
   const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
-    isRecordEligible(record, input),
+    isRecordEligible(record),
   );
   const sources = sourceReferences(records);
   const accountFit =

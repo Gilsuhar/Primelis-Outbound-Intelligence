@@ -195,6 +195,9 @@ function accountStatusPersistence(persistence: BuildSequencePersistence) {
 }
 
 function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
+  if (record.type === "CASE_STUDY") {
+    return isCaseStudyEligible(record);
+  }
   if (!record.approvedText.trim() || record.sourceIds.length === 0) {
     return false;
   }
@@ -221,9 +224,7 @@ function isCaseStudyEligible(record: SequenceKnowledgeRecord) {
   return (
     record.type === "CASE_STUDY" &&
     record.approvedText.trim().length > 0 &&
-    record.sourceIds.length > 0 &&
-    !record.usageRestrictions?.trim() &&
-    (record.usageScope === "EMAIL_AND_LINKEDIN" || record.usageScope === "PUBLIC_MARKETING")
+    record.sourceIds.length > 0
   );
 }
 
@@ -455,7 +456,39 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
         cs.id,
         cs.title,
         'CASE_STUDY' AS type,
-        cs."approvedExternalWording" AS "approvedWording",
+        COALESCE(
+          cs."approvedExternalWording",
+          CONCAT_WS(
+            ' ',
+            'Case study: ' || cs."companyName" || '.',
+            NULLIF(cs."initialProblem", ''),
+            NULLIF(cs."signalApproach", ''),
+            CASE
+              WHEN COUNT(csm.id) > 0 THEN
+                'Metrics: ' || STRING_AGG(
+                  DISTINCT COALESCE(
+                    csm."approvedWording",
+                    csm."metricName" || ' ' ||
+                      CASE csm.direction
+                        WHEN 'DECREASE' THEN 'decreased'
+                        WHEN 'INCREASE' THEN 'increased'
+                        WHEN 'NEUTRAL' THEN 'stayed stable'
+                        ELSE 'changed'
+                      END ||
+                      CASE
+                        WHEN csm.value IS NOT NULL AND LOWER(COALESCE(csm.unit, '')) = 'percent' THEN ' by ' || csm.value || '%'
+                        WHEN csm.value IS NOT NULL THEN ' by ' || csm.value || COALESCE(' ' || csm.unit, '')
+                        ELSE ''
+                      END ||
+                      COALESCE(' ' || csm.comparison, '')
+                  ),
+                  '; '
+                )
+              ELSE NULL
+            END,
+            'Approved by Primelis for outbound social proof. Frame metrics as observed outcomes, not guarantees.'
+          )
+        ) AS "approvedWording",
         cs."signalApproach" AS body,
         cs."initialProblem" AS summary,
         ARRAY['EMAIL', 'LINKEDIN']::"Channel"[] AS channels,
@@ -467,7 +500,8 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       FROM "CaseStudy" cs
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
-      WHERE cs."approvalStatus" = 'APPROVED'
+      LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
+      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
       GROUP BY cs.id
       ORDER BY title ASC
     `;

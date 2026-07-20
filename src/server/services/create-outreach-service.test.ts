@@ -61,10 +61,10 @@ function persistence(
       records.filter(
         (record) =>
           (record.channels.includes(input.channel) || record.channels.includes("INTERNAL")) &&
-          !record.usageRestrictions &&
           record.sourceIds.length > 0 &&
           record.approvedText.length > 0 &&
           (input.useCaseStudy || record.type !== "CASE_STUDY") &&
+          (record.type === "CASE_STUDY" || !record.usageRestrictions) &&
           !(record.type === "OBJECTION" && /adthena|revvim|competitor/i.test(record.approvedText)),
       ),
     persistDraft: async (draft) => {
@@ -163,8 +163,9 @@ describe("Create Outreach service", () => {
         id: "retail-case-study",
         title: "Retail proof",
         type: "CASE_STUDY" as OutreachKnowledgeRecord["type"],
+        usageRestrictions: "Legacy imported restriction.",
         approvedText:
-          "A comparable retail brand reduced wasted brand-search spend while maintaining organic traffic.",
+          "Sandro reduced ad cost by 50% at equal performance while organic traffic increased 52%.",
       }),
     ]);
 
@@ -181,7 +182,7 @@ describe("Create Outreach service", () => {
       );
       expect(result.data.claimsUsed).toEqual(
         expect.arrayContaining([
-          "A comparable retail brand reduced wasted brand-search spend while maintaining organic traffic.",
+          "Sandro reduced ad cost by 50% at equal performance while organic traffic increased 52%.",
         ]),
       );
     }
