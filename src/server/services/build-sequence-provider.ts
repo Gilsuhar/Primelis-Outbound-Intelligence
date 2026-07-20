@@ -456,6 +456,12 @@ export function createBuildSequenceAiProvider(
               desiredTone: request.input.desiredTone,
               desiredOverallDuration: request.input.desiredOverallDuration,
               selectedAngle: result.selectedAngle,
+              approvedKnowledge: request.records.slice(0, 12).map((record) => ({
+                title: record.title,
+                type: record.type,
+                approvedText: record.approvedText,
+                sourceTitles: record.sourceTitles,
+              })),
               sequencePlan: result.steps.map((step) => ({
                 stepNumber: step.stepNumber,
                 channel: step.channel,
@@ -464,6 +470,11 @@ export function createBuildSequenceAiProvider(
               })),
             },
             writingInstructions: [
+              "Decision hierarchy: approvedKnowledge and approvedFacts are the source of truth for Signal, product behavior, proof, objections, and approved claims.",
+              "Use your general B2B and industry knowledge only to choose angle, language, and likely buyer concerns. Never present general model knowledge as a verified fact about the specific company.",
+              "If the company is well-known, you may use broad public category knowledge cautiously, such as travel marketplace, SaaS, ecommerce, or enterprise software. Phrase it as context, not as a discovered fact.",
+              "Separate verified facts from assumptions in your reasoning. Prospect-facing copy may ask about assumptions, but must not assert unverified details.",
+              "Prefer the strongest relevant approvedKnowledge over generic outbound patterns. If approvedKnowledge includes winning-message examples or case studies, borrow the strategic pattern, not the exact wording.",
               "Write the sequence from scratch. Do not rewrite or imitate a local template.",
               "Return sequenceSteps with exactly the same number of steps and the same order as brief.sequencePlan.",
               "Each email body should be 55-100 words. Each LinkedIn body should be 25-55 words.",
