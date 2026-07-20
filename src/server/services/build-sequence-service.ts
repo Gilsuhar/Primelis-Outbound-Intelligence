@@ -384,6 +384,17 @@ function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGen
   };
 }
 
+function openAiFallbackReason(providerName: string, notes: string[]) {
+  if (providerName !== "openai") {
+    return undefined;
+  }
+  return notes.find((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse|did not match the app schema/i.test(
+      note,
+    ),
+  );
+}
+
 export class PrismaBuildSequencePersistence implements BuildSequencePersistence {
   constructor(private readonly client: MinimalPrismaClient = prisma) {}
 
@@ -590,6 +601,13 @@ export async function generateBuildSequence(
       generation: baseGeneration,
     }),
   );
+  const fallbackReason = openAiFallbackReason(provider.metadata.providerName, generated.safetyNotes);
+  if (fallbackReason) {
+    return err(
+      "AI_PROVIDER_FAILED",
+      `OpenAI did not generate this sequence. ${fallbackReason}`,
+    );
+  }
 
   if (!validateSequenceGeneration(input, generated)) {
     return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");

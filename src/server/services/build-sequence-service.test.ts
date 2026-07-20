@@ -449,6 +449,43 @@ describe("Build Sequence service", () => {
     });
   });
 
+  it("does not show deterministic fallback as a successful OpenAI sequence", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            safetyNotes: [
+              ...generated.safetyNotes,
+              "AI provider failed safely. Deterministic fallback was used.",
+            ],
+          };
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "AI_PROVIDER_FAILED",
+      message:
+        "OpenAI did not generate this sequence. AI provider failed safely. Deterministic fallback was used.",
+    });
+  });
+
   it("returns structured errors for invalid input and unauthorized users", async () => {
     const { adapter } = persistence([]);
     const invalid = await generateBuildSequence({ companyName: "" }, { persistence: adapter });

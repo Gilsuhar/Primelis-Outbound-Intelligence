@@ -452,6 +452,17 @@ export function createAiProvider(env: NodeJS.ProcessEnv = process.env): AiProvid
 
 export function mapAiProviderError(error: unknown): AiProviderStatusResult {
   const text = error instanceof Error ? error.message : "";
+  if (error instanceof z.ZodError) {
+    return status(
+      "PROVIDER_ERROR",
+      `OpenAI returned JSON but it did not match the app schema: ${error.issues
+        .slice(0, 3)
+        .map((issue) => `${issue.path.join(".") || "root"} ${issue.message}`)
+        .join("; ")}`,
+      false,
+      "configured-model",
+    );
+  }
   if (text.includes("RATE_LIMITED")) {
     return status("RATE_LIMITED", "AI provider rate limit reached.", false, "configured-model");
   }
@@ -494,6 +505,14 @@ export function mapAiProviderError(error: unknown): AiProviderStatusResult {
     return status(
       "PROVIDER_ERROR",
       "OpenAI returned a response the app could not parse as JSON.",
+      false,
+      "configured-model",
+    );
+  }
+  if (text) {
+    return status(
+      "PROVIDER_ERROR",
+      `AI provider failed safely (${text.replace(/sk-[a-zA-Z0-9_-]+/g, "sk-hidden").slice(0, 240)}).`,
       false,
       "configured-model",
     );
