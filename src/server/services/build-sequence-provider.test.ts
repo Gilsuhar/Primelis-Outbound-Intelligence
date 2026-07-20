@@ -107,6 +107,62 @@ describe("Build Sequence OpenAI provider", () => {
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
   });
 
+  it("accepts OpenAI sequence steps even when primaryContent is omitted", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand control",
+              messageBody: "AI-only step one with a fresh paid-brand angle.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "Re: organic demand",
+              messageBody: "AI-only step two with a separate organic-demand angle.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Re: brand coverage",
+              messageBody: "AI-only step three with a calm final note.",
+              cta: "Should I leave this here?",
+            },
+          ],
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        overallStrategy: "Fallback strategy.",
+        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+        angleRationale: "Fallback rationale.",
+        personaEmphasis: {
+          persona: "Performance Marketing",
+          emphasis: "efficiency",
+          rationale: "Owns paid brand.",
+        },
+        detectedAccountSignals: [],
+        safetyNotes: [],
+        knowledgeLimitations: [],
+      },
+    });
+
+    expect(result.steps[0].messageBody).toBe("AI-only step one with a fresh paid-brand angle.");
+    expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
+  });
+
   it("shows a specific fallback reason when OpenAI rejects the model", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",

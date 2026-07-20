@@ -56,7 +56,7 @@ const draftSafetyFlagSchema = z.object({
 });
 
 const aiDraftResponseSchema = z.object({
-  primaryContent: z.string().trim().min(1).max(5000),
+  primaryContent: z.string().trim().max(5000).optional().default(""),
   shorterAlternative: z.string().trim().max(2500).optional(),
   cta: z.string().trim().max(300).optional(),
   subjectLines: z.array(z.string().trim().max(120)).max(5).optional(),
@@ -71,10 +71,10 @@ const aiDraftResponseSchema = z.object({
     )
     .max(8)
     .optional(),
-  sourceReferences: z.array(z.string().trim().max(160)).max(20),
-  factualClaimsUsed: z.array(z.string().trim().max(500)).max(20),
-  uncertaintyNotes: z.array(z.string().trim().max(500)).max(10),
-  safetyFlags: z.array(draftSafetyFlagSchema).max(20),
+  sourceReferences: z.array(z.string().trim().max(160)).max(20).optional().default([]),
+  factualClaimsUsed: z.array(z.string().trim().max(500)).max(20).optional().default([]),
+  uncertaintyNotes: z.array(z.string().trim().max(500)).max(10).optional().default([]),
+  safetyFlags: z.array(draftSafetyFlagSchema).max(20).optional().default([]),
   changeSummary: z.string().trim().max(800).optional(),
 });
 
@@ -388,7 +388,8 @@ export class OpenAiProvider implements AiProvider {
                     safetyPolicy: request.context.safetyPolicy,
                     outputLanguageInstruction: request.context.outputLanguageInstruction,
                     outputContract: {
-                      primaryContent: "string",
+                      primaryContent:
+                        "string. Optional for BUILD_SEQUENCE when sequenceSteps are returned.",
                       shorterAlternative: "string optional",
                       cta: "string optional",
                       subjectLines: "string[] optional",
