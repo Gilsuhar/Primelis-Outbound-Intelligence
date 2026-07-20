@@ -68,6 +68,21 @@ function roundPercentages(text: string) {
   });
 }
 
+function stripSoftFiller(text: string) {
+  return text
+    .replace(/\busually where\b/gi, "where")
+    .replace(/\busually\b/gi, "often")
+    .replace(/\btends to\b/gi, "can")
+    .replace(/\bgets noisy\b/gi, "gets hard to measure")
+    .replace(/\bspend gets noisy\b/gi, "spend gets harder to control")
+    .replace(/\bdrifts?\b/gi, "increases")
+    .replace(/\bplaying out\b/gi, "showing up")
+    .replace(/\bthe tradeoff\b/gi, "the decision")
+    .replace(/\bsits in the same place\b/gi, "faces the same decision")
+    .replace(/\bcarries the same pressure\b/gi, "has the same pressure")
+    .replace(/\bunlock\b/gi, "show");
+}
+
 function stripTrailingQuestionWhenCtaExists(body: string, cta: string) {
   if (!cta.trim()) {
     return body;
@@ -77,11 +92,13 @@ function stripTrailingQuestionWhenCtaExists(body: string, cta: string) {
   if (!last?.endsWith("?")) {
     return body;
   }
-  return blocks.slice(0, -1).join("\n\n").trim() || body;
+  const withoutQuestion = last.replace(/\s*[^.!?]*\?\s*$/, "").trim();
+  const nextBlocks = withoutQuestion ? [...blocks.slice(0, -1), withoutQuestion] : blocks.slice(0, -1);
+  return nextBlocks.join("\n\n").trim() || body;
 }
 
 function cleanAiText(text: string, maxLength: number) {
-  return roundPercentages(stripFallbackPhrases(stripCommercialTerms(text)))
+  return stripSoftFiller(roundPercentages(stripFallbackPhrases(stripCommercialTerms(text))))
     .replace(/\s+\n/g, "\n")
     .trim()
     .slice(0, maxLength)

@@ -44,6 +44,17 @@ function trimSentences(text: string, maxSentences: number) {
   return sentences.slice(0, maxSentences).join(" ");
 }
 
+function sectionsFromMessage(message: string, cta: string): OutreachGeneration["emailSections"] {
+  const paragraphs = message.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  const bodyParagraphs = paragraphs.filter((paragraph) => paragraph !== cta);
+  return [
+    { label: "INTRO", text: bodyParagraphs[0] ?? message },
+    { label: "PAIN POINT", text: bodyParagraphs[1] ?? "" },
+    { label: "SOLUTION", text: bodyParagraphs.slice(2).join("\n\n") || bodyParagraphs[1] || "" },
+    { label: "SOFT CTA", text: cta },
+  ].filter((section) => section.text.trim().length > 0) as OutreachGeneration["emailSections"];
+}
+
 function stripCommercialTerms(text: string) {
   return text.replace(
     /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
@@ -387,12 +398,13 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
+        const aiCta = aiResult.cta ?? result.cta;
         return {
           ...result,
           recommendedMessage: aiResult.primaryContent,
-          emailSections: result.emailSections,
+          emailSections: sectionsFromMessage(aiResult.primaryContent, aiCta),
           shorterVersion: aiResult.shorterAlternative ?? result.shorterVersion,
-          cta: aiResult.cta ?? result.cta,
+          cta: aiCta,
           subjectLines: aiResult.subjectLines ?? result.subjectLines,
           claimsUsed: aiResult.factualClaimsUsed.length
             ? aiResult.factualClaimsUsed

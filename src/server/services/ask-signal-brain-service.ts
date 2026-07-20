@@ -332,6 +332,10 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
             NULLIF(cs."initialProblem", ''),
             NULLIF(cs."signalApproach", ''),
             CASE
+              WHEN COUNT(i.id) > 0 THEN 'Industries: ' || STRING_AGG(DISTINCT i.name, ', ')
+              ELSE NULL
+            END,
+            CASE
               WHEN COUNT(csm.id) > 0 THEN
                 'Metrics: ' || STRING_AGG(
                   DISTINCT COALESCE(
@@ -370,6 +374,8 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
+      LEFT JOIN "_CaseStudyIndustries" csi ON csi."A" = cs.id
+      LEFT JOIN "Industry" i ON i.id = csi."B"
       WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
       GROUP BY cs.id
       ORDER BY title ASC

@@ -282,7 +282,10 @@ export function CreateOutreachClient() {
 
   const displayedSubjectLines = subjectDrafts ?? result?.subjectLines ?? [];
   const displayedFullEmail =
-    fullDraft ?? result?.emailSections.map((section) => section.text).join("\n\n") ?? "";
+    fullDraft ??
+    result?.recommendedMessage ??
+    result?.emailSections.map((section) => section.text).join("\n\n") ??
+    "";
   const quality = result ? draftQuality(displayedFullEmail, result.cta, result.safetyNotes) : null;
 
   useEffect(() => {

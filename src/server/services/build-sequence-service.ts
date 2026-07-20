@@ -228,6 +228,28 @@ function isCaseStudyEligible(record: SequenceKnowledgeRecord) {
   );
 }
 
+function knowledgeRank(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
+  if (record.type !== "CASE_STUDY") {
+    return 0;
+  }
+  const haystack = `${record.title} ${record.approvedText}`.toLowerCase();
+  const industry = input.industry?.toLowerCase().trim();
+  let rank = 20;
+  if (industry && haystack.includes(industry)) {
+    rank -= 10;
+  }
+  if (/fashion|luxury/.test(industry ?? "") && /fashion|luxury|retail/.test(haystack)) {
+    rank -= 6;
+  }
+  if (/saas|software|b2b|data|lead/.test(industry ?? "") && /saas|data|lead|martech/.test(haystack)) {
+    rank -= 6;
+  }
+  if (/retail|e-?commerce|footwear/.test(industry ?? "") && /retail|e-?commerce|footwear/.test(haystack)) {
+    rank -= 6;
+  }
+  return rank;
+}
+
 function sourceReferences(records: SequenceKnowledgeRecord[]): SequenceSourceReference[] {
   const references = new Map<string, SequenceSourceReference>();
   for (const record of records) {
@@ -464,6 +486,10 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
             NULLIF(cs."initialProblem", ''),
             NULLIF(cs."signalApproach", ''),
             CASE
+              WHEN COUNT(i.id) > 0 THEN 'Industries: ' || STRING_AGG(DISTINCT i.name, ', ')
+              ELSE NULL
+            END,
+            CASE
               WHEN COUNT(csm.id) > 0 THEN
                 'Metrics: ' || STRING_AGG(
                   DISTINCT COALESCE(
@@ -501,16 +527,21 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
+      LEFT JOIN "_CaseStudyIndustries" csi ON csi."A" = cs.id
+      LEFT JOIN "Industry" i ON i.id = csi."B"
       WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
       GROUP BY cs.id
       ORDER BY title ASC
     `;
-    return rows.map(mapKnowledgeRow).filter((record) => {
-      if (record.type === "CASE_STUDY") {
-        return isCaseStudyEligible(record);
-      }
-      return isKnowledgeItemEligible(record, input);
-    });
+    return rows
+      .map(mapKnowledgeRow)
+      .filter((record) => {
+        if (record.type === "CASE_STUDY") {
+          return isCaseStudyEligible(record);
+        }
+        return isKnowledgeItemEligible(record, input);
+      })
+      .sort((a, b) => knowledgeRank(a, input) - knowledgeRank(b, input));
   }
 
   async persistDraft({

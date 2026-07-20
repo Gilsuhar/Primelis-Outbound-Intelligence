@@ -321,6 +321,10 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
             NULLIF(cs."initialProblem", ''),
             NULLIF(cs."signalApproach", ''),
             CASE
+              WHEN COUNT(i.id) > 0 THEN 'Industries: ' || STRING_AGG(DISTINCT i.name, ', ')
+              ELSE NULL
+            END,
+            CASE
               WHEN COUNT(csm.id) > 0 THEN
                 'Metrics: ' || STRING_AGG(
                   DISTINCT COALESCE(
