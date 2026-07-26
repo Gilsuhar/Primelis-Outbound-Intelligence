@@ -31,6 +31,7 @@ function knowledge(overrides: Partial<ReplyKnowledgeRecord>): ReplyKnowledgeReco
     id: "approved-product-truth",
     title: "Approved product truth",
     type: "PRODUCT_TRUTH",
+    approvalStatus: "APPROVED",
     approvedText:
       "Signal evaluates paid and organic brand search together to support efficient decisions.",
     channels: ["EMAIL", "LINKEDIN", "INTERNAL"],
@@ -41,13 +42,14 @@ function knowledge(overrides: Partial<ReplyKnowledgeRecord>): ReplyKnowledgeReco
   };
 }
 
-function persistence(records: ReplyKnowledgeRecord[]) {
+function persistence(records: ReplyKnowledgeRecord[], actorRole = "SALES_USER") {
   const persisted: Array<{
     creatorId: string;
     request: ReplyToProspectInput;
     result: Omit<ReplyToProspectResult, "draftId">;
   }> = [];
   const adapter: ReplyPersistence = {
+    getActor: async (actorId) => ({ id: actorId, role: actorRole }),
     retrieveEligibleKnowledge: async (input) =>
       records.filter(
         (record) =>
@@ -75,6 +77,11 @@ describe("Reply to Prospect service", () => {
   it("retrieves only approved eligible records supplied by the persistence boundary", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved-email" }),
+      knowledge({ id: "draft-excluded", approvalStatus: "DRAFT" }),
+      knowledge({ id: "review-excluded", approvalStatus: "NEEDS_REVIEW" }),
+      knowledge({ id: "restricted-status-excluded", approvalStatus: "RESTRICTED" }),
+      knowledge({ id: "archived-excluded", approvalStatus: "ARCHIVED" }),
+      knowledge({ id: "rejected-excluded", approvalStatus: "REJECTED" }),
       knowledge({ id: "linkedin-only", channels: ["LINKEDIN"] }),
       knowledge({ id: "restricted", usageRestrictions: "Internal only." }),
       knowledge({ id: "needs-review-excluded", sourceIds: [] }),
@@ -86,6 +93,18 @@ describe("Reply to Prospect service", () => {
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["approved-email"]);
     }
+  });
+
+  it("requires an authorized application actor before generating a reply", async () => {
+    const { adapter, persisted } = persistence([knowledge({ id: "approved" })], "VIEWER");
+
+    const result = await generateReplyToProspect(baseInput, { persistence: adapter });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("FORBIDDEN");
+    }
+    expect(persisted).toEqual([]);
   });
 
   it("enforces LinkedIn channel eligibility", async () => {

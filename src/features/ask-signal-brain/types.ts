@@ -50,6 +50,7 @@ export type SignalBrainKnowledgeRecord = {
   id: string;
   title: string;
   type: "PRODUCT_TRUTH" | "MESSAGE_EXAMPLE" | "OBJECTION" | "CASE_STUDY" | "PLAYBOOK_GUIDANCE";
+  approvalStatus?: string;
   approvedText: string;
   channels: ChannelTag[];
   usageRestrictions?: string;

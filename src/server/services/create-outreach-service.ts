@@ -131,6 +131,7 @@ function mapKnowledgeRow(row: Row): OutreachKnowledgeRecord {
     id: asString(row.id),
     title: asString(row.title),
     type: asString(row.type) as OutreachKnowledgeRecord["type"],
+    approvalStatus: asOptionalString(row.approvalStatus),
     approvedText:
       asOptionalString(row.approvedWording) ??
       asOptionalString(row.body) ??
@@ -159,6 +160,9 @@ function mapCaseStudyRow(row: Row): OutreachKnowledgeRecord {
 }
 
 function isEligible(record: OutreachKnowledgeRecord, channel: CreateOutreachInput["channel"]) {
+  if (record.approvalStatus && record.approvalStatus !== "APPROVED") {
+    return false;
+  }
   if (!record.approvedText.trim() || record.sourceIds.length === 0) {
     return false;
   }
@@ -285,6 +289,7 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
         ki.id,
         ki.title,
         ki.type,
+        ki."approvalStatus",
         ki."approvedWording",
         ki.body,
         ki.summary,
@@ -313,6 +318,7 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
       SELECT
         cs.id,
         cs.title,
+        cs."approvalStatus",
         COALESCE(
           cs."approvedExternalWording",
           CONCAT_WS(
@@ -360,7 +366,7 @@ export class PrismaCreateOutreachPersistence implements CreateOutreachPersistenc
       LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
       LEFT JOIN "SourceDocument" s ON s.id = css."B"
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
-      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
+      WHERE cs."approvalStatus" = 'APPROVED'
         AND LOWER(i.name) = LOWER(${input.industry})
       GROUP BY cs.id
       ORDER BY cs."updatedAt" DESC
@@ -462,7 +468,9 @@ export async function generateCreateOutreach(
   }
 
   const provider = dependencies.provider ?? createOutreachAiProvider();
-  const records = await persistence.retrieveEligibleKnowledge(input);
+  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
+    isEligible(record, input.channel),
+  );
   const sources = sourceReferences(records);
   const selected = selectOutreachAngle(input);
   const baseGeneration = {

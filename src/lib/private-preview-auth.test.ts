@@ -17,9 +17,21 @@ describe("private preview auth policy", () => {
   });
 
   it("keeps administration routes admin-only", () => {
-    expect(isAdminRoute("/imported-signal-review")).toBe(true);
-    expect(canAccessRoute("/imported-signal-review", "SALES_USER")).toBe(false);
-    expect(canAccessRoute("/imported-signal-review", "KNOWLEDGE_ADMIN")).toBe(true);
+    const adminRoutes = [
+      "/knowledge-library",
+      "/add-knowledge",
+      "/review-queue",
+      "/imported-signal-review",
+      "/claims/development-fixture",
+      "/do-not-contact/import",
+      "/account-research/import",
+    ];
+
+    for (const route of adminRoutes) {
+      expect(isAdminRoute(route)).toBe(true);
+      expect(canAccessRoute(route, "SALES_USER")).toBe(false);
+      expect(canAccessRoute(route, "KNOWLEDGE_ADMIN")).toBe(true);
+    }
   });
 
   it("allows sales users into sales workflows", () => {

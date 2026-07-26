@@ -39,6 +39,7 @@ const replyInputSchema = z.object({
 type Row = Record<string, unknown>;
 
 export type ReplyPersistence = {
+  getActor(actorId: string): Promise<{ id: string; role: string } | null>;
   retrieveEligibleKnowledge(input: ReplyToProspectInput): Promise<ReplyKnowledgeRecord[]>;
   persistDraft(input: {
     creatorId: string;
@@ -117,6 +118,7 @@ function mapKnowledgeRow(row: Row): ReplyKnowledgeRecord {
     id: asString(row.id),
     title: asString(row.title),
     type: asString(row.type) as ReplyKnowledgeRecord["type"],
+    approvalStatus: asOptionalString(row.approvalStatus),
     approvedText:
       asOptionalString(row.approvedWording) ??
       asOptionalString(row.body) ??
@@ -131,6 +133,9 @@ function mapKnowledgeRow(row: Row): ReplyKnowledgeRecord {
 }
 
 function isRecordEligible(record: ReplyKnowledgeRecord, channel: ReplyToProspectInput["channel"]) {
+  if (record.approvalStatus && record.approvalStatus !== "APPROVED") {
+    return false;
+  }
   if (!record.approvedText.trim() || record.sourceIds.length === 0) {
     return false;
   }
@@ -192,12 +197,24 @@ function safetyWarningsFor(input: ReplyToProspectInput, records: ReplyKnowledgeR
 export class PrismaReplyPersistence implements ReplyPersistence {
   constructor(private readonly client: MinimalPrismaClient = prisma) {}
 
+  async getActor(actorId: string) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, role
+      FROM "User"
+      WHERE id = ${actorId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    return row ? { id: asString(row.id), role: asString(row.role) } : null;
+  }
+
   async retrieveEligibleKnowledge(input: ReplyToProspectInput) {
     const rows = await this.client.$queryRaw<Row[]>`
       SELECT
         ki.id,
         ki.title,
         ki.type,
+        ki."approvalStatus",
         ki."approvedWording",
         ki.body,
         ki.summary,
@@ -281,9 +298,15 @@ export async function generateReplyToProspect(
   const input = parsed.data;
   const creatorId = input.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaReplyPersistence();
+  const actor = await persistence.getActor(creatorId);
+  if (!actor || !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role)) {
+    return err("FORBIDDEN", "Only authorized sales or knowledge users can reply to prospects.");
+  }
   const provider = dependencies.provider ?? createReplyAiProvider();
   const intents = classifyProspectMessage(input.prospectMessage);
-  const records = await persistence.retrieveEligibleKnowledge(input);
+  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
+    isRecordEligible(record, input.channel),
+  );
   const safetyWarnings = safetyWarningsFor(input, records);
   const generated = await provider.generate({ input, intents, records, safetyWarnings });
   const safeGenerated = {

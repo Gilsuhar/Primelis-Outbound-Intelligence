@@ -24,6 +24,7 @@ function knowledge(overrides: Partial<SignalBrainKnowledgeRecord>): SignalBrainK
     id: "approved-product-truth",
     title: "Approved product truth",
     type: "PRODUCT_TRUTH",
+    approvalStatus: "APPROVED",
     approvedText:
       "Signal evaluates Solo, Competitive, and Ghost branded-search scenarios by looking at paid and organic outcomes together.",
     channels: ["EMAIL", "LINKEDIN", "INTERNAL"],
@@ -55,6 +56,11 @@ describe("Ask Signal Brain service", () => {
   it("retrieves only approved eligible knowledge and returns source references", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
+      knowledge({ id: "draft-excluded", approvalStatus: "DRAFT" }),
+      knowledge({ id: "review-excluded", approvalStatus: "NEEDS_REVIEW" }),
+      knowledge({ id: "restricted-status-excluded", approvalStatus: "RESTRICTED" }),
+      knowledge({ id: "archived-excluded", approvalStatus: "ARCHIVED" }),
+      knowledge({ id: "rejected-excluded", approvalStatus: "REJECTED" }),
       knowledge({ id: "needs-review-excluded", sourceIds: [] }),
       knowledge({ id: "restricted-excluded", usageRestrictions: "Internal only." }),
     ]);

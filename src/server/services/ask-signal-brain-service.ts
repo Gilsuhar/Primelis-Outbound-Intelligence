@@ -104,6 +104,7 @@ function mapKnowledgeRow(row: Row): SignalBrainKnowledgeRecord {
     id: asString(row.id),
     title: asString(row.title),
     type: asString(row.type) as SignalBrainKnowledgeRecord["type"],
+    approvalStatus: asOptionalString(row.approvalStatus),
     approvedText:
       asOptionalString(row.approvedWording) ??
       asOptionalString(row.body) ??
@@ -125,6 +126,7 @@ function playbookRecords(): SignalBrainKnowledgeRecord[] {
       id: "playbook-icp-v1",
       title: "Signal ICP v1",
       type: "PLAYBOOK_GUIDANCE",
+      approvalStatus: "APPROVED",
       approvedText: approvedIcpSummary(),
       channels: ["INTERNAL"],
       sourceIds: ["playbook"],
@@ -135,6 +137,7 @@ function playbookRecords(): SignalBrainKnowledgeRecord[] {
       id: "playbook-personas-v1",
       title: "Signal persona framework",
       type: "PLAYBOOK_GUIDANCE",
+      approvalStatus: "APPROVED",
       approvedText: personas
         .map((persona) => `${persona.tier}: ${persona.name}. ${persona.relevance}`)
         .join(" "),
@@ -147,6 +150,9 @@ function playbookRecords(): SignalBrainKnowledgeRecord[] {
 }
 
 function isKnowledgeItemEligible(record: SignalBrainKnowledgeRecord) {
+  if (record.approvalStatus && record.approvalStatus !== "APPROVED") {
+    return false;
+  }
   if (record.type === "CASE_STUDY") {
     return record.approvedText.trim().length > 0 && record.sourceIds.length > 0;
   }
@@ -178,6 +184,7 @@ function isKnowledgeItemEligible(record: SignalBrainKnowledgeRecord) {
 function isCaseStudyEligible(record: SignalBrainKnowledgeRecord) {
   if (
     record.type !== "CASE_STUDY" ||
+    (record.approvalStatus && record.approvalStatus !== "APPROVED") ||
     !record.approvedText.trim() ||
     record.sourceIds.length === 0
   ) {
@@ -301,6 +308,7 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
         ki.id,
         ki.title,
         ki.type,
+        ki."approvalStatus",
         ki."approvedWording",
         ki.body,
         ki.summary,
@@ -324,6 +332,7 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
         cs.id,
         cs.title,
         'CASE_STUDY' AS type,
+        cs."approvalStatus",
         COALESCE(
           cs."approvedExternalWording",
           CONCAT_WS(
@@ -376,7 +385,7 @@ export class PrismaSignalBrainPersistence implements SignalBrainPersistence {
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
       LEFT JOIN "_CaseStudyIndustries" csi ON csi."A" = cs.id
       LEFT JOIN "Industry" i ON i.id = csi."B"
-      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
+      WHERE cs."approvalStatus" = 'APPROVED'
       GROUP BY cs.id
       ORDER BY title ASC
     `;

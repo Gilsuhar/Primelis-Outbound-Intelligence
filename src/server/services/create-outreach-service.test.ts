@@ -34,6 +34,7 @@ function knowledge(overrides: Partial<OutreachKnowledgeRecord>): OutreachKnowled
     id: "approved-product-truth",
     title: "Approved product truth",
     type: "PRODUCT_TRUTH",
+    approvalStatus: "APPROVED",
     approvedText:
       "Signal evaluates paid and organic brand search together to support efficient decisions.",
     channels: ["EMAIL", "LINKEDIN", "INTERNAL"],
@@ -110,6 +111,11 @@ describe("Create Outreach service", () => {
   it("retrieves only approved eligible knowledge from the persistence boundary", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
+      knowledge({ id: "draft-excluded", approvalStatus: "DRAFT" }),
+      knowledge({ id: "review-excluded", approvalStatus: "NEEDS_REVIEW" }),
+      knowledge({ id: "restricted-status-excluded", approvalStatus: "RESTRICTED" }),
+      knowledge({ id: "archived-excluded", approvalStatus: "ARCHIVED" }),
+      knowledge({ id: "rejected-excluded", approvalStatus: "REJECTED" }),
       knowledge({ id: "needs-review-excluded", sourceIds: [] }),
       knowledge({ id: "restricted-excluded", usageRestrictions: "Internal only." }),
     ]);
@@ -119,6 +125,37 @@ describe("Create Outreach service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["approved"]);
+    }
+  });
+
+  it("does not pass unapproved case-study proof to generation", async () => {
+    const { adapter } = persistence([
+      knowledge({ id: "approved" }),
+      knowledge({
+        id: "case-study-needs-review",
+        type: "CASE_STUDY",
+        approvalStatus: "NEEDS_REVIEW",
+        approvedText: "Needs-review proof must not be used.",
+      }),
+      knowledge({
+        id: "case-study-approved",
+        type: "CASE_STUDY",
+        approvalStatus: "APPROVED",
+        approvedText: "Approved case-study proof may be used.",
+      }),
+    ]);
+
+    const result = await generateCreateOutreach(
+      { ...baseInput, useCaseStudy: true },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
+        "approved",
+        "case-study-approved",
+      ]);
     }
   });
 

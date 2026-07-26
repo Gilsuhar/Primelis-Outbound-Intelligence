@@ -167,6 +167,7 @@ function mapKnowledgeRow(row: Row): SequenceKnowledgeRecord {
     id: asString(row.id),
     title: asString(row.title),
     type: asString(row.type) as SequenceKnowledgeRecord["type"],
+    approvalStatus: asOptionalString(row.approvalStatus),
     approvedText:
       asOptionalString(row.approvedWording) ??
       asOptionalString(row.body) ??
@@ -195,6 +196,9 @@ function accountStatusPersistence(persistence: BuildSequencePersistence) {
 }
 
 function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
+  if (record.approvalStatus && record.approvalStatus !== "APPROVED") {
+    return false;
+  }
   if (record.type === "CASE_STUDY") {
     return isCaseStudyEligible(record);
   }
@@ -223,6 +227,7 @@ function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSe
 function isCaseStudyEligible(record: SequenceKnowledgeRecord) {
   return (
     record.type === "CASE_STUDY" &&
+    (!record.approvalStatus || record.approvalStatus === "APPROVED") &&
     record.approvedText.trim().length > 0 &&
     record.sourceIds.length > 0
   );
@@ -488,6 +493,7 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
         ki.id,
         ki.title,
         ki.type,
+        ki."approvalStatus",
         ki."approvedWording",
         ki.body,
         ki.summary,
@@ -510,6 +516,7 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
         cs.id,
         cs.title,
         'CASE_STUDY' AS type,
+        cs."approvalStatus",
         COALESCE(
           cs."approvedExternalWording",
           CONCAT_WS(
@@ -561,7 +568,7 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
       LEFT JOIN "_CaseStudyIndustries" csi ON csi."A" = cs.id
       LEFT JOIN "Industry" i ON i.id = csi."B"
-      WHERE cs."approvalStatus" IN ('APPROVED', 'NEEDS_REVIEW')
+      WHERE cs."approvalStatus" = 'APPROVED'
       GROUP BY cs.id
       ORDER BY title ASC
     `;
@@ -678,7 +685,12 @@ export async function generateBuildSequence(
   }
 
   const provider = dependencies.provider ?? createBuildSequenceAiProvider();
-  const records = await persistence.retrieveEligibleKnowledge(input);
+  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) => {
+    if (record.type === "CASE_STUDY") {
+      return isCaseStudyEligible(record);
+    }
+    return isKnowledgeItemEligible(record, input);
+  });
   const sources = sourceReferences(records);
   const selected = selectSequenceAngle(input);
   const baseGeneration = {

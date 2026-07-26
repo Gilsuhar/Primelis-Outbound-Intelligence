@@ -36,6 +36,7 @@ export type ReplyKnowledgeRecord = {
   id: string;
   title: string;
   type: "PRODUCT_TRUTH" | "MESSAGE_EXAMPLE" | "OBJECTION" | "CASE_STUDY";
+  approvalStatus?: string;
   approvedText: string;
   channels: ChannelTag[];
   usageRestrictions?: string;
