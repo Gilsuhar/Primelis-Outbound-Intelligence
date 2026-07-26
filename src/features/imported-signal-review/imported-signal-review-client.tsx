@@ -34,6 +34,7 @@ import {
   type ChannelTag,
 } from "@/features/knowledge/types";
 import { formatEnumLabel } from "@/lib/status";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 
 const adminActor: ReviewActor = {
   id: "seed-admin-user",
@@ -126,7 +127,7 @@ export function ImportedSignalReviewClient({
         action,
       });
       if (!result.ok) {
-        setMessage(result.message);
+        setMessage(safeClientErrorMessage(result.message));
         return;
       }
       const status =
@@ -384,7 +385,7 @@ function RecordReviewPanel({
         reason: `Imported Signal review action: ${action}`,
       });
       if (!result.ok) {
-        onMessage(result.message);
+        onMessage(safeClientErrorMessage(result.message));
         return;
       }
       setRecords((current) =>

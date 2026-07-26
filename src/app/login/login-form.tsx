@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import Image from "next/image";
 
 import { continueWithGoogle, requestLoginLink, signOutAction } from "@/app/auth/actions";
@@ -17,6 +18,29 @@ const loginErrorMessages: Record<LoginErrorCode, string> = {
   oauth_failed: "We could not finish Google sign-in. Please try again.",
   oauth_start_failed: "We could not start Google sign-in. Please try again.",
 };
+
+function PendingSubmitButton({
+  children,
+  pendingLabel,
+  className,
+}: {
+  children: React.ReactNode;
+  pendingLabel: string;
+  className: string;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      aria-disabled={pending}
+      className={`${className} disabled:cursor-not-allowed disabled:opacity-60`}
+      disabled={pending}
+      type="submit"
+    >
+      {pending ? pendingLabel : children}
+    </button>
+  );
+}
 
 export function LoginForm({
   accessPending = false,
@@ -58,29 +82,28 @@ export function LoginForm({
         {accessPending ? (
           <>
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-              Ask a Knowledge Admin to add your email to the application `User` table and assign
-              either the Sales or Knowledge Admin role. Sign out and try again after access is
-              assigned.
+              Ask a Primelis workspace admin to approve this email for Signal access. Sign out and
+              try again after access is assigned.
             </div>
             <form action={signOutAction} className="mt-4">
-              <button
+              <PendingSubmitButton
                 className="w-full rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:bg-cream"
-                type="submit"
+                pendingLabel="Signing out..."
               >
                 Sign out
-              </button>
+              </PendingSubmitButton>
             </form>
           </>
         ) : (
           <div className="mt-6 space-y-5">
             <form action={continueWithGoogle}>
               <input name="next" type="hidden" value={nextPath} />
-              <button
+              <PendingSubmitButton
                 className="w-full rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#2c2d27]"
-                type="submit"
+                pendingLabel="Opening Google..."
               >
                 Continue with Google
-              </button>
+              </PendingSubmitButton>
               <p className="mt-2 text-xs leading-5 text-[#707267]">
                 Recommended for private preview access.
               </p>
@@ -116,7 +139,10 @@ export function LoginForm({
         )}
 
         {loginError ? (
-          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            role="alert"
+          >
             {loginErrorMessages[loginError]}
           </p>
         ) : null}
@@ -129,6 +155,7 @@ export function LoginForm({
                 ? "border-lime bg-lime/20 text-ink"
                 : "border-amber-200 bg-amber-50 text-amber-900",
             ].join(" ")}
+            role={state.ok ? "status" : "alert"}
           >
             {state.message}
           </p>

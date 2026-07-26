@@ -13,6 +13,7 @@ import type {
   CompanyContactImportPreview,
 } from "@/features/company-contact-enrichment/types";
 import type { UserRole } from "@/features/knowledge/types";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 
 export function CompanyContactImportClient({ role }: { role: UserRole }) {
   const [importType, setImportType] = useState<CompanyContactCsvType>("COMPANY");
@@ -48,7 +49,7 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
       });
       if (!response.ok) {
         setPreview(null);
-        setMessage(response.message);
+        setMessage(safeClientErrorMessage(response.message));
         return;
       }
       setPreview(response.data);
@@ -67,7 +68,7 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
       setMessage(
         response.ok
           ? `Import complete: ${response.data.imported} imported, ${response.data.updated} updated, ${response.data.skipped} skipped.`
-          : response.message,
+          : safeClientErrorMessage(response.message),
       );
     });
   }
@@ -98,8 +99,8 @@ export function CompanyContactImportClient({ role }: { role: UserRole }) {
           <h2 className="text-lg font-semibold text-ink">CSV import</h2>
         </div>
         <div className="mt-4 rounded-lg border border-line bg-cream px-3 py-2 text-sm leading-6 text-[#34352e]">
-          Minimum company columns: <span className="font-semibold">company_name, domain</span>.
-          If industry, size, or revenue are missing, Signal will infer a suggested industry, ICP fit,
+          Minimum company columns: <span className="font-semibold">company_name, domain</span>. If
+          industry, size, or revenue are missing, Signal will infer a suggested industry, ICP fit,
           persona, and outreach angle for review.
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">

@@ -1,19 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  Brain,
-  ExternalLink,
-  FileText,
-  Lightbulb,
-  ShieldCheck,
-} from "lucide-react";
+import { Brain, ExternalLink, FileText, Lightbulb, ShieldCheck } from "lucide-react";
 
 import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
-import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
+import {
+  WorkflowBadge,
+  WorkflowPage,
+  WorkflowSectionTitle,
+} from "@/features/workflow/workflow-layout";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type { SignalBrainMode, SignalBrainResult } from "@/features/ask-signal-brain/types";
 
@@ -173,7 +172,7 @@ export function AskSignalBrainClient() {
 
       if (!response.ok) {
         setResult(null);
-        setError(response.message);
+        setError(safeClientErrorMessage(response.message));
         return;
       }
 
@@ -193,7 +192,6 @@ export function AskSignalBrainClient() {
       eyebrow={t("workflow.eyebrow")}
       title={t("workflow.brain.title")}
     >
-
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <form
           action={onSubmit}
@@ -271,7 +269,12 @@ export function AskSignalBrainClient() {
                 options={triggerOptions}
                 textarea
               />
-              <SmartField label={t("workflow.internalNotes")} name="internalNotes" options={[]} textarea />
+              <SmartField
+                label={t("workflow.internalNotes")}
+                name="internalNotes"
+                options={[]}
+                textarea
+              />
             </div>
           </details>
 
@@ -325,9 +328,7 @@ export function AskSignalBrainClient() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm leading-6 text-[#6f6d5f]">
-                {t("workflow.brain.empty")}
-              </p>
+              <p className="text-sm leading-6 text-[#6f6d5f]">{t("workflow.brain.empty")}</p>
             )}
           </article>
 
@@ -396,7 +397,9 @@ export function AskSignalBrainClient() {
                   ))}
                 </div>
                 <details className="mt-4 rounded-xl border border-line p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">Safety</summary>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                    Safety
+                  </summary>
                   <div className="mt-3 space-y-2">
                     {result.safetyWarnings.length > 0 ? (
                       result.safetyWarnings.map((warning) => (
@@ -413,7 +416,9 @@ export function AskSignalBrainClient() {
                   </div>
                 </details>
                 <details className="mt-3 rounded-xl border border-line p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">Sources</summary>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                    Sources
+                  </summary>
                   <div className="mt-3 space-y-2">
                     {result.sourceReferences.map((source) => (
                       <p className="text-sm text-[#34352e]" key={source.id}>

@@ -20,6 +20,7 @@ import type {
 import { industries } from "@/features/playbook/playbook-content";
 import { useOutputLanguage } from "@/components/language-selector";
 import { WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 
 const yesNoUnknown: Array<{ label: string; value: YesNoUnknown }> = [
@@ -45,11 +46,7 @@ const marketOptions = [
   "Regional market",
   "Global brand",
 ];
-const revenueOptions = [
-  "$20M-$50M revenue",
-  "$50M+ revenue",
-  "Unknown",
-];
+const revenueOptions = ["$20M-$50M revenue", "$50M+ revenue", "Unknown"];
 const employeeOptions = ["100-200 employees", "200+ employees", "Enterprise team", "Unknown"];
 
 const statusFields = [
@@ -101,8 +98,7 @@ function fieldStatus(formData: FormData) {
   return Object.fromEntries(
     statusFields.map((field) => {
       const value = formData.get(field);
-      const hasSignal =
-        typeof value === "string" && value.trim().length > 0 && value !== "UNKNOWN";
+      const hasSignal = typeof value === "string" && value.trim().length > 0 && value !== "UNKNOWN";
       return [field, hasSignal ? "USER_PROVIDED" : "UNKNOWN"];
     }),
   ) as Record<string, FactStatus>;
@@ -134,15 +130,7 @@ function SelectYesNoUnknown({ name, label }: { name: string; label: string }) {
   );
 }
 
-function SmartSelect({
-  name,
-  label,
-  options,
-}: {
-  name: string;
-  label: string;
-  options: string[];
-}) {
+function SmartSelect({ name, label, options }: { name: string; label: string; options: string[] }) {
   const [value, setValue] = useState("");
   const [custom, setCustom] = useState("");
   const isCustom = value === "__custom";
@@ -236,7 +224,7 @@ export function AccountResearchClient() {
 
       if (!response.ok) {
         setResult(null);
-        setError(response.message);
+        setError(safeClientErrorMessage(response.message));
         return;
       }
       setResult(response.data);
@@ -252,7 +240,7 @@ export function AccountResearchClient() {
       });
       if (!response.ok) {
         setResearch(null);
-        setError(response.message);
+        setError(safeClientErrorMessage(response.message));
         return;
       }
       setResearch(response.data);
@@ -279,7 +267,7 @@ export function AccountResearchClient() {
       });
       if (!response.ok) {
         setEnrichment(null);
-        setError(response.message);
+        setError(safeClientErrorMessage(response.message));
         return;
       }
       setEnrichment(response.data);
@@ -292,7 +280,6 @@ export function AccountResearchClient() {
       eyebrow={t("workflow.eyebrow")}
       title={t("account.title")}
     >
-
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <form
           action={onSubmit}
@@ -350,7 +337,11 @@ export function AccountResearchClient() {
                 options={marketOptions}
               />
               <SmartSelect label="ICP" name="revenueContext" options={revenueOptions} />
-              <SmartSelect label={t("account.employeeContext")} name="employeeContext" options={employeeOptions} />
+              <SmartSelect
+                label={t("account.employeeContext")}
+                name="employeeContext"
+                options={employeeOptions}
+              />
               <label className="block space-y-1 text-sm font-medium text-[#34352e]">
                 {t("account.companyType")}
                 <select
@@ -458,22 +449,22 @@ export function AccountResearchClient() {
               Advanced tools
             </summary>
             <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              className="signal-button-secondary"
-              disabled={isPending}
-              formAction={runWebsiteResearch}
-              type="submit"
-            >
-              Research company website
-            </button>
-            <button
-              className="signal-button-secondary"
-              disabled={isPending}
-              formAction={runProviderEnrichment}
-              type="submit"
-            >
-              Enrich company and contacts
-            </button>
+              <button
+                className="signal-button-secondary"
+                disabled={isPending}
+                formAction={runWebsiteResearch}
+                type="submit"
+              >
+                Research company website
+              </button>
+              <button
+                className="signal-button-secondary"
+                disabled={isPending}
+                formAction={runProviderEnrichment}
+                type="submit"
+              >
+                Enrich company and contacts
+              </button>
             </div>
           </details>
         </form>

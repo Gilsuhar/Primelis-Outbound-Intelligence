@@ -15,6 +15,7 @@ import type {
   RefinementCommand,
   RefinementWorkflow,
 } from "@/features/draft-refinement/types";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 
 const quickCommands: Array<{ label: string; command: RefinementCommand }> = [
   { label: "Generate again", command: "REGENERATE" },
@@ -85,8 +86,14 @@ function localPreviewForCommand(content: string, command: RefinementCommand, fee
     return formatted
       .replace(/Do you already track this today\?/gi, "Do you already have a way to detect that?")
       .replace(/Worth a quick compare\??/gi, "Do you have visibility into when this happens?")
-      .replace(/Worth comparing how you decide this today\?/gi, "Is this already part of your paid-brand review?")
-      .replace(/Would a simple view of this be useful\?/gi, "Is this something your team already checks regularly?");
+      .replace(
+        /Worth comparing how you decide this today\?/gi,
+        "Is this already part of your paid-brand review?",
+      )
+      .replace(
+        /Would a simple view of this be useful\?/gi,
+        "Is this something your team already checks regularly?",
+      );
   }
   if (command === "LESS_SALESY") {
     return formatted
@@ -99,7 +106,10 @@ function localPreviewForCommand(content: string, command: RefinementCommand, fee
     return `${formatted}\n\nRevision note: ${feedback.trim()}`;
   }
   return formatted
-    .replace(/branded search can look healthy in reports/gi, "branded search can look efficient in reports")
+    .replace(
+      /branded search can look healthy in reports/gi,
+      "branded search can look efficient in reports",
+    )
     .replace(/Do you already track this today\?/gi, "Do you already have a way to detect that?");
 }
 
@@ -130,7 +140,7 @@ export function DraftRefinementPanel({
       });
       if (!active) return;
       if (!response.ok) {
-        setMessage(response.message);
+        setMessage(safeClientErrorMessage(response.message));
         return;
       }
       setResult(response.data);
@@ -162,7 +172,9 @@ export function DraftRefinementPanel({
         customFeedback: customFeedback || undefined,
       });
       if (!response.ok) {
-        setMessage(`Preview updated locally. Server save failed: ${response.message}`);
+        setMessage(
+          `Preview updated locally. Server save failed: ${safeClientErrorMessage(response.message)}`,
+        );
         return;
       }
       setResult(response.data);
@@ -182,7 +194,7 @@ export function DraftRefinementPanel({
         editedContent: manualContent,
       });
       if (!response.ok) {
-        setMessage(response.message);
+        setMessage(safeClientErrorMessage(response.message));
         return;
       }
       setResult(response.data as DraftRefinementResult);
@@ -199,7 +211,7 @@ export function DraftRefinementPanel({
         versionId: version.id,
       });
       if (!response.ok) {
-        setMessage(response.message);
+        setMessage(safeClientErrorMessage(response.message));
         return;
       }
       setResult(response.data as DraftRefinementResult);
@@ -274,9 +286,7 @@ export function DraftRefinementPanel({
             <Wand2 aria-hidden="true" className="h-4 w-4 text-olive" />
             Live editable preview
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#34352e]">
-            {livePreview}
-          </p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#34352e]">{livePreview}</p>
         </div>
       ) : null}
 
@@ -349,7 +359,6 @@ export function DraftRefinementPanel({
           </div>
         </details>
       ) : null}
-
     </section>
   );
 }

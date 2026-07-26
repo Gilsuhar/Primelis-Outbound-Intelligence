@@ -58,14 +58,27 @@ export function DoNotContactClient({ records }: { records: DoNotContactRecord[] 
             {translateUi("dnc.emptyDescription", language)}
           </p>
         </section>
+      ) : results.length === 0 ? (
+        <section className="rounded-2xl border border-line bg-white p-6 text-center">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-lime text-ink">
+            <Search aria-hidden="true" className="h-6 w-6" />
+          </span>
+          <h2 className="mt-4 text-xl font-semibold text-ink">No matching account found</h2>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#6f6d5f]">
+            Try another company name or domain. This search only checks the available suppression
+            records.
+          </p>
+        </section>
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {results.map(({ record, blocked, label }) => (
             <article className="rounded-2xl border border-line bg-white p-5" key={record.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-ink">{record.companyName}</h2>
-                  <p className="text-sm text-[#6f6d5f]">
+                <div className="min-w-0">
+                  <h2 className="break-words text-lg font-semibold text-ink">
+                    {record.companyName}
+                  </h2>
+                  <p className="break-words text-sm text-[#6f6d5f]">
                     {record.domain ?? translateUi("dnc.domainMissing", language)}
                   </p>
                 </div>

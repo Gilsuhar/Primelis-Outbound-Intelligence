@@ -8,7 +8,12 @@ import { useOutputLanguage } from "@/components/language-selector";
 import { AccountStatusPanel } from "@/features/account-status/account-status-panel";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
-import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
+import {
+  WorkflowBadge,
+  WorkflowPage,
+  WorkflowSectionTitle,
+} from "@/features/workflow/workflow-layout";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   CreateOutreachResult,
@@ -43,7 +48,13 @@ const buyerRoleOptions = personas
   .map((persona) => persona.name)
   .filter((name) => name !== "Brand Marketing or Brand Leadership");
 
-const marketOptions = ["United States", "US and Europe", "Multi-country", "Regional market", "Global brand"];
+const marketOptions = [
+  "United States",
+  "US and Europe",
+  "Multi-country",
+  "Regional market",
+  "Global brand",
+];
 
 const paidSearchOptions = [
   "Runs branded-search ads",
@@ -53,7 +64,14 @@ const paidSearchOptions = [
   "Unknown; ask discovery question",
 ];
 
-const vendorOptions = ["Adthena", "Revvim", "Auction Insights", "Google Ads only", "Agency-managed setup", "Unknown"];
+const vendorOptions = [
+  "Adthena",
+  "Revvim",
+  "Auction Insights",
+  "Google Ads only",
+  "Agency-managed setup",
+  "Unknown",
+];
 
 const triggerOptions = [
   "Validate branded-search activity",
@@ -114,11 +132,19 @@ function countMatches(text: string, pattern: RegExp) {
 }
 
 function usedDeterministicFallback(notes: string[]) {
-  return notes.some((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(note));
+  return notes.some((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(
+      note,
+    ),
+  );
 }
 
 function fallbackReason(notes: string[]) {
-  return notes.find((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(note));
+  return notes.find((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(
+      note,
+    ),
+  );
 }
 
 function providerLabel(result: CreateOutreachResult) {
@@ -155,7 +181,11 @@ function draftQuality(fullEmail: string, cta: string, safetyNotes: string[] = []
     wins.push("No obvious keyword repetition.");
   }
 
-  if (!/(organic|unnecessary spend|wasted spend|not changing the outcome|incremental|lower bids|pause)/i.test(text)) {
+  if (
+    !/(organic|unnecessary spend|wasted spend|not changing the outcome|incremental|lower bids|pause)/i.test(
+      text,
+    )
+  ) {
     issues.push("Needs a clearer buyer pain: organic capture, wasted spend, or bid control.");
   } else {
     wins.push("Has a clear buyer pain.");
@@ -219,7 +249,12 @@ function OptionalSelect({
           value={custom}
         />
       ) : null}
-      <input name={name} required={required} type="hidden" value={isCustom ? custom : selectedValue} />
+      <input
+        name={name}
+        required={required}
+        type="hidden"
+        value={isCustom ? custom : selectedValue}
+      />
     </label>
   );
 }
@@ -336,7 +371,7 @@ export function CreateOutreachClient() {
             ? `${response.message} Click "Continue with override" above, then generate again.`
             : response.code === "VALIDATION_ERROR"
               ? "Add a company name, then generate again. The other fields can be filled automatically."
-              : response.message,
+              : safeClientErrorMessage(response.message),
         );
         return;
       }
@@ -370,7 +405,6 @@ export function CreateOutreachClient() {
       eyebrow={t("workflow.eyebrow")}
       title={t("workflow.create.title")}
     >
-
       <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <form
           action={onSubmit}
@@ -686,27 +720,33 @@ export function CreateOutreachClient() {
                   <details className="rounded-lg border border-line bg-white p-3">
                     <summary className="cursor-pointer list-none">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-ink">Draft quality</p>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          quality.issues.length === 0
-                            ? "bg-[#eef8ed] text-[#2f6f3a]"
-                            : "bg-[#fff7e8] text-[#8a5a2b]"
-                        }`}
-                      >
-                        {quality.status}
-                      </span>
+                        <p className="text-sm font-semibold text-ink">Draft quality</p>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            quality.issues.length === 0
+                              ? "bg-[#eef8ed] text-[#2f6f3a]"
+                              : "bg-[#fff7e8] text-[#8a5a2b]"
+                          }`}
+                        >
+                          {quality.status}
+                        </span>
                       </div>
                     </summary>
                     <div className="mt-3 grid gap-2">
                       {quality.issues.length > 0
                         ? quality.issues.map((issue) => (
-                            <p className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]" key={issue}>
+                            <p
+                              className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]"
+                              key={issue}
+                            >
                               {issue}
                             </p>
                           ))
                         : quality.wins.map((win) => (
-                            <p className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]" key={win}>
+                            <p
+                              className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]"
+                              key={win}
+                            >
                               {win}
                             </p>
                           ))}
@@ -715,9 +755,7 @@ export function CreateOutreachClient() {
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm leading-6 text-stone-600">
-                {t("workflow.create.empty")}
-              </p>
+              <p className="text-sm leading-6 text-stone-600">{t("workflow.create.empty")}</p>
             )}
           </article>
 

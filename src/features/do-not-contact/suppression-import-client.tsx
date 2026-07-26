@@ -8,6 +8,7 @@ import {
   previewSuppressionImportAction,
 } from "@/app/do-not-contact/import/actions";
 import type { UserRole } from "@/features/knowledge/types";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import type { SuppressionImportMode, SuppressionImportPreview } from "./import-types";
 
 export function SuppressionImportClient({ role }: { role: UserRole }) {
@@ -38,7 +39,7 @@ export function SuppressionImportClient({ role }: { role: UserRole }) {
       const response = await previewSuppressionImportAction({ csvText, filename, mode });
       if (!response.ok) {
         setPreview(null);
-        setMessage(response.message);
+        setMessage(safeClientErrorMessage(response.message));
         return;
       }
       setPreview(response.data);
@@ -52,7 +53,7 @@ export function SuppressionImportClient({ role }: { role: UserRole }) {
       setMessage(
         response.ok
           ? `Import complete: ${response.data.imported} imported, ${response.data.updated} updated.`
-          : response.message,
+          : safeClientErrorMessage(response.message),
       );
     });
   }

@@ -41,8 +41,9 @@ function NavigationSection({
 
           return (
             <Link
+              aria-current={isActive ? "page" : undefined}
               className={[
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
+                "flex min-w-0 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
                 isActive
                   ? "bg-lime text-ink"
                   : muted
@@ -53,11 +54,48 @@ function NavigationSection({
               key={item.href}
             >
               <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <span>{translateNavigationLabel(item.label, language)}</span>
+              <span className="min-w-0 truncate">
+                {translateNavigationLabel(item.label, language)}
+              </span>
             </Link>
           );
         })}
       </nav>
+    </div>
+  );
+}
+
+function ViewerAccountPanel({
+  role,
+  email,
+  language,
+}: {
+  role: UserRole;
+  email: string;
+  language: ReturnType<typeof useOutputLanguage>;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
+        <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-olive" />
+        <span className="min-w-0 truncate">
+          {role === "KNOWLEDGE_ADMIN"
+            ? translateUi("shell.adminView", language)
+            : translateUi("shell.salesView", language)}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-[#6f6d5f]">
+        <span className="min-w-0 truncate">{email}</span>
+        <form action={signOutAction}>
+          <button
+            aria-label="Sign out"
+            className="rounded-full p-1 text-olive transition hover:bg-cream hover:text-ink"
+            type="submit"
+          >
+            <LogOut aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -98,25 +136,8 @@ export function AppShell({
               <span className="block truncate text-lg font-semibold text-ink">Signal</span>
             </span>
           </Link>
-          <div className="hidden flex-col gap-2 sm:flex lg:mt-5">
-            <div className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-[#6f6d5f]">
-              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-olive" />
-              {role === "KNOWLEDGE_ADMIN"
-                ? translateUi("shell.adminView", language)
-                : translateUi("shell.salesView", language)}
-            </div>
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-[#6f6d5f]">
-              <span className="min-w-0 truncate">{viewer.email}</span>
-              <form action={signOutAction}>
-                <button
-                  aria-label="Sign out"
-                  className="rounded-full p-1 text-olive transition hover:bg-cream hover:text-ink"
-                  type="submit"
-                >
-                  <LogOut aria-hidden="true" className="h-4 w-4" />
-                </button>
-              </form>
-            </div>
+          <div className="hidden sm:flex lg:mt-5">
+            <ViewerAccountPanel role={role} email={viewer.email} language={language} />
           </div>
         </div>
 
@@ -142,6 +163,9 @@ export function AppShell({
                 muted
               />
             ) : null}
+            <div className="border-t border-line pt-4 sm:hidden">
+              <ViewerAccountPanel role={role} email={viewer.email} language={language} />
+            </div>
           </div>
         </details>
 

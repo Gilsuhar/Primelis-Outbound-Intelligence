@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  FileText,
-  MessageSquareReply,
-  ShieldCheck,
-} from "lucide-react";
+import { FileText, MessageSquareReply, ShieldCheck } from "lucide-react";
 
 import { generateReplyToProspectAction } from "@/app/reply-to-prospect/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { personas } from "@/features/playbook/playbook-content";
-import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
+import {
+  WorkflowBadge,
+  WorkflowPage,
+  WorkflowSectionTitle,
+} from "@/features/workflow/workflow-layout";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   ReplyChannel,
@@ -38,11 +39,19 @@ const buyerRoleOptions = personas
   .filter((name) => name !== "Brand Marketing or Brand Leadership");
 
 function usedDeterministicFallback(notes: string[]) {
-  return notes.some((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(note));
+  return notes.some((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(
+      note,
+    ),
+  );
 }
 
 function fallbackReason(notes: string[]) {
-  return notes.find((note) => /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(note));
+  return notes.find((note) =>
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(
+      note,
+    ),
+  );
 }
 
 function providerLabel(result: ReplyToProspectResult) {
@@ -135,7 +144,7 @@ export function ReplyToProspectClient() {
 
       if (!response.ok) {
         setResult(null);
-        setError(response.message);
+        setError(safeClientErrorMessage(response.message));
         return;
       }
 
@@ -155,7 +164,6 @@ export function ReplyToProspectClient() {
       eyebrow={t("workflow.eyebrow")}
       title={t("workflow.reply.title")}
     >
-
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <form
           action={onSubmit}
@@ -333,9 +341,7 @@ export function ReplyToProspectClient() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm leading-6 text-stone-600">
-                {t("workflow.reply.empty")}
-              </p>
+              <p className="text-sm leading-6 text-stone-600">{t("workflow.reply.empty")}</p>
             )}
           </article>
 

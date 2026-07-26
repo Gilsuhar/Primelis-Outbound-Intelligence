@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Ban, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 
 import { checkAccountStatusAction } from "@/app/account-status/actions";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import type { AccountStatusResult } from "./types";
 
 type AccountStatusPanelProps = {
@@ -72,7 +73,7 @@ export function AccountStatusPanel({
         });
         if (requestIdRef.current !== requestId) return;
         if (!response.ok) {
-          setMessage(response.message);
+          setMessage(safeClientErrorMessage(response.message));
           return;
         }
         setStatus(response.data);
@@ -126,7 +127,9 @@ export function AccountStatusPanel({
             {status.domain ? <span>Domain: {status.domain}</span> : null}
             {status.owner ? <span>Owner: {status.owner}</span> : null}
             {status.stage ? <span>Status: {status.stage}</span> : null}
-            {status.lastActivity ? <span>Last activity: {status.lastActivity.slice(0, 10)}</span> : null}
+            {status.lastActivity ? (
+              <span>Last activity: {status.lastActivity.slice(0, 10)}</span>
+            ) : null}
             {status.reason ? <span>Reason: {status.reason}</span> : null}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">

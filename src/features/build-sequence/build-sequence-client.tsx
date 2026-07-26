@@ -21,7 +21,12 @@ import { AccountStatusPanel } from "@/features/account-status/account-status-pan
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
-import { WorkflowBadge, WorkflowPage, WorkflowSectionTitle } from "@/features/workflow/workflow-layout";
+import {
+  WorkflowBadge,
+  WorkflowPage,
+  WorkflowSectionTitle,
+} from "@/features/workflow/workflow-layout";
+import { safeClientErrorMessage } from "@/lib/ui-errors";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   BuildSequenceResult,
@@ -337,7 +342,10 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
   const wins: string[] = [];
   const subjects = steps.map((step) => normalizedLine(step.subjectLine ?? "")).filter(Boolean);
   const ctas = steps.map((step) => normalizedLine(step.cta ?? "")).filter(Boolean);
-  const bodyText = steps.map((step) => step.messageBody).join("\n").toLowerCase();
+  const bodyText = steps
+    .map((step) => step.messageBody)
+    .join("\n")
+    .toLowerCase();
   const uniquePurposes = new Set(steps.map((step) => step.purpose));
 
   if (usedDeterministicFallback(safetyNotes)) {
@@ -357,11 +365,15 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
   }
 
   if ((bodyText.match(/\bcompare|comparing\b/g)?.length ?? 0) > 2) {
-    issues.push("The sequence leans too hard on compare. Swap one CTA for detect, check, or automate.");
+    issues.push(
+      "The sequence leans too hard on compare. Swap one CTA for detect, check, or automate.",
+    );
   }
 
   if ((bodyText.match(/\bbrand(ed)? search\b/g)?.length ?? 0) > 8) {
-    issues.push("Brand-search wording repeats a lot. Add one line about organic demand or bid control.");
+    issues.push(
+      "Brand-search wording repeats a lot. Add one line about organic demand or bid control.",
+    );
   }
 
   if (uniquePurposes.size >= Math.min(steps.length, 3)) {
@@ -370,7 +382,11 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
     issues.push("Steps are not distinct enough. Regenerate one body or CTA.");
   }
 
-  if (steps.some((step) => step.purpose === "BREAKUP_CLOSE_LOOP" || step.purpose === "LOW_PRESSURE_FOLLOW_UP")) {
+  if (
+    steps.some(
+      (step) => step.purpose === "BREAKUP_CLOSE_LOOP" || step.purpose === "LOW_PRESSURE_FOLLOW_UP",
+    )
+  ) {
     wins.push("Includes a low-pressure close.");
   }
 
@@ -387,9 +403,7 @@ function formString(formData: FormData, name: string) {
 }
 
 function missingQuickBriefFields(formData: FormData) {
-  return [
-    ["companyName", "Company"],
-  ]
+  return [["companyName", "Company"]]
     .filter(([name]) => !formString(formData, name))
     .map(([, label]) => label);
 }
@@ -502,9 +516,9 @@ export function BuildSequenceClient() {
   const [stepSubjectDrafts, setStepSubjectDrafts] = useState<Record<number, string>>({});
   const [stepCtaDrafts, setStepCtaDrafts] = useState<Record<number, string>>({});
   const [stepBodyVariantIndexes, setStepBodyVariantIndexes] = useState<Record<number, number>>({});
-  const [stepSubjectVariantIndexes, setStepSubjectVariantIndexes] = useState<Record<number, number>>(
-    {},
-  );
+  const [stepSubjectVariantIndexes, setStepSubjectVariantIndexes] = useState<
+    Record<number, number>
+  >({});
   const [stepCtaVariantIndexes, setStepCtaVariantIndexes] = useState<Record<number, number>>({});
   const [hubSpotStatus, setHubSpotStatus] = useState<{
     state: "idle" | "sending" | "success" | "error";
@@ -557,7 +571,10 @@ export function BuildSequenceClient() {
 
   function regenerateSubject(step: SequenceStep) {
     const variants = subjectVariants(step, companyName || "this account");
-    const nextIndex = variantIndex(stepSubjectVariantIndexes[step.stepNumber] ?? -1, variants.length);
+    const nextIndex = variantIndex(
+      stepSubjectVariantIndexes[step.stepNumber] ?? -1,
+      variants.length,
+    );
     setStepSubjectVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepSubjectDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
   }
@@ -591,15 +608,18 @@ export function BuildSequenceClient() {
         contactFirstName: formString(formData, "contactFirstName") || undefined,
         contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
         industry: formString(formData, "industry") || undefined,
-        companyContext: formString(formData, "companyContext") || "Potential fit - validate spend/demand",
+        companyContext:
+          formString(formData, "companyContext") || "Potential fit - validate spend/demand",
         geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
         paidSearchContext: formString(formData, "paidSearchContext") || undefined,
         currentVendor: formString(formData, "currentVendor") || undefined,
-        observedTrigger: formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
+        observedTrigger:
+          formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
         primaryChannel,
         sequenceLength,
         desiredTone: tone,
-        desiredOverallDuration: formString(formData, "desiredOverallDuration") || "12 business days",
+        desiredOverallDuration:
+          formString(formData, "desiredOverallDuration") || "12 business days",
         outputLanguage,
         accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
         internalNotes: formString(formData, "internalNotes") || undefined,
@@ -610,7 +630,7 @@ export function BuildSequenceClient() {
         setError(
           response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED"
             ? `${response.message} Click "Continue with override" above, then build again.`
-            : response.message,
+            : safeClientErrorMessage(response.message),
         );
         if (response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED") {
           setAccountStatusRefreshKey((current) => current + 1);
@@ -644,7 +664,7 @@ export function BuildSequenceClient() {
       });
 
       if (!response.ok) {
-        setHubSpotStatus({ state: "error", message: response.message });
+        setHubSpotStatus({ state: "error", message: safeClientErrorMessage(response.message) });
         return;
       }
 
@@ -667,7 +687,6 @@ export function BuildSequenceClient() {
       eyebrow={t("workflow.eyebrow")}
       title={t("workflow.sequence.title")}
     >
-
       <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <form
           action={onSubmit}
@@ -780,7 +799,11 @@ export function BuildSequenceClient() {
                 name="observedTrigger"
                 options={triggerOptions}
               />
-              <SmartField label={t("workflow.currentVendor")} name="currentVendor" options={vendorOptions} />
+              <SmartField
+                label={t("workflow.currentVendor")}
+                name="currentVendor"
+                options={vendorOptions}
+              />
               <SmartField
                 label={t("workflow.paidSearchContext")}
                 name="paidSearchContext"
@@ -799,7 +822,12 @@ export function BuildSequenceClient() {
                 </select>
               </label>
               <div className="sm:col-span-2">
-                <SmartField label={t("workflow.internalNotes")} name="internalNotes" options={[]} textarea />
+                <SmartField
+                  label={t("workflow.internalNotes")}
+                  name="internalNotes"
+                  options={[]}
+                  textarea
+                />
               </div>
             </div>
           </details>
@@ -876,12 +904,18 @@ export function BuildSequenceClient() {
                     <div className="mt-3 grid gap-2">
                       {quality.issues.length > 0
                         ? quality.issues.map((issue) => (
-                            <p className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]" key={issue}>
+                            <p
+                              className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]"
+                              key={issue}
+                            >
                               {issue}
                             </p>
                           ))
                         : quality.wins.map((win) => (
-                            <p className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]" key={win}>
+                            <p
+                              className="rounded-md bg-[#eef8ed] px-3 py-2 text-sm text-[#2f6f3a]"
+                              key={win}
+                            >
                               {win}
                             </p>
                           ))}
@@ -890,9 +924,7 @@ export function BuildSequenceClient() {
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm leading-6 text-stone-600">
-                {t("workflow.sequence.empty")}
-              </p>
+              <p className="text-sm leading-6 text-stone-600">{t("workflow.sequence.empty")}</p>
             )}
             <div className="mt-4 rounded-md border border-line bg-[#f8f5ef] p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
