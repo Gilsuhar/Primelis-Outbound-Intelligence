@@ -57,6 +57,19 @@ export function validateDraftSafety(text: string): DraftSafetyFlag[] {
       status: "Restricted",
     },
     {
+      pattern: /\$\s?\d|\b\d+k\/month\b|\b\d+\s?(?:usd|dollars)\b/gi,
+      reason: "Specific commercial figures must not be introduced during refinement.",
+      replacement: "commercial scope",
+      status: "Restricted",
+    },
+    {
+      pattern:
+        /\b(attached|enclosed|calendar link|meeting is booked|we are scheduled|as agreed for our meeting)\b/gi,
+      reason: "Attachments, calendar links, and meeting commitments must not be invented.",
+      replacement: "I can send the relevant material if useful",
+      status: "Unsupported",
+    },
+    {
       pattern: /\bguarantee(?:d|s)?\b|\balways\b|\bwithout affecting conversions\b/gi,
       reason: "Guarantees and universal outcomes are unsupported.",
       replacement: "may help evaluate the opportunity with evidence",

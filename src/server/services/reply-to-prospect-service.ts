@@ -13,6 +13,10 @@ import {
   type ReplyToProspectInput,
   type ReplyToProspectResult,
 } from "@/features/reply-to-prospect/types";
+import {
+  classifyReplyIntent,
+  validateReplyOutput,
+} from "@/features/reply-to-prospect/reply-intelligence";
 import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
@@ -22,7 +26,7 @@ import {
   createInitialDraftVersion,
   PrismaDraftVersionPersistence,
 } from "./draft-versioning-service";
-import { detectConversationStage, lastProspectTurn } from "./reply-conversation-stage";
+import { detectConversationStage } from "./reply-conversation-stage";
 import { err, ok } from "./result";
 
 const replyInputSchema = z.object({
@@ -90,34 +94,13 @@ function containsInternalPromptLabels(text: string) {
 }
 
 export function classifyProspectMessage(message: string): ProspectIntent[] {
-  const text = lastProspectTurn(message).toLowerCase();
-  const intents = new Set<ProspectIntent>();
-
-  if (/\b(adthena|revvim|vendor|tool|platform|already use|current provider)\b/.test(text)) {
-    intents.add("EXISTING_VENDOR");
-  }
-  if (/\b(api|technical|integrat|data|how does|setup|implementation)\b/.test(text)) {
-    intents.add("TECHNICAL_QUESTION");
-  }
-  if (/\b(not interested|no thanks|happy with|too busy|not a priority)\b/.test(text)) {
-    intents.add("NOT_INTERESTED");
-  }
-  if (/\b(cost|expensive|budget|why|concern|objection)\b/.test(text)) {
-    intents.add("OBJECTION");
-  }
-  if (/\b(next quarter|later|timing|now|when|timeline)\b/.test(text)) {
-    intents.add("TIMING");
-  }
-  if (/\b(deck|slides|overview|one pager|send info)\b/.test(text)) {
-    intents.add("DECK_REQUEST");
-  }
-  if (
-    /\b(methodology|measure|measurement|incremental|organic|paid search|brand search|branded ads|branded search|how do you handle)\b/.test(text)
-  ) {
-    intents.add("METHODOLOGY_QUESTION");
-  }
-
-  return intents.size > 0 ? Array.from(intents) : ["UNCLEAR_REQUEST"];
+  const analysis = classifyReplyIntent({
+    prospectMessage: message,
+    channel: "EMAIL",
+    desiredTone: "CONSULTATIVE",
+    desiredLength: "STANDARD",
+  });
+  return Array.from(new Set([analysis.primaryIntent, ...analysis.secondaryIntents]));
 }
 
 function mapKnowledgeRow(row: Row): ReplyKnowledgeRecord {
@@ -193,18 +176,25 @@ function safetyWarningsFor(input: ReplyToProspectInput, records: ReplyKnowledgeR
   }
   const stage = detectConversationStage(input.prospectMessage);
   if (stage.deckRequestIsOld) {
-    warnings.add("Conversation history shows the deck was already sent; do not offer to send it again.");
+    warnings.add(
+      "Conversation history shows the deck was already sent; do not offer to send it again.",
+    );
   }
   if (stage.pricingAlreadyAnswered) {
-    warnings.add("Conversation history shows commercials were already answered; reply should move toward feedback or a walkthrough.");
+    warnings.add(
+      "Conversation history shows commercials were already answered; reply should move toward feedback or a walkthrough.",
+    );
   }
   return Array.from(warnings);
 }
 
-function validateReplyGeneration(result: {
-  recommendedReply: string;
-  shorterAlternative: string;
-}) {
+function validateReplyGeneration(
+  result: {
+    recommendedReply: string;
+    shorterAlternative: string;
+  },
+  analysis?: ReturnType<typeof classifyReplyIntent>,
+) {
   const publicOutput = `${result.recommendedReply}\n${result.shorterAlternative}`;
   if (result.recommendedReply.trim().length < 10) {
     return false;
@@ -213,6 +203,9 @@ function validateReplyGeneration(result: {
     return false;
   }
   if (containsInternalPromptLabels(publicOutput)) {
+    return false;
+  }
+  if (analysis && !validateReplyOutput(result, analysis).ok) {
     return false;
   }
   return true;
@@ -390,7 +383,10 @@ export async function generateReplyToProspect(
     return err("FORBIDDEN", "Only authorized sales or knowledge users can reply to prospects.");
   }
   const provider = dependencies.provider ?? createReplyAiProvider();
-  const intents = classifyProspectMessage(input.prospectMessage);
+  const replyAnalysis = classifyReplyIntent(input);
+  const intents = Array.from(
+    new Set([replyAnalysis.primaryIntent, ...replyAnalysis.secondaryIntents]),
+  );
   const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
     isRecordEligible(record, input.channel),
   );
@@ -398,8 +394,14 @@ export async function generateReplyToProspect(
     workflow: "REPLY_TO_PROSPECT",
     companyName: input.companyName,
     contactRole: input.contactRole,
-    question: input.prospectMessage,
-    conversation: input.contextNotes,
+    question: replyAnalysis.latestProspectMessage,
+    conversation: [
+      ...replyAnalysis.priorProspectMessages,
+      ...replyAnalysis.priorSellerMessages,
+      input.contextNotes,
+    ]
+      .filter(Boolean)
+      .join("\n"),
     requestedProof: replyRequestsProof(input, intents),
   });
   const records = proofSelection.records as ReplyKnowledgeRecord[];
@@ -407,6 +409,7 @@ export async function generateReplyToProspect(
   const generated = await provider.generate({
     input,
     intents,
+    replyAnalysis,
     records,
     safetyWarnings: [...safetyWarnings, ...proofSelection.notes],
   });
@@ -420,7 +423,7 @@ export async function generateReplyToProspect(
     ) as ProspectIntent[],
     safetyWarnings: Array.from(new Set([...generated.safetyWarnings, ...proofSelection.notes])),
   };
-  if (!validateReplyGeneration(safeGenerated)) {
+  if (!validateReplyGeneration(safeGenerated, replyAnalysis)) {
     return err("GENERATION_REJECTED", "Generated reply failed safety or quality validation.");
   }
   const proofValidation = validateProofUsage({

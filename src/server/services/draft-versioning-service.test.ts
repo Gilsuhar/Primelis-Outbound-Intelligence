@@ -141,6 +141,23 @@ describe("Phase N draft provider and versioning", () => {
     expect(flags.map((flag) => flag.status)).toContain("Unsupported");
   });
 
+  it("flags exact commercial figures and invented follow-up commitments", () => {
+    const flags = validateDraftSafety(
+      "The plan is $25K/month. I attached the deck, sent a calendar link, and our meeting is booked.",
+    );
+
+    expect(flags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: "Restricted" }),
+        expect.objectContaining({ status: "Unsupported" }),
+      ]),
+    );
+    expect(flags.map((flag) => flag.reason).join(" ")).toMatch(/specific commercial figures/i);
+    expect(flags.map((flag) => flag.reason).join(" ")).toMatch(
+      /attachments, calendar links, and meeting commitments/i,
+    );
+  });
+
   it("creates a new version for shorten and preserves the original parent relationship", async () => {
     const store = persistence({ versions: [version()] });
     const result = await refineDraftVersion(
@@ -190,7 +207,9 @@ describe("Phase N draft provider and versioning", () => {
     expect(changedCta.ok).toBe(true);
     if (!lessSalesy.ok || !changedCta.ok) return;
     expect(lessSalesy.data.currentVersion.generatedContent).not.toBe(original);
-    expect(lessSalesy.data.currentVersion.generatedContent).toMatch(/unnecessary spend|short check/i);
+    expect(lessSalesy.data.currentVersion.generatedContent).toMatch(
+      /unnecessary spend|short check/i,
+    );
     expect(changedCta.data.currentVersion.generatedContent).toMatch(
       /Do you already have a way to catch this|How do you catch this today/i,
     );

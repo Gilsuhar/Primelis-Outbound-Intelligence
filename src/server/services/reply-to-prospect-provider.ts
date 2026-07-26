@@ -4,7 +4,9 @@ import type {
   ReplyKnowledgeRecord,
   ReplyProviderMetadata,
   ReplyToProspectInput,
+  ReplyIntentAnalysis,
 } from "@/features/reply-to-prospect/types";
+import { responsePolicyForIntent } from "@/features/reply-to-prospect/reply-intelligence";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
 import { createAiProvider, mapAiProviderError } from "./ai-provider";
@@ -13,6 +15,7 @@ import { detectConversationStage } from "./reply-conversation-stage";
 export type ReplyProviderRequest = {
   input: ReplyToProspectInput;
   intents: ProspectIntent[];
+  replyAnalysis?: ReplyIntentAnalysis;
   records: ReplyKnowledgeRecord[];
   safetyWarnings: string[];
 };
@@ -54,7 +57,11 @@ function stripDisallowedCommercialTerms(text: string) {
 }
 
 function humanizeFact(fact: string) {
-  if (/solo|competitive|ghost|pause|reduce bids|serp|google ads|search console|conversion-source|conversion performance/i.test(fact)) {
+  if (
+    /solo|competitive|ghost|pause|reduce bids|serp|google ads|search console|conversion-source|conversion performance/i.test(
+      fact,
+    )
+  ) {
     return "The core idea is simple: compare paid brand coverage with organic results before deciding where spend is still needed.";
   }
   return fact;
@@ -62,7 +69,11 @@ function humanizeFact(fact: string) {
 
 function deckReply(input: ReplyToProspectInput) {
   const stage = detectConversationStage(input.prospectMessage);
-  if (stage.deckRequestIsOld || stage.pricingAlreadyAnswered || stage.needsFollowUpAfterCommercials) {
+  if (
+    stage.deckRequestIsOld ||
+    stage.pricingAlreadyAnswered ||
+    stage.needsFollowUpAfterCommercials
+  ) {
     return followUpAfterCommercialsReply(input);
   }
   const opener =
@@ -173,9 +184,94 @@ function methodologyReply(input: ReplyToProspectInput) {
   return [opener, answer, product, cta].join(" ");
 }
 
+function feeStructureReply(input: ReplyToProspectInput) {
+  const answer =
+    "At a high level, commercials are based on the branded-search scope: brand spend, active markets, and whether Bing is included. I would avoid quoting a number before checking that scope.";
+  const value =
+    "The value side is the same check: where paid brand is protecting demand, and where bids can come down without giving up coverage.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Worth 10 minutes to pressure-test that against your brand spend?"
+      : "Worth 10 minutes to pressure-test that against your brand spend?";
+  return [answer, value, cta].join(" ");
+}
+
+function valueReply(input: ReplyToProspectInput, records: ReplyKnowledgeRecord[]) {
+  const proof = records.find((record) => record.type === "CASE_STUDY");
+  const answer =
+    "The value is reducing brand spend that is not doing incremental work, while keeping coverage when competitors are present or protection is needed.";
+  const proofLine = proof
+    ? trimSentences(proof.approvedText, 1)
+    : "Without a matched proof point, I would keep it to the mechanism rather than claim a savings range.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Want to pressure-test the gap on one market?"
+      : "Want to pressure-test the gap on one market before going deeper?";
+  return [answer, proofLine, cta].join(" ");
+}
+
+function dataSourceReply(input: ReplyToProspectInput) {
+  const answer =
+    "Signal uses live Google and Bing search-result monitoring to see when competitors appear or disappear. It can also use approved account data such as Google Ads, Search Console, and conversion-source context where connected or supplied.";
+  const distinction =
+    "The key distinction is that this is based on live search-page conditions, not only a third-party estimate.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Is the question mainly data accuracy or setup?"
+      : "Is your main question data accuracy, setup, or what actions it can trigger?";
+  return [answer, distinction, cta].join(" ");
+}
+
+function dashboardReply(input: ReplyToProspectInput) {
+  const answer =
+    "A dashboard is useful for visibility. The difference I would check is action: whether the setup can lower bids, pause where configured, or restore coverage when competitor pressure changes.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Does your dashboard already trigger those bid decisions?"
+      : "Does your dashboard already trigger those bid decisions, or is it mainly reporting?";
+  return [answer, cta].join(" ");
+}
+
+function agencyReply() {
+  const answer =
+    "That can work with an agency. I would frame Signal as a decision layer the agency or internal team can use alongside the people managing the account.";
+  const cta = "Are bid and pause decisions already adjusted based on live competitor presence?";
+  return [answer, cta].join(" ");
+}
+
+function pauseObjectionReply(input: ReplyToProspectInput) {
+  const answer =
+    "Pausing is not the only mode. If full pause feels too aggressive, Signal can also support lowering bids to the minimum needed while keeping coverage.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Is lower-bid mode closer to how you would approach it?"
+      : "Is lower-bid mode closer to how your team would approach it?";
+  return [answer, cta].join(" ");
+}
+
+function referralReply(input: ReplyToProspectInput) {
+  const answer = "Thanks, that helps.";
+  const cta =
+    input.channel === "LINKEDIN"
+      ? "Who would be the best owner for paid brand coverage?"
+      : "Who would be the best owner for paid brand coverage on your side?";
+  return [answer, cta].join(" ");
+}
+
+function strongRejectionReply() {
+  return "Understood. I will leave it there.";
+}
+
+function vacationReply() {
+  return "Thanks for letting me know. I will leave this until you are back.";
+}
+
 function existingVendorReply(input: ReplyToProspectInput) {
   const vendor = detectedVendor(input.prospectMessage);
-  const opener = vendor === "your current setup" ? "That makes sense." : `That makes sense - ${vendor} is a serious setup.`;
+  const opener =
+    vendor === "your current setup"
+      ? "That makes sense."
+      : `That makes sense - ${vendor} is a serious setup.`;
   if (vendor === "Revvim") {
     const answer =
       input.desiredLength === "SHORT"
@@ -200,9 +296,7 @@ function notInterestedReply(input: ReplyToProspectInput) {
   const reason =
     "I reached out because paid brand can be hard to judge from campaign metrics alone, but no need to force it if it is not a priority.";
   const cta =
-    input.channel === "LINKEDIN"
-      ? "I can close the loop here."
-      : "I can close the loop here.";
+    input.channel === "LINKEDIN" ? "I can close the loop here." : "I can close the loop here.";
   return [opener, reason, cta].join(" ");
 }
 
@@ -217,7 +311,12 @@ function timingReply(input: ReplyToProspectInput) {
   return [opener, answer, cta].join(" ");
 }
 
-function defaultReply(input: ReplyToProspectInput, intents: ProspectIntent[], primaryFact: string, secondaryFact: string) {
+function defaultReply(
+  input: ReplyToProspectInput,
+  intents: ProspectIntent[],
+  primaryFact: string,
+  secondaryFact: string,
+) {
   const cta =
     input.channel === "LINKEDIN"
       ? "Do you already have a way to catch this?"
@@ -245,6 +344,7 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
   async generate({
     input,
     intents,
+    replyAnalysis,
     records,
     safetyWarnings,
   }: ReplyProviderRequest): Promise<ReplyGeneration> {
@@ -267,6 +367,36 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
       if (stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered) {
         return followUpAfterCommercialsReply(input);
       }
+      switch (replyAnalysis?.primaryIntent) {
+        case "STRONG_REJECTION":
+          return strongRejectionReply();
+        case "POLITE_DECLINE":
+          return notInterestedReply(input);
+        case "VACATION_OR_UNAVAILABLE":
+          return vacationReply();
+        case "REQUESTS_FEE_STRUCTURE":
+        case "REQUESTS_PRICING":
+          return feeStructureReply(input);
+        case "REQUESTS_ROI_OR_VALUE":
+          return valueReply(input, records);
+        case "DATA_SOURCE_QUESTION":
+          return dataSourceReply(input);
+        case "EXISTING_DASHBOARD":
+        case "MONITORING_VERSUS_ACTION":
+          return dashboardReply(input);
+        case "AGENCY_HANDLES_IT":
+          return agencyReply();
+        case "DOES_NOT_WANT_TO_PAUSE":
+          return pauseObjectionReply(input);
+        case "REFERRAL":
+        case "WRONG_CONTACT":
+          return referralReply(input);
+        case "NOT_A_PRIORITY":
+        case "TIMING":
+          return timingReply(input);
+        default:
+          break;
+      }
       if (intents.includes("DECK_REQUEST")) {
         return deckReply(input);
       }
@@ -286,46 +416,64 @@ export class DeterministicReplyProvider implements ReplyAiProvider {
     })();
 
     const stage = detectConversationStage(input.prospectMessage);
-    const shorterAlternative = stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered
-      ? followUpAfterCommercialsShortReply(input)
-      : intents.includes("DECK_REQUEST")
-      ? [
-          input.channel === "LINKEDIN" ? "Yes, happy to send it." : "Yes, happy to send it over.",
-          "I will keep it focused on the paid-brand question and add two relevant bullets.",
-        ].join(" ")
-      : intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
-        ? [
-            "Good question.",
-            "I would first check whether paid brand clicks are changing the outcome or whether organic would already capture that demand.",
-            "Happy to send the simple version.",
-          ].join(" ")
-        : intents.includes("EXISTING_VENDOR")
+    const shorterAlternative =
+      stage.needsFollowUpAfterCommercials || stage.pricingAlreadyAnswered
+        ? followUpAfterCommercialsShortReply(input)
+        : replyAnalysis?.primaryIntent === "REQUESTS_PRICING" ||
+            replyAnalysis?.primaryIntent === "REQUESTS_FEE_STRUCTURE"
           ? [
-              detectedVendor(input.prospectMessage) === "your current setup"
-                ? "Makes sense."
-                : `Makes sense - ${detectedVendor(input.prospectMessage)} is a serious setup.`,
-              detectedVendor(input.prospectMessage) === "Revvim"
-                ? "The gap I would check is whether it also lowers CPC when other advertisers are present, while keeping you covered."
-                : "The gap I would check is whether you can lower or pause brand ads when nobody else is bidding, then bring coverage back when the page changes.",
-              detectedVendor(input.prospectMessage) === "Revvim"
-                ? "Is that already covered on your side?"
-                : "Is that already automated on your side?",
+              "Commercials depend on branded-search scope, active markets, and whether Bing is included.",
+              "Worth 10 minutes to pressure-test the range against your brand spend?",
             ].join(" ")
-      : [
-          openingFor(input, intents),
-          facts[0]
-            ? humanizeFact(trimSentences(facts[0], 1))
-            : "I can only answer from approved Signal material.",
-          input.channel === "LINKEDIN"
-            ? "Do you already track this today?"
-            : "Happy to send two tailored bullets.",
-        ]
-          .filter(Boolean)
-          .join(" ");
+          : replyAnalysis?.primaryIntent === "DATA_SOURCE_QUESTION"
+            ? [
+                "Signal starts from live Google and Bing search results, then uses approved Ads, Search Console, and conversion context where available.",
+                "Is your question more about data accuracy or setup?",
+              ].join(" ")
+            : replyAnalysis?.primaryIntent === "STRONG_REJECTION"
+              ? strongRejectionReply()
+              : intents.includes("DECK_REQUEST")
+                ? [
+                    input.channel === "LINKEDIN"
+                      ? "Yes, happy to send it."
+                      : "Yes, happy to send it over.",
+                    "I will keep it focused on the paid-brand question and add two relevant bullets.",
+                  ].join(" ")
+                : intents.includes("METHODOLOGY_QUESTION") || intents.includes("TECHNICAL_QUESTION")
+                  ? [
+                      "Good question.",
+                      "I would first check whether paid brand clicks are changing the outcome or whether organic would already capture that demand.",
+                      "Happy to send the simple version.",
+                    ].join(" ")
+                  : intents.includes("EXISTING_VENDOR")
+                    ? [
+                        detectedVendor(input.prospectMessage) === "your current setup"
+                          ? "Makes sense."
+                          : `Makes sense - ${detectedVendor(input.prospectMessage)} is a serious setup.`,
+                        detectedVendor(input.prospectMessage) === "Revvim"
+                          ? "The gap I would check is whether it also lowers CPC when other advertisers are present, while keeping you covered."
+                          : "The gap I would check is whether you can lower or pause brand ads when nobody else is bidding, then bring coverage back when the page changes.",
+                        detectedVendor(input.prospectMessage) === "Revvim"
+                          ? "Is that already covered on your side?"
+                          : "Is that already automated on your side?",
+                      ].join(" ")
+                    : [
+                        openingFor(input, intents),
+                        facts[0]
+                          ? humanizeFact(trimSentences(facts[0], 1))
+                          : "I can only answer from approved Signal material.",
+                        input.channel === "LINKEDIN"
+                          ? "Do you already track this today?"
+                          : "Happy to send two tailored bullets.",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
 
     const strategyParts = [
-      `Detected ${intents.map((intent) => intent.toLowerCase().replaceAll("_", " ")).join(", ")}${companyPhrase}.`,
+      `Detected ${replyAnalysis?.primaryIntent.toLowerCase().replaceAll("_", " ") ?? intents.map((intent) => intent.toLowerCase().replaceAll("_", " ")).join(", ")}${companyPhrase}.`,
       "Answer the prospect's question first, use only approved Signal records, and keep the CTA soft.",
+      replyAnalysis?.directQuestion ? `Direct question: ${replyAnalysis.directQuestion}` : "",
+      ...(replyAnalysis ? responsePolicyForIntent(replyAnalysis) : []),
       rules.length > 0 ? "Messaging rules were used as guardrails, not as external claims." : "",
     ].filter(Boolean);
 
@@ -370,6 +518,9 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
             brief: {
               prospectMessage: request.input.prospectMessage,
               latestProspectTurn: stage.lastTurn,
+              latestProspectMessage: request.replyAnalysis?.latestProspectMessage,
+              priorProspectMessages: request.replyAnalysis?.priorProspectMessages,
+              priorSellerMessages: request.replyAnalysis?.priorSellerMessages,
               conversationStage: stage,
               companyName: request.input.companyName,
               contactRole: request.input.contactRole,
@@ -377,6 +528,7 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               desiredTone: request.input.desiredTone,
               desiredLength: request.input.desiredLength,
               contextNotes: request.input.contextNotes,
+              replyIntent: request.replyAnalysis,
               detectedIntent: request.intents,
               approvedKnowledge: request.records.slice(0, 12).map((record) => ({
                 title: record.title,
@@ -393,23 +545,37 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               "Prefer the strongest relevant approvedKnowledge over generic outbound patterns. If approvedKnowledge includes winning-message examples or case studies, borrow the strategic pattern, not the exact wording.",
               "Write the reply from scratch from the prospect message, brief, and approved facts. Do not imitate a local template.",
               "If the prospectMessage is a full conversation history, answer only the latest prospect turn and respect what has already happened earlier in the thread.",
+              "The latestProspectMessage is the message to answer. Use priorProspectMessages and priorSellerMessages only as context.",
+              "Do not reverse roles. Do not treat salesperson messages as prospect requests.",
+              "If directQuestion exists, answer it in the first sentence or first short paragraph.",
               "If a deck was already sent, do not offer to send the deck again. If commercials/pricing were already answered, move toward feedback, a 10-minute walkthrough, or pressure-testing the numbers.",
               "Answer the prospect's actual question first.",
               "Sound like a calm senior seller, not support documentation.",
               "If the prospect asks for a deck, acknowledge it and ask the minimum useful follow-up or offer to send the relevant short material, using only approved facts.",
               "If they mention Adthena, Revvim, Auction Insights, an agency, or Google Ads, do not attack the vendor. Position Signal as the decision layer for paid-brand coverage.",
+              "If they ask about dashboards or monitoring, acknowledge visibility and explain action: lower bids, pause where configured, or restore coverage when search-page conditions change.",
+              "If they object to pausing branded ads, explain lower-bid mode as an alternative. Do not imply every customer pauses ads.",
+              "If they ask about data sources, mention live Google and Bing search-result monitoring and approved Ads/Search Console/conversion context only. Do not invent integrations.",
+              "If they ask about commercials, answer the basis without inventing prices, discounts, packages, or ROI. If exact pricing is unavailable, say it depends on branded-search scope, spend, and active markets.",
+              "If they decline or strongly reject, do not keep selling.",
               "Keep it short enough to send as-is. No bullets unless the prospect explicitly asked for detail.",
               "Use one useful distinction: visibility, decision automation, paid vs organic, or when bids can safely come down.",
               "End with one low-pressure next question.",
+              ...(request.replyAnalysis ? responsePolicyForIntent(request.replyAnalysis) : []),
+              ...(request.replyAnalysis?.sensitivePointsToAvoid ?? []),
             ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
             userProvidedContext: [
               request.input.prospectMessage
                 ? `Conversation history and latest prospect message from user: ${request.input.prospectMessage}`
                 : "",
-              request.input.companyName ? `Company name from user: ${request.input.companyName}` : "",
+              request.input.companyName
+                ? `Company name from user: ${request.input.companyName}`
+                : "",
               request.input.contactRole ? `Buyer role from user: ${request.input.contactRole}` : "",
-              request.input.contextNotes ? `Additional user context: ${request.input.contextNotes}` : "",
+              request.input.contextNotes
+                ? `Additional user context: ${request.input.contextNotes}`
+                : "",
             ].filter(Boolean),
             sourceReferences: request.records.flatMap((record) =>
               record.sourceIds.map((id, index) => ({
@@ -419,7 +585,9 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               })),
             ),
             safetyPolicy: result.safetyWarnings,
-            outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
+            outputLanguageInstruction: outputLanguageInstruction(
+              request.input.outputLanguage ?? "ENGLISH",
+            ),
           },
         });
         const guardedReply = enforceReplyConversationStage(request.input, result, {

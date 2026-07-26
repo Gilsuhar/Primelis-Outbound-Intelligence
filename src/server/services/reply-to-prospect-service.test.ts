@@ -210,8 +210,7 @@ describe("Reply to Prospect service", () => {
       {
         ...baseInput,
         channel: "LINKEDIN",
-        prospectMessage:
-          "Do you have a deck I can checkout?",
+        prospectMessage: "Do you have a deck I can checkout?",
         companyName: "Nike",
         contactRole: "Head of Paid Search",
         desiredLength: "SHORT",
@@ -289,6 +288,132 @@ describe("Reply to Prospect service", () => {
     }
   });
 
+  it("answers commercial questions directly without inventing package prices", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "What does the fee structure look like? How do the commercials work?",
+        companyName: "NinjaTrader",
+        desiredLength: "SHORT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("REQUESTS_FEE_STRUCTURE");
+      expect(result.data.recommendedReply).toMatch(/commercials are based on/i);
+      expect(result.data.recommendedReply).toMatch(/scope|spend|markets/i);
+      expect(result.data.recommendedReply).not.toMatch(
+        /\$\s?\d|\b\d+k\/month\b|\b(Core|Pro|Prime|Enterprise)\b/i,
+      );
+    }
+  });
+
+  it("explains data sources before asking a follow-up question", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "What data do you use to make the decision?",
+        companyName: "Nike",
+        desiredTone: "DIRECT",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("DATA_SOURCE_QUESTION");
+      expect(result.data.recommendedReply).toMatch(
+        /live Google and Bing search-result monitoring/i,
+      );
+      expect(result.data.recommendedReply).toMatch(/Google Ads|Search Console|conversion/i);
+    }
+  });
+
+  it("positions dashboards as visibility and Signal as action logic", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "We already have a dashboard for brand search monitoring.",
+        companyName: "Booking.com",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("EXISTING_DASHBOARD");
+      expect(result.data.recommendedReply).toMatch(/dashboard is useful for visibility/i);
+      expect(result.data.recommendedReply).toMatch(/lower bids|pause|restore coverage/i);
+    }
+  });
+
+  it("handles pause concerns by offering lower-bid mode", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "We do not want to pause branded ads.",
+        companyName: "Nike",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("DOES_NOT_WANT_TO_PAUSE");
+      expect(result.data.recommendedReply).toMatch(/Pausing is not the only mode/i);
+      expect(result.data.recommendedReply).toMatch(/lowering bids/i);
+    }
+  });
+
+  it("handles agency objections without attacking the agency", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "Our agency handles paid search already.",
+        companyName: "Mango",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("AGENCY_HANDLES_IT");
+      expect(result.data.recommendedReply).toMatch(/agency or internal team can use/i);
+      expect(result.data.recommendedReply).not.toMatch(/replace|better than|weaker than/i);
+    }
+  });
+
+  it("keeps strong rejection replies minimal", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage: "Stop emailing me.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.detectedIntent).toContain("STRONG_REJECTION");
+      expect(result.data.recommendedReply).toBe("Understood. I will leave it there.");
+      expect(result.data.recommendedReply).not.toMatch(/Signal|brand|worth|call/i);
+    }
+  });
+
   it("uses full LinkedIn thread context and follows up after deck and commercials", async () => {
     const thread = [
       "Hi Jack- thanks for connecting, how do you handle branded ads when no competitors are bidding on your brand?",
@@ -319,9 +444,13 @@ describe("Reply to Prospect service", () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.recommendedReply).toMatch(/fee structure|Signal value|short technical walkthrough|pressure-test/i);
+      expect(result.data.recommendedReply).toMatch(
+        /fee structure|Signal value|short technical walkthrough|pressure-test/i,
+      );
       expect(result.data.shorterAlternative).toMatch(/pricing\/value tradeoff|pressure-test/i);
-      expect(result.data.recommendedReply).not.toMatch(/send (the )?deck again|happy to send it|two relevant bullets/i);
+      expect(result.data.recommendedReply).not.toMatch(
+        /send (the )?deck again|happy to send it|two relevant bullets/i,
+      );
       expect(result.data.safetyWarnings).toEqual(
         expect.arrayContaining([
           "Conversation history shows the deck was already sent; do not offer to send it again.",
@@ -364,7 +493,9 @@ describe("Reply to Prospect service", () => {
 
     expect(guarded.recommendedReply).toBe(fallback.recommendedReply);
     expect(guarded.shorterAlternative).toBe(fallback.shorterAlternative);
-    expect(guarded.recommendedReply).not.toMatch(/On the commercials|flat monthly fee|trailing 12-month/i);
+    expect(guarded.recommendedReply).not.toMatch(
+      /On the commercials|flat monthly fee|trailing 12-month/i,
+    );
     expect(guarded.shorterAlternative).not.toMatch(/Do you already track this today/i);
   });
 
