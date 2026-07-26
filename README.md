@@ -4,9 +4,14 @@ Internal sales intelligence and messaging foundation for Primelis Signal.
 
 ## Scope
 
-This foundation is Signal-only and English-only. It does not include automated
-email sending, LinkedIn automation, CRM integration, pricing generation, public
-signup, analytics dashboards, or fake performance data.
+This application is Signal-only and English-first. It includes private-preview
+sales workflows, approved-knowledge retrieval, live OpenAI generation when
+configured, deterministic fallback generation, Do Not Contact checks, and a
+limited HubSpot sequence export that creates a company note and review task.
+
+It does not include automated email sending, LinkedIn automation, public signup,
+analytics dashboards, pricing generation for prospects, or fake performance
+data.
 
 ## Stack
 
@@ -15,11 +20,36 @@ signup, analytics dashboards, or fake performance data.
 - Tailwind CSS
 - PostgreSQL with Prisma
 - Supabase Auth private preview
+- OpenAI Responses API, when server-side OpenAI variables are configured
 - Zod
 - pnpm
 - ESLint
 - Prettier
 - Vitest
+
+## Current Application Workflows
+
+Sales routes require an authenticated application user:
+
+- `/` Home workspace
+- `/playbook` Signal Playbook
+- `/account-research` Account Research
+- `/icp-insights` ICP Insights
+- `/create-outreach` Create Outreach
+- `/build-sequence` Build Sequence
+- `/reply-to-prospect` Reply to Prospect
+- `/ask-signal-brain` Ask Signal Brain
+- `/do-not-contact` Do Not Contact
+
+Knowledge-admin routes require the `KNOWLEDGE_ADMIN` application role:
+
+- `/knowledge-library`
+- `/add-knowledge`
+- `/review-queue`
+- `/imported-signal-review`
+- `/account-research/import`
+- `/do-not-contact/import`
+- `/claims/[claimId]`
 
 ## Database
 
@@ -71,10 +101,10 @@ required.
 
 ## Private Preview Authentication
 
-The app uses Supabase Auth magic links for invited users only. Public signup
-must remain disabled in the Supabase dashboard. The app also passes
-`shouldCreateUser: false` when requesting magic links, so users must be invited
-or created in Supabase Auth before they can receive access.
+The app uses Supabase Auth for private-preview access. It currently supports
+Google OAuth and magic-link sign-in. Public signup must remain disabled in the
+Supabase dashboard. Magic-link requests pass `shouldCreateUser: false`, so users
+must be invited or created in Supabase Auth before they can receive access.
 
 Roles are trusted from the application `User` table, not from client fields or
 user-editable metadata. Supported private preview roles are:
@@ -107,6 +137,7 @@ NEXT_PUBLIC_APP_URL="https://PRIVATE_PREVIEW_APP_URL"
 AI_PROVIDER=""
 OPENAI_API_KEY=""
 OPENAI_MODEL=""
+HUBSPOT_PRIVATE_APP_TOKEN=""
 ```
 
 To enable live OpenAI generation in the application server, set:
@@ -126,6 +157,33 @@ Supabase projects should use the publishable key from the project Connect dialog
 
 Do not add a service-role key unless a future server-only admin operation truly
 requires it. No service-role key is required for the current private preview.
+
+### OpenAI Generation
+
+Live AI generation is server-side only. When `AI_PROVIDER="openai"` and
+`OPENAI_API_KEY` are configured, Create Outreach, Build Sequence, Reply to
+Prospect, Ask Signal Brain, and draft refinement call the OpenAI Responses API.
+
+Generation still starts from approved internal context and service-level safety
+rules. The model can use general B2B language and industry context to improve
+angle and wording, but it must not present unverified company-specific details as
+facts. Approved product truth, case studies, social proof, objection handling,
+and winning-message examples remain the source of truth for outbound claims.
+
+If OpenAI is not configured, unavailable, rate-limited, or returns invalid JSON,
+the app fails safely to deterministic generation and surfaces provider status in
+the generated output.
+
+### HubSpot Export Status
+
+Build Sequence has a limited HubSpot export service. When
+`HUBSPOT_PRIVATE_APP_TOKEN` is configured, the server can search or create a
+HubSpot company, add the generated sequence as a note, and create a review task.
+The service checks suppression records before writing to HubSpot.
+
+This is not a full HubSpot integration, sync engine, ownership resolver, or
+automated sending workflow. No new HubSpot integration work is part of the Phase
+1 repository audit.
 
 ### Deployment Readiness
 
@@ -231,8 +289,9 @@ which preserves traceability rather than silently changing approval state.
 
 ## Generated Draft Separation
 
-AI generation, retrieval, embeddings, and LLM APIs are not implemented yet. The
-`GeneratedDraft` boundary exists only to protect future workflows:
+AI generation is implemented behind server-side providers with deterministic
+fallbacks. The `GeneratedDraft` boundary keeps generated copy separate from
+approved knowledge:
 
 - A generated draft is not knowledge.
 - A generated draft cannot be approved.
@@ -244,11 +303,14 @@ AI generation, retrieval, embeddings, and LLM APIs are not implemented yet. The
 
 ## Fixture Adapter Architecture
 
-Current services use in-memory fixture adapters. Server-side boundaries exist
-for creating submissions, transitioning review status, retrieving approved
-knowledge, and submitting generated drafts for review. These boundaries validate
-inputs with Zod and return structured success/error results.
+The repository has both Prisma/PostgreSQL and fixture persistence adapters.
+`src/server/repositories/adapter-factory.ts` selects Prisma when `DATABASE_URL`
+is available. In development and test only, missing `DATABASE_URL` falls back to
+fixtures so local screens and tests remain usable. Production intentionally
+throws when `DATABASE_URL` is missing.
 
-The adapter shape is intentionally swappable so a future Prisma/PostgreSQL
-adapter can replace fixtures without changing the safety rules or UI permission
-model.
+Server-side boundaries exist for creating submissions, transitioning review
+status, retrieving approved knowledge, generating drafts, importing suppression
+and account data, checking account status, and exporting a sequence to HubSpot.
+These boundaries validate inputs with Zod and return structured success/error
+results.
