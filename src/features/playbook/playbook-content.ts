@@ -23,11 +23,11 @@ export const coreIcpSignals = [
 ];
 
 export const companySizeGuidance = [
-  "Revenue above $50M, 200+ employees, active branded-search ads, and dedicated Paid Search or Performance ownership are high-priority signals.",
-  "$20M-$50M revenue or 100-200 employees can still be relevant when brand demand and branded-search activity are meaningful.",
-  "$20M+ revenue is a qualification signal, not a universal hard rule.",
-  "Do not present revenue or spend as verified unless the user provides it or a trusted source supports it.",
-  "Meaningful branded-search spend, often around $20K+ monthly, can be a strong signal, but it is not a universal minimum or commercial rule.",
+  "Larger companies with active branded-search ads and dedicated Paid Search or Performance ownership are higher-priority signals.",
+  "Mid-market companies can still be relevant when brand demand and branded-search activity are meaningful.",
+  "Company size is a qualification signal, not a universal hard rule.",
+  "Do not present revenue, employee count, or spend as verified unless the user provides it or a trusted source supports it.",
+  "Meaningful branded-search spend can be a strong signal, but it is not a universal minimum or commercial rule.",
 ];
 
 export const qualificationChecklist = [
@@ -54,6 +54,297 @@ export const workSteps = [
   "Handle Reply",
   "Record Outcome",
 ];
+
+export const onboardingChecklist = [
+  {
+    title: "Learn the product",
+    guidance:
+      "Start with Signal Overview, Solo Bidder, CPC Optimization, incrementality, and monitoring versus automation.",
+    route: "/playbook",
+  },
+  {
+    title: "Check account fit",
+    guidance: "Use ICP, persona, account research, and Do Not Contact before writing any outreach.",
+    route: "/account-research",
+  },
+  {
+    title: "Write from approved context",
+    guidance:
+      "Use Create Outreach or Build Sequence after facts, assumptions, proof, and claims to avoid are clear.",
+    route: "/create-outreach",
+  },
+  {
+    title: "Handle replies carefully",
+    guidance:
+      "Use Reply to Prospect for pricing, deck, vendor, dashboard, agency, pause, timing, and rejection replies.",
+    route: "/reply-to-prospect",
+  },
+  {
+    title: "Ask before inventing",
+    guidance:
+      "Use Ask Signal Brain when unsure. If a fact is not approved or user-provided, do not state it.",
+    route: "/ask-signal-brain",
+  },
+] as const;
+
+export const signalProductGuide = [
+  {
+    title: "Signal overview",
+    guidance:
+      "Signal helps teams monitor branded search conditions on Google and Bing where supported, identify competitor presence, and decide when branded coverage should stay active, bid lower, pause where configured, or restore protection.",
+    avoid:
+      "Do not promise guaranteed savings, guaranteed incrementality, exact click preservation, universal compatibility, exact pricing, or that every customer uses pause mode.",
+  },
+  {
+    title: "Solo Bidder",
+    guidance:
+      "Solo Bidder describes moments when the brand may be the only meaningful advertiser on its own branded search. Signal can help identify those moments and support pausing or lowering bids where configured, then restoring protection when competition returns.",
+    avoid:
+      "Do not claim a prospect is currently solo bidding unless verified. Do not say every solo-bidder click is wasted.",
+  },
+  {
+    title: "CPC Optimization",
+    guidance:
+      "CPC Optimization is the lower-bid path: rather than turning campaigns off, the team can seek the minimum sufficient bid needed to keep appropriate coverage while avoiding unnecessary CPC pressure.",
+    avoid:
+      "Do not describe unsupported algorithmic details or claim a specific bid strategy is used by the prospect.",
+  },
+  {
+    title: "Incrementality",
+    guidance:
+      "The practical question is whether a paid branded click changed the outcome or whether organic would likely have captured the demand. Signal does not assume every paid brand click is waste; it helps teams evaluate the tradeoff.",
+    avoid:
+      "Do not present incrementality as perfectly measurable in every account or every market.",
+  },
+  {
+    title: "Monitoring versus automation",
+    guidance:
+      "Dashboards and monitoring tools help teams see conditions. Signal is positioned as a decision and action layer that may complement dashboards, agencies, internal tools, and paid-search teams.",
+    avoid:
+      "Do not attack agencies, Google, dashboards, Similarweb, internal tools, Adthena, Revvim, or any other vendor.",
+  },
+] as const;
+
+export const accountResearchWorkflow = [
+  "Confirm company identity and domain before using account context.",
+  "Identify business model, likely markets, and whether branded-search demand appears meaningful.",
+  "Find the likely paid-search, performance, acquisition, ecommerce, growth, or brand owner.",
+  "Review approved internal knowledge and separate approved facts from user-provided context.",
+  "Mark assumptions explicitly before choosing an outreach angle.",
+  "Check Do Not Contact, ownership, recent outreach, and suppression before generating copy.",
+  "Choose proof only when the customer, industry, persona, and metric are relevant and approved.",
+  "Record claims to avoid before sending the draft through outreach or sequence generation.",
+] as const;
+
+export const outreachPrinciples = [
+  "Start with the prospect's process, not with Signal's feature list.",
+  "Use one clear problem: branded-search efficiency, control, visibility, incrementality, or lower CPC.",
+  "Avoid over-personalization unless the fact is verified or user-provided.",
+  "Ask one practical question and use one CTA.",
+  "Use approved proof sparingly; one relevant case study is usually enough.",
+  "Keep first touches concise and avoid fake urgency.",
+  "Do not claim account-specific waste, competitor bidding, rising CPC, or agency usage without evidence.",
+  "Do not over-explain Signal in the first message.",
+] as const;
+
+export const sequenceGuidance = [
+  {
+    step: "Step 1",
+    job: "Open with one direct branded-search question tied to the buyer's likely process.",
+  },
+  {
+    step: "Step 2",
+    job: "Add business context, such as paid brand looking efficient while hiding overlap with organic.",
+  },
+  {
+    step: "Step 3",
+    job: "Add method, approved proof, or a short explanation of how Signal watches live search conditions.",
+  },
+  {
+    step: "Step 4",
+    job: "Close the loop politely or add a different angle such as lower CPC or restoring coverage.",
+  },
+  {
+    step: "Stop rule",
+    job: "Do not keep pushing after a strong rejection, clear do-not-contact signal, or blocked account status.",
+  },
+] as const;
+
+export const replyObjectionGuidance = [
+  {
+    intent: "Deck request",
+    answerFirst:
+      "Acknowledge the request and keep the material focused on the paid-brand question.",
+    avoid: "Do not claim a deck is attached unless it actually is.",
+    nextStep: "Offer the relevant deck or a short walkthrough.",
+  },
+  {
+    intent: "Pricing or fee structure",
+    answerFirst:
+      "Explain that commercials depend on branded-search scope, spend, active markets, and supported channels.",
+    avoid: "Do not invent tiers, discounts, exact prices, POCs, or ROI.",
+    nextStep: "Pressure-test the range against brand spend in a short walkthrough.",
+  },
+  {
+    intent: "ROI or value",
+    answerFirst:
+      "Tie value to reducing non-incremental brand spend while keeping appropriate coverage.",
+    avoid: "Do not guarantee savings or transfer one customer's percentage to another prospect.",
+    nextStep: "Use one approved proof point only if relevant.",
+  },
+  {
+    intent: "Data-source question",
+    answerFirst:
+      "Mention live Google and Bing search-result monitoring plus approved Ads, Search Console, and conversion context where available.",
+    avoid: "Do not invent integrations or data access.",
+    nextStep: "Ask whether their concern is accuracy, setup, or action logic.",
+  },
+  {
+    intent: "Existing dashboard or monitoring",
+    answerFirst: "Acknowledge visibility and explain the difference between seeing and acting.",
+    avoid: "Do not dismiss their dashboard.",
+    nextStep: "Ask whether bid or pause decisions are automated from those signals.",
+  },
+  {
+    intent: "Agency, internal tool, or vendor",
+    answerFirst:
+      "Respect the current setup and position Signal as a decision layer alongside the team.",
+    avoid: "Do not attack the agency, internal team, or vendor.",
+    nextStep: "Ask what actions are already automated.",
+  },
+  {
+    intent: "Does not want to pause",
+    answerFirst: "Clarify that lower-bid mode is also possible; pause is not the only path.",
+    avoid: "Do not imply every customer pauses brand ads.",
+    nextStep: "Ask whether lower-bid mode is closer to their approach.",
+  },
+  {
+    intent: "Timing, referral, or decline",
+    answerFirst: "Respect the answer before adding any context.",
+    avoid: "Do not fight the objection or restart the pitch.",
+    nextStep: "Follow timing, ask for the right owner, or close the loop.",
+  },
+] as const;
+
+export const qualificationGuidance = {
+  strongSignals: [
+    "Meaningful branded-search demand and active branded ads.",
+    "Paid Search, Performance, Growth, Acquisition, Ecommerce, or Brand owner is identifiable.",
+    "Multi-market or multi-brand complexity creates governance or control needs.",
+    "The team cares about paid and organic overlap, CPC pressure, or measurement quality.",
+    "The prospect asks about value, data sources, automation, or current process.",
+  ],
+  weakSignals: [
+    "No clear paid-search owner.",
+    "No visible branded-search activity or brand demand.",
+    "The company is too small for efficiency gains to matter.",
+    "Only generic marketing interest is visible.",
+  ],
+  dealRisks: [
+    "Agency owns the account and internal buyer has limited influence.",
+    "The buyer expects guaranteed savings or exact incrementality.",
+    "The team wants a reporting dashboard only.",
+    "Commercial scope, active markets, or technical readiness are unknown.",
+  ],
+  discoveryQuestions: [
+    "How do you decide when paid brand coverage is still needed?",
+    "Who owns branded-search bid decisions today?",
+    "Do you review paid and organic brand performance together?",
+    "What happens when competitors disappear or return?",
+    "Is the current process automated or reviewed manually?",
+  ],
+} as const;
+
+export const aeHandoffFields = [
+  "Company, domain, prospect name, and role.",
+  "Problem identified and why it matters now.",
+  "Confirmed facts versus assumptions.",
+  "Current process, agency involvement, dashboard, vendor, or internal tool.",
+  "Relevant markets, branded-search scope, and open questions.",
+  "Proof shared and whether it was approved for that use.",
+  "Objections raised: pricing, value, data source, pause concern, timing, or vendor.",
+  "Commercial discussion status without inventing terms.",
+  "Technical questions and next step.",
+  "Risks, claims to avoid, and owner for follow-up.",
+] as const;
+
+export const claimsToAvoid = [
+  "Do not claim the company is overspending without evidence.",
+  "Do not claim competitors are bidding without evidence.",
+  "Do not claim CPC is rising unless verified.",
+  "Do not claim a specific bidding strategy is used.",
+  "Do not claim guaranteed savings, guaranteed incrementality, or guaranteed click preservation.",
+  "Do not apply one customer's percentage to another prospect.",
+  "Do not claim a deck, attachment, meeting, or calendar link exists when it does not.",
+  "Do not invent pricing, tiers, discounts, POCs, integrations, or customer names.",
+  "Do not invent current agency, dashboard, vendor, or internal-tool usage.",
+  "Do not claim Google recommendations are always wrong.",
+  "Do not claim Signal fully replaces the paid-search team or agency.",
+] as const;
+
+export const workflowGuide = [
+  {
+    tool: "Account Research",
+    purpose: "Clarify account identity, market context, likely personas, facts, and assumptions.",
+    whenNot: "Do not use it as proof that a company has waste, competitors, or rising CPC.",
+    route: "/account-research",
+  },
+  {
+    tool: "ICP Insights",
+    purpose:
+      "Understand where Signal has traction and which industries or personas are likely relevant.",
+    whenNot: "Do not treat ICP guidance as a verified account fact.",
+    route: "/icp-insights",
+  },
+  {
+    tool: "Create Outreach",
+    purpose: "Draft a concise first message from the approved brief and selected account angle.",
+    whenNot: "Do not use it before checking suppression or recent account activity.",
+    route: "/create-outreach",
+  },
+  {
+    tool: "Build Sequence",
+    purpose:
+      "Create a short sequence where each step adds a new job: opener, context, proof or method, close.",
+    whenNot: "Do not use it to repeat the same message four times.",
+    route: "/build-sequence",
+  },
+  {
+    tool: "Reply to Prospect",
+    purpose:
+      "Answer the latest prospect reply using Phase 7 intent handling and approved knowledge.",
+    whenNot: "Do not paste internal instructions as if they are prospect facts.",
+    route: "/reply-to-prospect",
+  },
+  {
+    tool: "Ask Signal Brain",
+    purpose:
+      "Ask one specific question when unsure about product, proof, wording, or objection handling.",
+    whenNot: "Do not use it to invent proof, pricing, integrations, or account-specific claims.",
+    route: "/ask-signal-brain",
+  },
+  {
+    tool: "Do Not Contact",
+    purpose:
+      "Check suppression, active customer, active opportunity, ownership, and recent outreach guidance.",
+    whenNot: "Do not bypass a restricted status with generated copy.",
+    route: "/do-not-contact",
+  },
+  {
+    tool: "Knowledge Library",
+    purpose: "Review approved facts, proof, objections, and sources.",
+    whenNot: "Sales users should not treat unapproved drafts as send-ready facts.",
+    route: "/knowledge-library",
+  },
+] as const;
+
+export const playbookContentArchitecture = [
+  "Stable process guidance is code-defined so new employees have a consistent onboarding path.",
+  "Approved product truth and reviewed proof remain data-backed where the current repository supports it.",
+  "Case-study metrics must keep their customer, source, usage scope, and review state together.",
+  "Example wording teaches phrasing only; it is not a standalone factual claim.",
+  "Admin review and source management stay separate from the sales playbook experience.",
+] as const;
 
 export const industries: IndustryPlaybookEntry[] = [
   {
@@ -319,8 +610,7 @@ export const outreachReplyEvidence = {
     {
       label: "Auto Disable Branded Ads",
       replyRows: 29,
-      useFor:
-        "Direct messages about pausing branded ads when no competitors are present.",
+      useFor: "Direct messages about pausing branded ads when no competitors are present.",
     },
     {
       label: "Last email / close loop",
@@ -398,14 +688,17 @@ export const replyBackedSequenceSteps = [
     step: "Email 1",
     replyStep: "Step #2",
     replyRows: 51,
-    bestSubjects: ["deactivating branded ads", "Primelis - Intro", "{{company}} x Primelis - Intro"],
+    bestSubjects: [
+      "deactivating branded ads",
+      "Primelis - Intro",
+      "{{company}} x Primelis - Intro",
+    ],
     repliedTemplates: [
       "Email 1A - Auto Disable Branded Ads",
       "Email 1B - Auto Disable Branded Ads",
       "Email 1A - General paid ads",
     ],
-    role:
-      "Open with one direct branded-search question. Do not over-explain Signal in the first message.",
+    role: "Open with one direct branded-search question. Do not over-explain Signal in the first message.",
   },
   {
     step: "Email 2",
@@ -416,8 +709,7 @@ export const replyBackedSequenceSteps = [
       "Email 2A - General paid ads for context",
       "Email 2B - General paid ads for context",
     ],
-    role:
-      "Add business context: paid brand can look efficient in reports while still creating avoidable spend.",
+    role: "Add business context: paid brand can look efficient in reports while still creating avoidable spend.",
   },
   {
     step: "Email 3",
@@ -425,8 +717,7 @@ export const replyBackedSequenceSteps = [
     replyRows: 20,
     bestSubjects: ["Re: brand incrementality", "Re: optimize branded ads"],
     repliedTemplates: ["Email 3A - Video", "Email 3 Video 1A - All", "Email 3B - Video"],
-    role:
-      "Add proof, method, or a short visual explanation. Keep it concrete and avoid technical jargon.",
+    role: "Add proof, method, or a short visual explanation. Keep it concrete and avoid technical jargon.",
   },
   {
     step: "Email 4",
@@ -437,8 +728,7 @@ export const replyBackedSequenceSteps = [
       "Email 4A - more context with image",
       "Email 4 - Auto Lower CPC on Branded Ads",
     ],
-    role:
-      "Vary the angle: lower CPC, keep top position, or reduce coverage only when competitors are absent.",
+    role: "Vary the angle: lower CPC, keep top position, or reduce coverage only when competitors are absent.",
   },
   {
     step: "Close loop",
@@ -446,8 +736,7 @@ export const replyBackedSequenceSteps = [
     replyRows: 21,
     bestSubjects: ["Re: Primelis - Intro", "Re: deactivating branded ads"],
     repliedTemplates: ["Last email", "keep ads up 4A Steve"],
-    role:
-      "Close politely. The last email still produced replies, so it should not sound like a throwaway.",
+    role: "Close politely. The last email still produced replies, so it should not sound like a throwaway.",
   },
 ] as const;
 
@@ -575,7 +864,8 @@ export const winningMessages = [
   },
   {
     title: "After connect - two-outcome explainer",
-    useWhen: "After a LinkedIn connection when you need to explain both pause and bid-lowering outcomes.",
+    useWhen:
+      "After a LinkedIn connection when you need to explain both pause and bid-lowering outcomes.",
     channel: "LinkedIn",
     message:
       "Thanks for connecting, {{firstName}}! We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nAlternatively, the CPC algorithm lowers the bid to the minimum needed for branded ads to appear at the top of Google searches.\n\nDo you already have a way to do that?",
@@ -616,8 +906,7 @@ export const winningMessages = [
     channel: "LinkedIn",
     message:
       "Thanks for connecting, {{firstName}}. We built a tool that automatically turns off branded ads when competitors are not bidding, so {{company}} can get the organic click instead of a paid one.\n\nDo you already have a way to do that?",
-    whyItWorks:
-      "It is extremely short and keeps the buyer focused on one decision.",
+    whyItWorks: "It is extremely short and keeps the buyer focused on one decision.",
   },
   {
     title: "After connect - paid strategy angle",
@@ -726,7 +1015,8 @@ export const winningMessages = [
   },
   {
     title: "LinkedIn connection request",
-    useWhen: "Send as the connection request before pitching. Keep it shorter than a normal LinkedIn message.",
+    useWhen:
+      "Send as the connection request before pitching. Keep it shorter than a normal LinkedIn message.",
     channel: "LinkedIn",
     message:
       "Hi {{firstName}}, quick question on {{company}} brand search. Curious how your team decides when paid brand coverage is still needed versus when organic already does enough.",

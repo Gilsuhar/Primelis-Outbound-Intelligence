@@ -22,7 +22,7 @@ export async function getSignalPlaybookData(): Promise<PlaybookData> {
       objections: byStatusAndCategory(records, "NEEDS_REVIEW", "OBJECTION").concat(
         byStatusAndCategory(records, "RESTRICTED", "OBJECTION"),
       ),
-      caseStudies: records.filter((record) => record.category === "CASE_STUDY"),
+      caseStudies: byStatusAndCategory(records, "APPROVED", "CASE_STUDY"),
       industries,
       personas,
       practiceScenarios,

@@ -19,24 +19,37 @@ import { EvidenceBadge, SectionHeader, SignalCard, SignalHero } from "@/componen
 import { inferCaseStudyIndustries } from "@/features/knowledge/case-study-industry-tags";
 import type { ViewerRole } from "@/features/playbook/types";
 import {
+  accountResearchWorkflow,
+  aeHandoffFields,
   calculateProgress,
+  claimsToAvoid,
   companySizeGuidance,
   coreIcpSignals,
   emptyProgress,
   evidenceDescriptions,
+  onboardingChecklist,
   outreachReplyEvidence,
+  outreachPrinciples,
+  playbookContentArchitecture,
   qualificationChecklist,
+  qualificationGuidance,
+  replyObjectionGuidance,
   replyBackedSequenceSteps,
+  sequenceGuidance,
+  signalProductGuide,
   teamProspectReplyEvidence,
   winningMessageGroups,
   winningMessages,
+  workflowGuide,
   workSteps,
 } from "@/features/playbook/playbook-content";
 import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type { PlaybookData, PlaybookProgressKey, PlaybookProgressState } from "./types";
 
 const sectionLinks = [
+  ["start", "Start Here"],
   ["learn", "Learn Signal"],
+  ["product", "Product"],
   ["icp", "Signal ICP"],
   ["industries", "Industries"],
   ["personas", "Personas"],
@@ -46,6 +59,8 @@ const sectionLinks = [
   ["winning-messages", "Winning Messages"],
   ["objections", "Objections"],
   ["case-studies", "Case Studies"],
+  ["handoff", "Handoff"],
+  ["claims", "Claims to Avoid"],
   ["dnc", "Do Not Contact"],
   ["practice", "Practice"],
   ["progress", "Progress"],
@@ -63,7 +78,9 @@ function PlaybookTabs({
   translate: (key: UiTextKey) => string;
 }) {
   const translatedLabels: Record<SectionId, string> = {
+    start: "Start Here",
     learn: "Learn Signal",
+    product: "Product",
     icp: "Signal ICP",
     industries: "Industries",
     personas: "Personas",
@@ -73,6 +90,8 @@ function PlaybookTabs({
     "winning-messages": "Winning Messages",
     objections: "Objections",
     "case-studies": "Case Studies",
+    handoff: "Handoff",
+    claims: "Claims to Avoid",
     dnc: translate("nav.Do Not Contact"),
     practice: "Practice",
     progress: "Progress",
@@ -113,7 +132,7 @@ function CompactDetails({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group rounded-2xl border border-line bg-cream p-4 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime">
+    <details className="group rounded-2xl border border-line bg-cream p-4 transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
         <span>
           {eyebrow ? (
@@ -145,10 +164,7 @@ function OpenDetailsHint({ label = "Open details" }: { label?: string }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-[#5c5a4f] transition group-hover:border-lime group-hover:text-ink">
       {label}
-      <ChevronDown
-        aria-hidden="true"
-        className="h-3.5 w-3.5"
-      />
+      <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
     </span>
   );
 }
@@ -258,64 +274,6 @@ function findCaseStudyPreview(title: string) {
   const normalizedTitle = title.toLowerCase();
   return caseStudyPreviews.find((preview) => normalizedTitle.includes(preview.match));
 }
-
-const supplementalCaseStudies = [
-  {
-    match: "apollo",
-    title: "Apollo.io reduces blended CPC while increasing conversion rate",
-    imageSrc: "/case-studies/apollo-signal-case-study.png",
-    imageAlt: "Apollo.io Signal case study preview",
-    industry: "SaaS",
-    metrics: [
-      ["Blended CPC", "-43% North America data"],
-      ["Cumulative savings", "$1M+"],
-      ["Conversion rate", "+14% aggregated across all markets"],
-    ],
-    source: "Case Study Signal AppsFlyer / Apollo.io PDF",
-    persona: "Paid Acquisition, Paid Search, Performance Marketing",
-  },
-  {
-    match: "copa",
-    title: "Copa Airlines decreases blended CPC while flight purchases increase",
-    imageSrc: "/case-studies/copa-airlines-signal-case-study.png",
-    imageAlt: "Copa Airlines Signal performance report preview",
-    industry: "Airlines and Travel",
-    metrics: [
-      ["Blended CPC", "-75% from $0.20 to $0.05"],
-      ["Blended CTR", "Stable at 75.4% since activation"],
-      ["Flight purchases", "+15% vs February and +22% vs March 2024"],
-    ],
-    source: "Copa Airlines Cross-Brand Performance Report 04/03/2025",
-    persona: "Paid Search, Performance Marketing, Travel growth teams",
-  },
-  {
-    match: "sandro",
-    title: "Sandro reduces ad cost while organic traffic grows",
-    imageSrc: "/case-studies/sandro-signal-case-study.png",
-    imageAlt: "Sandro Signal case study preview",
-    industry: "Fashion and Luxury",
-    metrics: [
-      ["Ad cost", "-50% at equal performance"],
-      ["Average CPC", "-40%"],
-      ["Organic traffic", "+52%"],
-    ],
-    source: "Sandro Signal use case",
-    persona: "Paid Search, Performance Marketing, Digital Marketing",
-  },
-  {
-    match: "dior",
-    title: "Dior reduces branded media cost while maintaining performance",
-    imageSrc: "/case-studies/dior-signal-case-study.png",
-    imageAlt: "Dior Signal case study preview",
-    industry: "Fashion and Luxury",
-    metrics: [
-      ["Ad cost", "-54% at equal performance"],
-      ["Average CPC", "-60%"],
-    ],
-    source: "Dior Signal use case",
-    persona: "Paid Search, Performance Marketing, Luxury digital teams",
-  },
-] as const;
 
 type WinningLibraryId = "email" | "linkedin" | "reply";
 
@@ -432,7 +390,7 @@ export function PlaybookClient({
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [progress, setProgress] = useState<PlaybookProgressState>(emptyProgress);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState<SectionId>("learn");
+  const [activeSection, setActiveSection] = useState<SectionId>("start");
   const [activeWinningLibrary, setActiveWinningLibrary] = useState<WinningLibraryId>("email");
   const [activeWinningStep, setActiveWinningStep] = useState("All");
   const progressView = useMemo(
@@ -448,11 +406,7 @@ export function PlaybookClient({
     return messageStepLabel(message.title, activeWinningLibrary) === activeWinningStep;
   });
   const winningStepLabels = ["All", ...(activeWinningLibraryConfig?.stepLabels ?? [])];
-  const missingSupplementalCaseStudies = supplementalCaseStudies.filter(
-    (caseStudy) =>
-      !data.caseStudies.some((record) => record.title.toLowerCase().includes(caseStudy.match)),
-  );
-
+  const approvedCaseStudies = data.caseStudies.filter((record) => record.status === "APPROVED");
   function selectWinningLibrary(libraryId: WinningLibraryId) {
     setActiveWinningLibrary(libraryId);
     setActiveWinningStep("All");
@@ -476,6 +430,43 @@ export function PlaybookClient({
       />
 
       <PlaybookTabs activeSection={activeSection} onChange={setActiveSection} translate={t} />
+
+      <PlaybookSection
+        description="A practical path for new sales users: learn the product, check fit, write carefully, and handle replies from approved context."
+        eyebrow="Start Here"
+        hidden={activeSection !== "start"}
+        id="start"
+        title="Primelis Signal onboarding"
+      >
+        <div className="grid gap-3 lg:grid-cols-5">
+          {onboardingChecklist.map((item, index) => (
+            <SignalCard
+              description={item.guidance}
+              href={item.route}
+              key={item.title}
+              title={`${index + 1}. ${item.title}`}
+            />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <SignalCard title="Recommended order">
+            <ol className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {workSteps.map((step, index) => (
+                <li key={step}>
+                  {index + 1}. {step}
+                </li>
+              ))}
+            </ol>
+          </SignalCard>
+          <SignalCard title="Content architecture">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {playbookContentArchitecture.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </SignalCard>
+        </div>
+      </PlaybookSection>
 
       <PlaybookSection
         description={t("playbook.learn.description")}
@@ -519,6 +510,32 @@ export function PlaybookClient({
             ))}
           </ul>
         </CompactDetails>
+      </PlaybookSection>
+
+      <PlaybookSection
+        description="Use this section to explain Signal naturally without turning guidance into unsupported proof."
+        eyebrow="B. Product Guide"
+        hidden={activeSection !== "product"}
+        id="product"
+        title="What Signal does and how to explain it"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          {signalProductGuide.map((item) => (
+            <CompactDetails
+              badge={<WarningLabel text="Safe explanation" />}
+              key={item.title}
+              title={item.title}
+            >
+              <p>{item.guidance}</p>
+              <div className="mt-4 rounded-xl border border-line bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                  Claims to avoid
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.avoid}</p>
+              </div>
+            </CompactDetails>
+          ))}
+        </div>
       </PlaybookSection>
 
       <PlaybookSection
@@ -592,7 +609,7 @@ export function PlaybookClient({
         <div className="grid gap-4 lg:grid-cols-2">
           {data.personas.map((persona) => (
             <details
-              className="group rounded-2xl border border-line bg-white p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+              className="group rounded-2xl border border-line bg-white p-5 transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft"
               key={persona.name}
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
@@ -682,6 +699,31 @@ export function PlaybookClient({
             ))}
           </ul>
         </SignalCard>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SignalCard title="Strong signals">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {qualificationGuidance.strongSignals.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </SignalCard>
+          <SignalCard title="Weak signals and risks">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {[...qualificationGuidance.weakSignals, ...qualificationGuidance.dealRisks].map(
+                (item) => (
+                  <li key={item}>- {item}</li>
+                ),
+              )}
+            </ul>
+          </SignalCard>
+        </div>
+        <CompactDetails title="Discovery questions">
+          <ul className="space-y-2">
+            {qualificationGuidance.discoveryQuestions.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </CompactDetails>
       </PlaybookSection>
 
       <PlaybookSection
@@ -717,6 +759,43 @@ export function PlaybookClient({
             <MessageSquareReply className="h-4 w-4" />
             {t("workflow.reply.title")}
           </Link>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {workflowGuide.map((item) => (
+            <SignalCard
+              description={`${item.purpose} When not to use: ${item.whenNot}`}
+              href={item.route}
+              key={item.tool}
+              title={item.tool}
+            />
+          ))}
+        </div>
+        <CompactDetails title="Account research process">
+          <ol className="space-y-2">
+            {accountResearchWorkflow.map((item, index) => (
+              <li key={item}>
+                {index + 1}. {item}
+              </li>
+            ))}
+          </ol>
+        </CompactDetails>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SignalCard title="Outreach principles">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {outreachPrinciples.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </SignalCard>
+          <SignalCard title="Sequence structure">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-[#5c5a4f]">
+              {sequenceGuidance.map((item) => (
+                <li key={item.step}>
+                  <strong>{item.step}:</strong> {item.job}
+                </li>
+              ))}
+            </ul>
+          </SignalCard>
         </div>
       </PlaybookSection>
 
@@ -766,7 +845,7 @@ export function PlaybookClient({
           <div className="mt-5 grid gap-3">
             {replyBackedSequenceSteps.map((step) => (
               <details
-                className="group rounded-xl border border-line bg-cream transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+                className="group rounded-xl border border-line bg-cream transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft"
                 key={step.step}
               >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
@@ -774,9 +853,7 @@ export function PlaybookClient({
                     <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
                       {step.step} · {step.replyRows} replies
                     </span>
-                    <span className="mt-2 block text-base font-semibold text-ink">
-                      {step.role}
-                    </span>
+                    <span className="mt-2 block text-base font-semibold text-ink">{step.role}</span>
                     <span className="mt-1 block text-sm text-[#6f6d5f]">
                       Outreach reply source: {step.replyStep}
                     </span>
@@ -817,7 +894,9 @@ export function PlaybookClient({
                 </div>
                 <button
                   className="mx-4 mb-4 inline-flex min-h-9 items-center justify-center rounded-full border border-line bg-white px-3 text-xs font-semibold text-olive transition hover:border-lime hover:bg-lime hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
-                  onClick={() => selectWinningStep("email", step.step === "Close loop" ? "Close" : step.step)}
+                  onClick={() =>
+                    selectWinningStep("email", step.step === "Close loop" ? "Close" : step.step)
+                  }
                   type="button"
                 >
                   Show matching {step.step} patterns
@@ -841,7 +920,11 @@ export function PlaybookClient({
             <WarningLabel text={`${activeWinningMessages.length} examples`} />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Winning message steps">
+          <div
+            className="mt-4 flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="Winning message steps"
+          >
             {winningStepLabels.map((label) => {
               const matchingCount =
                 label === "All"
@@ -855,22 +938,22 @@ export function PlaybookClient({
                     ).length;
 
               return (
-              <button
-                aria-selected={activeWinningStep === label}
-                className={[
-                  "min-h-9 rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive",
-                  activeWinningStep === label
-                    ? "border-lime bg-lime text-ink shadow-soft"
-                    : "border-line bg-cream text-[#5c5a4f] hover:text-ink",
-                ].join(" ")}
-                key={label}
-                onClick={() => setActiveWinningStep(label)}
-                role="tab"
-                type="button"
-              >
-                {label}
-                <span className="ml-1 text-[10px] opacity-70">{matchingCount}</span>
-              </button>
+                <button
+                  aria-selected={activeWinningStep === label}
+                  className={[
+                    "min-h-9 rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive",
+                    activeWinningStep === label
+                      ? "border-lime bg-lime text-ink shadow-soft"
+                      : "border-line bg-cream text-[#5c5a4f] hover:text-ink",
+                  ].join(" ")}
+                  key={label}
+                  onClick={() => setActiveWinningStep(label)}
+                  role="tab"
+                  type="button"
+                >
+                  {label}
+                  <span className="ml-1 text-[10px] opacity-70">{matchingCount}</span>
+                </button>
               );
             })}
           </div>
@@ -878,52 +961,52 @@ export function PlaybookClient({
           <div className="mt-5 grid gap-3">
             {activeWinningMessages.length > 0 ? (
               activeWinningMessages.map((item) => (
-              <details
-                className="group rounded-xl border border-line bg-cream transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
-                key={item.title}
-              >
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
-                  <span>
-                    <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
-                      {messageStepLabel(item.title, activeWinningLibrary)}
+                <details
+                  className="group rounded-xl border border-line bg-cream transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft"
+                  key={item.title}
+                >
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-4">
+                    <span>
+                      <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-olive">
+                        {messageStepLabel(item.title, activeWinningLibrary)}
+                      </span>
+                      <span className="mt-2 block text-base font-semibold text-ink">
+                        {messageDisplayTitle(item.title)}
+                      </span>
+                      <span className="mt-1 block text-sm leading-5 text-[#6f6d5f]">
+                        {item.useWhen}
+                      </span>
                     </span>
-                    <span className="mt-2 block text-base font-semibold text-ink">
-                      {messageDisplayTitle(item.title)}
-                    </span>
-                    <span className="mt-1 block text-sm leading-5 text-[#6f6d5f]">
-                      {item.useWhen}
-                    </span>
-                  </span>
-                  <OpenDetailsHint />
-                </summary>
-                <div className="space-y-4 border-t border-line p-4 pt-4">
-                  {"subject" in item && item.subject ? (
+                    <OpenDetailsHint />
+                  </summary>
+                  <div className="space-y-4 border-t border-line p-4 pt-4">
+                    {"subject" in item && item.subject ? (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                          Subject
+                        </p>
+                        <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
+                          {item.subject}
+                        </p>
+                      </div>
+                    ) : null}
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                        Subject
+                        Message
                       </p>
-                      <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
-                        {item.subject}
-                      </p>
+                      <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
+                        {item.message}
+                      </pre>
                     </div>
-                  ) : null}
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                      Message
-                    </p>
-                    <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
-                      {item.message}
-                    </pre>
+                    <details className="group rounded-xl border border-line bg-white p-3 transition open:border-lime hover:border-lime">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                        <span>Why this works</span>
+                        <OpenDetailsHint label="Open" />
+                      </summary>
+                      <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
+                    </details>
                   </div>
-                  <details className="group rounded-xl border border-line bg-white p-3 transition hover:border-lime open:border-lime">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
-                      <span>Why this works</span>
-                      <OpenDetailsHint label="Open" />
-                    </summary>
-                    <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{item.whyItWorks}</p>
-                  </details>
-                </div>
-              </details>
+                </details>
               ))
             ) : (
               <div className="rounded-xl border border-line bg-cream p-4 text-sm leading-6 text-[#5c5a4f]">
@@ -934,255 +1017,256 @@ export function PlaybookClient({
           </div>
         </div>
 
-        <details className="group rounded-2xl border border-line bg-cream p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime">
+        <details className="group rounded-2xl border border-line bg-cream p-5 transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-ink">
             <span>Evidence, rules, and raw examples</span>
             <OpenDetailsHint />
           </summary>
           <div className="mt-4 space-y-6">
-        <div className="mb-6 rounded-2xl border border-line bg-white p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Outreach reply evidence
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-ink">
-                Signal and legacy Cross Brand replies
-              </h3>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
-                {outreachReplyEvidence.scope}
-              </p>
-            </div>
-            <WarningLabel text={`${outreachReplyEvidence.relatedReplyRows} relevant replies`} />
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {outreachReplyEvidence.strongestSubjectClusters.map((cluster) => (
-              <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-semibold text-ink">{cluster.label}</p>
-                  <WarningLabel text={`${cluster.replyRows} replies`} />
+            <div className="mb-6 rounded-2xl border border-line bg-white p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Outreach reply evidence
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-ink">
+                    Signal and legacy Cross Brand replies
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                    {outreachReplyEvidence.scope}
+                  </p>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
+                <WarningLabel text={`${outreachReplyEvidence.relatedReplyRows} relevant replies`} />
               </div>
-            ))}
-          </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {outreachReplyEvidence.strongestTemplateClusters.map((cluster) => (
-              <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-semibold text-ink">{cluster.label}</p>
-                  <WarningLabel text={`${cluster.replyRows} replies`} />
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {outreachReplyEvidence.strongestSubjectClusters.map((cluster) => (
+                  <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-ink">{cluster.label}</p>
+                      <WarningLabel text={`${cluster.replyRows} replies`} />
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {outreachReplyEvidence.strongestTemplateClusters.map((cluster) => (
+                  <div className="rounded-xl border border-line bg-cream p-4" key={cluster.label}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-ink">{cluster.label}</p>
+                      <WarningLabel text={`${cluster.replyRows} replies`} />
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                <div className="rounded-xl border border-line bg-cream p-4 lg:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Copy rules
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                    {outreachReplyEvidence.copyRules.map((rule) => (
+                      <li key={rule}>- {rule}</li>
+                    ))}
+                  </ul>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{cluster.useFor}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-xl border border-line bg-cream p-4 lg:col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Copy rules
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
-                {outreachReplyEvidence.copyRules.map((rule) => (
-                  <li key={rule}>- {rule}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Product naming
-              </p>
-              <p className="mt-3 text-sm leading-6 text-[#34352e]">
-                {outreachReplyEvidence.currentProductName}
-              </p>
-              <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
-                {outreachReplyEvidence.limitation}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Sequence rules from replies
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
-                {outreachReplyEvidence.stepLearning.map((rule) => (
-                  <li key={rule}>- {rule}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Persona language
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
-                {outreachReplyEvidence.titleLearning.map((rule) => (
-                  <li key={rule}>- {rule}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <details className="group mt-4 rounded-xl border border-line bg-cream p-4 transition hover:border-lime open:border-lime">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
-              <span>Account examples from relevant replies</span>
-              <OpenDetailsHint label="Open" />
-            </summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {outreachReplyEvidence.replyingAccountExamples.map((account) => (
-                <span
-                  className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
-                  key={account}
-                >
-                  {account}
-                </span>
-              ))}
-            </div>
-          </details>
-        </div>
-
-        <div className="mb-6 rounded-2xl border border-line bg-white p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Team reply prospect evidence
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-ink">
-                Who replied across the team
-              </h3>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
-                {teamProspectReplyEvidence.scope}
-              </p>
-            </div>
-            <WarningLabel
-              text={`${teamProspectReplyEvidence.relatedBrandOrPaidMediaProspects} brand / paid media matches`}
-            />
-          </div>
-
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            {teamProspectReplyEvidence.personaLearning.map((persona) => (
-              <div className="rounded-xl border border-line bg-cream p-4" key={persona.label}>
-                <p className="font-semibold text-ink">{persona.label}</p>
-                <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{persona.guidance}</p>
-                <div className="mt-3 space-y-1 text-xs leading-5 text-[#6f6d5f]">
-                  {persona.examples.map((example) => (
-                    <p key={example}>• {example}</p>
-                  ))}
+                <div className="rounded-xl border border-line bg-cream p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Product naming
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-[#34352e]">
+                    {outreachReplyEvidence.currentProductName}
+                  </p>
+                  <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
+                    {outreachReplyEvidence.limitation}
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Copy rules by persona
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
-                {teamProspectReplyEvidence.copyRules.map((rule) => (
-                  <li key={rule}>- {rule}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-xl border border-line bg-cream p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                Useful account and industry signals
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[...teamProspectReplyEvidence.industryLearning, ...teamProspectReplyEvidence.accountExamples].map(
-                  (item) => (
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-line bg-cream p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Sequence rules from replies
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                    {outreachReplyEvidence.stepLearning.map((rule) => (
+                      <li key={rule}>- {rule}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-xl border border-line bg-cream p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Persona language
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                    {outreachReplyEvidence.titleLearning.map((rule) => (
+                      <li key={rule}>- {rule}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <details className="group mt-4 rounded-xl border border-line bg-cream p-4 transition open:border-lime hover:border-lime">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                  <span>Account examples from relevant replies</span>
+                  <OpenDetailsHint label="Open" />
+                </summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {outreachReplyEvidence.replyingAccountExamples.map((account) => (
                     <span
                       className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
-                      key={item}
+                      key={account}
                     >
-                      {item}
+                      {account}
                     </span>
-                  ),
-                )}
-              </div>
-              <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
-                {teamProspectReplyEvidence.limitation}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {winningMessageGroups.map((group) => {
-            const groupMessages = winningMessages.filter((item) =>
-              group.channels.includes(item.channel),
-            );
-
-            return (
-              <div className="rounded-2xl border border-line bg-white p-5" key={group.label}>
-                <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                      {group.label} examples
-                    </p>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
-                      {group.description}
-                    </p>
-                  </div>
-                  <WarningLabel text={`${groupMessages.length} unique examples`} />
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {groupMessages.map((item) => (
-                    <details
-                      className="rounded-2xl border border-line bg-cream p-5"
-                      key={item.title}
-                    >
-                      <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-                        <span>
-                          <span className="block text-lg font-semibold text-ink">
-                            {item.title}
-                          </span>
-                          <span className="mt-1 block text-sm text-[#6f6d5f]">
-                            {item.useWhen}
-                          </span>
-                        </span>
-                        <WarningLabel text={item.channel} />
-                      </summary>
-                      <div className="mt-4 space-y-4 border-t border-line pt-4">
-                        {"subject" in item && item.subject ? (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                              Subject
-                            </p>
-                            <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
-                              {item.subject}
-                            </p>
-                          </div>
-                        ) : null}
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                            Message
-                          </p>
-                          <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
-                            {item.message}
-                          </pre>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
-                            Why it works
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">
-                            {item.whyItWorks}
-                          </p>
-                        </div>
-                      </div>
-                    </details>
                   ))}
                 </div>
+              </details>
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-line bg-white p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Team reply prospect evidence
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-ink">
+                    Who replied across the team
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                    {teamProspectReplyEvidence.scope}
+                  </p>
+                </div>
+                <WarningLabel
+                  text={`${teamProspectReplyEvidence.relatedBrandOrPaidMediaProspects} brand / paid media matches`}
+                />
               </div>
-            );
-          })}
-        </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                {teamProspectReplyEvidence.personaLearning.map((persona) => (
+                  <div className="rounded-xl border border-line bg-cream p-4" key={persona.label}>
+                    <p className="font-semibold text-ink">{persona.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">{persona.guidance}</p>
+                    <div className="mt-3 space-y-1 text-xs leading-5 text-[#6f6d5f]">
+                      {persona.examples.map((example) => (
+                        <p key={example}>• {example}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-line bg-cream p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Copy rules by persona
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-[#34352e]">
+                    {teamProspectReplyEvidence.copyRules.map((rule) => (
+                      <li key={rule}>- {rule}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-xl border border-line bg-cream p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                    Useful account and industry signals
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      ...teamProspectReplyEvidence.industryLearning,
+                      ...teamProspectReplyEvidence.accountExamples,
+                    ].map((item) => (
+                      <span
+                        className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-[#5c5a4f]"
+                        key={item}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-[#6f6d5f]">
+                    {teamProspectReplyEvidence.limitation}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {winningMessageGroups.map((group) => {
+                const groupMessages = winningMessages.filter((item) =>
+                  group.channels.includes(item.channel),
+                );
+
+                return (
+                  <div className="rounded-2xl border border-line bg-white p-5" key={group.label}>
+                    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                          {group.label} examples
+                        </p>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5c5a4f]">
+                          {group.description}
+                        </p>
+                      </div>
+                      <WarningLabel text={`${groupMessages.length} unique examples`} />
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {groupMessages.map((item) => (
+                        <details
+                          className="rounded-2xl border border-line bg-cream p-5"
+                          key={item.title}
+                        >
+                          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+                            <span>
+                              <span className="block text-lg font-semibold text-ink">
+                                {item.title}
+                              </span>
+                              <span className="mt-1 block text-sm text-[#6f6d5f]">
+                                {item.useWhen}
+                              </span>
+                            </span>
+                            <WarningLabel text={item.channel} />
+                          </summary>
+                          <div className="mt-4 space-y-4 border-t border-line pt-4">
+                            {"subject" in item && item.subject ? (
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                                  Subject
+                                </p>
+                                <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink">
+                                  {item.subject}
+                                </p>
+                              </div>
+                            ) : null}
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                                Message
+                              </p>
+                              <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-white px-3 py-3 font-sans text-sm leading-6 text-[#34352e]">
+                                {item.message}
+                              </pre>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-olive">
+                                Why it works
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-[#5c5a4f]">
+                                {item.whyItWorks}
+                              </p>
+                            </div>
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </details>
       </PlaybookSection>
@@ -1195,22 +1279,16 @@ export function PlaybookClient({
         title={t("playbook.objections.title")}
       >
         <div className="grid gap-4 md:grid-cols-2">
-          {[
-            "We already use Adthena",
-            "We already use Revvim",
-            "We use Auction Insights",
-            "We handle this internally",
-            "Our agency manages this",
-            "This is not a priority",
-            "Send me a deck",
-            "We are happy with the current setup",
-            "We tried lowering brand spend before",
-            "We always have competitors",
-          ].map((objection) => (
-            <CompactDetails key={objection} title={objection}>
+          {replyObjectionGuidance.map((objection) => (
+            <CompactDetails key={objection.intent} title={objection.intent}>
               <p className="mt-3 text-sm leading-6 text-[#5c5a4f]">
-                Understand what they mean, answer the real concern, avoid competitor weakness
-                claims, and use Reply to Prospect for a careful response.
+                <strong>Answer first:</strong> {objection.answerFirst}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[#5c5a4f]">
+                <strong>Avoid:</strong> {objection.avoid}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[#5c5a4f]">
+                <strong>Next step:</strong> {objection.nextStep}
               </p>
               <Link
                 className="mt-4 inline-flex text-sm font-semibold text-olive"
@@ -1231,9 +1309,9 @@ export function PlaybookClient({
         title={t("playbook.caseStudies.title")}
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          {data.caseStudies.length > 0 ? (
+          {approvedCaseStudies.length > 0 ? (
             <>
-              {data.caseStudies.map((record) => {
+              {approvedCaseStudies.map((record) => {
                 const preview = findCaseStudyPreview(record.title);
                 const displayIndustries =
                   record.industries.length > 0
@@ -1242,7 +1320,7 @@ export function PlaybookClient({
 
                 return (
                   <details
-                    className="group overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+                    className="group overflow-hidden rounded-2xl border border-line bg-white transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft"
                     key={record.id}
                   >
                     <summary className="cursor-pointer list-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
@@ -1289,39 +1367,6 @@ export function PlaybookClient({
                   </details>
                 );
               })}
-              {missingSupplementalCaseStudies.map((caseStudy) => (
-                <details
-                  className="group overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
-                  key={caseStudy.match}
-                >
-                  <summary className="cursor-pointer list-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
-                    <Image
-                      alt={caseStudy.imageAlt}
-                      className="aspect-[16/9] w-full border-b border-line object-cover object-top transition group-hover:scale-[1.01]"
-                      height={800}
-                      src={caseStudy.imageSrc}
-                      width={1400}
-                    />
-                    <div className="flex flex-wrap items-start justify-between gap-3 p-5">
-                      <h3 className="text-lg font-semibold text-ink">{caseStudy.title}</h3>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <WarningLabel text="Internal use only" />
-                        <OpenDetailsHint />
-                      </span>
-                    </div>
-                  </summary>
-                  <div className="space-y-2 px-5 pb-5 text-sm leading-6 text-[#5c5a4f]">
-                    <p>{caseStudy.industry}</p>
-                    {caseStudy.metrics.map(([label, value]) => (
-                      <p key={label}>
-                        <strong>{label}:</strong> {value}
-                      </p>
-                    ))}
-                    <p>Source: {caseStudy.source}</p>
-                    <p>Best-fit persona: {caseStudy.persona}</p>
-                  </div>
-                </details>
-              ))}
             </>
           ) : (
             <SignalCard
@@ -1333,7 +1378,43 @@ export function PlaybookClient({
       </PlaybookSection>
 
       <PlaybookSection
-        eyebrow="K. Do Not Contact"
+        description="Use this structure when a prospect is qualified enough for a human follow-up or AE review. This is guidance only until CRM access exists."
+        eyebrow="K. AE Handoff"
+        hidden={activeSection !== "handoff"}
+        id="handoff"
+        title="Qualified opportunity handoff"
+      >
+        <SignalCard title="Handoff fields">
+          <ul className="mt-4 grid gap-2 text-sm leading-6 text-[#5c5a4f] md:grid-cols-2">
+            {aeHandoffFields.map((field) => (
+              <li key={field}>- {field}</li>
+            ))}
+          </ul>
+        </SignalCard>
+        <SignalCard
+          description="Keep proof shared, objections raised, commercial discussion status, technical questions, and claims to avoid visible for the next owner. Do not claim CRM sync or HubSpot handoff until that integration is live."
+          title="Handoff rule"
+        />
+      </PlaybookSection>
+
+      <PlaybookSection
+        description="These are prohibited unless verified, approved, and relevant to the specific prospect."
+        eyebrow="L. Claims to Avoid"
+        hidden={activeSection !== "claims"}
+        id="claims"
+        title="Claims to avoid"
+      >
+        <SignalCard title="Never make these claims casually">
+          <ul className="mt-4 grid gap-2 text-sm leading-6 text-[#5c5a4f] lg:grid-cols-2">
+            {claimsToAvoid.map((claim) => (
+              <li key={claim}>- {claim}</li>
+            ))}
+          </ul>
+        </SignalCard>
+      </PlaybookSection>
+
+      <PlaybookSection
+        eyebrow="M. Do Not Contact"
         hidden={activeSection !== "dnc"}
         id="dnc"
         title={t("playbook.dnc.title")}
@@ -1348,7 +1429,7 @@ export function PlaybookClient({
 
       <PlaybookSection
         description="Write or choose an answer, reveal guidance, and mark practice complete."
-        eyebrow="L. Practice"
+        eyebrow="N. Practice"
         hidden={activeSection !== "practice"}
         id="practice"
         title={t("playbook.practice.title")}
@@ -1356,7 +1437,7 @@ export function PlaybookClient({
         <div className="space-y-3">
           {data.practiceScenarios.map((scenario) => (
             <details
-              className="group rounded-2xl border border-line bg-cream p-5 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-soft open:border-lime"
+              className="group rounded-2xl border border-line bg-cream p-5 transition open:border-lime hover:-translate-y-0.5 hover:border-lime hover:shadow-soft"
               key={scenario.id}
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-lg font-semibold text-ink">
@@ -1377,7 +1458,7 @@ export function PlaybookClient({
                   value={practiceAnswers[scenario.id] ?? ""}
                 />
               </label>
-              <details className="group mt-3 rounded-xl border border-line bg-white p-3 transition hover:border-lime open:border-lime">
+              <details className="group mt-3 rounded-xl border border-line bg-white p-3 transition open:border-lime hover:border-lime">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-olive">
                   <span>Reveal guidance</span>
                   <OpenDetailsHint label="Open" />
@@ -1399,7 +1480,7 @@ export function PlaybookClient({
 
       <PlaybookSection
         description="No time tracking, behavioral monitoring, or productivity scoring."
-        eyebrow="M. Progress"
+        eyebrow="O. Progress"
         hidden={activeSection !== "progress"}
         id="progress"
         title={t("playbook.progress.title")}
