@@ -327,8 +327,22 @@ export function CreateOutreachClient() {
     const params = new URLSearchParams(window.location.search);
     const company = params.get("company");
     const domain = params.get("domain");
+    const role = params.get("role");
+    const selectedIndustry = params.get("industry");
+    const fit = params.get("fit");
+    const market = params.get("market");
+    const paidContext = params.get("paidContext");
+    const trigger = params.get("trigger");
+    const researchNotes = params.get("researchNotes");
     if (company) setCompanyName(company);
     if (domain) setCompanyWebsite(domain);
+    if (role) setContactRole(role);
+    if (selectedIndustry) setIndustry(selectedIndustry);
+    if (fit) setCompanyContext(fit);
+    if (market) setGeographyOrMarkets(market);
+    if (paidContext) setPaidSearchContext(paidContext);
+    if (trigger) setObservedTrigger(trigger);
+    if (researchNotes) setInternalNotes(researchNotes);
   }, []);
 
   async function copyText(key: string, text: string) {

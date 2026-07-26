@@ -15,6 +15,7 @@ import type {
   AccountAssessmentResult,
   CompanyType,
   FactStatus,
+  FilteredResearchHandoff,
   YesNoUnknown,
 } from "@/features/account-research/types";
 import { industries } from "@/features/playbook/playbook-content";
@@ -104,11 +105,25 @@ function fieldStatus(formData: FormData) {
   ) as Record<string, FactStatus>;
 }
 
-function workflowHref(baseHref: string, companyName: string, companyDomain: string) {
+function workflowHref(
+  baseHref: string,
+  companyName: string,
+  companyDomain: string,
+  handoff?: FilteredResearchHandoff,
+) {
   if (!companyName.trim() && !companyDomain.trim()) return baseHref;
   const params = new URLSearchParams();
-  if (companyName.trim()) params.set("company", companyName.trim());
-  if (companyDomain.trim()) params.set("domain", companyDomain.trim());
+  const context = handoff ?? { companyName, companyDomain };
+  if (context.companyName.trim()) params.set("company", context.companyName.trim());
+  if (context.companyDomain?.trim()) params.set("domain", context.companyDomain.trim());
+  if (context.contactRole?.trim()) params.set("role", context.contactRole.trim());
+  if (context.industry?.trim()) params.set("industry", context.industry.trim());
+  if (context.companyContext?.trim()) params.set("fit", context.companyContext.trim());
+  if (context.geographyOrMarkets?.trim()) params.set("market", context.geographyOrMarkets.trim());
+  if (context.paidSearchContext?.trim())
+    params.set("paidContext", context.paidSearchContext.trim());
+  if (context.observedTrigger?.trim()) params.set("trigger", context.observedTrigger.trim());
+  if (context.internalNotes?.trim()) params.set("researchNotes", context.internalNotes.trim());
   return `${baseHref}?${params.toString()}`;
 }
 
@@ -708,7 +723,12 @@ export function AccountResearchClient() {
                       ) : (
                         <a
                           className="signal-button-secondary"
-                          href={workflowHref(link.href, companyName, companyDomain)}
+                          href={workflowHref(
+                            link.href,
+                            companyName,
+                            companyDomain,
+                            result.downstreamHandoff,
+                          )}
                           key={link.href}
                         >
                           {link.label}
@@ -720,6 +740,27 @@ export function AccountResearchClient() {
                 <p className="rounded-xl bg-cream p-3 text-sm leading-6 text-[#6f6d5f]">
                   {result.suppression.label}. {result.suppression.verificationWarning}
                 </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-line p-3">
+                    <p className="text-sm font-semibold text-ink">What is known</p>
+                    <ul className="mt-2 space-y-1 text-sm leading-5 text-[#6f6d5f]">
+                      {(result.structuredResearch.verifiedFacts.length
+                        ? result.structuredResearch.verifiedFacts
+                        : ["No approved verified account facts were provided."]
+                      ).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-line p-3">
+                    <p className="text-sm font-semibold text-ink">Use as questions</p>
+                    <ul className="mt-2 space-y-1 text-sm leading-5 text-[#6f6d5f]">
+                      {result.openQuestions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-sm leading-6 text-[#6f6d5f]">
@@ -755,6 +796,24 @@ export function AccountResearchClient() {
                     </ul>
                   </div>
                 </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Likely opportunities</p>
+                    <ul className="mt-2 space-y-1 text-sm leading-5 text-[#6f6d5f]">
+                      {result.likelyOpportunities.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Claims to avoid</p>
+                    <ul className="mt-2 space-y-1 text-sm leading-5 text-[#6f6d5f]">
+                      {result.claimsToAvoid.slice(0, 5).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </article>
 
               <article className="rounded-2xl border border-line bg-white p-5">
@@ -772,8 +831,25 @@ export function AccountResearchClient() {
                       {result.angleRecommendation.primaryAngle}
                     </p>
                     <p>{result.angleRecommendation.whyItFits}</p>
+                    <p>Safe question: {result.angleRecommendation.safeOpeningQuestion}</p>
                     <p>Do not claim: {result.angleRecommendation.mustNotClaim}</p>
                   </div>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {result.stakeholderRecommendations.slice(0, 4).map((stakeholder) => (
+                    <div
+                      className="rounded-xl border border-line p-3 text-sm"
+                      key={stakeholder.role}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-ink">{stakeholder.role}</p>
+                        <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-ink">
+                          {stakeholder.priority}
+                        </span>
+                      </div>
+                      <p className="mt-1 leading-5 text-[#6f6d5f]">{stakeholder.reason}</p>
+                    </div>
+                  ))}
                 </div>
               </article>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Brain, ExternalLink, FileText, Lightbulb, ShieldCheck } from "lucide-react";
 
 import { askSignalBrainAction } from "@/app/ask-signal-brain/actions";
@@ -88,6 +88,8 @@ type SmartFieldProps = {
   placeholder?: string;
   required?: boolean;
   textarea?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
 };
 
 function label(value: string) {
@@ -106,12 +108,16 @@ function SmartField({
   placeholder = "Enter manually",
   required = false,
   textarea = false,
+  value,
+  onChange,
 }: SmartFieldProps) {
-  const [value, setValue] = useState("");
+  const [internalValue, setInternalValue] = useState("");
   const [customValue, setCustomValue] = useState("");
   const outputLanguage = useOutputLanguage();
-  const isCustom = value === "__custom";
-  const finalValue = isCustom ? customValue : value;
+  const selectedValue = value ?? internalValue;
+  const setSelectedValue = onChange ?? setInternalValue;
+  const isCustom = selectedValue === "__custom";
+  const finalValue = isCustom ? customValue : selectedValue;
   const Input = textarea ? "textarea" : "input";
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
@@ -120,8 +126,8 @@ function SmartField({
       {label}
       <select
         className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-        onChange={(event) => setValue(event.target.value)}
-        value={value}
+        onChange={(event) => setSelectedValue(event.target.value)}
+        value={selectedValue}
       >
         <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
@@ -148,9 +154,46 @@ export function AskSignalBrainClient() {
   const outputLanguage = useOutputLanguage();
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [mode, setMode] = useState<SignalBrainMode>("QUICK_ANSWER");
+  const [question, setQuestion] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [companySizeOrRevenue, setCompanySizeOrRevenue] = useState("");
+  const [geographyOrMarkets, setGeographyOrMarkets] = useState("");
+  const [paidSearchContext, setPaidSearchContext] = useState("");
+  const [currentVendor, setCurrentVendor] = useState("");
+  const [observedTrigger, setObservedTrigger] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
   const [result, setResult] = useState<SignalBrainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const company = params.get("company");
+    const domain = params.get("domain");
+    const role = params.get("role");
+    const selectedIndustry = params.get("industry");
+    const fit = params.get("fit");
+    const market = params.get("market");
+    const paidContext = params.get("paidContext");
+    const trigger = params.get("trigger");
+    const researchNotes = params.get("researchNotes");
+    if (company) setCompanyName(company);
+    if (domain) setCompanyWebsite(domain);
+    if (role) setContactRole(role);
+    if (selectedIndustry) setIndustry(selectedIndustry);
+    if (fit) setCompanySizeOrRevenue(fit);
+    if (market) setGeographyOrMarkets(market);
+    if (paidContext) setPaidSearchContext(paidContext);
+    if (trigger) {
+      setObservedTrigger(trigger);
+      setQuestion(trigger);
+      setMode("ACCOUNT_QUALIFICATION");
+    }
+    if (researchNotes) setInternalNotes(researchNotes);
+  }, []);
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -205,10 +248,12 @@ export function AskSignalBrainClient() {
           <SmartField
             label={t("workflow.brain.questionLabel")}
             name="question"
+            onChange={setQuestion}
             options={questionTemplates}
             placeholder="Write the exact question"
             required
             textarea
+            value={question}
           />
 
           <label className="block space-y-1 text-sm font-medium text-[#34352e]">
@@ -231,49 +276,77 @@ export function AskSignalBrainClient() {
               {t("workflow.advancedAccountContext")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <SmartField label={t("workflow.company")} name="companyName" options={[]} />
-              <SmartField label={t("workflow.website")} name="companyWebsite" options={[]} />
+              <SmartField
+                label={t("workflow.company")}
+                name="companyName"
+                onChange={setCompanyName}
+                options={[]}
+                value={companyName}
+              />
+              <SmartField
+                label={t("workflow.website")}
+                name="companyWebsite"
+                onChange={setCompanyWebsite}
+                options={[]}
+                value={companyWebsite}
+              />
               <SmartField
                 label={t("workflow.buyerRole")}
                 name="contactRole"
+                onChange={setContactRole}
                 options={buyerRoleOptions}
+                value={contactRole}
               />
               <SmartField
                 label={t("workflow.industry")}
                 name="industry"
+                onChange={setIndustry}
                 options={industries.map((industry) => industry.name)}
+                value={industry}
               />
               <SmartField
                 label="Company size or revenue"
                 name="companySizeOrRevenue"
+                onChange={setCompanySizeOrRevenue}
                 options={companySizeOptions}
+                value={companySizeOrRevenue}
               />
               <SmartField
                 label={t("account.markets")}
                 name="geographyOrMarkets"
+                onChange={setGeographyOrMarkets}
                 options={marketOptions}
+                value={geographyOrMarkets}
               />
               <SmartField
                 label={t("workflow.paidSearchContext")}
                 name="paidSearchContext"
+                onChange={setPaidSearchContext}
                 options={paidSearchOptions}
+                value={paidSearchContext}
               />
               <SmartField
                 label={t("workflow.currentVendor")}
                 name="currentVendor"
+                onChange={setCurrentVendor}
                 options={vendorOptions}
+                value={currentVendor}
               />
               <SmartField
                 label={t("workflow.reasonForOutreach")}
                 name="observedTrigger"
+                onChange={setObservedTrigger}
                 options={triggerOptions}
                 textarea
+                value={observedTrigger}
               />
               <SmartField
                 label={t("workflow.internalNotes")}
                 name="internalNotes"
+                onChange={setInternalNotes}
                 options={[]}
                 textarea
+                value={internalNotes}
               />
             </div>
           </details>

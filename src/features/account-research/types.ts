@@ -1,5 +1,12 @@
 export const yesNoUnknownOptions = ["YES", "NO", "UNKNOWN"] as const;
 export const factStatuses = ["VERIFIED", "USER_PROVIDED", "ASSUMPTION", "UNKNOWN"] as const;
+export const researchTrustLevels = [
+  "VERIFIED_APPROVED_INTERNAL",
+  "USER_PROVIDED",
+  "IMPORTED_UNVERIFIED",
+  "MODEL_INFERENCE",
+  "UNKNOWN",
+] as const;
 export const companyTypes = [
   "B2B",
   "B2C",
@@ -19,6 +26,7 @@ export const confidenceLevels = ["High", "Medium", "Low"] as const;
 
 export type YesNoUnknown = (typeof yesNoUnknownOptions)[number];
 export type FactStatus = (typeof factStatuses)[number];
+export type ResearchTrustLevel = (typeof researchTrustLevels)[number];
 export type CompanyType = (typeof companyTypes)[number];
 export type QualificationResult = (typeof qualificationResults)[number];
 export type ConfidenceLevel = (typeof confidenceLevels)[number];
@@ -55,9 +63,17 @@ export type AccountResearchInput = {
 };
 
 export type FactClassification = {
+  field: string;
   label: string;
   value: string;
   status: FactStatus;
+  source: string;
+  trustLevel: ResearchTrustLevel;
+  required: boolean;
+  passedToAi: boolean;
+  stored: boolean;
+  allowedAsFactualOutreachPersonalization: boolean;
+  allowedOnlyAsQuestionOrHypothesis: boolean;
 };
 
 export type IndustryEvidence = {
@@ -91,14 +107,57 @@ export type PersonaRecommendation = {
   seniorityGuidance: string;
 };
 
+export type StakeholderRecommendation = {
+  role: string;
+  priority:
+    | "Primary stakeholder"
+    | "Secondary stakeholder"
+    | "Possible influencer"
+    | "Likely wrong contact";
+  reason: string;
+};
+
 export type AngleRecommendation = {
   primaryAngle: string;
   secondaryAngle?: string;
   whyItFits: string;
   supportingSignal: string;
   mustNotClaim: string;
+  safeOpeningQuestion: string;
+  bestProofCategory?: string;
+  claimsToAvoid: string[];
   recommendedWorkflow:
     "Create Outreach" | "Build Sequence" | "Reply to Prospect" | "Ask Signal Brain";
+};
+
+export type ResearchResultStructure = {
+  accountSummary: string[];
+  signalRelevance: {
+    result: QualificationResult;
+    confidence: ConfidenceLevel;
+    reasons: string[];
+  };
+  verifiedFacts: string[];
+  userProvidedContext: string[];
+  inferredContext: string[];
+  likelyOpportunities: string[];
+  openQuestions: string[];
+  suggestedStakeholders: StakeholderRecommendation[];
+  recommendedOutreachAngle: AngleRecommendation;
+  claimsToAvoid: string[];
+  evidenceContext: string[];
+};
+
+export type FilteredResearchHandoff = {
+  companyName: string;
+  companyDomain?: string;
+  contactRole?: string;
+  industry?: string;
+  companyContext?: string;
+  geographyOrMarkets?: string;
+  paidSearchContext?: string;
+  observedTrigger?: string;
+  internalNotes?: string;
 };
 
 export type AccountAssessmentResult = {
@@ -114,7 +173,13 @@ export type AccountAssessmentResult = {
   disqualificationRisks: string[];
   suppression: SuppressionResult;
   personaRecommendation: PersonaRecommendation;
+  stakeholderRecommendations: StakeholderRecommendation[];
   angleRecommendation: AngleRecommendation;
+  openQuestions: string[];
+  likelyOpportunities: string[];
+  claimsToAvoid: string[];
+  structuredResearch: ResearchResultStructure;
+  downstreamHandoff: FilteredResearchHandoff;
   recommendedNextAction: string;
   researchChecklist: string[];
   workflowLinks: Array<{ label: string; href: string; disabled?: boolean; reason?: string }>;

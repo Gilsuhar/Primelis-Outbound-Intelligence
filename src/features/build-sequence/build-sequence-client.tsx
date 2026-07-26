@@ -423,6 +423,8 @@ type SmartFieldProps = {
   required?: boolean;
   textarea?: boolean;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
 };
 
 function SmartField({
@@ -433,12 +435,16 @@ function SmartField({
   required = false,
   textarea = false,
   defaultValue = "",
+  value,
+  onChange,
 }: SmartFieldProps) {
-  const [value, setValue] = useState(defaultValue);
+  const [internalValue, setInternalValue] = useState(defaultValue);
   const [customValue, setCustomValue] = useState("");
   const outputLanguage = useOutputLanguage();
-  const isCustom = value === "__custom";
-  const finalValue = isCustom ? customValue : value;
+  const selectedValue = value ?? internalValue;
+  const setSelectedValue = onChange ?? setInternalValue;
+  const isCustom = selectedValue === "__custom";
+  const finalValue = isCustom ? customValue : selectedValue;
   const Input = textarea ? "textarea" : "input";
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
 
@@ -447,8 +453,8 @@ function SmartField({
       {label}
       <select
         className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-        onChange={(event) => setValue(event.target.value)}
-        value={value}
+        onChange={(event) => setSelectedValue(event.target.value)}
+        value={selectedValue}
       >
         <option value="">{t("workflow.choose")}</option>
         {options.map((option) => (
@@ -503,6 +509,14 @@ export function BuildSequenceClient() {
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [companyContext, setCompanyContext] = useState("");
+  const [geographyOrMarkets, setGeographyOrMarkets] = useState("");
+  const [paidSearchContext, setPaidSearchContext] = useState("");
+  const [currentVendor, setCurrentVendor] = useState("");
+  const [observedTrigger, setObservedTrigger] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
@@ -547,8 +561,22 @@ export function BuildSequenceClient() {
     const params = new URLSearchParams(window.location.search);
     const company = params.get("company");
     const domain = params.get("domain");
+    const role = params.get("role");
+    const selectedIndustry = params.get("industry");
+    const fit = params.get("fit");
+    const market = params.get("market");
+    const paidContext = params.get("paidContext");
+    const trigger = params.get("trigger");
+    const researchNotes = params.get("researchNotes");
     if (company) setCompanyName(company);
     if (domain) setCompanyWebsite(domain);
+    if (role) setContactRole(role);
+    if (selectedIndustry) setIndustry(selectedIndustry);
+    if (fit) setCompanyContext(fit);
+    if (market) setGeographyOrMarkets(market);
+    if (paidContext) setPaidSearchContext(paidContext);
+    if (trigger) setObservedTrigger(trigger);
+    if (researchNotes) setInternalNotes(researchNotes);
   }, []);
 
   async function copyText(key: string, text: string) {
@@ -715,12 +743,16 @@ export function BuildSequenceClient() {
             <SmartField
               label={t("workflow.buyerRole")}
               name="contactRole"
+              onChange={setContactRole}
               options={buyerRoleOptions}
+              value={contactRole}
             />
             <SmartField
               label={t("workflow.industry")}
               name="industry"
+              onChange={setIndustry}
               options={industries.map((industry) => industry.name)}
+              value={industry}
             />
             <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
               {t("workflow.steps")}
@@ -787,27 +819,37 @@ export function BuildSequenceClient() {
               <SmartField
                 label={t("workflow.market")}
                 name="geographyOrMarkets"
+                onChange={setGeographyOrMarkets}
                 options={marketOptions}
+                value={geographyOrMarkets}
               />
               <SmartField
                 label={t("workflow.fitIcp")}
                 name="companyContext"
+                onChange={setCompanyContext}
                 options={companySizeOptions}
+                value={companyContext}
               />
               <SmartField
                 label={t("workflow.reasonForOutreach")}
                 name="observedTrigger"
+                onChange={setObservedTrigger}
                 options={triggerOptions}
+                value={observedTrigger}
               />
               <SmartField
                 label={t("workflow.currentVendor")}
                 name="currentVendor"
+                onChange={setCurrentVendor}
                 options={vendorOptions}
+                value={currentVendor}
               />
               <SmartField
                 label={t("workflow.paidSearchContext")}
                 name="paidSearchContext"
+                onChange={setPaidSearchContext}
                 options={paidSearchOptions}
+                value={paidSearchContext}
               />
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
                 {t("workflow.channel")}
@@ -825,8 +867,10 @@ export function BuildSequenceClient() {
                 <SmartField
                   label={t("workflow.internalNotes")}
                   name="internalNotes"
+                  onChange={setInternalNotes}
                   options={[]}
                   textarea
+                  value={internalNotes}
                 />
               </div>
             </div>

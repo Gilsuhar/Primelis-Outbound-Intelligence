@@ -47,6 +47,30 @@ describe("company/contact CSV import", () => {
     expect(response.data.summary.imported).toBe(1);
   });
 
+  it("keeps imported company classification as review-only enrichment, not approved knowledge", () => {
+    const preview = buildCompanyContactImportPreview(
+      [
+        "company_name,domain,industry,employee_range,revenue_range",
+        "Nike,nike.com,Fashion and Luxury,5000,$500M",
+      ].join("\n"),
+      "COMPANY",
+      "ADD_NEW_ONLY",
+      new Set(),
+      new Set(),
+    );
+
+    expect(preview.invalidRows).toHaveLength(0);
+    expect(preview.proposedNewRecords[0].domain).toBe("nike.com");
+    expect(preview.proposedNewRecords[0].signal_icp_fit).toMatch(/Strong fit/i);
+    expect(preview.proposedNewRecords[0].recommended_persona).toBe(
+      "Head or Director of Paid Search",
+    );
+    expect(preview.proposedNewRecords[0].classification_notes).toMatch(/often|suggests|review/i);
+    expect(JSON.stringify(preview.proposedNewRecords[0])).not.toMatch(
+      /approved knowledge|verified fact|approved fact/i,
+    );
+  });
+
   it("previews contact CSV, duplicate rows, existing conflicts, invalid email, URL, domain, and formulas", () => {
     const csv = [
       "full_name,title,company_name,domain,professional_profile_url,business_email",

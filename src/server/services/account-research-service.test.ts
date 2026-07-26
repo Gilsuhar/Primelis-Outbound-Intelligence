@@ -208,6 +208,77 @@ describe("Account Research service", () => {
     if (result.ok) {
       expect(result.data.assumptions).toContain("Branded-search ads active: Yes");
       expect(result.data.verifiedSignals).not.toContain("Branded-search ads active: Yes");
+      expect(result.data.verifiedSignals).not.toContain("Active branded-search ads");
+      expect(result.data.structuredResearch.inferredContext).toContain(
+        "Branded-search ads active: Yes",
+      );
+    }
+  });
+
+  it("keeps user-provided context separate from approved verified facts", async () => {
+    const { adapter } = persistence();
+
+    const result = await assessAccountResearch(
+      {
+        ...baseInput,
+        factStatuses: {
+          brandedSearchAdsActive: "USER_PROVIDED",
+          strongOrganicBrandVisibility: "VERIFIED",
+          meaningfulBrandedSearchDemand: "USER_PROVIDED",
+        },
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const brandAds = result.data.factClassifications.find(
+        (fact) => fact.field === "brandedSearchAdsActive",
+      );
+      expect(brandAds).toMatchObject({
+        trustLevel: "USER_PROVIDED",
+        allowedAsFactualOutreachPersonalization: false,
+        allowedOnlyAsQuestionOrHypothesis: true,
+      });
+      expect(result.data.structuredResearch.verifiedFacts).toContain(
+        "Strong organic brand visibility: Yes",
+      );
+      expect(result.data.structuredResearch.verifiedFacts).not.toContain(
+        "Branded-search ads active: Yes",
+      );
+      expect(result.data.structuredResearch.userProvidedContext).toContain(
+        "Branded-search ads active: Yes",
+      );
+    }
+  });
+
+  it("keeps unknown fields unknown and out of factual downstream context", async () => {
+    const { adapter } = persistence();
+
+    const result = await assessAccountResearch(
+      {
+        ...baseInput,
+        companyName: "Sparse Co",
+        revenueContext: undefined,
+        employeeContext: undefined,
+        brandedSearchAdsActive: "UNKNOWN",
+        strongOrganicBrandVisibility: "UNKNOWN",
+        meaningfulBrandedSearchDemand: "UNKNOWN",
+        multiMarketOrBrandComplexity: "UNKNOWN",
+        dedicatedPaidSearchOrPerformanceTeam: "UNKNOWN",
+        knownPaidSearchOwner: undefined,
+        meaningfulPaidSearchInvestment: "UNKNOWN",
+        factStatuses: {},
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.qualificationResult).toBe("Insufficient information");
+      expect(result.data.unknowns).toContain("Meaningful branded-search demand");
+      expect(result.data.downstreamHandoff.paidSearchContext).toBeUndefined();
+      expect(result.data.structuredResearch.verifiedFacts).toEqual([]);
     }
   });
 
@@ -228,6 +299,36 @@ describe("Account Research service", () => {
     expect(executive.ok && executive.data.personaRecommendation.seniorityGuidance).toMatch(
       /Seniority alone|operational owner/i,
     );
+  });
+
+  it("recommends stakeholder categories without inventing employee names", async () => {
+    const { adapter } = persistence();
+
+    const result = await assessAccountResearch(
+      {
+        ...baseInput,
+        knownPaidSearchOwner: "CMO",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.stakeholderRecommendations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "Head of Paid Search",
+            priority: "Secondary stakeholder",
+          }),
+          expect.objectContaining({
+            role: "CMO",
+            priority: expect.stringMatching(/Possible influencer|Likely wrong contact/),
+          }),
+        ]),
+      );
+      expect(JSON.stringify(result.data.stakeholderRecommendations)).not.toMatch(/Jane|John|Jack/i);
+      expect(result.data.downstreamHandoff.contactRole).toBe("CMO");
+    }
   });
 
   it("returns correct industry evidence labels", async () => {
@@ -264,6 +365,59 @@ describe("Account Research service", () => {
     expect(vendor.ok && vendor.data.angleRecommendation.mustNotClaim).toMatch(
       /unsupported claims/i,
     );
+  });
+
+  it("returns conditional opportunities, safe questions, and claims to avoid", async () => {
+    const { adapter } = persistence();
+
+    const result = await assessAccountResearch(baseInput, { persistence: adapter });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.likelyOpportunities.join(" ")).toMatch(/\bIf\b/);
+      expect(result.data.angleRecommendation.safeOpeningQuestion).toMatch(/\?$/);
+      expect(result.data.claimsToAvoid).toEqual(
+        expect.arrayContaining([
+          "Do not claim competitors are bidding without evidence.",
+          "Do not claim CPC is rising without evidence.",
+          "Do not claim wasted spend as a verified fact.",
+          "Do not promise a specific saving percentage for this company.",
+        ]),
+      );
+      expect(result.data.angleRecommendation.primaryAngle).not.toMatch(/competitor/i);
+    }
+  });
+
+  it("passes only filtered research context to downstream workflows", async () => {
+    const { adapter } = persistence();
+
+    const result = await assessAccountResearch(
+      {
+        ...baseInput,
+        knownPain: "Seller thinks CPC may be rising.",
+        factStatuses: {
+          brandedSearchAdsActive: "VERIFIED",
+          strongOrganicBrandVisibility: "VERIFIED",
+          meaningfulBrandedSearchDemand: "VERIFIED",
+          knownPain: "ASSUMPTION",
+        },
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.downstreamHandoff.companyName).toBe("Acme");
+      expect(result.data.downstreamHandoff.observedTrigger).toBe(
+        result.data.angleRecommendation.safeOpeningQuestion,
+      );
+      expect(result.data.downstreamHandoff.internalNotes).toContain("Use as questions, not facts");
+      expect(result.data.downstreamHandoff.internalNotes).toContain("Claims to avoid");
+      expect(result.data.downstreamHandoff.internalNotes).not.toContain(
+        "VERIFIED_APPROVED_INTERNAL",
+      );
+      expect(result.data.downstreamHandoff.internalNotes).not.toContain("MODEL_INFERENCE");
+    }
   });
 
   it("persists assessments separately without modifying knowledge or suppression data", async () => {
