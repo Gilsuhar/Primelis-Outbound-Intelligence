@@ -88,22 +88,22 @@ function triggerPhrase(input: CreateOutreachInput) {
   const company = companyForCopy(input.companyName);
 
   if (!trigger) {
-    return `When ${company} already ranks organically, how do you decide when branded ads still need to run?`;
+    return `For a brand like ${company}, how do you decide when branded ads still need to run and when organic may already be enough?`;
   }
   if (/validate branded-search activity|confirm branded-search activity/i.test(trigger)) {
-    return `When ${company} owns the organic result, how do you decide when branded ads are still adding anything?`;
+    return `When organic may already capture brand demand, how do you decide whether ${company} still needs paid coverage?`;
   }
   if (/competitors/i.test(trigger)) {
-    return `When competitors appear and disappear on ${company} brand terms, who decides when coverage should change?`;
+    return `If competitors appear and disappear on ${company} brand terms, who decides when paid coverage should change?`;
   }
   if (/efficiency|brand-spend/i.test(trigger)) {
     return `There may be a paid-brand efficiency question at ${company}: which clicks are protection, and which are just demand you already owned?`;
   }
   if (/multi-market|governance|control/i.test(trigger)) {
-    return `For ${company}, the hard part is often not brand search itself but changing coverage market by market without manual checks.`;
+    return `If ${company} manages brand coverage across markets, the hard part is changing coverage without another manual check.`;
   }
   if (/growth|acquisition/i.test(trigger)) {
-    return `${company}'s growth context makes one question worth isolating: is paid brand improving acquisition, or just buying demand organic would capture?`;
+    return `If acquisition efficiency is on the agenda at ${company}, one question is worth isolating: is paid brand improving acquisition, or buying demand organic would capture?`;
   }
   return `${trigger} made me think a brand-search efficiency conversation may be relevant for ${company}.`;
 }
@@ -191,14 +191,14 @@ function contextLine(input: CreateOutreachInput) {
   const company = companyForCopy(input.companyName);
   const details = contextDetails(input);
   if (details.length === 0) {
-    return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
+    return `One paid-brand question for ${company}: branded search can look efficient while still hiding unnecessary spend.`;
   }
 
   if (details.some((detail) => /brand demand|paid-search|brand-search|spend/i.test(String(detail)))) {
-    return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
+    return `One paid-brand question for ${company}: branded search can look efficient while still hiding unnecessary spend.`;
   }
 
-  return `I had ${company} on my list because branded search can look efficient while still hiding unnecessary spend.`;
+  return `One paid-brand question for ${company}: branded search can look efficient while still hiding unnecessary spend.`;
 }
 
 function personaLine(input: CreateOutreachInput) {
@@ -393,6 +393,18 @@ export function createOutreachAiProvider(env: NodeJS.ProcessEnv = process.env): 
               "CTA must ask one practical question about how they decide or monitor this today. Keep the full draft short, clean and strong.",
             ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            userProvidedContext: [
+              request.input.companyName ? `Company name: ${request.input.companyName}` : "",
+              request.input.companyWebsite ? `Company website: ${request.input.companyWebsite}` : "",
+              request.input.contactFirstName ? `Prospect first name: ${request.input.contactFirstName}` : "",
+              request.input.contactRole ? `Buyer role: ${request.input.contactRole}` : "",
+              request.input.industry ? `Industry selected by user: ${request.input.industry}` : "",
+              request.input.companyContext ? `Company context from user: ${request.input.companyContext}` : "",
+              request.input.geographyOrMarkets ? `Markets from user: ${request.input.geographyOrMarkets}` : "",
+              request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
+              request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
+              request.input.observedTrigger ? `Outreach reason from user: ${request.input.observedTrigger}` : "",
+            ].filter(Boolean),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),

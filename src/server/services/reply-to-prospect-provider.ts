@@ -403,6 +403,14 @@ export function createReplyAiProvider(env: NodeJS.ProcessEnv = process.env): Rep
               "End with one low-pressure next question.",
             ],
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            userProvidedContext: [
+              request.input.prospectMessage
+                ? `Conversation history and latest prospect message from user: ${request.input.prospectMessage}`
+                : "",
+              request.input.companyName ? `Company name from user: ${request.input.companyName}` : "",
+              request.input.contactRole ? `Buyer role from user: ${request.input.contactRole}` : "",
+              request.input.contextNotes ? `Additional user context: ${request.input.contextNotes}` : "",
+            ].filter(Boolean),
             sourceReferences: request.records.flatMap((record) =>
               record.sourceIds.map((id, index) => ({
                 id,

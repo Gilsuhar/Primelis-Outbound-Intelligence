@@ -256,6 +256,21 @@ export function createSignalBrainProvider(
           currentDraft: result.directAnswer,
           context: {
             approvedFacts: request.records.map((record) => record.approvedText).slice(0, 10),
+            userProvidedContext: [
+              request.input.question ? `User question: ${request.input.question}` : "",
+              request.input.companyName ? `Company name from user: ${request.input.companyName}` : "",
+              request.input.industry ? `Industry from user: ${request.input.industry}` : "",
+              request.input.contactRole ? `Buyer role from user: ${request.input.contactRole}` : "",
+              request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
+              request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
+              request.input.observedTrigger ? `Observed trigger from user: ${request.input.observedTrigger}` : "",
+              request.input.internalNotes ? `Internal notes from user: ${request.input.internalNotes}` : "",
+            ].filter(Boolean),
+            writingInstructions: [
+              "Use approved facts for product truth and approved proof.",
+              "Treat the user question and account context as user-provided context, not verified Primelis knowledge.",
+              "If account-specific evidence is missing, say what to verify or phrase the answer as a cautious recommendation.",
+            ],
             sourceReferences: request.records.flatMap((record) =>
               record.sourceIds.map((id, index) => ({
                 id,

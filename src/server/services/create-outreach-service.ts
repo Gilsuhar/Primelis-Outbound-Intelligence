@@ -117,6 +117,12 @@ function sanitizeOutput(text: string) {
   );
 }
 
+function containsInternalPromptLabels(text: string) {
+  return /\b(VERIFIED_INTERNAL_KNOWLEDGE|USER_PROVIDED_CONTEXT|CONVERSATION_HISTORY|APPROVED_PROOF|UNKNOWN_OR_UNVERIFIED|approvedKnowledge|approvedFacts|outputContract)\b/.test(
+    text,
+  );
+}
+
 function accountStatusPersistence(persistence: CreateOutreachPersistence) {
   return {
     getActor: persistence.getActor.bind(persistence),
@@ -150,6 +156,7 @@ function mapCaseStudyRow(row: Row): OutreachKnowledgeRecord {
     id: asString(row.id),
     title: asString(row.title),
     type: "CASE_STUDY",
+    approvalStatus: asOptionalString(row.approvalStatus),
     approvedText: asOptionalString(row.approvedWording) ?? "",
     channels: ["EMAIL", "LINKEDIN", "INTERNAL"],
     usageRestrictions: asOptionalString(row.usageRestrictions),
@@ -249,6 +256,33 @@ function safetyNotes(input: CreateOutreachInput, records: OutreachKnowledgeRecor
     notes.add("No eligible industry-matched case study was available for this draft.");
   }
   return Array.from(notes);
+}
+
+function validateOutreachGeneration(input: CreateOutreachInput, generation: OutreachGeneration) {
+  const publicOutput = [
+    generation.recommendedMessage,
+    generation.shorterVersion,
+    generation.cta,
+    generation.connectionRequest ?? "",
+    ...generation.subjectLines,
+    ...generation.emailSections.map((section) => section.text),
+  ].join("\n");
+  if (generation.recommendedMessage.trim().length < 20) {
+    return false;
+  }
+  if (generation.cta.trim().length === 0) {
+    return false;
+  }
+  if (input.channel === "EMAIL" && generation.subjectLines.length === 0) {
+    return false;
+  }
+  if (input.channel === "LINKEDIN" && generation.subjectLines.length > 0) {
+    return false;
+  }
+  if (containsInternalPromptLabels(publicOutput)) {
+    return false;
+  }
+  return true;
 }
 
 export class PrismaCreateOutreachPersistence implements CreateOutreachPersistence {
@@ -505,6 +539,9 @@ export async function generateCreateOutreach(
     claimsUsed: generated.claimsUsed.map(sanitizeOutput),
     safetyNotes: Array.from(new Set([...generated.safetyNotes, ...baseGeneration.safetyNotes])),
   };
+  if (!validateOutreachGeneration(input, safeGenerated)) {
+    return err("GENERATION_REJECTED", "Generated outreach failed safety or quality validation.");
+  }
   const resultWithoutId = {
     ...safeGenerated,
     recordsUsed: records,

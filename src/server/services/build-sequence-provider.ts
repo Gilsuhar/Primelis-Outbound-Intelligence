@@ -359,7 +359,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       `Quick question on ${company}: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
-      "The decision is practical: stay covered when competitors appear, lower bids when CPC is being pushed up, and avoid paying for demand the organic result would already win.",
+      "The decision is practical: stay covered if competitors appear, lower bids if CPC is being pushed up, and avoid paying for demand the organic result would already win.",
       "Signal gives the team a live view of that decision across paid and organic, without turning it into another manual check.",
     ],
     PROBLEM_FRAMING: [
@@ -398,7 +398,7 @@ function bodyForPurpose({
     LOW_PRESSURE_FOLLOW_UP: [
       greeting(input),
       "",
-      `Wanted to keep this narrow. If paid-brand efficiency is on the radar at ${input.companyName}, it may be worth a quick check.`,
+      `Keeping this narrow: if paid-brand efficiency becomes relevant at ${input.companyName}, it may be worth a quick check.`,
       "If it is not a current priority, no problem.",
     ],
     BREAKUP_CLOSE_LOOP: [
@@ -603,21 +603,34 @@ export function createBuildSequenceAiProvider(
               "Keep one soft CTA per step. Never include a question in the final sentence of the body when a separate cta field is returned.",
             ],
             approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),
+            userProvidedContext: [
+              request.input.companyName ? `Company name: ${request.input.companyName}` : "",
+              request.input.companyWebsite ? `Company website: ${request.input.companyWebsite}` : "",
+              request.input.contactFirstName ? `Prospect first name: ${request.input.contactFirstName}` : "",
+              request.input.contactRole ? `Buyer role: ${request.input.contactRole}` : "",
+              request.input.industry ? `Industry selected by user: ${request.input.industry}` : "",
+              request.input.companyContext ? `Company context from user: ${request.input.companyContext}` : "",
+              request.input.geographyOrMarkets ? `Markets from user: ${request.input.geographyOrMarkets}` : "",
+              request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
+              request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
+              request.input.observedTrigger ? `Outreach reason from user: ${request.input.observedTrigger}` : "",
+            ].filter(Boolean),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
             outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
           },
         });
+        if (aiResult.sequenceSteps?.length !== result.steps.length) {
+          throw new Error("MALFORMED_RESPONSE");
+        }
         const aiSteps =
-          aiResult.sequenceSteps?.length === result.steps.length
-            ? result.steps.map((step, index) => {
+          result.steps.map((step, index) => {
                 const aiStep = aiResult.sequenceSteps?.[index];
                 if (!aiStep) {
                   return step;
                 }
                 return normalizeAiStep(step, aiStep);
-              })
-            : result.steps;
+              });
         return {
           ...result,
           steps: aiSteps,

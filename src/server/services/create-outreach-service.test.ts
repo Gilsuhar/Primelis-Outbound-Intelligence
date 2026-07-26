@@ -451,6 +451,62 @@ describe("Create Outreach service", () => {
     });
   });
 
+  it("rejects empty generated outreach before persisting a draft", async () => {
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateCreateOutreach(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "test-provider",
+          modelName: "empty-output",
+          deterministic: false,
+        },
+        generate: async ({ generation }) => ({
+          ...generation,
+          subjectLines: ["Acme paid brand"],
+          recommendedMessage: "",
+          emailSections: [],
+          shorterVersion: "",
+          cta: "",
+          claimsUsed: [],
+        }),
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated outreach failed safety or quality validation.",
+    });
+    expect(persisted).toEqual([]);
+  });
+
+  it("does not turn missing account evidence into asserted company facts", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateCreateOutreach(
+      {
+        ...baseInput,
+        companyName: "Nike",
+        companyWebsite: undefined,
+        paidSearchContext: undefined,
+        observedTrigger: undefined,
+        companyContext: undefined,
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.recommendedMessage).not.toMatch(
+        /Nike (runs|is running|has high|has weak|is losing|uses a specific|owns the organic)/i,
+      );
+      expect(result.data.knowledgeLimitations).toContain(
+        "No verified paid-search context was provided.",
+      );
+    }
+  });
+
   it("returns structured errors for invalid input and unauthorized users", async () => {
     const { adapter } = persistence([]);
     const invalid = await generateCreateOutreach({ companyName: "" }, { persistence: adapter });

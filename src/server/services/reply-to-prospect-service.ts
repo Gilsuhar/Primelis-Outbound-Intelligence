@@ -82,6 +82,12 @@ function sanitizeGeneratedText(text: string) {
   );
 }
 
+function containsInternalPromptLabels(text: string) {
+  return /\b(VERIFIED_INTERNAL_KNOWLEDGE|USER_PROVIDED_CONTEXT|CONVERSATION_HISTORY|APPROVED_PROOF|UNKNOWN_OR_UNVERIFIED|approvedKnowledge|approvedFacts|outputContract)\b/.test(
+    text,
+  );
+}
+
 export function classifyProspectMessage(message: string): ProspectIntent[] {
   const text = lastProspectTurn(message).toLowerCase();
   const intents = new Set<ProspectIntent>();
@@ -192,6 +198,23 @@ function safetyWarningsFor(input: ReplyToProspectInput, records: ReplyKnowledgeR
     warnings.add("Conversation history shows commercials were already answered; reply should move toward feedback or a walkthrough.");
   }
   return Array.from(warnings);
+}
+
+function validateReplyGeneration(result: {
+  recommendedReply: string;
+  shorterAlternative: string;
+}) {
+  const publicOutput = `${result.recommendedReply}\n${result.shorterAlternative}`;
+  if (result.recommendedReply.trim().length < 10) {
+    return false;
+  }
+  if (result.shorterAlternative.trim().length < 10) {
+    return false;
+  }
+  if (containsInternalPromptLabels(publicOutput)) {
+    return false;
+  }
+  return true;
 }
 
 export class PrismaReplyPersistence implements ReplyPersistence {
@@ -318,6 +341,9 @@ export async function generateReplyToProspect(
       prospectIntents.includes(intent),
     ) as ProspectIntent[],
   };
+  if (!validateReplyGeneration(safeGenerated)) {
+    return err("GENERATION_REJECTED", "Generated reply failed safety or quality validation.");
+  }
   const sources = sourceReferences(records);
   const resultWithoutId = {
     ...safeGenerated,

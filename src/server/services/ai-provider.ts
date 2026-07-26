@@ -15,6 +15,7 @@ export type AiDraftRequest = {
   userInstruction?: string;
   context: {
     approvedFacts: string[];
+    userProvidedContext?: string[];
     sourceReferences: Array<{ id: string; title?: string; sourceDate?: string }>;
     safetyPolicy: string[];
     outputLanguageInstruction?: string;
@@ -77,6 +78,40 @@ const aiDraftResponseSchema = z.object({
   safetyFlags: z.array(draftSafetyFlagSchema).max(20).optional().default([]),
   changeSummary: z.string().trim().max(800).optional(),
 });
+
+function hasUsablePrimaryContent(response: AiDraftResponse) {
+  return response.primaryContent.trim().length >= 10;
+}
+
+function hasUsableSequenceSteps(response: AiDraftResponse) {
+  return Boolean(
+    response.sequenceSteps?.length &&
+      response.sequenceSteps.every(
+        (step) => step.messageBody.trim().length >= 20 && step.cta.trim().length > 0,
+      ),
+  );
+}
+
+function assertWorkflowOutput(request: AiDraftRequest, response: AiDraftResponse) {
+  if (request.workflow === "BUILD_SEQUENCE") {
+    const expectedLength =
+      typeof request.context.brief?.sequenceLength === "number"
+        ? request.context.brief.sequenceLength
+        : undefined;
+    if (!hasUsableSequenceSteps(response)) {
+      throw new Error("MALFORMED_RESPONSE");
+    }
+    if (expectedLength && response.sequenceSteps?.length !== expectedLength) {
+      throw new Error("MALFORMED_RESPONSE");
+    }
+    return response;
+  }
+
+  if (!hasUsablePrimaryContent(response)) {
+    throw new Error("MALFORMED_RESPONSE");
+  }
+  return response;
+}
 
 function status(
   value: AiProviderStatusResult["status"],
@@ -383,6 +418,10 @@ export class OpenAiProvider implements AiProvider {
                     userInstruction: request.userInstruction,
                     brief: request.context.brief,
                     writingInstructions: request.context.writingInstructions,
+                    verifiedInternalKnowledge: request.context.approvedFacts.slice(0, 12),
+                    userProvidedContext: (request.context.userProvidedContext ?? []).slice(0, 12),
+                    unknownOrUnverifiedPolicy:
+                      "Company, prospect, market, vendor, spend, competitor, CPC, dashboard, and bidding-strategy details are unknown unless they appear in verifiedInternalKnowledge, sources, or explicit userProvidedContext. User-provided context may be used naturally, but do not present it as approved Primelis knowledge.",
                     approvedFacts: request.context.approvedFacts.slice(0, 12),
                     sources: request.context.sourceReferences.slice(0, 12),
                     safetyPolicy: request.context.safetyPolicy,
@@ -431,7 +470,8 @@ export class OpenAiProvider implements AiProvider {
           .filter((text): text is string => Boolean(text))
           .join("\n");
       if (!content) throw new Error("MALFORMED_RESPONSE");
-      return aiDraftResponseSchema.parse(parseJsonObject(content));
+      const parsed = aiDraftResponseSchema.parse(parseJsonObject(content));
+      return assertWorkflowOutput(request, parsed);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error("TEMPORARILY_UNAVAILABLE");

@@ -358,6 +358,36 @@ describe("Reply to Prospect service", () => {
     });
   });
 
+  it("rejects empty generated replies before persisting a draft", async () => {
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateReplyToProspect(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "test-provider",
+          modelName: "empty-output",
+          deterministic: false,
+        },
+        generate: async ({ intents, safetyWarnings }) => ({
+          recommendedReply: "",
+          shorterAlternative: "",
+          responseStrategy: "Empty provider response.",
+          detectedIntent: intents,
+          claimsUsed: [],
+          safetyWarnings,
+        }),
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated reply failed safety or quality validation.",
+    });
+    expect(persisted).toEqual([]);
+  });
+
   it("returns structured errors for invalid input", async () => {
     const { adapter } = persistence([]);
 
