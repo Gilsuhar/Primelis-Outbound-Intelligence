@@ -19,6 +19,7 @@ import {
   type SignalBrainSourceReference,
 } from "@/features/ask-signal-brain/types";
 import { personas } from "@/features/playbook/playbook-content";
+import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import { createSignalBrainProvider, type SignalBrainProvider } from "./ask-signal-brain-provider";
@@ -251,23 +252,23 @@ function safetyWarningsFor(input: SignalBrainInput, records: SignalBrainKnowledg
 }
 
 function selectCaseStudyRecommendation(
-  records: SignalBrainKnowledgeRecord[],
+  proofSelection: ReturnType<typeof selectProofForContext>,
   input: SignalBrainInput,
 ): CaseStudyRecommendation | undefined {
-  const caseStudy = records.find((record) => record.type === "CASE_STUDY");
-  if (!caseStudy) {
+  const selectedProof = proofSelection.selectedProof;
+  if (!selectedProof) {
     return undefined;
   }
 
   return {
-    recommendedCaseStudy: caseStudy.title,
-    whyItFits: `It is the closest eligible approved case study for ${input.industry ?? "the provided context"}.`,
+    recommendedCaseStudy: selectedProof.record.title,
+    whyItFits: selectedProof.matchReasons.join("; "),
     bestFitIndustry: input.industry ?? "Use only when the industry fit is verified.",
     bestFitPersona: input.contactRole ?? "Paid Search or Performance owner",
     bestFitObjection: "Use for proof requests when the metric directly supports the buyer concern.",
-    eligibleUsageScope: caseStudy.usageScope ?? "PRIMELIS_APPROVED_OUTBOUND",
-    approvedMetrics: caseStudy.metrics ?? [],
-    externalUseWarning: "Approved by Primelis for outbound use; frame metrics as observed outcomes.",
+    eligibleUsageScope: selectedProof.record.usageScope ?? "PRIMELIS_APPROVED_OUTBOUND",
+    approvedMetrics: selectedProof.record.metrics ?? selectedProof.allowedMetricPhrases,
+    externalUseWarning: selectedProof.guidance,
   };
 }
 
@@ -478,9 +479,28 @@ export async function askSignalBrain(
 
   const provider = dependencies.provider ?? createSignalBrainProvider();
   const intents = classifySignalBrainQuestion(input);
-  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
+  const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
     isRecordEligible(record),
   );
+  const proofRequested =
+    input.mode === "CASE_STUDY_SELECTION" ||
+    /\b(case study|proof|customer story|metric|saving|savings|mql|sql|pipeline)\b/i.test(
+      input.question,
+    );
+  const proofSelection = selectProofForContext(eligibleRecords, {
+    workflow: "ASK_SIGNAL_BRAIN",
+    companyName: input.companyName,
+    industry: input.industry,
+    contactRole: input.contactRole,
+    question: input.question,
+    conversation: `${input.paidSearchContext ?? ""} ${input.observedTrigger ?? ""} ${input.internalNotes ?? ""}`,
+    requestedProof: proofRequested,
+  });
+  const records = (
+    proofSelection.selectedProof
+      ? proofSelection.records
+      : eligibleRecords.filter((record) => record.type !== "CASE_STUDY")
+  ) as SignalBrainKnowledgeRecord[];
   const sources = sourceReferences(records);
   const accountFit =
     input.mode === "ACCOUNT_QUALIFICATION" || intents.includes("ACCOUNT_QUALIFICATION")
@@ -496,9 +516,9 @@ export async function askSignalBrain(
       : undefined;
   const caseStudyRecommendation =
     input.mode === "CASE_STUDY_SELECTION" || intents.includes("CASE_STUDY_SELECTION")
-      ? selectCaseStudyRecommendation(records, input)
+      ? selectCaseStudyRecommendation(proofSelection, input)
       : undefined;
-  const safetyWarnings = safetyWarningsFor(input, records);
+  const safetyWarnings = [...safetyWarningsFor(input, records), ...proofSelection.notes];
   const generated = await provider.generate({
     input,
     intents,
@@ -525,6 +545,26 @@ export async function askSignalBrain(
 
   if (!validateGeneration(resultWithoutId)) {
     return err("GENERATION_REJECTED", "Signal Brain answer failed safety validation.");
+  }
+  if (proofRequested || proofSelection.selectedProof) {
+    const proofValidation = validateProofUsage({
+      output: JSON.stringify({
+        directAnswer: resultWithoutId.directAnswer,
+        conciseRecommendation: resultWithoutId.conciseRecommendation,
+        reasoningSummary: resultWithoutId.reasoningSummary,
+        recommendedNextAction: resultWithoutId.recommendedNextAction,
+        caseStudyRecommendation: resultWithoutId.caseStudyRecommendation,
+      }),
+      selectedProof: proofSelection.selectedProof,
+      availableProofRecords: eligibleRecords,
+      maxMetricMentions: 2,
+    });
+    if (!proofValidation.ok) {
+      return err(
+        "GENERATION_REJECTED",
+        `Signal Brain answer failed proof validation. ${proofValidation.reason}`,
+      );
+    }
   }
 
   const draftId = await persistence.persistDraft({

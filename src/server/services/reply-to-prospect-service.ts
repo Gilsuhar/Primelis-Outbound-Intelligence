@@ -13,6 +13,7 @@ import {
   type ReplyToProspectInput,
   type ReplyToProspectResult,
 } from "@/features/reply-to-prospect/types";
+import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -217,6 +218,15 @@ function validateReplyGeneration(result: {
   return true;
 }
 
+function replyRequestsProof(input: ReplyToProspectInput, intents: ProspectIntent[]) {
+  return (
+    intents.includes("DECK_REQUEST") ||
+    /\b(value|fee|pricing|commercials|cost|roi|savings|save|saved|case study|proof|example|deck|mql|sql|pipeline)\b/i.test(
+      `${input.prospectMessage} ${input.contextNotes ?? ""}`,
+    )
+  );
+}
+
 export class PrismaReplyPersistence implements ReplyPersistence {
   constructor(private readonly client: MinimalPrismaClient = prisma) {}
 
@@ -252,7 +262,61 @@ export class PrismaReplyPersistence implements ReplyPersistence {
       WHERE ki."approvalStatus" = 'APPROVED'
         AND ki.type IN ('PRODUCT_TRUTH', 'MESSAGE_EXAMPLE', 'OBJECTION')
       GROUP BY ki.id
-      ORDER BY ki."updatedAt" DESC
+
+      UNION ALL
+
+      SELECT
+        cs.id,
+        cs.title,
+        'CASE_STUDY' AS type,
+        cs."approvalStatus",
+        COALESCE(
+          cs."approvedExternalWording",
+          CONCAT_WS(
+            ' ',
+            'Case study: ' || cs."companyName" || '.',
+            NULLIF(cs."initialProblem", ''),
+            NULLIF(cs."signalApproach", ''),
+            CASE
+              WHEN COUNT(csm.id) > 0 THEN
+                'Metrics: ' || STRING_AGG(
+                  DISTINCT COALESCE(
+                    csm."approvedWording",
+                    csm."metricName" || ' ' ||
+                      CASE csm.direction
+                        WHEN 'DECREASE' THEN 'decreased'
+                        WHEN 'INCREASE' THEN 'increased'
+                        WHEN 'NEUTRAL' THEN 'stayed stable'
+                        ELSE 'changed'
+                      END ||
+                      CASE
+                        WHEN csm.value IS NOT NULL AND LOWER(COALESCE(csm.unit, '')) = 'percent' THEN ' by ' || csm.value || '%'
+                        WHEN csm.value IS NOT NULL THEN ' by ' || csm.value || COALESCE(' ' || csm.unit, '')
+                        ELSE ''
+                      END ||
+                      COALESCE(' ' || csm.comparison, '')
+                  ),
+                  '; '
+                )
+              ELSE NULL
+            END,
+            'Approved by Primelis for outbound social proof. Frame metrics as observed outcomes, not guarantees.'
+          )
+        ) AS "approvedWording",
+        cs."signalApproach" AS body,
+        cs."initialProblem" AS summary,
+        ARRAY['EMAIL', 'LINKEDIN']::"Channel"[] AS channels,
+        cs."usageRestrictions",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.id), NULL) AS "sourceIds",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s.title), NULL) AS "sourceTitles",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT s."sourceDate"::text), NULL) AS "sourceDates"
+      FROM "CaseStudy" cs
+      LEFT JOIN "_CaseStudySources" css ON css."A" = cs.id
+      LEFT JOIN "SourceDocument" s ON s.id = css."B"
+      LEFT JOIN "CaseStudyMetric" csm ON csm."caseStudyId" = cs.id
+      WHERE cs."approvalStatus" = 'APPROVED'
+      GROUP BY cs.id
+      ORDER BY title ASC
     `;
     return rows.map(mapKnowledgeRow).filter((record) => isRecordEligible(record, input.channel));
   }
@@ -327,11 +391,25 @@ export async function generateReplyToProspect(
   }
   const provider = dependencies.provider ?? createReplyAiProvider();
   const intents = classifyProspectMessage(input.prospectMessage);
-  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
+  const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
     isRecordEligible(record, input.channel),
   );
+  const proofSelection = selectProofForContext(eligibleRecords, {
+    workflow: "REPLY_TO_PROSPECT",
+    companyName: input.companyName,
+    contactRole: input.contactRole,
+    question: input.prospectMessage,
+    conversation: input.contextNotes,
+    requestedProof: replyRequestsProof(input, intents),
+  });
+  const records = proofSelection.records as ReplyKnowledgeRecord[];
   const safetyWarnings = safetyWarningsFor(input, records);
-  const generated = await provider.generate({ input, intents, records, safetyWarnings });
+  const generated = await provider.generate({
+    input,
+    intents,
+    records,
+    safetyWarnings: [...safetyWarnings, ...proofSelection.notes],
+  });
   const safeGenerated = {
     ...generated,
     recommendedReply: sanitizeGeneratedText(generated.recommendedReply),
@@ -340,9 +418,26 @@ export async function generateReplyToProspect(
     detectedIntent: generated.detectedIntent.filter((intent) =>
       prospectIntents.includes(intent),
     ) as ProspectIntent[],
+    safetyWarnings: Array.from(new Set([...generated.safetyWarnings, ...proofSelection.notes])),
   };
   if (!validateReplyGeneration(safeGenerated)) {
     return err("GENERATION_REJECTED", "Generated reply failed safety or quality validation.");
+  }
+  const proofValidation = validateProofUsage({
+    output: [
+      safeGenerated.recommendedReply,
+      safeGenerated.shorterAlternative,
+      ...safeGenerated.claimsUsed,
+    ].join("\n"),
+    selectedProof: proofSelection.selectedProof,
+    availableProofRecords: eligibleRecords,
+    maxMetricMentions: 1,
+  });
+  if (!proofValidation.ok) {
+    return err(
+      "GENERATION_REJECTED",
+      `Generated reply failed proof validation. ${proofValidation.reason}`,
+    );
   }
   const sources = sourceReferences(records);
   const resultWithoutId = {

@@ -22,6 +22,7 @@ import {
 } from "@/features/build-sequence/types";
 import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
+import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -685,12 +686,22 @@ export async function generateBuildSequence(
   }
 
   const provider = dependencies.provider ?? createBuildSequenceAiProvider();
-  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) => {
+  const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) => {
     if (record.type === "CASE_STUDY") {
       return isCaseStudyEligible(record);
     }
     return isKnowledgeItemEligible(record, input);
   });
+  const proofSelection = selectProofForContext(eligibleRecords, {
+    workflow: "BUILD_SEQUENCE",
+    companyName: input.companyName,
+    industry: input.industry,
+    contactRole: input.contactRole,
+    question: input.observedTrigger,
+    conversation: `${input.companyContext ?? ""} ${input.paidSearchContext ?? ""} ${input.internalNotes ?? ""}`,
+    requestedProof: true,
+  });
+  const records = proofSelection.records as SequenceKnowledgeRecord[];
   const sources = sourceReferences(records);
   const selected = selectSequenceAngle(input);
   const baseGeneration = {
@@ -699,7 +710,7 @@ export async function generateBuildSequence(
     angleRationale: selected.rationale,
     personaEmphasis: getSequencePersonaGuidance(input.contactRole),
     detectedAccountSignals: detectSequenceAccountSignals(input),
-    safetyNotes: safetyNotes(input, records),
+    safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
     knowledgeLimitations: knowledgeLimitations(input, records),
   };
   const generated = sanitizeSequenceGeneration(
@@ -720,6 +731,19 @@ export async function generateBuildSequence(
 
   if (!validateSequenceGeneration(input, generated, records)) {
     return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+  }
+  const proofValidation = validateProofUsage({
+    output: JSON.stringify({
+      overallStrategy: generated.overallStrategy,
+      claimsUsed: generated.claimsUsed,
+      steps: generated.steps,
+    }),
+    selectedProof: proofSelection.selectedProof,
+    availableProofRecords: eligibleRecords,
+    maxMetricMentions: input.sequenceLength > 4 ? 2 : 1,
+  });
+  if (!proofValidation.ok) {
+    return err("GENERATION_REJECTED", `Generated sequence failed proof validation. ${proofValidation.reason}`);
   }
 
   const resultWithoutId = {

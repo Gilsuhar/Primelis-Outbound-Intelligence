@@ -76,7 +76,7 @@ describe("Ask Signal Brain service", () => {
     }
   });
 
-  it("excludes competitor claims while allowing sourced case-study proof", async () => {
+  it("excludes competitor objection records and internally restricted case-study proof", async () => {
     const { adapter } = persistence([
       knowledge({ id: "approved" }),
       knowledge({
@@ -96,8 +96,8 @@ describe("Ask Signal Brain service", () => {
     const result = await askSignalBrain(
       {
         ...baseInput,
-        question: "How should I approach a prospect already using Adthena?",
-        currentVendor: "Adthena",
+        question: "How should I approach a prospect using their current search platform?",
+        currentVendor: "Current search platform",
         mode: "OBJECTION_GUIDANCE",
       },
       { persistence: adapter },
@@ -105,13 +105,10 @@ describe("Ask Signal Brain service", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
-        "approved",
-        "approved-proof-case-study",
-      ]);
+      expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["approved"]);
       expect(JSON.stringify(result.data)).not.toMatch(/worse than/i);
-      expect(result.data.safetyWarnings).toContain(
-        "Competitor context should validate the current setup and avoid replacement pressure.",
+      expect(result.data.recordsUsed.map((record) => record.id)).not.toContain(
+        "approved-proof-case-study",
       );
     }
   });
@@ -236,10 +233,12 @@ describe("Ask Signal Brain service", () => {
         recommendedCaseStudy: "Eligible retail case study",
         eligibleUsageScope: "EMAIL_AND_LINKEDIN",
       });
-      expect(result.data.recordsUsed.map((record) => record.id)).toContain(
+      expect(result.data.recordsUsed.map((record) => record.id)).not.toContain(
         "legacy-case-study",
       );
-      expect(result.data.caseStudyRecommendation?.externalUseWarning).toContain("Approved by Primelis");
+      expect(result.data.caseStudyRecommendation?.externalUseWarning).toContain(
+        "only selected proof",
+      );
     }
   });
 

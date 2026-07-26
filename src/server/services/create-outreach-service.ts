@@ -20,6 +20,7 @@ import {
 } from "@/features/create-outreach/types";
 import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
+import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -502,9 +503,25 @@ export async function generateCreateOutreach(
   }
 
   const provider = dependencies.provider ?? createOutreachAiProvider();
-  const records = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
+  const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) =>
     isEligible(record, input.channel),
   );
+  const proofSelection = input.useCaseStudy
+    ? selectProofForContext(eligibleRecords, {
+        workflow: "CREATE_OUTREACH",
+        companyName: input.companyName,
+        industry: input.industry,
+        contactRole: input.contactRole,
+        question: input.observedTrigger,
+        conversation: `${input.companyContext ?? ""} ${input.paidSearchContext ?? ""} ${input.internalNotes ?? ""}`,
+        requestedProof: true,
+      })
+    : {
+        records: eligibleRecords.filter((record) => record.type !== "CASE_STUDY"),
+        notes: ["Case studies were not used because the optional proof setting was off."],
+        selectedProof: undefined,
+      };
+  const records = proofSelection.records as OutreachKnowledgeRecord[];
   const sources = sourceReferences(records);
   const selected = selectOutreachAngle(input);
   const baseGeneration = {
@@ -513,7 +530,7 @@ export async function generateCreateOutreach(
     detectedSignals: detectAccountSignals(input),
     personaGuidance: getPersonaGuidance(input.contactRole),
     knowledgeLimitations: knowledgeLimitations(input, records),
-    safetyNotes: safetyNotes(input, records),
+    safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
   };
   const generated = await provider.generate({
     input,
@@ -541,6 +558,23 @@ export async function generateCreateOutreach(
   };
   if (!validateOutreachGeneration(input, safeGenerated)) {
     return err("GENERATION_REJECTED", "Generated outreach failed safety or quality validation.");
+  }
+  const proofValidation = validateProofUsage({
+    output: [
+      safeGenerated.recommendedMessage,
+      safeGenerated.shorterVersion,
+      safeGenerated.cta,
+      safeGenerated.connectionRequest ?? "",
+      ...safeGenerated.subjectLines,
+      ...safeGenerated.emailSections.map((section) => section.text),
+      ...safeGenerated.claimsUsed,
+    ].join("\n"),
+    selectedProof: proofSelection.selectedProof,
+    availableProofRecords: eligibleRecords,
+    maxMetricMentions: 1,
+  });
+  if (!proofValidation.ok) {
+    return err("GENERATION_REJECTED", `Generated outreach failed proof validation. ${proofValidation.reason}`);
   }
   const resultWithoutId = {
     ...safeGenerated,

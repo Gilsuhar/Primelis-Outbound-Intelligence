@@ -142,6 +142,41 @@ describe("Reply to Prospect service", () => {
     }
   });
 
+  it("includes one selected proof record for value or commercial follow-up replies", async () => {
+    let providerRecordIds: string[] = [];
+    const provider = new DeterministicReplyProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      providerRecordIds = request.records.map((record) => record.id);
+      return originalGenerate(request);
+    };
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "fintech-proof",
+        title: "Fintech savings proof",
+        type: "CASE_STUDY",
+        approvedText:
+          "Case study: Bluevine. Signal reduced brand spend by 54% while keeping qualified demand stable.",
+        sourceIds: ["fintech-source"],
+      }),
+    ]);
+
+    const result = await generateReplyToProspect(
+      {
+        ...baseInput,
+        prospectMessage:
+          "I see. Thanks. What does the fee structure look like and what value should we expect?",
+        contextNotes:
+          "Deck was already sent. Answer commercials and move toward a 10-minute walkthrough.",
+      },
+      { persistence: adapter, provider },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(providerRecordIds).toEqual(["product-truth", "fintech-proof"]);
+  });
+
   it("does not introduce commercial terms in generated replies", async () => {
     const { adapter } = persistence([
       knowledge({

@@ -263,6 +263,40 @@ describe("Build Sequence service", () => {
     });
   });
 
+  it("passes only the selected approved case-study proof to the sequence provider", async () => {
+    let providerRecordIds: string[] = [];
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      providerRecordIds = request.records.map((record) => record.id);
+      return originalGenerate(request);
+    };
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "retail-proof",
+        title: "Crocs retail proof",
+        type: "CASE_STUDY",
+        approvedText:
+          "Case study: Crocs. Total branded search spend decreased by 71.2% while monitoring paid and organic performance.",
+      }),
+      knowledge({
+        id: "saas-proof",
+        title: "AppsFlyer B2B SaaS proof",
+        type: "CASE_STUDY",
+        approvedText:
+          "Case study: AppsFlyer. Signal protected MQL and SQL quality while reducing wasted brand spend.",
+      }),
+    ]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result.ok).toBe(true);
+    expect(providerRecordIds).toContain("product-truth");
+    expect(providerRecordIds).toContain("retail-proof");
+    expect(providerRecordIds).not.toContain("saas-proof");
+  });
+
   it("rejects sequences that use more than one case-study proof company", async () => {
     const provider = new DeterministicBuildSequenceProvider();
     const originalGenerate = provider.generate.bind(provider);
@@ -302,7 +336,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed proof validation."),
     });
   });
 
