@@ -146,6 +146,22 @@ function hasScreenshotContext(input: BuildSequenceInput) {
   );
 }
 
+type StepTwoMode = "VISUAL" | "PROOF" | "DIAGNOSTIC";
+
+function proofTextHasMetric(text: string) {
+  return /\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b/i.test(text);
+}
+
+function stepTwoMode(input: BuildSequenceInput, caseStudyFacts: string[]): StepTwoMode {
+  if (hasScreenshotContext(input)) {
+    return "VISUAL";
+  }
+  if (caseStudyFacts.some(proofTextHasMetric)) {
+    return "PROOF";
+  }
+  return "DIAGNOSTIC";
+}
+
 function screenshotDetails(input: BuildSequenceInput) {
   return [
     input.screenshotContext,
@@ -157,6 +173,13 @@ function screenshotDetails(input: BuildSequenceInput) {
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function conciseProofText(text: string) {
+  const cleaned = stripCommercialTerms(roundPercentages(text))
+    .replace(/\s+/g, " ")
+    .trim();
+  return trimSentences(cleaned, 2);
 }
 
 function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
@@ -240,19 +263,15 @@ function ctaForPurpose(
       ? "Do you already track this?"
       : "Is this on your radar?";
   }
-  const pattern = winningPatternForPurpose(input, purpose, stepNumber - 1);
-  if (pattern.cta) {
-    return pattern.cta;
-  }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you already have a way to detect that?",
-    PROBLEM_FRAMING: "Do you have visibility into when this happens?",
-    METHODOLOGY_DIFFERENTIATION: "Is this something your team already checks regularly?",
+    FIRST_TOUCH_RELEVANCE: "Do you currently have visibility into those moments?",
+    PROBLEM_FRAMING: "How often do you see this across your branded searches?",
+    METHODOLOGY_DIFFERENTIATION: "Worth a brief walkthrough?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
-    SOCIAL_PROOF: "Want the short version of how another team approached this?",
-    TECHNICAL_CLARIFICATION: "Would a two-point methodology view help?",
+    SOCIAL_PROOF: "Would it be useful to compare this with your current branded-search process?",
+    TECHNICAL_CLARIFICATION: "Would a brief walkthrough help?",
     LOW_PRESSURE_FOLLOW_UP: "Should I park this for later?",
-    BREAKUP_CLOSE_LOOP: "If this is not relevant, I can close the loop here.",
+    BREAKUP_CLOSE_LOOP: "No problem if it isn't a priority right now.",
   };
   return ctas[purpose];
 }
@@ -315,6 +334,16 @@ function roleAngle(input: BuildSequenceInput) {
 }
 
 function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"], body: string) {
+  const referencePurposes: SequenceStep["purpose"][] = [
+    "FIRST_TOUCH_RELEVANCE",
+    "PROBLEM_FRAMING",
+    "METHODOLOGY_DIFFERENTIATION",
+    "BREAKUP_CLOSE_LOOP",
+  ];
+  if (referencePurposes.includes(purpose)) {
+    return stripCommercialTerms(body);
+  }
+
   const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
   const hello = blocks[0]?.startsWith("Hi ") ? blocks[0] : greeting(input);
   const content = blocks[0]?.startsWith("Hi ") ? blocks.slice(1) : blocks;
@@ -371,17 +400,19 @@ function bodyForPurpose({
   purpose,
   channel,
   secondaryFact,
+  stepTwoMode,
   ctaIndex,
 }: {
   input: BuildSequenceInput;
   purpose: SequenceStep["purpose"];
   channel: SequenceStep["channel"];
   secondaryFact: string;
+  stepTwoMode: StepTwoMode;
   ctaIndex: number;
 }) {
-  const trigger = input.observedTrigger.trim();
   const company = displayCompany(input);
-  const simpleSecondaryFact = humanizeFact(secondaryFact);
+  const simpleSecondaryFact =
+    stepTwoMode === "PROOF" ? secondaryFact : humanizeFact(secondaryFact);
   const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
   const patternBody = pattern.body;
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
@@ -401,34 +432,39 @@ function bodyForPurpose({
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Quick question on ${company}: how do you decide when branded ads should stay live, and when organic would have captured the click anyway?`,
-      "The decision is practical: stay covered if competitors appear, lower bids if CPC is being pushed up, and avoid paying for demand the organic result would already win.",
-      "Signal gives the team a live view of that decision across paid and organic, without turning it into another manual check.",
+      `Quick question on ${company}'s branded search: how do you decide when brand ads are genuinely protecting the query, and when organic may have captured the click anyway?`,
+      "Signal monitors live Google and Bing results and can adjust coverage as competitor activity changes, rather than leaving brand bids on the same setting throughout the day.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      hasScreenshotContext(input)
-        ? "Here is a simple example of the type of moment Signal monitors."
-        : "Branded-search coverage often stays unchanged even though competitor presence changes throughout the day.",
-      hasScreenshotContext(input)
-        ? `In this supplied example: ${screenshotDetails(input)}`
-        : "The practical gap is visibility: knowing when coverage is protecting demand, and when the bid can come down without turning the review into manual work.",
-      hasScreenshotContext(input)
-        ? "Signal can identify this condition automatically, so the team can choose to pause or reduce the bid without treating the example as proof about your account."
-        : `For ${company}, I would treat that as a process question, not a claim about current waste.`,
+      stepTwoMode === "VISUAL"
+        ? "Here's an example of the type of moment Signal monitors:"
+        : stepTwoMode === "PROOF"
+          ? "Approved proof:"
+          : "Branded-search coverage often remains unchanged even though competitor presence can change during the day.",
+      stepTwoMode === "VISUAL"
+        ? `In this example, ${screenshotDetails(input)}`
+        : stepTwoMode === "PROOF"
+          ? conciseProofText(simpleSecondaryFact)
+          : "The useful diagnostic is simple: can the team see when the brand is alone, when competitors return, and whether bids should change with that condition?",
+      stepTwoMode === "VISUAL"
+          ? "Signal can identify these conditions automatically and either pause the ad or reduce the bid, depending on the team's strategy."
+          : stepTwoMode === "PROOF"
+          ? "The useful next step is to compare where paid coverage protects demand and where bids can safely come down."
+          : `For ${company}, I would treat that as a visibility question, not as proof about the account.`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "The technology angle is simple: Signal monitors Google and Bing search results in real time, checks whether competitors are present, and connects that live view with Google Ads, Search Console and conversion data.",
-      "When the brand is alone, bids can come down or pause. When competitors return, coverage comes back before demand is exposed.",
-      "That is where Signal fits: turning brand coverage into an automated decision instead of a manual review.",
+      "Signal continuously checks competitor presence on branded queries.",
+      "When the brand is the only advertiser, it can pause the ad or lower the bid. When competition returns, coverage is adjusted again automatically.",
+      "The goal is to maintain protection without using the same bid in every search condition.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
       "",
-      `The only assumption I would make about ${company} is a light one: ${cleanSelection(trigger) ?? trigger}.`,
+      `The only assumption I would make about ${company} is a light one: branded-search process may be worth checking.`,
       "I would not pitch that as proof. I would use it as a reason to check whether paid brand is still doing work organic cannot do.",
     ],
     SOCIAL_PROOF: [
@@ -453,8 +489,9 @@ function bodyForPurpose({
     BREAKUP_CLOSE_LOOP: [
       greeting(input),
       "",
-      "I will close the loop after this note.",
-      "If branded-search efficiency becomes a priority later, the useful starting point is straightforward: where is paid coverage protecting demand, and where is it only adding cost?",
+      "I'll close the loop here.",
+      "This may already be something your team manages closely. If not, I can send the short version of how teams review those moments.",
+      "No problem if it isn't a priority right now.",
     ],
   };
 
@@ -505,25 +542,24 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     const caseStudyFacts = records
       .filter((record) => record.type === "CASE_STUDY")
       .map((record) => stripCommercialTerms(record.approvedText));
+    const proofFacts = caseStudyFacts.filter(proofTextHasMetric);
+    const selectedStepTwoMode = stepTwoMode(input, proofFacts);
     const primaryFact = productFacts[0]
       ? trimSentences(productFacts[0], 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
     const secondaryFact = productFacts[1] ? trimSentences(productFacts[1], 1) : primaryFact;
-    const purposes: SequencePurpose[] = defaultPurposesForLength(
-      input.sequenceLength,
-      !hasScreenshotContext(input) && caseStudyFacts.length > 0,
-    );
+    const purposes: SequencePurpose[] = defaultPurposesForLength();
     const sourceIds = Array.from(new Set(records.flatMap((record) => record.sourceIds)));
 
     const steps = purposes.map((purpose, index): SequenceStep => {
       const stepNumber = index + 1;
       const channel = channelForStep(input.primaryChannel, index);
-      const isFinal = stepNumber === input.sequenceLength;
+      const isFinal = stepNumber === purposes.length;
       const cta = ctaForPurpose(input, purpose, stepNumber, isFinal, channel);
       return {
         stepNumber,
         channel,
-        delay: delayFor(stepNumber, input.sequenceLength, input.desiredOverallDuration),
+        delay: delayFor(stepNumber, purposes.length, input.desiredOverallDuration),
         purpose,
         channelRationale:
           (input.primaryChannel === "MIXED"
@@ -539,7 +575,8 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           input,
           purpose,
           channel,
-          secondaryFact: caseStudyFacts[0] ?? secondaryFact,
+          secondaryFact: proofFacts[0] ?? secondaryFact,
+          stepTwoMode: selectedStepTwoMode,
           ctaIndex: index,
         }),
         cta,
@@ -588,6 +625,11 @@ export function createBuildSequenceAiProvider(
       const fallback = new DeterministicBuildSequenceProvider();
       const result = await fallback.generate(request);
       const promptRecords = recordsForPrompt(request.records);
+      const selectedCaseStudyFacts = promptRecords
+        .filter((record) => record.type === "CASE_STUDY")
+        .map((record) => record.approvedText)
+        .filter(proofTextHasMetric);
+      const selectedStepTwoMode = stepTwoMode(request.input, selectedCaseStudyFacts);
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -623,6 +665,7 @@ export function createBuildSequenceAiProvider(
               observationDate: request.input.observationDate,
               screenshotShows: request.input.screenshotShows,
               selectedAngle: result.selectedAngle,
+              stepTwoMode: selectedStepTwoMode,
               approvedKnowledge: promptRecords.map((record) => ({
                 title: record.title,
                 type: record.type,
@@ -637,37 +680,19 @@ export function createBuildSequenceAiProvider(
               })),
             },
             writingInstructions: [
-              "Decision hierarchy: approvedKnowledge and approvedFacts are the source of truth for Signal, product behavior, proof, objections, and approved claims.",
-              "Use your general B2B and industry knowledge only to choose angle, language, and likely buyer concerns. Never present general model knowledge as a verified fact about the specific company.",
-              "If the company is well-known, you may use broad public category knowledge cautiously, such as travel marketplace, SaaS, ecommerce, or enterprise software. Phrase it as context, not as a discovered fact.",
-              "Separate verified facts from assumptions in your reasoning. Prospect-facing copy may ask about assumptions, but must not assert unverified details.",
-              "Prefer the strongest relevant approvedKnowledge over generic outbound patterns. If approvedKnowledge includes winning-message examples or case studies, borrow the strategic pattern, not the exact wording.",
-              "Treat retrieved CASE_STUDY records as approved Primelis outbound proof. Use one relevant case study in step 2 when any case study matches the industry/persona. Do not use more than one case study unless the user explicitly asks for multiple proof points.",
-              "Only mention a named customer, savings percentage, MQL, SQL, revenue, clicks, or performance metric if that exact claim appears in approvedKnowledge or approvedFacts.",
-              "If an approved metric exists, make it concrete and compact: reduced branded-search spend while keeping overall performance, revenue, clicks, lead volume, MQLs, SQLs, or demo quality stable or improved.",
-              "For ecommerce, retail, fashion, travel or luxury accounts, prioritize savings while maintaining revenue, clicks, traffic quality and market coverage. For B2B SaaS, prioritize CAC, MQL, SQL, demo quality and pipeline efficiency.",
-              "When approvedKnowledge includes 40-60% style metrics such as 40%, 50%, 54%, or 60%, you may use them as observed customer outcomes. Never frame them as a guarantee for the prospect.",
-              "Write the sequence from scratch. Do not rewrite or imitate a local template.",
-              "Return sequenceSteps with exactly the same number of steps and the same order as brief.sequencePlan.",
-              "Each email body should be 45-85 words. Each LinkedIn body should be 25-50 words. Make every email short, clean and strong.",
-              "Write more direct and less poetic. Avoid soft filler like usually, tends to, noisy, drift, playing out, the tradeoff, the difference is, sits in the same place, and carries the same pressure unless the sentence would lose clarity without it.",
-              "Use plain sales language: cost, CPC, organic coverage, competitors, bid changes, savings, revenue, clicks, MQL, SQL. No lyrical or essay-style phrasing.",
-              "Each step must add a new reason, not repeat the same brand-search question.",
-              "Round prospect-facing percentages to whole numbers: write 71%, not 71.2%, unless the exact decimal is specifically important.",
-              "If a case-study subject line names an industry, it must match the proof company. Crocs is retail/footwear/ecommerce, not travel. If unsure, write 'customer example' instead of an industry label.",
-              "Do not use these fallback phrases or close variants: 'Quick question on', 'For context', 'A useful way to look at this', 'I will close the loop here', 'If this is not relevant, I can close the loop here'.",
-              "Do not repeat the same idea in the body and CTA. The final step must close once only.",
-              "The selected buyer role must change the copy: Paid Search gets operational bid/control language, Growth gets CAC/acquisition efficiency, CMO/VP gets budget visibility and business outcome language.",
-              "If buyer role is missing or generic, write for a paid-brand/search leader without pretending to know the exact title.",
-              "The selected tone must visibly change the copy: DIRECT is shorter and plainer, WARM is softer and less assumptive, EXECUTIVE removes tactical detail and emphasizes business control.",
-              "Do not reuse the same opening structure across steps. Avoid starting every step with 'When', 'For context', or 'A useful way'.",
-              "Four-step progression: Step 1 opens with one process-based branded-search question. Step 2 is evidence-led: use supplied screenshot/SERP context first, otherwise one approved relevant case study, otherwise a concise diagnostic insight. Step 3 explains how Signal acts: monitors Google and Bing, detects competitor/no-competitor changes, lowers or pauses bids when configured, and restores coverage when competition returns. Final step: brief respectful close only.",
-              "If screenshot context exists, Step 2 must include the exact placeholder '[Insert relevant SERP or Signal screenshot here]' and describe only what the user supplied. Do not say the screenshot is from the prospect account unless the user explicitly supplied that fact.",
-              "If screenshot context is absent, do not invent an image, solo-bidder condition, competitor absence, screenshot, or visual observation.",
-              "Step 2 must not use a vague anonymous customer story. Use a named approved case study with exact metric, or a practical diagnostic insight.",
-              "Do not use fluffy phrases like checking in, wanted to follow up, hope you are well, thought this might be relevant, or I had the company on my list.",
-              "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",
-              "Keep one soft CTA per step. Never include a question in the final sentence of the body when a separate cta field is returned.",
+              "Template-first task: do not invent a new sequence strategy. Return exactly four sequenceSteps matching brief.sequencePlan.",
+              "Use this approved reference as the primary style and structure. Step 1: Hi [First name], Quick question on [Company]'s branded search: how do you decide when brand ads are genuinely protecting the query, and when organic may have captured the click anyway? Signal monitors live Google and Bing results and adjusts branded coverage as competitor activity changes. Do you currently have visibility into those moments?",
+              "Reference Step 2 visual mode: Here's a simple example of the type of moment Signal monitors: [placeholder]. In this example, describe only what the user supplied. Signal can identify these conditions automatically and either pause the ad or reduce the bid, depending on the team's strategy. Ask whether they have visibility into similar moments.",
+              "Reference Step 3: Signal continuously checks competitor presence on branded queries. When the brand is the only advertiser, it can pause the ad or lower the bid. When competition returns, coverage is adjusted again automatically. End with a brief walkthrough CTA.",
+              "Reference Step 4: close the loop, acknowledge they may already manage this, offer one light next step, and do not add new proof or technical detail.",
+              "Step 2 mode is preselected by the application as brief.stepTwoMode. If VISUAL, use only supplied screenshot fields and include the exact placeholder through imagePlaceholder, not inside body text. If PROOF, use only the selected named approved case study and exact approved metric. If DIAGNOSTIC, use a conditional general insight with no customer, no metric, and no prospect-specific claim.",
+              "Allowed adaptation only: first name, company or brand, role context, supplied screenshot context, selected approved case study, approved product facts, and CTA wording within the approved intent.",
+              "Rejected bad example: 'At LELO, branded search can be doing more work than it should if competitors are taking slots or if your own ad is carrying spend when organic already covers the query.' Reject because it assumes competitor activity, wasted spend, and organic coverage.",
+              "Rejected bad example: 'A customer example we've seen...' Reject because it is anonymous and has no approved customer or metric.",
+              "Never claim the prospect has waste, competitors, crowded queries, high CPC, rising spend, poor incrementality, organic coverage, or inefficient coverage unless that exact verified context was supplied.",
+              "Avoid vague AI language: conversion-source data, outcome data, cleaner read, cleaner bid decision, the angle, setup pattern, plain example, real work, doing more work than it should.",
+              "Use concrete language: Google Ads, Search Console, conversion data, competitor presence, pause ads, reduce bids, restore coverage, branded-search process.",
+              "Keep each body close to the reference length. One idea per step. One CTA per step. No extra paragraphs. No anonymous stories. No repeated product explanation.",
             ],
             approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),
             userProvidedContext: [
@@ -676,11 +701,15 @@ export function createBuildSequenceAiProvider(
               request.input.contactFirstName ? `Prospect first name: ${request.input.contactFirstName}` : "",
               request.input.contactRole ? `Buyer role: ${request.input.contactRole}` : "",
               request.input.industry ? `Industry selected by user: ${request.input.industry}` : "",
-              request.input.companyContext ? `Company context from user: ${request.input.companyContext}` : "",
+              cleanSelection(request.input.companyContext)
+                ? `Company context from user: ${cleanSelection(request.input.companyContext)}`
+                : "",
               request.input.geographyOrMarkets ? `Markets from user: ${request.input.geographyOrMarkets}` : "",
               request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
               request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
-              request.input.observedTrigger ? `Outreach reason from user: ${request.input.observedTrigger}` : "",
+              cleanSelection(request.input.observedTrigger)
+                ? `Outreach reason from user: ${cleanSelection(request.input.observedTrigger)}`
+                : "",
               request.input.screenshotAvailable ? "Screenshot or SERP context available: yes" : "Screenshot or SERP context available: no",
               request.input.screenshotContext ? `Screenshot context from user: ${request.input.screenshotContext}` : "",
               request.input.screenshotShows ? `Screenshot shows, according to user: ${request.input.screenshotShows}` : "",

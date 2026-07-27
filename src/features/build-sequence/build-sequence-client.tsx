@@ -44,10 +44,7 @@ const tones: { label: string; value: SequenceTone }[] = [
 ];
 
 const lengths: { label: string; value: SequenceLength }[] = [
-  { label: "3 steps", value: 3 },
   { label: "4 steps", value: 4 },
-  { label: "5 steps", value: 5 },
-  { label: "6 steps", value: 6 },
 ];
 
 const companySizeOptions = [
@@ -824,6 +821,13 @@ export function BuildSequenceClient() {
             refreshKey={accountStatusRefreshKey}
             submitOnOverride
           />
+
+          <div className="rounded-lg border border-line bg-[#f8f5ef] px-3 py-2 text-sm text-stone-700">
+            <span className="font-semibold text-ink">Step 2 mode: </span>
+            {screenshotAvailable
+              ? "Visual example"
+              : "Approved case study when available, otherwise diagnostic insight"}
+          </div>
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">

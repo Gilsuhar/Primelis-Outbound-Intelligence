@@ -91,6 +91,10 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Steps")).toBeTruthy();
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Duration")).toBeTruthy();
+    expect(screen.getByText("Step 2 mode:")).toBeTruthy();
+    expect(
+      screen.getByText("Approved case study when available, otherwise diagnostic insight"),
+    ).toBeTruthy();
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
   });
 

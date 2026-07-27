@@ -12,7 +12,7 @@ const input: BuildSequenceInput = {
   companyContext: "Strong fit - confirmed",
   observedTrigger: "Validate branded-search activity",
   primaryChannel: "EMAIL",
-  sequenceLength: 3,
+  sequenceLength: 4,
   desiredTone: "DIRECT",
   desiredOverallDuration: "10 business days",
   creatorId: "seed-sales-user",
@@ -62,8 +62,13 @@ describe("Build Sequence OpenAI provider", () => {
               cta: "Is this visible in your reporting?",
             },
             {
+              subjectLine: "Re: competitor presence",
+              messageBody: "AI step three: competitor presence, lower bids, and restored coverage.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
               subjectLine: "Closing the loop",
-              messageBody: "AI step three: a low-pressure close without repeating the opener.",
+              messageBody: "AI step four: a low-pressure close without repeating the opener.",
               cta: "Should I close the loop here?",
             },
           ],
@@ -71,7 +76,7 @@ describe("Build Sequence OpenAI provider", () => {
           factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
           uncertaintyNotes: [],
           safetyFlags: [],
-          changeSummary: "Use a sharper three-step sequence.",
+          changeSummary: "Use a sharper four-step sequence.",
         }),
       }),
     } as Response);
@@ -98,10 +103,11 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps.map((step) => step.messageBody)).toEqual([
       "AI step one: a sharp Nike-specific paid-brand decision.",
       "AI step two: a new angle on organic demand and unnecessary spend.",
-      "AI step three: a low-pressure close without repeating the opener.",
+      "AI step three: competitor presence, lower bids, and restored coverage.",
+      "AI step four: a low-pressure close without repeating the opener.",
     ]);
     expect(result.steps[0].subjectLine).toBe("Nike paid brand decision");
-    expect(result.overallStrategy).toBe("Use a sharper three-step sequence.");
+    expect(result.overallStrategy).toBe("Use a sharper four-step sequence.");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
     const body = JSON.parse(String(requestInit?.body));
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
@@ -132,7 +138,12 @@ describe("Build Sequence OpenAI provider", () => {
             },
             {
               subjectLine: "Re: brand coverage",
-              messageBody: "AI-only step three with a calm final note.",
+              messageBody: "AI-only step three with a mechanism note.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "AI-only step four with a calm final note.",
               cta: "Should I leave this here?",
             },
           ],
@@ -187,8 +198,13 @@ describe("Build Sequence OpenAI provider", () => {
               cta: "Is this visible in reporting?",
             },
             {
+              subjectLine: "Re: competitor presence",
+              messageBody: "AI step three with a brief mechanism explanation.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
               subjectLine: "Close the loop",
-              messageBody: "AI step three with a brief low-pressure close for the sequence.",
+              messageBody: "AI step four with a brief low-pressure close for the sequence.",
               cta: "Should I leave this here?",
             },
           ],
@@ -249,8 +265,13 @@ describe("Build Sequence OpenAI provider", () => {
               cta: "Is this visible in reporting?",
             },
             {
+              subjectLine: "Re: competitor presence",
+              messageBody: "Step 3 - Day 6\nAI step three after the duplicated model heading.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
               subjectLine: "Close the loop",
-              messageBody: "Step 3 - Final touch\nAI step three after the duplicated model heading.",
+              messageBody: "Step 4 - Final touch\nAI step four after the duplicated model heading.",
               cta: "Should I leave this here?",
             },
           ],
@@ -286,6 +307,7 @@ describe("Build Sequence OpenAI provider", () => {
       "AI step one after the duplicated model heading.",
       "AI step two after the duplicated model heading.",
       "AI step three after the duplicated model heading.",
+      "AI step four after the duplicated model heading.",
     ]);
   });
 

@@ -212,22 +212,11 @@ export function channelForStep(primaryChannel: SequenceChannel, stepIndex: numbe
   return stepIndex % 2 === 0 ? "EMAIL" : "LINKEDIN";
 }
 
-export function defaultPurposesForLength(
-  length: number,
-  hasEligibleSocialProof: boolean,
-): SequencePurpose[] {
-  const base: SequencePurpose[] = [
+export function defaultPurposesForLength(): SequencePurpose[] {
+  return [
     "FIRST_TOUCH_RELEVANCE",
     "PROBLEM_FRAMING",
     "METHODOLOGY_DIFFERENTIATION",
-    "ACCOUNT_SPECIFIC_OBSERVATION",
-    "TECHNICAL_CLARIFICATION",
-    "LOW_PRESSURE_FOLLOW_UP",
+    "BREAKUP_CLOSE_LOOP",
   ];
-  const withFinal = base.slice(0, Math.max(length - 1, 0));
-  if (hasEligibleSocialProof && length >= 4) {
-    withFinal[1] = "SOCIAL_PROOF";
-  }
-  const finalPurposes: SequencePurpose[] = [...withFinal, "BREAKUP_CLOSE_LOOP"];
-  return finalPurposes.slice(0, length);
 }
