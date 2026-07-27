@@ -517,6 +517,13 @@ export function BuildSequenceClient() {
   const [currentVendor, setCurrentVendor] = useState("");
   const [observedTrigger, setObservedTrigger] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
+  const [screenshotAvailable, setScreenshotAvailable] = useState(false);
+  const [screenshotContext, setScreenshotContext] = useState("");
+  const [brandKeyword, setBrandKeyword] = useState("");
+  const [marketCountry, setMarketCountry] = useState("");
+  const [device, setDevice] = useState("");
+  const [observationDate, setObservationDate] = useState("");
+  const [screenshotShows, setScreenshotShows] = useState("");
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
@@ -586,7 +593,7 @@ export function BuildSequenceClient() {
   }
 
   function fullStepText(step: SequenceStep) {
-    return [step.subjectLine, step.connectionRequest, step.messageBody, step.cta]
+    return [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.messageBody, step.cta]
       .filter(Boolean)
       .join("\n\n");
   }
@@ -651,6 +658,13 @@ export function BuildSequenceClient() {
         outputLanguage,
         accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
         internalNotes: formString(formData, "internalNotes") || undefined,
+        screenshotAvailable,
+        screenshotContext: formString(formData, "screenshotContext") || undefined,
+        brandKeyword: formString(formData, "brandKeyword") || undefined,
+        marketCountry: formString(formData, "marketCountry") || undefined,
+        device: formString(formData, "device") || undefined,
+        observationDate: formString(formData, "observationDate") || undefined,
+        screenshotShows: formString(formData, "screenshotShows") || undefined,
       });
 
       if (!response.ok) {
@@ -851,6 +865,64 @@ export function BuildSequenceClient() {
                 options={paidSearchOptions}
                 value={paidSearchContext}
               />
+              <div className="sm:col-span-2 rounded-lg border border-line bg-white p-3">
+                <label className="flex items-start gap-2 text-sm font-semibold text-ink">
+                  <input
+                    checked={screenshotAvailable}
+                    className="mt-1"
+                    onChange={(event) => setScreenshotAvailable(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Screenshot or SERP context available
+                </label>
+                <p className="mt-1 text-xs leading-5 text-stone-500">
+                  Describe what the image shows. No upload needed. The sequence will use this only
+                  as user-provided context.
+                </p>
+                {screenshotAvailable ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 text-sm font-medium text-stone-700 sm:col-span-2">
+                      Screenshot context
+                      <textarea
+                        className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+                        name="screenshotContext"
+                        onChange={(event) => setScreenshotContext(event.target.value)}
+                        placeholder="Example: generic solo-bidder SERP example, not from the prospect account."
+                        value={screenshotContext}
+                      />
+                    </label>
+                    <TextField
+                      label="Brand keyword"
+                      name="brandKeyword"
+                      onChange={setBrandKeyword}
+                      value={brandKeyword}
+                    />
+                    <TextField
+                      label="Market or country"
+                      name="marketCountry"
+                      onChange={setMarketCountry}
+                      value={marketCountry}
+                    />
+                    <TextField label="Device" name="device" onChange={setDevice} value={device} />
+                    <TextField
+                      label="Observation date"
+                      name="observationDate"
+                      onChange={setObservationDate}
+                      value={observationDate}
+                    />
+                    <label className="space-y-1 text-sm font-medium text-stone-700 sm:col-span-2">
+                      What the screenshot shows
+                      <textarea
+                        className="min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+                        name="screenshotShows"
+                        onChange={(event) => setScreenshotShows(event.target.value)}
+                        placeholder="Example: brand ad above organic result, no other advertiser visible in this supplied example."
+                        value={screenshotShows}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </div>
               <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
                 {t("workflow.channel")}
                 <select
@@ -1089,6 +1161,21 @@ export function BuildSequenceClient() {
                         <p className="mt-3 rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-ink">
                           {step.connectionRequest}
                         </p>
+                      ) : null}
+                      {step.imagePlaceholder ? (
+                        <div className="mt-3 rounded-md border border-dashed border-[#9a6a20] bg-[#fff7e8] p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a5a2b]">
+                            Image placeholder
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-ink">
+                            {step.imagePlaceholder}
+                          </p>
+                          {step.imageContextNote ? (
+                            <p className="mt-2 text-xs leading-5 text-[#8a5a2b]">
+                              {step.imageContextNote}
+                            </p>
+                          ) : null}
+                        </div>
                       ) : null}
                       <div className="mt-3">
                         <div className="mb-2 flex items-center justify-between gap-2">

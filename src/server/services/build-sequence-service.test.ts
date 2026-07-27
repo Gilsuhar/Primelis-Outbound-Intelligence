@@ -239,6 +239,149 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("uses supplied screenshot context as the Step 2 visual evidence placeholder", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        screenshotAvailable: true,
+        screenshotContext: "Generic SERP example supplied by the seller, not from Acme.",
+        brandKeyword: "acme",
+        marketCountry: "US",
+        device: "desktop",
+        observationDate: "2026-07-24",
+        screenshotShows:
+          "Brand ad appears above its organic result and no other advertiser is visible in this supplied example.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const stepTwo = result.data.steps[1];
+      expect(stepTwo.purpose).toBe("PROBLEM_FRAMING");
+      expect(stepTwo.imagePlaceholder).toBe("[Insert relevant SERP or Signal screenshot here]");
+      expect(stepTwo.imageContextNote).toContain("not from Acme");
+      expect(stepTwo.messageBody).toContain("supplied example");
+      expect(stepTwo.messageBody).not.toMatch(/Acme is a solo bidder|Acme has no competitors/i);
+    }
+  });
+
+  it("does not invent screenshot or solo-bidder observations when visual context is absent", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 1
+            ? {
+                ...step,
+                messageBody:
+                  "The screenshot shows Acme as the only advertiser above the organic result.",
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+  });
+
+  it("rejects vague anonymous customer stories in Step 2", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 1
+            ? {
+                ...step,
+                messageBody:
+                  "One customer example showed that branded spend could be reduced without a concrete approved metric.",
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+  });
+
+  it("rejects repeated CTAs and keeps Step 4 shorter than the explanatory steps", async () => {
+    const repeatedCtaProvider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = repeatedCtaProvider.generate.bind(repeatedCtaProvider);
+    repeatedCtaProvider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step) => ({
+          ...step,
+          cta: "Worth a brief look?",
+        })),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const rejected = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: repeatedCtaProvider,
+    });
+    const accepted = await generateBuildSequence(baseInput, { persistence: adapter });
+
+    expect(rejected).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      const finalStep = accepted.data.steps.at(-1)!;
+      const averageEarlierLength =
+        accepted.data.steps.slice(0, -1).reduce((total, step) => total + step.messageBody.length, 0) /
+        (accepted.data.steps.length - 1);
+      expect(finalStep.messageBody.length).toBeLessThan(averageEarlierLength);
+    }
+  });
+
+  it("follows the four-step progression for standard email sequences", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps.map((step) => step.purpose)).toEqual([
+        "FIRST_TOUCH_RELEVANCE",
+        "PROBLEM_FRAMING",
+        "METHODOLOGY_DIFFERENTIATION",
+        "BREAKUP_CLOSE_LOOP",
+      ]);
+      expect(result.data.steps[0].messageBody).toMatch(/how do you decide/i);
+      expect(result.data.steps[1].messageBody).toMatch(/visibility|process question/i);
+      expect(result.data.steps[2].messageBody).toMatch(/Google and Bing|competitors return/i);
+      expect(result.data.steps[3].messageBody).toMatch(/close|not relevant|no problem/i);
+    }
+  });
+
   it("rejects repeated or near-duplicate steps", async () => {
     const provider = new DeterministicBuildSequenceProvider();
     const originalGenerate = provider.generate.bind(provider);
@@ -336,7 +479,9 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: expect.stringContaining("Generated sequence failed proof validation."),
+      message: expect.stringMatching(
+        /Generated sequence failed (safety or quality|proof) validation\./,
+      ),
     });
   });
 
@@ -397,8 +542,8 @@ describe("Build Sequence service", () => {
       expect(
         result.data.steps[0].messageBody.match(/how do you decide when branded ads/gi)?.length,
       ).toBe(1);
-      expect(result.data.steps[1].messageBody).toMatch(/Google does not offer an easy way/i);
-      expect(result.data.steps[1].messageBody).toMatch(/captured organically/i);
+      expect(result.data.steps[1].messageBody).toMatch(/visibility|process question/i);
+      expect(result.data.steps[1].messageBody).not.toMatch(/Google does not offer an easy way/i);
       expect(result.data.steps[2].messageBody).toMatch(/not relevant|no problem|later/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");

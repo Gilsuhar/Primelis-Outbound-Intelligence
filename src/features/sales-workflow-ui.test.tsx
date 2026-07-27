@@ -94,6 +94,21 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
   });
 
+  it("keeps Build Sequence screenshot context optional and tucked into advanced details", () => {
+    render(<BuildSequenceClient />);
+
+    const advanced = screen.getByText("Advanced optional details").closest("details");
+    expect(advanced?.open).toBe(false);
+
+    fireEvent.click(screen.getByText("Advanced optional details"));
+    expect(screen.getByText("Screenshot or SERP context available")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Screenshot or SERP context available"));
+    expect(screen.getByLabelText("Screenshot context")).toBeTruthy();
+    expect(screen.getByLabelText("What the screenshot shows")).toBeTruthy();
+    expect(screen.getByLabelText("Brand keyword")).toBeTruthy();
+  });
+
   it("gives Build Sequence Generate buttons materially different local variants", () => {
     const step: SequenceStep = {
       stepNumber: 1,

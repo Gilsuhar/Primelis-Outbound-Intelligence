@@ -49,6 +49,13 @@ export type BuildSequenceInput = {
   outputLanguage?: OutputLanguage;
   accountStatusOverride?: boolean;
   internalNotes?: string;
+  screenshotAvailable?: boolean;
+  screenshotContext?: string;
+  brandKeyword?: string;
+  marketCountry?: string;
+  device?: string;
+  observationDate?: string;
+  screenshotShows?: string;
   creatorId?: string;
 };
 
@@ -100,6 +107,8 @@ export type SequenceStep = {
   connectionRequest?: string;
   messageBody: string;
   cta: string;
+  imagePlaceholder?: string;
+  imageContextNote?: string;
   claimsUsed: string[];
   sourceIds: string[];
 };

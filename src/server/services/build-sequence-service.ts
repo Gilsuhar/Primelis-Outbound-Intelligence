@@ -81,6 +81,13 @@ const buildSequenceSchema = z.object({
   outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   accountStatusOverride: z.boolean().optional().default(false),
   internalNotes: z.string().trim().max(1200).optional(),
+  screenshotAvailable: z.boolean().optional().default(false),
+  screenshotContext: z.string().trim().max(800).optional(),
+  brandKeyword: z.string().trim().max(120).optional(),
+  marketCountry: z.string().trim().max(120).optional(),
+  device: z.string().trim().max(80).optional(),
+  observationDate: z.string().trim().max(80).optional(),
+  screenshotShows: z.string().trim().max(500).optional(),
   creatorId: z.string().trim().min(1).optional(),
 });
 
@@ -94,6 +101,8 @@ const sequenceStepSchema = z.object({
   connectionRequest: z.string().trim().max(300).optional(),
   messageBody: z.string().trim().min(20).max(1600),
   cta: z.string().trim().max(220),
+  imagePlaceholder: z.string().trim().max(120).optional(),
+  imageContextNote: z.string().trim().max(1000).optional(),
   claimsUsed: z.array(z.string().trim()).default([]),
   sourceIds: z.array(z.string().trim()).default([]),
 });
@@ -326,6 +335,45 @@ function normalizedMessage(step: SequenceStep) {
     .trim();
 }
 
+function hasVisualContext(input: BuildSequenceInput) {
+  return Boolean(
+    input.screenshotAvailable &&
+      [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
+  );
+}
+
+function normalizedCta(step: SequenceStep) {
+  return step.cta
+    .toLowerCase()
+    .replace(/[^a-z0-9\s?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function questionCount(text: string) {
+  return (text.match(/\?/g) ?? []).length;
+}
+
+function containsVagueAnonymousCustomerStory(text: string) {
+  return /\b(one|a|another)\s+(customer|client|brand|company|team)\s+(example|found|showed|saw|proved|reduced|cut|saved)\b/i.test(
+    text,
+  );
+}
+
+function containsUnsupportedVisualClaim(text: string) {
+  return /\b(screenshot|serp|image|visual|example)\b/i.test(text) &&
+    /\bshows|visible|appears|above|below|only advertiser|no other advertiser|solo bidder\b/i.test(
+      text,
+    );
+}
+
+function containsProspectWasteClaim(input: BuildSequenceInput, text: string) {
+  const company = input.companyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${company}\\b.{0,80}\\b(wasting|wasteful|overpaying|unnecessary spend)\\b`, "i").test(
+    text,
+  );
+}
+
 function similarity(a: string, b: string) {
   const aWords = new Set(a.split(" ").filter((word) => word.length > 3));
   const bWords = new Set(b.split(" ").filter((word) => word.length > 3));
@@ -404,7 +452,57 @@ function validateSequenceGeneration(
       }
     }
   }
+  const ctas = steps.map(normalizedCta).filter(Boolean);
+  if (new Set(ctas).size !== ctas.length) {
+    return false;
+  }
+  if (steps.some((step) => questionCount(`${step.messageBody} ${step.cta}`) > 2)) {
+    return false;
+  }
+  if (steps.some((step) => questionCount(step.cta) > 1)) {
+    return false;
+  }
+  if (steps.some((step) => containsVagueAnonymousCustomerStory(step.messageBody))) {
+    return false;
+  }
+  if (!hasVisualContext(input)) {
+    if (steps.some((step) => step.imagePlaceholder || step.imageContextNote)) {
+      return false;
+    }
+    if (steps.some((step) => containsUnsupportedVisualClaim(step.messageBody))) {
+      return false;
+    }
+  }
+  if (hasVisualContext(input)) {
+    const stepTwo = steps[1];
+    if (!stepTwo?.imagePlaceholder?.includes("[Insert relevant SERP or Signal screenshot here]")) {
+      return false;
+    }
+    if (!stepTwo.imageContextNote) {
+      return false;
+    }
+  }
+  if (steps.some((step) => containsProspectWasteClaim(input, step.messageBody))) {
+    return false;
+  }
+  if (
+    steps.length >= 4 &&
+    !(
+      steps[0].purpose === "FIRST_TOUCH_RELEVANCE" &&
+      ["PROBLEM_FRAMING", "SOCIAL_PROOF"].includes(steps[1].purpose) &&
+      steps[2].purpose === "METHODOLOGY_DIFFERENTIATION" &&
+      steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP"
+    )
+  ) {
+    return false;
+  }
   const finalStep = steps[steps.length - 1];
+  const averageEarlierLength =
+    steps.slice(0, -1).reduce((total, step) => total + step.messageBody.length, 0) /
+    Math.max(steps.length - 1, 1);
+  if (finalStep.messageBody.length >= averageEarlierLength) {
+    return false;
+  }
   if (
     finalStep.purpose !== "BREAKUP_CLOSE_LOOP" ||
     !/close the loop|not relevant|no problem|leave this|park this|timing|circle back/i.test(

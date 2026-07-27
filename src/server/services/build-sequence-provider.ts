@@ -116,7 +116,31 @@ type AiSequenceStep = {
   connectionRequest?: string;
   messageBody: string;
   cta: string;
+  imagePlaceholder?: string;
+  imageContextNote?: string;
 };
+
+const imagePlaceholderText = "[Insert relevant SERP or Signal screenshot here]";
+
+function hasScreenshotContext(input: BuildSequenceInput) {
+  return Boolean(
+    input.screenshotAvailable &&
+      [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
+  );
+}
+
+function screenshotDetails(input: BuildSequenceInput) {
+  return [
+    input.screenshotContext,
+    input.screenshotShows ? `What it shows: ${input.screenshotShows}` : "",
+    input.brandKeyword ? `Brand keyword: ${input.brandKeyword}` : "",
+    input.marketCountry ? `Market: ${input.marketCountry}` : "",
+    input.device ? `Device: ${input.device}` : "",
+    input.observationDate ? `Observed: ${input.observationDate}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
   const firstCaseStudy = records.find((record) => record.type === "CASE_STUDY");
@@ -153,6 +177,8 @@ function normalizeAiStep(step: SequenceStep, aiStep: AiSequenceStep) {
         : step.connectionRequest,
     messageBody,
     cta,
+    imagePlaceholder: step.imagePlaceholder,
+    imageContextNote: step.imageContextNote,
   };
 }
 
@@ -365,9 +391,15 @@ function bodyForPurpose({
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "For context, Google does not offer an easy way to automatically pause or adjust branded ads when no other advertisers are bidding.",
-      "As a result, many teams keep paying for clicks that could have been captured organically or at a much lower CPC.",
-      `That is the gap I would check at ${company}: can the team see those quiet search-page moments and act without a manual review?`,
+      hasScreenshotContext(input)
+        ? "Here is a simple example of the type of moment Signal monitors."
+        : "Branded-search coverage often stays unchanged even though competitor presence changes throughout the day.",
+      hasScreenshotContext(input)
+        ? `In this supplied example: ${screenshotDetails(input)}`
+        : "The practical gap is visibility: knowing when coverage is protecting demand, and when the bid can come down without turning the review into manual work.",
+      hasScreenshotContext(input)
+        ? "Signal can identify this condition automatically, so the team can choose to pause or reduce the bid without treating the example as proof about your account."
+        : `For ${company}, I would treat that as a process question, not a claim about current waste.`,
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
@@ -385,9 +417,9 @@ function bodyForPurpose({
     SOCIAL_PROOF: [
       greeting(input),
       "",
-      "One reason this tends to land: it is not a generic cost-cutting conversation.",
+      "One concrete customer result is more useful than another broad brand-search explanation.",
       simpleSecondaryFact,
-      "The practical takeaway is to keep coverage where it protects demand, and stop overpaying where organic is already doing the work.",
+      "The practical takeaway is to test where paid coverage is protecting demand and where the bid can safely come down.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
@@ -462,7 +494,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     const secondaryFact = productFacts[1] ? trimSentences(productFacts[1], 1) : primaryFact;
     const purposes: SequencePurpose[] = defaultPurposesForLength(
       input.sequenceLength,
-      caseStudyFacts.length > 0,
+      !hasScreenshotContext(input) && caseStudyFacts.length > 0,
     );
     const sourceIds = Array.from(new Set(records.flatMap((record) => record.sourceIds)));
 
@@ -494,6 +526,14 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           ctaIndex: index,
         }),
         cta,
+        imagePlaceholder:
+          purpose === "PROBLEM_FRAMING" && hasScreenshotContext(input)
+            ? imagePlaceholderText
+            : undefined,
+        imageContextNote:
+          purpose === "PROBLEM_FRAMING" && hasScreenshotContext(input)
+            ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${screenshotDetails(input)}`
+            : undefined,
         claimsUsed: [
           purpose === "SOCIAL_PROOF"
             ? humanizeFact(caseStudyFacts[0] ?? secondaryFact)
@@ -558,6 +598,13 @@ export function createBuildSequenceAiProvider(
               sequenceLength: request.input.sequenceLength,
               desiredTone: request.input.desiredTone,
               desiredOverallDuration: request.input.desiredOverallDuration,
+              screenshotAvailable: request.input.screenshotAvailable,
+              screenshotContext: request.input.screenshotContext,
+              brandKeyword: request.input.brandKeyword,
+              marketCountry: request.input.marketCountry,
+              device: request.input.device,
+              observationDate: request.input.observationDate,
+              screenshotShows: request.input.screenshotShows,
               selectedAngle: result.selectedAngle,
               approvedKnowledge: promptRecords.map((record) => ({
                 title: record.title,
@@ -597,7 +644,10 @@ export function createBuildSequenceAiProvider(
               "If buyer role is missing or generic, write for a paid-brand/search leader without pretending to know the exact title.",
               "The selected tone must visibly change the copy: DIRECT is shorter and plainer, WARM is softer and less assumptive, EXECUTIVE removes tactical detail and emphasizes business control.",
               "Do not reuse the same opening structure across steps. Avoid starting every step with 'When', 'For context', or 'A useful way'.",
-              "Step 1: sharp account-relevant opener. Step 2: proof-backed problem/gap using at most one case study if available. Step 3: unload the technology pitch clearly: Signal monitors Google and Bing search results in real time, detects competitor/no-competitor moments, connects that with Google Ads, Search Console and conversion data, and helps decide when to lower/pause bids or restore coverage. Final step: low-pressure close only.",
+              "Four-step progression: Step 1 opens with one process-based branded-search question. Step 2 is evidence-led: use supplied screenshot/SERP context first, otherwise one approved relevant case study, otherwise a concise diagnostic insight. Step 3 explains how Signal acts: monitors Google and Bing, detects competitor/no-competitor changes, lowers or pauses bids when configured, and restores coverage when competition returns. Final step: brief respectful close only.",
+              "If screenshot context exists, Step 2 must include the exact placeholder '[Insert relevant SERP or Signal screenshot here]' and describe only what the user supplied. Do not say the screenshot is from the prospect account unless the user explicitly supplied that fact.",
+              "If screenshot context is absent, do not invent an image, solo-bidder condition, competitor absence, screenshot, or visual observation.",
+              "Step 2 must not use a vague anonymous customer story. Use a named approved case study with exact metric, or a practical diagnostic insight.",
               "Do not use fluffy phrases like checking in, wanted to follow up, hope you are well, thought this might be relevant, or I had the company on my list.",
               "Do not invent verified facts about the company. Convert unverified inputs into cautious questions.",
               "Keep one soft CTA per step. Never include a question in the final sentence of the body when a separate cta field is returned.",
@@ -614,6 +664,13 @@ export function createBuildSequenceAiProvider(
               request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
               request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
               request.input.observedTrigger ? `Outreach reason from user: ${request.input.observedTrigger}` : "",
+              request.input.screenshotAvailable ? "Screenshot or SERP context available: yes" : "Screenshot or SERP context available: no",
+              request.input.screenshotContext ? `Screenshot context from user: ${request.input.screenshotContext}` : "",
+              request.input.screenshotShows ? `Screenshot shows, according to user: ${request.input.screenshotShows}` : "",
+              request.input.brandKeyword ? `Brand keyword from user: ${request.input.brandKeyword}` : "",
+              request.input.marketCountry ? `Screenshot market/country from user: ${request.input.marketCountry}` : "",
+              request.input.device ? `Screenshot device from user: ${request.input.device}` : "",
+              request.input.observationDate ? `Screenshot observation date from user: ${request.input.observationDate}` : "",
             ].filter(Boolean),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,
