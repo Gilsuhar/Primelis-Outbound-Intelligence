@@ -225,6 +225,70 @@ describe("Build Sequence OpenAI provider", () => {
     expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
   });
 
+  it("strips a single leading Step header from OpenAI body fields", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand process",
+              messageBody: "Step 1 - Day 0\nAI step one after the duplicated model heading.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "One evidence-led follow-up",
+              messageBody: "Step 2 - Day 3\nAI step two after the duplicated model heading.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "Step 3 - Final touch\nAI step three after the duplicated model heading.",
+              cta: "Should I leave this here?",
+            },
+          ],
+          sourceReferences: ["source-1"],
+          factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
+          uncertaintyNotes: [],
+          safetyFlags: [],
+          changeSummary: "Use cleaned OpenAI sequence steps.",
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        overallStrategy: "Fallback strategy.",
+        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+        angleRationale: "Fallback rationale.",
+        personaEmphasis: {
+          persona: "Performance Marketing",
+          emphasis: "efficiency",
+          rationale: "Owns paid brand.",
+        },
+        detectedAccountSignals: [],
+        safetyNotes: [],
+        knowledgeLimitations: [],
+      },
+    });
+
+    expect(result.steps.map((step) => step.messageBody)).toEqual([
+      "AI step one after the duplicated model heading.",
+      "AI step two after the duplicated model heading.",
+      "AI step three after the duplicated model heading.",
+    ]);
+  });
+
   it("shows a specific fallback reason when OpenAI rejects the model", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",

@@ -408,7 +408,21 @@ function missingQuickBriefFields(formData: FormData) {
     .map(([, label]) => label);
 }
 
+export function buildFullStepText(step: SequenceStep) {
+  return [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.messageBody, step.cta]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function buildFullSequenceText(steps: SequenceStep[]) {
+  return steps
+    .map((step) => `Step ${step.stepNumber} - ${step.delay}\n${buildFullStepText(step)}`)
+    .join("\n\n---\n\n");
+}
+
 export const __buildSequenceVariantTest = {
+  buildFullSequenceText,
+  buildFullStepText,
   bodyVariants,
   ctaVariants,
   subjectVariants,
@@ -593,15 +607,11 @@ export function BuildSequenceClient() {
   }
 
   function fullStepText(step: SequenceStep) {
-    return [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.messageBody, step.cta]
-      .filter(Boolean)
-      .join("\n\n");
+    return buildFullStepText(step);
   }
 
   function fullSequenceText() {
-    return displayedSteps
-      .map((step) => `Step ${step.stepNumber} - ${step.delay}\n${fullStepText(step)}`)
-      .join("\n\n---\n\n");
+    return buildFullSequenceText(displayedSteps);
   }
 
   function regenerateSubject(step: SequenceStep) {

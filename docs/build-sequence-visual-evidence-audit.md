@@ -60,8 +60,12 @@ The diagnostic fallback remains conditional and general. It must not invent anon
 
 Validation now rejects:
 
+- A full sequence repeated twice, such as `Step 1, 2, 3, 4, Step 1, 2, 3, 4`.
+- One individual step containing a complete sequence or multiple later step headings.
+- Step 2 containing Step 1's heading or body.
 - Duplicate or near-duplicate step bodies.
 - Duplicate CTAs across the sequence.
+- Repeated show/send/example CTA intent across most non-final steps.
 - Several repeated questions in one step.
 - Two steps that effectively do the same job.
 - Standard four-step sequences that do not follow process, evidence, mechanism, close.
@@ -72,10 +76,14 @@ Validation now rejects:
 Validation now rejects:
 
 - Vague anonymous customer stories.
+- Unnamed proof phrases such as "a customer example we've seen", "one customer found", or "a client we worked with".
 - Screenshot or visual claims without supplied visual context.
 - Claims that the prospect is wasting spend.
+- Step 1 crowded-auction, competitor-presence, high-spend, weak-control, waste, or poor-incrementality claims unless supplied context supports them.
 - Unsupported competitor absence or solo-bidder implications.
 - Multiple case-study proof companies.
+- Prospect first-name drift and unrelated account names in the final step.
+- Approved proof customer names being treated as the prospect account.
 - Unsupported commercial, POC, pricing, or competitor-comparison language already blocked by the existing safety layer.
 
 ## Output Validation
@@ -92,6 +100,44 @@ Each sequence step still returns:
 - Optional image-context note
 
 Internal notes are separated from copied email content. Raw JSON, internal labels, empty bodies, duplicate bodies, repeated CTAs, unsupported proof, and unsafe provider fallback states are rejected by service/provider validation.
+
+## Duplicate Sequence Output Fix
+
+A confirmed Build Sequence defect was found where the rendered output could effectively become:
+
+```text
+Step 1
+Step 2
+Step 3
+Step 4
+
+Step 1
+Step 2
+Step 3
+Step 4
+```
+
+Root cause:
+
+- The UI already renders and copies from canonical structured step objects.
+- The persistence boundary already stores structured steps separately from strategy text.
+- The weak boundary was provider/service normalization: an OpenAI body field could contain markdown step headings or a full combined sequence inside an individual step.
+- When that contaminated body reached the renderer, the UI correctly added its own `Step X - Day Y` wrapper, making the user-facing sequence look duplicated even though the UI was not intentionally appending a second result.
+
+Fix:
+
+- The provider strips one leading `Step X` header from an individual OpenAI body field when removal is deterministic.
+- The service sanitization applies the same safe single-header removal before validation and storage.
+- The service rejects any step that contains multiple step headings, a full embedded sequence, repeated separators, or a repeated `1, 2, 3, 4, 1, 2, 3, 4` order.
+- Copy-all and copy-step formatting now have pure formatter coverage proving they use canonical structured steps once and do not include internal structured fields.
+
+Storage and rendering boundaries:
+
+- Successful drafts persist `result.steps` once in `draftContent`.
+- `inputSnapshot.generatedSequence` mirrors the same canonical structured steps for audit context.
+- User-facing timeline rendering uses `result.steps`.
+- Copy-all and copy-single-step are built from structured steps only.
+- Raw provider prose is not rendered alongside normalized steps.
 
 ## Safety Flags Parser Fix
 
@@ -147,6 +193,13 @@ Added regression coverage for:
 - Mixed object/string safety flags normalized.
 - Empty string, number, boolean, null, and malformed safety flags rejected.
 - Build Sequence OpenAI response with string `safetyFlags` no longer triggers fallback.
+- Full duplicated four-step sequence rejected before storage.
+- A single leading OpenAI `Step X` header normalized safely.
+- Step contamination with Step 1 inside Step 2 rejected.
+- Prospect first-name drift and unrelated final-step company names rejected.
+- Unsupported Step 1 crowded-auction and waste claims rejected.
+- Step 4 product-pitch restart rejected.
+- Copy-all output contains each canonical step once and excludes internal fields.
 
 ## Remaining Risks
 

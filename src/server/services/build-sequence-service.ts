@@ -160,8 +160,12 @@ function containsCommercialTerms(text: string) {
   return /\b(pricing|price|poc|proof of concept|trial|discount|commercial offer)\b/i.test(text);
 }
 
+function stripLeadingStepHeader(text: string) {
+  return text.replace(/^\s*step\s+\d+\s*(?:[-:–—].*)?\r?\n+/i, "").trim();
+}
+
 function sanitizeGeneratedText(text: string) {
-  return text
+  return stripLeadingStepHeader(text)
     .replace(
       /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
       "commercial details",
@@ -335,6 +339,28 @@ function normalizedMessage(step: SequenceStep) {
     .trim();
 }
 
+function normalizedText(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizedEntity(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\.(com|io|co|net|org|ai)$/i, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hasVisualContext(input: BuildSequenceInput) {
   return Boolean(
     input.screenshotAvailable &&
@@ -355,9 +381,10 @@ function questionCount(text: string) {
 }
 
 function containsVagueAnonymousCustomerStory(text: string) {
-  return /\b(one|a|another)\s+(customer|client|brand|company|team)\s+(example|found|showed|saw|proved|reduced|cut|saved)\b/i.test(
-    text,
-  );
+  return /\b(a customer example|one customer found|a client we worked with|we(?:'|’)ve seen with customers|another customer|one customer|a client|one client|a brand we worked with|a team we worked with)\b/i.test(text) ||
+    /\b(one|a|another)\s+(customer|client|brand|company|team)\s+(example|found|showed|saw|proved|reduced|cut|saved)\b/i.test(
+      text,
+    );
 }
 
 function containsUnsupportedVisualClaim(text: string) {
@@ -368,10 +395,203 @@ function containsUnsupportedVisualClaim(text: string) {
 }
 
 function containsProspectWasteClaim(input: BuildSequenceInput, text: string) {
-  const company = input.companyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const company = escapeRegExp(input.companyName);
   return new RegExp(`\\b${company}\\b.{0,80}\\b(wasting|wasteful|overpaying|unnecessary spend)\\b`, "i").test(
     text,
   );
+}
+
+function containsUnsupportedStepOneClaim(input: BuildSequenceInput, step: SequenceStep) {
+  const text = `${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`;
+  const verified = [
+    input.paidSearchContext,
+    input.internalNotes,
+    input.screenshotContext,
+    input.screenshotShows,
+    input.observedTrigger,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const hasSupport = /crowded|competitor|competition|auction|waste|unnecessary spend|spend is high|high spend|weak control|incremental|incrementality/i.test(
+    verified,
+  );
+  if (hasSupport) {
+    return false;
+  }
+  return /\b(crowded|competitors?\s+(?:are\s+)?(?:showing|appearing|present)|waste(?:ful)?|wasting|unnecessary spend|spend is high|high spend|control is weak|weak control|incrementality is poor|poor incrementality)\b/i.test(
+    text,
+  );
+}
+
+function stepHeadingMatches(text: string) {
+  return Array.from(text.matchAll(/\bstep\s+([1-6])\b/gi)).map((match) => Number(match[1]));
+}
+
+function containsRepeatedStepOrder(text: string, expectedLength: number) {
+  const numbers = stepHeadingMatches(text);
+  if (numbers.length < expectedLength * 2) {
+    return false;
+  }
+  const expected = Array.from({ length: expectedLength }, (_value, index) => index + 1);
+  for (let index = 0; index <= numbers.length - expected.length * 2; index += 1) {
+    const first = numbers.slice(index, index + expected.length).join(",");
+    const second = numbers.slice(index + expected.length, index + expected.length * 2).join(",");
+    if (first === expected.join(",") && second === expected.join(",")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function containsStepContamination(step: SequenceStep, expectedLength: number) {
+  const body = step.messageBody;
+  const headings = stepHeadingMatches(body);
+  if (headings.length > 1) {
+    return true;
+  }
+  if (step.stepNumber !== 1 && headings.includes(1)) {
+    return true;
+  }
+  if (containsRepeatedStepOrder(body, expectedLength)) {
+    return true;
+  }
+  if (expectedLength >= 4 && /step\s+1\b[\s\S]*step\s+2\b[\s\S]*step\s+3\b[\s\S]*step\s+4\b/i.test(body)) {
+    return true;
+  }
+  if ((body.match(/\n\s*---+\s*\n/g) ?? []).length > 1) {
+    return true;
+  }
+  return false;
+}
+
+function renderedSequenceText(steps: SequenceStep[]) {
+  return steps
+    .map((step) =>
+      [
+        `Step ${step.stepNumber} - ${step.delay}`,
+        step.subjectLine,
+        step.connectionRequest,
+        step.imagePlaceholder,
+        step.messageBody,
+        step.cta,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    )
+    .join("\n\n---\n\n");
+}
+
+function hasDuplicateCompleteSequence(steps: SequenceStep[], generation: SequenceGeneration) {
+  const rendered = renderedSequenceText(steps);
+  if (containsRepeatedStepOrder(rendered, steps.length)) {
+    return true;
+  }
+  const allText = [
+    generation.overallStrategy,
+    generation.claimsUsed.join("\n"),
+    generation.safetyNotes.join("\n"),
+    generation.knowledgeLimitations.join("\n"),
+    rendered,
+  ].join("\n");
+  if (containsRepeatedStepOrder(allText, steps.length)) {
+    return true;
+  }
+  const bodyCounts = new Map<string, number>();
+  for (const step of steps) {
+    const body = normalizedMessage(step);
+    bodyCounts.set(body, (bodyCounts.get(body) ?? 0) + 1);
+  }
+  return Array.from(bodyCounts.values()).some((count) => count > 1);
+}
+
+function ctaIntent(cta: string) {
+  const text = normalizedText(cta);
+  if (/close|leave|park|timing|no need|not relevant/.test(text)) {
+    return "close";
+  }
+  if (/see|show|walk|demo|send|share|example|look|review|compare|useful|help/.test(text)) {
+    return "show_or_send";
+  }
+  if (/detect|visibility|track|monitor|see/.test(text)) {
+    return "visibility";
+  }
+  if (/decide|handle|process|evaluate|assess/.test(text)) {
+    return "process";
+  }
+  return text.split(" ").slice(0, 3).join(" ");
+}
+
+function hasRepeatedCtaIntent(steps: SequenceStep[]) {
+  const intents = steps.map((step) => ctaIntent(step.cta)).filter(Boolean);
+  const nonCloseIntents = intents.filter((intent) => intent !== "close");
+  return (
+    nonCloseIntents.length >= 3 &&
+      nonCloseIntents.filter((intent) => intent === "show_or_send").length >=
+        nonCloseIntents.length - 1
+  );
+}
+
+function hasFinalStepPitchRestart(finalStep: SequenceStep) {
+  const text = normalizedText(`${finalStep.messageBody} ${finalStep.cta}`);
+  return /\b(monitors?|google ads|search console|bing|competitors?|pause|reduce bids|restore coverage|case study|reduced|saved|mql|sql|revenue|clicks|walkthrough|framework|methodology|example)\b/.test(
+    text,
+  );
+}
+
+function containsVagueLanguage(text: string) {
+  return /\b(conversion-source data|outcome data|paid brand line|cleaner bid decision|the angle|setup pattern|plain example|live search-result monitoring to separate demand capture)\b/i.test(
+    text,
+  );
+}
+
+function hasEntityMismatch(
+  input: BuildSequenceInput,
+  steps: SequenceStep[],
+  records: SequenceKnowledgeRecord[],
+) {
+  const allowedCompany = normalizedEntity(input.companyName);
+  const allowedDomain = input.companyWebsite ? normalizedEntity(input.companyWebsite) : "";
+  const proofCompanies = caseStudyCompanies(records).map(normalizedEntity);
+  const allowedEntities = new Set(
+    [allowedCompany, allowedDomain, ...proofCompanies].filter((entity) => entity.length > 1),
+  );
+  const knownAccountNames = [
+    "nike",
+    "booking",
+    "bookingcom",
+    "uber",
+    "mango",
+    "apollo",
+    "brex",
+    "monday",
+    "mondaycom",
+    "crocs",
+    "chloe",
+    "dior",
+    "ninjatrader",
+  ];
+
+  for (const step of steps) {
+    const greeting = step.messageBody.match(/\bhi\s+([a-z][a-z'-]{1,40})\b/i);
+    if (
+      input.contactFirstName &&
+      greeting?.[1] &&
+      !["there", input.contactFirstName.toLowerCase()].includes(greeting[1].toLowerCase())
+    ) {
+      return true;
+    }
+  }
+
+  const finalText = `${steps.at(-1)?.subjectLine ?? ""} ${steps.at(-1)?.messageBody ?? ""} ${steps.at(-1)?.cta ?? ""}`;
+  for (const account of knownAccountNames) {
+    if (allowedEntities.has(account)) {
+      continue;
+    }
+    if (new RegExp(`\\b${escapeRegExp(account)}(?:\\.com)?\\b`, "i").test(finalText)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function similarity(a: string, b: string) {
@@ -414,26 +634,36 @@ function validateSequenceGeneration(
   generation: SequenceGeneration,
   records: SequenceKnowledgeRecord[] = [],
 ) {
+  const fail = () => false;
   const parsedSteps = z.array(sequenceStepSchema).safeParse(generation.steps);
   if (!parsedSteps.success) {
-    return false;
+    return fail();
   }
 
   const steps = parsedSteps.data;
   if (steps.length !== input.sequenceLength) {
-    return false;
+    return fail();
   }
   const stepNumbers = steps.map((step) => step.stepNumber);
   if (!stepNumbers.every((stepNumber, index) => stepNumber === index + 1)) {
-    return false;
+    return fail();
   }
   const purposes = new Set(steps.map((step) => step.purpose));
   if (purposes.size !== steps.length) {
-    return false;
+    return fail();
   }
   const allowedChannels = channelsForSequence(input.primaryChannel);
   if (!steps.every((step) => allowedChannels.includes(step.channel))) {
-    return false;
+    return fail();
+  }
+  if (hasDuplicateCompleteSequence(steps, generation)) {
+    return fail();
+  }
+  if (steps.some((step) => containsStepContamination(step, input.sequenceLength))) {
+    return fail();
+  }
+  if (hasEntityMismatch(input, steps, records)) {
+    return fail();
   }
   if (
     input.primaryChannel === "MIXED" &&
@@ -442,48 +672,57 @@ function validateSequenceGeneration(
       steps.some((step) => step.channel === "LINKEDIN")
     )
   ) {
-    return false;
+    return fail();
   }
   const normalized = steps.map(normalizedMessage);
   for (let index = 0; index < normalized.length; index += 1) {
     for (let compare = index + 1; compare < normalized.length; compare += 1) {
       if (similarity(normalized[index], normalized[compare]) > 0.9) {
-        return false;
+        return fail();
       }
     }
   }
   const ctas = steps.map(normalizedCta).filter(Boolean);
   if (new Set(ctas).size !== ctas.length) {
-    return false;
+    return fail();
+  }
+  if (hasRepeatedCtaIntent(steps)) {
+    return fail();
   }
   if (steps.some((step) => questionCount(`${step.messageBody} ${step.cta}`) > 2)) {
-    return false;
+    return fail();
   }
   if (steps.some((step) => questionCount(step.cta) > 1)) {
-    return false;
+    return fail();
   }
   if (steps.some((step) => containsVagueAnonymousCustomerStory(step.messageBody))) {
-    return false;
+    return fail();
+  }
+  if (steps.some((step) => containsVagueLanguage(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`))) {
+    return fail();
+  }
+  if (steps[0] && containsUnsupportedStepOneClaim(input, steps[0])) {
+    return fail();
   }
   if (!hasVisualContext(input)) {
     if (steps.some((step) => step.imagePlaceholder || step.imageContextNote)) {
-      return false;
+      return fail();
     }
     if (steps.some((step) => containsUnsupportedVisualClaim(step.messageBody))) {
-      return false;
+      return fail();
     }
   }
   if (hasVisualContext(input)) {
     const stepTwo = steps[1];
     if (!stepTwo?.imagePlaceholder?.includes("[Insert relevant SERP or Signal screenshot here]")) {
-      return false;
+      return fail();
     }
     if (!stepTwo.imageContextNote) {
-      return false;
+      return fail();
     }
   }
   if (steps.some((step) => containsProspectWasteClaim(input, step.messageBody))) {
-    return false;
+    return fail();
   }
   if (
     steps.length >= 4 &&
@@ -494,14 +733,14 @@ function validateSequenceGeneration(
       steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP"
     )
   ) {
-    return false;
+    return fail();
   }
   const finalStep = steps[steps.length - 1];
   const averageEarlierLength =
     steps.slice(0, -1).reduce((total, step) => total + step.messageBody.length, 0) /
     Math.max(steps.length - 1, 1);
   if (finalStep.messageBody.length >= averageEarlierLength) {
-    return false;
+    return fail();
   }
   if (
     finalStep.purpose !== "BREAKUP_CLOSE_LOOP" ||
@@ -509,7 +748,10 @@ function validateSequenceGeneration(
       `${finalStep.messageBody} ${finalStep.cta}`,
     )
   ) {
-    return false;
+    return fail();
+  }
+  if (hasFinalStepPitchRestart(finalStep)) {
+    return fail();
   }
   const rendered = JSON.stringify({
     overallStrategy: generation.overallStrategy,
@@ -517,10 +759,10 @@ function validateSequenceGeneration(
     steps: generation.steps,
   });
   if (containsCommercialTerms(rendered) || containsCompetitorClaim(rendered)) {
-    return false;
+    return fail();
   }
   if (hasMultipleProofCompanies(generation, records)) {
-    return false;
+    return fail();
   }
   return true;
 }

@@ -97,8 +97,25 @@ function stripTrailingQuestionWhenCtaExists(body: string, cta: string) {
   return nextBlocks.join("\n\n").trim() || body;
 }
 
+function stripSingleStepHeader(text: string) {
+  const lines = text.split(/\r?\n/);
+  const firstContentIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (firstContentIndex === -1) {
+    return text;
+  }
+  const firstLine = lines[firstContentIndex].trim();
+  if (!/^step\s+\d+\s*(?:[-:–—].*)?$/i.test(firstLine)) {
+    return text;
+  }
+  return [...lines.slice(0, firstContentIndex), ...lines.slice(firstContentIndex + 1)]
+    .join("\n")
+    .trim();
+}
+
 function cleanAiText(text: string, maxLength: number) {
-  return stripSoftFiller(roundPercentages(stripFallbackPhrases(stripCommercialTerms(text))))
+  return stripSingleStepHeader(
+    stripSoftFiller(roundPercentages(stripFallbackPhrases(stripCommercialTerms(text)))),
+  )
     .replace(/\s+\n/g, "\n")
     .trim()
     .slice(0, maxLength)

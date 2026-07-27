@@ -136,6 +136,36 @@ describe("Sales workflow UI", () => {
     expect(__buildSequenceVariantTest.variantIndex(-1, bodyVariants.length)).toBe(0);
   });
 
+  it("formats Build Sequence copy-all from canonical steps exactly once", () => {
+    const steps: SequenceStep[] = [1, 2, 3, 4].map((stepNumber) => ({
+      stepNumber,
+      channel: "EMAIL",
+      delay: stepNumber === 1 ? "Day 0" : stepNumber === 4 ? "Final touch" : `Day ${stepNumber * 3}`,
+      purpose:
+        stepNumber === 1
+          ? "FIRST_TOUCH_RELEVANCE"
+          : stepNumber === 2
+            ? "PROBLEM_FRAMING"
+            : stepNumber === 3
+              ? "METHODOLOGY_DIFFERENTIATION"
+              : "BREAKUP_CLOSE_LOOP",
+      channelRationale: "Email is selected.",
+      subjectLine: `Subject ${stepNumber}`,
+      messageBody: `Body ${stepNumber}`,
+      cta: `CTA ${stepNumber}?`,
+      claimsUsed: [`Claim ${stepNumber}`],
+      sourceIds: [`source-${stepNumber}`],
+    }));
+
+    const copied = __buildSequenceVariantTest.buildFullSequenceText(steps);
+
+    expect(copied.match(/Step 1 - Day 0/g)).toHaveLength(1);
+    expect(copied.match(/Step 2 - Day 6/g)).toHaveLength(1);
+    expect(copied.match(/Step 3 - Day 9/g)).toHaveLength(1);
+    expect(copied.match(/Step 4 - Final touch/g)).toHaveLength(1);
+    expect(copied).not.toMatch(/claimsUsed|sourceIds|channelRationale|overallStrategy/i);
+  });
+
   it("infers domains in Account Research and explains the result", () => {
     render(<AccountResearchClient />);
 

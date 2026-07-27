@@ -406,6 +406,188 @@ describe("Build Sequence service", () => {
     });
   });
 
+  it("rejects a full four-step sequence duplicated inside one rendered step", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      const duplicatedSequence = result.steps
+        .map(
+          (step) =>
+            `Step ${step.stepNumber} - ${step.delay}\n${step.subjectLine ?? ""}\n${step.messageBody}\n${step.cta}`,
+        )
+        .join("\n\n---\n\n");
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 1
+            ? {
+                ...step,
+                messageBody: `${duplicatedSequence}\n\n---\n\n${duplicatedSequence}`,
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+    expect(persisted).toEqual([]);
+  });
+
+  it("normalizes a single leading step header but rejects step contamination", async () => {
+    const cleanHeaderProvider = new DeterministicBuildSequenceProvider();
+    const originalCleanGenerate = cleanHeaderProvider.generate.bind(cleanHeaderProvider);
+    cleanHeaderProvider.generate = async (request) => {
+      const result = await originalCleanGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 1
+            ? {
+                ...step,
+                messageBody: `Step 2 - Day 3\n${step.messageBody}`,
+              }
+            : step,
+        ),
+      };
+    };
+    const contaminatedProvider = new DeterministicBuildSequenceProvider();
+    const originalContaminatedGenerate = contaminatedProvider.generate.bind(contaminatedProvider);
+    contaminatedProvider.generate = async (request) => {
+      const result = await originalContaminatedGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 1
+            ? {
+                ...step,
+                messageBody: `Step 1 - Day 0\n${result.steps[0].messageBody}\n\nStep 2 - Day 3\n${step.messageBody}`,
+              }
+            : step,
+        ),
+      };
+    };
+    const acceptedStore = persistence([knowledge({ id: "product-truth" })]);
+    const rejectedStore = persistence([knowledge({ id: "product-truth" })]);
+
+    const accepted = await generateBuildSequence(baseInput, {
+      persistence: acceptedStore.adapter,
+      provider: cleanHeaderProvider,
+    });
+    const rejected = await generateBuildSequence(baseInput, {
+      persistence: rejectedStore.adapter,
+      provider: contaminatedProvider,
+    });
+
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.data.steps[1].messageBody).not.toMatch(/^Step 2/i);
+      expect(acceptedStore.persisted[0].result.steps[1].messageBody).not.toMatch(/^Step 2/i);
+    }
+    expect(rejected).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+    expect(rejectedStore.persisted).toEqual([]);
+  });
+
+  it("rejects inconsistent prospect names and unrelated final-step companies", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 0
+            ? { ...step, messageBody: step.messageBody.replace("Hi Sam,", "Hi Rex,") }
+            : index === result.steps.length - 1
+              ? { ...step, messageBody: `${step.messageBody}\n\nIf Uber reviews this later, happy to help.` }
+              : step,
+        ),
+      };
+    };
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+    expect(persisted).toEqual([]);
+  });
+
+  it("rejects unsupported Step 1 crowded-auction and waste claims", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === 0
+            ? {
+                ...step,
+                messageBody:
+                  "Hi Sam,\n\nWhen a brand query gets crowded, waste shows up fast and control gets weak.",
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      { ...baseInput, paidSearchContext: undefined, internalNotes: undefined },
+      { persistence: adapter, provider },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+  });
+
+  it("rejects Step 4 when it restarts the product pitch", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === result.steps.length - 1
+            ? {
+                ...step,
+                messageBody:
+                  "Hi Sam,\n\nSignal monitors Google Ads, Search Console, Bing and competitors, then can reduce bids, pause, restore coverage and provide another framework walkthrough.\n\nIf timing is wrong, no need to reply.",
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "GENERATION_REJECTED",
+      message: "Generated sequence failed safety or quality validation.",
+    });
+  });
+
   it("passes only the selected approved case-study proof to the sequence provider", async () => {
     let providerRecordIds: string[] = [];
     const provider = new DeterministicBuildSequenceProvider();
