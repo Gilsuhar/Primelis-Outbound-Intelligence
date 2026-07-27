@@ -51,10 +51,32 @@ export type AiProvider = {
 
 const draftSafetyFlagSchema = z.object({
   status: z.enum(["Safe", "Needs revision", "Restricted", "Unsupported"]),
-  flaggedWording: z.string().max(300),
-  reason: z.string().max(500),
-  saferReplacement: z.string().max(500),
+  flaggedWording: z.string().trim().max(300),
+  reason: z.string().trim().max(500),
+  saferReplacement: z.string().trim().max(500),
 });
+
+function normalizeSafetyFlag(value: unknown): DraftSafetyFlag {
+  if (typeof value === "string") {
+    const reason = value.trim();
+    if (!reason) {
+      throw new Error("EMPTY_SAFETY_FLAG");
+    }
+    return {
+      status: "Needs revision",
+      flaggedWording: "",
+      reason,
+      saferReplacement: "",
+    };
+  }
+
+  return draftSafetyFlagSchema.parse(value);
+}
+
+const rawSafetyFlagSchema = z.union([
+  draftSafetyFlagSchema,
+  z.string().trim().min(1),
+]).transform((value) => normalizeSafetyFlag(value));
 
 const aiDraftResponseSchema = z.object({
   primaryContent: z.string().trim().max(5000).optional().default(""),
@@ -75,7 +97,7 @@ const aiDraftResponseSchema = z.object({
   sourceReferences: z.array(z.string().trim().max(160)).max(20).optional().default([]),
   factualClaimsUsed: z.array(z.string().trim().max(500)).max(20).optional().default([]),
   uncertaintyNotes: z.array(z.string().trim().max(500)).max(10).optional().default([]),
-  safetyFlags: z.array(draftSafetyFlagSchema).max(20).optional().default([]),
+  safetyFlags: z.array(rawSafetyFlagSchema).max(20).optional().default([]),
   changeSummary: z.string().trim().max(800).optional(),
 });
 
@@ -437,7 +459,8 @@ export class OpenAiProvider implements AiProvider {
                       sourceReferences: "string[]",
                       factualClaimsUsed: "string[]",
                       uncertaintyNotes: "string[]",
-                      safetyFlags: "DraftSafetyFlag[]",
+                      safetyFlags:
+                        "DraftSafetyFlag[] where every item is exactly { status: 'Safe' | 'Needs revision' | 'Restricted' | 'Unsupported', flaggedWording: string, reason: string, saferReplacement: string }. Use [] when there are no flags. Valid example: [{\"status\":\"Needs revision\",\"flaggedWording\":\"unsupported claim\",\"reason\":\"The claim is not in approved context.\",\"saferReplacement\":\"Ask a cautious process question instead.\"}]",
                       changeSummary: "string optional",
                     },
                   }),

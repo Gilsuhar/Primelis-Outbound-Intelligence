@@ -163,6 +163,68 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
   });
 
+  it("does not fall back when OpenAI returns string safety flags", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand process",
+              messageBody: "AI step one with a process question about paid brand decisions.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "One evidence-led follow-up",
+              messageBody: "AI step two with distinct evidence-led context and no invented proof.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "AI step three with a brief low-pressure close for the sequence.",
+              cta: "Should I leave this here?",
+            },
+          ],
+          sourceReferences: ["source-1"],
+          factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
+          uncertaintyNotes: [],
+          safetyFlags: ["The output contains an unsupported claim"],
+          changeSummary: "Use the OpenAI sequence despite normalized safety flags.",
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        overallStrategy: "Fallback strategy.",
+        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+        angleRationale: "Fallback rationale.",
+        personaEmphasis: {
+          persona: "Performance Marketing",
+          emphasis: "efficiency",
+          rationale: "Owns paid brand.",
+        },
+        detectedAccountSignals: [],
+        safetyNotes: [],
+        knowledgeLimitations: [],
+      },
+    });
+
+    expect(result.overallStrategy).toBe("Use the OpenAI sequence despite normalized safety flags.");
+    expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
+    expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
+  });
+
   it("shows a specific fallback reason when OpenAI rejects the model", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",

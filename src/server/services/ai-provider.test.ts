@@ -114,4 +114,142 @@ describe("OpenAI provider output boundaries", () => {
     expect(prompt.verifiedInternalKnowledge).toEqual(["Signal monitors live search results."]);
     expect(prompt.userProvidedContext).toEqual(["Company name from user: Nike"]);
   });
+
+  it("accepts canonical object safety flags and trims their text fields", async () => {
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: ["source-1"],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+      safetyFlags: [
+        {
+          status: "Needs revision",
+          flaggedWording: " unsupported claim ",
+          reason: " needs source ",
+          saferReplacement: " ask a process question ",
+        },
+      ],
+    });
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-test",
+    }).generateDraft(request());
+
+    expect(result.safetyFlags).toEqual([
+      {
+        status: "Needs revision",
+        flaggedWording: "unsupported claim",
+        reason: "needs source",
+        saferReplacement: "ask a process question",
+      },
+    ]);
+  });
+
+  it("normalizes string safety flags into canonical objects", async () => {
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: ["source-1"],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+      safetyFlags: ["The output contains an unsupported claim"],
+    });
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-test",
+    }).generateDraft(request());
+
+    expect(result.safetyFlags).toEqual([
+      {
+        status: "Needs revision",
+        flaggedWording: "",
+        reason: "The output contains an unsupported claim",
+        saferReplacement: "",
+      },
+    ]);
+  });
+
+  it("normalizes mixed object and string safety flags", async () => {
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: ["source-1"],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+      safetyFlags: [
+        {
+          status: "Unsupported",
+          flaggedWording: "specific savings",
+          reason: "Not approved.",
+          saferReplacement: "Use cautious wording.",
+        },
+        "Needs proof review",
+      ],
+    });
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-test",
+    }).generateDraft(request());
+
+    expect(result.safetyFlags).toEqual([
+      {
+        status: "Unsupported",
+        flaggedWording: "specific savings",
+        reason: "Not approved.",
+        saferReplacement: "Use cautious wording.",
+      },
+      {
+        status: "Needs revision",
+        flaggedWording: "",
+        reason: "Needs proof review",
+        saferReplacement: "",
+      },
+    ]);
+  });
+
+  it("keeps missing safety flags as an empty array", async () => {
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: ["source-1"],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+    });
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-test",
+    }).generateDraft(request());
+
+    expect(result.safetyFlags).toEqual([]);
+  });
+
+  it.each([
+    ["empty string", ""],
+    ["number", 7],
+    ["boolean", true],
+    ["malformed object", { status: "Needs revision", reason: "Missing fields." }],
+    ["array", ["Nested flag"]],
+    ["null", null],
+  ])("rejects invalid safety flag shape: %s", async (_label, safetyFlag) => {
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: ["source-1"],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+      safetyFlags: [safetyFlag],
+    });
+
+    await expect(
+      new OpenAiProvider({
+        ...process.env,
+        OPENAI_API_KEY: "redacted",
+        OPENAI_MODEL: "gpt-test",
+      }).generateDraft(request()),
+    ).rejects.toThrow();
+  });
 });
