@@ -37,7 +37,7 @@ describe("Build Sequence OpenAI provider", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses AI-returned sequence steps instead of only updating strategy", async () => {
+  it("keeps the deterministic rendered sequence even when OpenAI returns full steps", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
       OPENAI_API_KEY: "sk-test",
@@ -100,20 +100,21 @@ describe("Build Sequence OpenAI provider", () => {
       },
     });
 
-    expect(result.steps.map((step) => step.messageBody)).toEqual([
-      "AI step one: a sharp Nike-specific paid-brand decision.",
-      "AI step two: a new angle on organic demand and unnecessary spend.",
-      "AI step three: competitor presence, lower bids, and restored coverage.",
-      "AI step four: a low-pressure close without repeating the opener.",
-    ]);
-    expect(result.steps[0].subjectLine).toBe("Nike paid brand decision");
-    expect(result.overallStrategy).toBe("Use a sharper four-step sequence.");
+    expect(result.steps[0].messageBody).toContain(
+      "Quick question on Nike's branded search: how do you track changes",
+    );
+    expect(result.steps[1].imagePlaceholder).toBe("{{! Insert screenshot }}");
+    expect(result.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
+    expect(result.steps[2].messageBody).toContain("40-60%");
+    expect(result.steps[3].messageBody).toContain("Not sure if this is a priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AI step one");
+    expect(result.overallStrategy).toContain("deterministic four-step framework");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
     const body = JSON.parse(String(requestInit?.body));
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
   });
 
-  it("accepts OpenAI sequence steps even when primaryContent is omitted", async () => {
+  it("accepts OpenAI schema without letting model text replace rendered steps", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
       OPENAI_API_KEY: "sk-test",
@@ -170,7 +171,8 @@ describe("Build Sequence OpenAI provider", () => {
       },
     });
 
-    expect(result.steps[0].messageBody).toBe("AI-only step one with a fresh paid-brand angle.");
+    expect(result.steps[0].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
+    expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
   });
 
@@ -236,12 +238,12 @@ describe("Build Sequence OpenAI provider", () => {
       },
     });
 
-    expect(result.overallStrategy).toBe("Use the OpenAI sequence despite normalized safety flags.");
+    expect(result.overallStrategy).toContain("deterministic four-step framework");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
     expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
   });
 
-  it("strips a single leading Step header from OpenAI body fields", async () => {
+  it("ignores leading Step headers from OpenAI body fields", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
       OPENAI_API_KEY: "sk-test",
@@ -303,12 +305,11 @@ describe("Build Sequence OpenAI provider", () => {
       },
     });
 
-    expect(result.steps.map((step) => step.messageBody)).toEqual([
-      "AI step one after the duplicated model heading.",
-      "AI step two after the duplicated model heading.",
-      "AI step three after the duplicated model heading.",
-      "AI step four after the duplicated model heading.",
-    ]);
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].messageBody).toContain("Google doesn't make it easy");
+    expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
+    expect(result.steps[3].messageBody).toContain("Not sure if this is a priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("duplicated model heading");
   });
 
   it("shows a specific fallback reason when OpenAI rejects the model", async () => {

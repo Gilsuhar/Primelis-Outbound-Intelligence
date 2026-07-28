@@ -267,14 +267,14 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.purpose).toBe("PROBLEM_FRAMING");
-      expect(stepTwo.imagePlaceholder).toBe("[Insert relevant SERP or Signal screenshot here]");
+      expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
       expect(stepTwo.imageContextNote).toContain("not from Acme");
       expect(stepTwo.messageBody).toContain("supplied example");
       expect(stepTwo.messageBody).not.toMatch(/Acme is a solo bidder|Acme has no competitors/i);
     }
   });
 
-  it("uses proof mode in Step 2 only with a named approved metric", async () => {
+  it("keeps approved proof in Step 3 instead of Step 2", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
@@ -295,15 +295,16 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
-      expect(stepTwo.messageBody).toContain("Dior");
-      expect(stepTwo.messageBody).toContain("54%");
+      expect(stepTwo.messageBody).not.toContain("Dior");
+      expect(stepTwo.messageBody).not.toContain("54%");
       expect(stepTwo.messageBody).not.toMatch(/a customer example|one customer|a client/i);
-      expect(result.data.steps[2].messageBody).not.toMatch(/\b54%|Dior\b/i);
+      expect(result.data.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
+      expect(result.data.steps[2].messageBody).toContain("40-60%");
       expect(result.data.steps[3].messageBody).not.toMatch(/\b54%|Dior\b/i);
     }
   });
 
-  it("uses diagnostic Step 2 when no screenshot or approved metric proof exists", async () => {
+  it("uses the Step 2 screenshot placeholder even when no visual has been supplied yet", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
@@ -320,7 +321,8 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
-      expect(stepTwo.messageBody).toMatch(/often remains unchanged|visibility question/i);
+      expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
+      expect(stepTwo.messageBody).toMatch(/Google doesn't make it easy|only advertiser on the SERP/i);
       expect(stepTwo.messageBody).not.toMatch(/\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b/i);
       expect(stepTwo.messageBody).not.toMatch(/customer example|one customer|one client/i);
     }
@@ -457,10 +459,10 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "BREAKUP_CLOSE_LOOP",
       ]);
-      expect(result.data.steps[0].messageBody).toMatch(/how do you decide/i);
-      expect(result.data.steps[1].messageBody).toMatch(/visibility|process question/i);
-      expect(result.data.steps[2].messageBody).toMatch(/competitor presence|competition returns/i);
-      expect(result.data.steps[3].messageBody).toMatch(/close|not relevant|no problem/i);
+      expect(result.data.steps[0].messageBody).toMatch(/how do you track/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Google doesn't make it easy|only advertiser/i);
+      expect(result.data.steps[2].messageBody).toMatch(/existing Google Ads setup|40-60%/i);
+      expect(result.data.steps[3].messageBody).toMatch(/priority right now|happy to share more/i);
     }
   });
 
@@ -802,18 +804,17 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).not.toContain("VP Performance Marketing");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
-      expect(result.data.steps[0].messageBody).toMatch(/how do you decide when brand ads/i);
+      expect(result.data.steps[0].messageBody).toMatch(/how do you track changes/i);
       expect(
-        result.data.steps[0].messageBody.match(/how do you decide when brand ads/gi)?.length,
+        result.data.steps[0].messageBody.match(/how do you track changes/gi)?.length,
       ).toBe(1);
-      expect(result.data.steps[1].messageBody).toMatch(/visibility|process question/i);
-      expect(result.data.steps[1].messageBody).not.toMatch(/Google does not offer an easy way/i);
-      expect(result.data.steps[3].messageBody).toMatch(/not relevant|no problem|priority/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Google doesn't make it easy|only advertiser/i);
+      expect(result.data.steps[3].messageBody).toMatch(/priority/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
       expect(JSON.stringify(result.data.steps)).not.toMatch(
-        /SERP|conversion-source|methodology gives|operational than|branded paid search is incremental/i,
+        /conversion-source|methodology gives|operational than|branded paid search is incremental/i,
       );
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
     }
@@ -905,7 +906,7 @@ describe("Build Sequence service", () => {
         purpose: "BREAKUP_CLOSE_LOOP",
       });
       expect(`${result.data.steps.at(-1)?.messageBody} ${result.data.steps.at(-1)?.cta}`).toMatch(
-        /close the loop|not relevant|no problem/i,
+        /priority right now|happy to share more/i,
       );
     }
   });
@@ -1096,8 +1097,10 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toContain("eligible-case-study");
       expect(result.data.steps[1].purpose).toBe("PROBLEM_FRAMING");
-      expect(result.data.steps[1].messageBody).toContain("Dior");
-      expect(result.data.steps[1].messageBody).toContain("54%");
+      expect(result.data.steps[1].messageBody).not.toContain("Dior");
+      expect(result.data.steps[1].messageBody).not.toContain("54%");
+      expect(result.data.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
+      expect(result.data.steps[2].messageBody).toContain("40-60%");
     }
   });
 });

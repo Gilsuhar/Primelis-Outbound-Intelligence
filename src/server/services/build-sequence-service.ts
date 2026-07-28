@@ -22,7 +22,7 @@ import {
 } from "@/features/build-sequence/types";
 import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
-import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
+import { selectProofForContext } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
@@ -378,6 +378,10 @@ function questionCount(text: string) {
   return (text.match(/\?/g) ?? []).length;
 }
 
+function wordCount(text: string) {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 function containsVagueAnonymousCustomerStory(text: string) {
   return /\b(a customer example|one customer found|a client we worked with|we(?:'|’)ve seen with customers|another customer|one customer|a client|one client|a brand we worked with|a team we worked with)\b/i.test(text) ||
     /\b(one|a|another)\s+(customer|client|brand|company|team)\s+(example|found|showed|saw|proved|reduced|cut|saved)\b/i.test(
@@ -542,91 +546,71 @@ function containsVagueLanguage(text: string) {
   );
 }
 
-function selectedStepTwoMode(input: BuildSequenceInput, records: SequenceKnowledgeRecord[]) {
-  if (hasVisualContext(input)) {
-    return "VISUAL" as const;
+function containsUnsupportedOrganicClaim(input: BuildSequenceInput, text: string) {
+  const support = [
+    input.paidSearchContext,
+    input.internalNotes,
+    input.screenshotContext,
+    input.screenshotShows,
+    input.observedTrigger,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (/organic.*captur|organic cannibalization|paid and organic/i.test(support)) {
+    return false;
   }
-  if (
-    records.some(
-      (record) => record.type === "CASE_STUDY" && textHasApprovedMetric(record.approvedText),
-    )
-  ) {
-    return "PROOF" as const;
-  }
-  return "DIAGNOSTIC" as const;
-}
-
-function textHasApprovedMetric(text: string) {
-  return /\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b/i.test(text);
+  return /organic.*captur|organic would|organic may have|organic already|organic can already|paid and organic/i.test(
+    text,
+  );
 }
 
 function validateStepOneReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /how do you decide|how do you currently|do you currently have visibility/i.test(text) &&
-    /Signal monitors live Google and Bing|Signal monitors live/i.test(text) &&
+    /how do you track|how do you currently|competitive landscape|bids should change/i.test(text) &&
+    /Signal monitors Google and Bing SERPs minute by minute|minute by minute/i.test(text) &&
+    /reduce CPC|maintain strong branded traffic|branded traffic/i.test(text) &&
     questionCount(text) <= 2 &&
-    !/case study|example|screenshot|\[Insert relevant SERP/i.test(text)
+    !/organic|case study|example|screenshot|\{\{! Insert screenshot \}\}/i.test(text)
   );
 }
 
-function validateStepTwoReference(
-  input: BuildSequenceInput,
-  step: SequenceStep,
-  records: SequenceKnowledgeRecord[],
-) {
-  const mode = selectedStepTwoMode(input, records);
+function validateStepTwoReference(step: SequenceStep) {
   const text = `${step.imagePlaceholder ?? ""} ${step.messageBody} ${step.cta}`;
-  if (mode === "VISUAL") {
-    const visualClaimSentences = text
-      .split(/(?<=[.!?])\s+/)
-      .filter((sentence) =>
-        new RegExp(`\\b${escapeRegExp(input.companyName)}\\b`, "i").test(sentence),
-      );
-    return (
-      step.imagePlaceholder === "[Insert relevant SERP or Signal screenshot here]" &&
-      /in this (?:supplied )?example|example of the type of moment/i.test(text) &&
-      !visualClaimSentences.some((sentence) =>
-        /\b(?:is|shows|appears).*\b(?:only advertiser|no other advertiser|solo bidder)\b/i.test(
-          sentence,
-        ),
-      )
-    );
-  }
-  if (mode === "PROOF") {
-    const proofCompanies = caseStudyCompanies(records);
-    return (
-      proofCompanies.some((company) => new RegExp(`\\b${escapeRegExp(company)}\\b`, "i").test(text)) &&
-      textHasApprovedMetric(text) &&
-      !containsVagueAnonymousCustomerStory(text)
-    );
-  }
   return (
-    /often remains unchanged|can change during the day|visibility question|diagnostic/i.test(text) &&
-    !textHasApprovedMetric(text) &&
-    !containsVagueAnonymousCustomerStory(text) &&
-    !caseStudyCompanies(records).some((company) =>
-      new RegExp(`\\b${escapeRegExp(company)}\\b`, "i").test(text),
-    )
+    step.imagePlaceholder === "{{! Insert screenshot }}" &&
+    /Google doesn(?:'|’)t make it easy/i.test(text) &&
+    /only advertiser on the SERP/i.test(text) &&
+    /adjust the bid|adjust bids|CPC/i.test(text) &&
+    /detect these moments|visibility/i.test(text) &&
+    !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
+    !containsVagueAnonymousCustomerStory(text)
   );
 }
 
 function validateStepThreeReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /competitor presence|competitors? (?:are )?(?:present|return)|competition returns/i.test(text) &&
-    /pause|lower(?:s)? (?:the )?bid|reduce(?:s)? bids/i.test(text) &&
-    /coverage (?:is )?(?:adjusted|restored|comes back)|competition returns/i.test(text) &&
-    !textHasApprovedMetric(text)
+    /existing Google Ads setup/i.test(text) &&
+    /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
+    /live competition signals/i.test(text) &&
+    /blended CTR/i.test(text) &&
+    /adjust bids in real time/i.test(text) &&
+    /reduce CPC/i.test(text) &&
+    /Crocs/i.test(text) &&
+    /AppsFlyer/i.test(text) &&
+    /MyHeritage/i.test(text) &&
+    /40-60%/i.test(text) &&
+    /clicks, conversions, and revenue/i.test(text)
   );
 }
 
 function validateStepFourReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /close the loop|close/i.test(text) &&
-    /already.*manage|not.*priority|no problem|timing/i.test(text) &&
-    !/case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b/i.test(text)
+    /priority right now|timing/i.test(text) &&
+    /happy to share more|happy to send a short overview/i.test(text) &&
+    !/close the loop|close this out|final email|case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b|monitors?|Google Ads|Search Console|Bing|competitors?|pause|reduce bids|restore coverage|walkthrough|demo/i.test(text)
   );
 }
 
@@ -714,10 +698,12 @@ function hasMultipleProofCompanies(generation: SequenceGeneration, records: Sequ
     claimsUsed: generation.claimsUsed,
     steps: generation.steps,
   }).toLowerCase();
+  const approvedSequenceProof = new Set(["crocs", "appsflyer", "myheritage"]);
   const mentioned = new Set(
     caseStudyCompanies(records)
       .filter((company) => rendered.includes(company.toLowerCase()))
-      .map((company) => company.toLowerCase()),
+      .map((company) => company.toLowerCase())
+      .filter((company) => !approvedSequenceProof.has(company)),
   );
   return mentioned.size > 1;
 }
@@ -791,8 +777,36 @@ function validateSequenceGeneration(
   if (steps.some((step) => questionCount(step.cta) > 1)) {
     return fail("cta-questions");
   }
+  if (
+    steps.some(
+      (step) =>
+        wordCount(
+          [
+            step.subjectLine,
+            step.connectionRequest,
+            step.imagePlaceholder,
+            step.messageBody,
+            step.cta,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        ) > 110,
+    )
+  ) {
+    return fail("word-count");
+  }
   if (steps.some((step) => containsVagueAnonymousCustomerStory(step.messageBody))) {
     return fail("anonymous");
+  }
+  if (
+    steps.some((step) =>
+      containsUnsupportedOrganicClaim(
+        input,
+        `${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`,
+      ),
+    )
+  ) {
+    return fail("organic");
   }
   if (steps.some((step) => containsVagueLanguage(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`))) {
     return fail("vague");
@@ -803,7 +817,7 @@ function validateSequenceGeneration(
   if (!validateStepOneReference(steps[0])) {
     return fail("step1-reference");
   }
-  if (!validateStepTwoReference(input, steps[1], records)) {
+  if (!validateStepTwoReference(steps[1])) {
     return fail("step2-reference");
   }
   if (!validateStepThreeReference(steps[2])) {
@@ -813,16 +827,16 @@ function validateSequenceGeneration(
     return fail("step4-reference");
   }
   if (!hasVisualContext(input)) {
-    if (steps.some((step) => step.imagePlaceholder || step.imageContextNote)) {
+    if (steps.some((step, index) => index !== 1 && (step.imagePlaceholder || step.imageContextNote))) {
       return fail("unexpected-image");
     }
-    if (steps.some((step) => containsUnsupportedVisualClaim(step.messageBody))) {
+    if (steps.some((step, index) => index !== 1 && containsUnsupportedVisualClaim(step.messageBody))) {
       return fail("unsupported-visual");
     }
   }
   if (hasVisualContext(input)) {
     const stepTwo = steps[1];
-    if (!stepTwo?.imagePlaceholder?.includes("[Insert relevant SERP or Signal screenshot here]")) {
+    if (!stepTwo?.imagePlaceholder?.includes("{{! Insert screenshot }}")) {
       return fail("image-placeholder");
     }
     if (!stepTwo.imageContextNote) {
@@ -852,7 +866,7 @@ function validateSequenceGeneration(
   }
   if (
     finalStep.purpose !== "BREAKUP_CLOSE_LOOP" ||
-    !/close the loop|not relevant|no problem|leave this|park this|timing|circle back/i.test(
+    !/priority right now|timing|happy to share more|happy to send/i.test(
       `${finalStep.messageBody} ${finalStep.cta}`,
     )
   ) {
@@ -1204,20 +1218,6 @@ export async function generateBuildSequence(
       return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
     }
   }
-  const proofValidation = validateProofUsage({
-    output: JSON.stringify({
-      overallStrategy: generated.overallStrategy,
-      claimsUsed: generated.claimsUsed,
-      steps: generated.steps,
-    }),
-    selectedProof: proofSelection.selectedProof,
-    availableProofRecords: eligibleRecords,
-    maxMetricMentions: input.sequenceLength > 4 ? 2 : 1,
-  });
-  if (!proofValidation.ok) {
-    return err("GENERATION_REJECTED", `Generated sequence failed proof validation. ${proofValidation.reason}`);
-  }
-
   const resultWithoutId = {
     ...generated,
     sequenceLength: input.sequenceLength,

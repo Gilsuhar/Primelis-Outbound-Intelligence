@@ -53,48 +53,11 @@ function stripCommercialTerms(text: string) {
 }
 
 function stripFallbackPhrases(text: string) {
-  return text
-    .replace(/Quick question on ([^:]+):/gi, "One narrow paid-brand question for $1:")
+  return stripSingleStepHeader(text)
     .replace(/^For context,\s*/gim, "")
     .replace(/A useful way to look at this is/gi, "The practical read is")
     .replace(/I will close the loop here\.\s*/gi, "")
     .replace(/If this is not relevant, I can close the loop here\./gi, "If timing is wrong, no need to reply.");
-}
-
-function roundPercentages(text: string) {
-  return text.replace(/\b(\d+)\.(\d+)%/g, (_match, whole, decimal) => {
-    const rounded = Number(decimal) >= 5 ? Number(whole) + 1 : Number(whole);
-    return `${rounded}%`;
-  });
-}
-
-function stripSoftFiller(text: string) {
-  return text
-    .replace(/\busually where\b/gi, "where")
-    .replace(/\busually\b/gi, "often")
-    .replace(/\btends to\b/gi, "can")
-    .replace(/\bgets noisy\b/gi, "gets hard to measure")
-    .replace(/\bspend gets noisy\b/gi, "spend gets harder to control")
-    .replace(/\bdrifts?\b/gi, "increases")
-    .replace(/\bplaying out\b/gi, "showing up")
-    .replace(/\bthe tradeoff\b/gi, "the decision")
-    .replace(/\bsits in the same place\b/gi, "faces the same decision")
-    .replace(/\bcarries the same pressure\b/gi, "has the same pressure")
-    .replace(/\bunlock\b/gi, "show");
-}
-
-function stripTrailingQuestionWhenCtaExists(body: string, cta: string) {
-  if (!cta.trim()) {
-    return body;
-  }
-  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
-  const last = blocks.at(-1);
-  if (!last?.endsWith("?")) {
-    return body;
-  }
-  const withoutQuestion = last.replace(/\s*[^.!?]*\?\s*$/, "").trim();
-  const nextBlocks = withoutQuestion ? [...blocks.slice(0, -1), withoutQuestion] : blocks.slice(0, -1);
-  return nextBlocks.join("\n\n").trim() || body;
 }
 
 function stripSingleStepHeader(text: string) {
@@ -112,54 +75,14 @@ function stripSingleStepHeader(text: string) {
     .trim();
 }
 
-function cleanAiText(text: string, maxLength: number) {
-  return stripSingleStepHeader(
-    stripSoftFiller(roundPercentages(stripFallbackPhrases(stripCommercialTerms(text)))),
-  )
-    .replace(/\s+\n/g, "\n")
-    .trim()
-    .slice(0, maxLength)
-    .trim();
-}
-
-function hasLowPressureClose(text: string) {
-  return /close the loop|not relevant|no problem|leave this|park this|timing|circle back|no need to reply/i.test(
-    text,
-  );
-}
-
-type AiSequenceStep = {
-  subjectLine?: string;
-  connectionRequest?: string;
-  messageBody: string;
-  cta: string;
-  imagePlaceholder?: string;
-  imageContextNote?: string;
-};
-
-const imagePlaceholderText = "[Insert relevant SERP or Signal screenshot here]";
+const imagePlaceholderText = "{{! Insert screenshot }}";
+const approvedProofCustomers = ["Crocs", "AppsFlyer", "MyHeritage"] as const;
 
 function hasScreenshotContext(input: BuildSequenceInput) {
   return Boolean(
     input.screenshotAvailable &&
       [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
   );
-}
-
-type StepTwoMode = "VISUAL" | "PROOF" | "DIAGNOSTIC";
-
-function proofTextHasMetric(text: string) {
-  return /\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b/i.test(text);
-}
-
-function stepTwoMode(input: BuildSequenceInput, caseStudyFacts: string[]): StepTwoMode {
-  if (hasScreenshotContext(input)) {
-    return "VISUAL";
-  }
-  if (caseStudyFacts.some(proofTextHasMetric)) {
-    return "PROOF";
-  }
-  return "DIAGNOSTIC";
 }
 
 function screenshotDetails(input: BuildSequenceInput) {
@@ -175,51 +98,11 @@ function screenshotDetails(input: BuildSequenceInput) {
     .join(" ");
 }
 
-function conciseProofText(text: string) {
-  const cleaned = stripCommercialTerms(roundPercentages(text))
-    .replace(/\s+/g, " ")
-    .trim();
-  return trimSentences(cleaned, 2);
-}
-
 function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
   const firstCaseStudy = records.find((record) => record.type === "CASE_STUDY");
   return records
     .filter((record) => record.type !== "CASE_STUDY" || record.id === firstCaseStudy?.id)
     .slice(0, 12);
-}
-
-function normalizeAiStep(step: SequenceStep, aiStep: AiSequenceStep) {
-  let messageBody = cleanAiText(aiStep.messageBody, 1600);
-  if (messageBody.length < 20) {
-    messageBody = step.messageBody;
-  }
-
-  let cta = cleanAiText(aiStep.cta, 220);
-  if (cta.length === 0) {
-    cta = step.cta;
-  }
-
-  if (step.purpose === "BREAKUP_CLOSE_LOOP" && !hasLowPressureClose(`${messageBody} ${cta}`)) {
-    cta = "No need to reply if timing is wrong.";
-  }
-  messageBody = stripTrailingQuestionWhenCtaExists(messageBody, cta);
-
-  return {
-    ...step,
-    subjectLine:
-      step.channel === "EMAIL"
-        ? cleanAiText(aiStep.subjectLine ?? step.subjectLine ?? "", 160)
-        : undefined,
-    connectionRequest:
-      step.channel === "LINKEDIN" && step.stepNumber === 1
-        ? cleanAiText(aiStep.connectionRequest ?? step.connectionRequest ?? "", 300)
-        : step.connectionRequest,
-    messageBody,
-    cta,
-    imagePlaceholder: step.imagePlaceholder,
-    imageContextNote: step.imageContextNote,
-  };
 }
 
 function greeting(input: BuildSequenceInput) {
@@ -250,47 +133,44 @@ function ctaForPurpose(
   purpose: SequenceStep["purpose"],
   stepNumber: number,
   isFinal: boolean,
-  channel: SequenceStep["channel"],
 ) {
   if (isFinal) {
-    return "If this is not relevant, I can close the loop here.";
-  }
-  if (channel === "LINKEDIN") {
-    if (stepNumber === 1) {
-      return "Open to connecting?";
-    }
-    return purpose === "METHODOLOGY_DIFFERENTIATION"
-      ? "Do you already track this?"
-      : "Is this on your radar?";
+    return "Happy to share more if useful.";
   }
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you currently have visibility into those moments?",
-    PROBLEM_FRAMING: "How often do you see this across your branded searches?",
-    METHODOLOGY_DIFFERENTIATION: "Worth a brief walkthrough?",
+    FIRST_TOUCH_RELEVANCE: "Do you have anything in place for that today?",
+    PROBLEM_FRAMING: "Is your team able to detect these moments automatically?",
+    METHODOLOGY_DIFFERENTIATION: "Worth a quick look?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
     SOCIAL_PROOF: "Would it be useful to compare this with your current branded-search process?",
     TECHNICAL_CLARIFICATION: "Would a brief walkthrough help?",
     LOW_PRESSURE_FOLLOW_UP: "Should I park this for later?",
-    BREAKUP_CLOSE_LOOP: "No problem if it isn't a priority right now.",
+    BREAKUP_CLOSE_LOOP: "Happy to share more if useful.",
   };
   return ctas[purpose];
 }
 
 function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"], stepNumber: number) {
   const pattern = winningPatternForPurpose(input, purpose, stepNumber - 1);
-  if (pattern.subject) {
+  const referencePurposes: SequencePurpose[] = [
+    "FIRST_TOUCH_RELEVANCE",
+    "PROBLEM_FRAMING",
+    "METHODOLOGY_DIFFERENTIATION",
+    "BREAKUP_CLOSE_LOOP",
+  ];
+  if (pattern.subject && !referencePurposes.includes(purpose)) {
     return pattern.subject;
   }
   const company = displayCompany(input);
   const subjects: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: `${company} branded ads question`,
-    PROBLEM_FRAMING: `Re: deactivating branded ads`,
-    METHODOLOGY_DIFFERENTIATION: `Re: lower branded CPC`,
+    FIRST_TOUCH_RELEVANCE: `${company} branded search visibility`,
+    PROBLEM_FRAMING: `Re: ${company} SERP visibility`,
+    METHODOLOGY_DIFFERENTIATION: `Re: Signal and branded CPC`,
     ACCOUNT_SPECIFIC_OBSERVATION: `${company}: one brand-search check`,
     SOCIAL_PROOF: `A practical paid-brand example`,
     TECHNICAL_CLARIFICATION: `Paid brand methodology`,
     LOW_PRESSURE_FOLLOW_UP: `Quick follow-up on ${company}`,
-    BREAKUP_CLOSE_LOOP: `Closing the loop`,
+    BREAKUP_CLOSE_LOOP: `Quick follow-up`,
   };
   return subjects[purpose] ?? `Thought for ${company} ${stepNumber}`;
 }
@@ -399,20 +279,14 @@ function bodyForPurpose({
   input,
   purpose,
   channel,
-  secondaryFact,
-  stepTwoMode,
   ctaIndex,
 }: {
   input: BuildSequenceInput;
   purpose: SequenceStep["purpose"];
   channel: SequenceStep["channel"];
-  secondaryFact: string;
-  stepTwoMode: StepTwoMode;
   ctaIndex: number;
 }) {
   const company = displayCompany(input);
-  const simpleSecondaryFact =
-    stepTwoMode === "PROOF" ? secondaryFact : humanizeFact(secondaryFact);
   const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
   const patternBody = pattern.body;
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
@@ -432,34 +306,24 @@ function bodyForPurpose({
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Quick question on ${company}'s branded search: how do you decide when brand ads are genuinely protecting the query, and when organic may have captured the click anyway?`,
-      "Signal monitors live Google and Bing results and can adjust coverage as competitor activity changes, rather than leaving brand bids on the same setting throughout the day.",
+      `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`,
+      "Signal monitors Google and Bing SERPs minute by minute, giving teams the visibility to react in real time, reduce CPC, and maintain strong branded traffic.",
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      stepTwoMode === "VISUAL"
-        ? "Here's an example of the type of moment Signal monitors:"
-        : stepTwoMode === "PROOF"
-          ? "Approved proof:"
-          : "Branded-search coverage often remains unchanged even though competitor presence can change during the day.",
-      stepTwoMode === "VISUAL"
-        ? `In this example, ${screenshotDetails(input)}`
-        : stepTwoMode === "PROOF"
-          ? conciseProofText(simpleSecondaryFact)
-          : "The useful diagnostic is simple: can the team see when the brand is alone, when competitors return, and whether bids should change with that condition?",
-      stepTwoMode === "VISUAL"
-          ? "Signal can identify these conditions automatically and either pause the ad or reduce the bid, depending on the team's strategy."
-          : stepTwoMode === "PROOF"
-          ? "The useful next step is to compare where paid coverage protects demand and where bids can safely come down."
-          : `For ${company}, I would treat that as a visibility question, not as proof about the account.`,
+      "Google doesn't make it easy to identify when your brand is the only advertiser on the SERP.",
+      `Here's an example from a recent search for ${company}:`,
+      hasScreenshotContext(input)
+        ? `At that moment, ${screenshotDetails(input)} This creates an opportunity to adjust the bid or CPC without losing coverage.`
+        : "Use the screenshot to call out only what is visible, then connect that moment to a possible bid or CPC adjustment without claiming waste.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "Signal continuously checks competitor presence on branded queries.",
-      "When the brand is the only advertiser, it can pause the ad or lower the bid. When competition returns, coverage is adjusted again automatically.",
-      "The goal is to maintain protection without using the same bid in every search condition.",
+      "Signal works alongside your existing Google Ads setup, without requiring your team to rebuild campaigns or change your current bidding strategy.",
+      "It uses live competition signals and blended CTR to adjust bids in real time, helping reduce CPC while maintaining visibility and performance.",
+      `Brands such as ${approvedProofCustomers.slice(0, -1).join(", ")}, and ${approvedProofCustomers.at(-1)} use Signal to save 40-60% on branded ads while maintaining or improving clicks, conversions, and revenue.`,
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -471,7 +335,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       "One concrete customer result is more useful than another broad brand-search explanation.",
-      simpleSecondaryFact,
+      `Brands such as ${approvedProofCustomers.slice(0, -1).join(", ")}, and ${approvedProofCustomers.at(-1)} use Signal to save 40-60% on branded ads while maintaining or improving clicks, conversions, and revenue.`,
       "The practical takeaway is to test where paid coverage is protecting demand and where the bid can safely come down.",
     ],
     TECHNICAL_CLARIFICATION: [
@@ -489,9 +353,7 @@ function bodyForPurpose({
     BREAKUP_CLOSE_LOOP: [
       greeting(input),
       "",
-      "I'll close the loop here.",
-      "This may already be something your team manages closely. If not, I can send the short version of how teams review those moments.",
-      "No problem if it isn't a priority right now.",
+      "Not sure if this is a priority right now.",
     ],
   };
 
@@ -539,23 +401,22 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     const productFacts = records
       .filter((record) => record.type === "PRODUCT_TRUTH")
       .map((record) => stripCommercialTerms(record.approvedText));
-    const caseStudyFacts = records
-      .filter((record) => record.type === "CASE_STUDY")
-      .map((record) => stripCommercialTerms(record.approvedText));
-    const proofFacts = caseStudyFacts.filter(proofTextHasMetric);
-    const selectedStepTwoMode = stepTwoMode(input, proofFacts);
     const primaryFact = productFacts[0]
       ? trimSentences(productFacts[0], 1)
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
-    const secondaryFact = productFacts[1] ? trimSentences(productFacts[1], 1) : primaryFact;
     const purposes: SequencePurpose[] = defaultPurposesForLength();
     const sourceIds = Array.from(new Set(records.flatMap((record) => record.sourceIds)));
+    const deterministicClaims = [
+      "Signal monitors Google and Bing SERPs minute by minute.",
+      "Signal works alongside the existing Google Ads setup without rebuilding campaigns or changing the current bidding strategy.",
+      "Crocs, AppsFlyer, and MyHeritage are approved proof customers for the 40-60% branded-ad savings range.",
+    ];
 
     const steps = purposes.map((purpose, index): SequenceStep => {
       const stepNumber = index + 1;
       const channel = channelForStep(input.primaryChannel, index);
       const isFinal = stepNumber === purposes.length;
-      const cta = ctaForPurpose(input, purpose, stepNumber, isFinal, channel);
+      const cta = ctaForPurpose(input, purpose, stepNumber, isFinal);
       return {
         stepNumber,
         channel,
@@ -575,23 +436,25 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           input,
           purpose,
           channel,
-          secondaryFact: proofFacts[0] ?? secondaryFact,
-          stepTwoMode: selectedStepTwoMode,
           ctaIndex: index,
         }),
         cta,
         imagePlaceholder:
-          purpose === "PROBLEM_FRAMING" && hasScreenshotContext(input)
+          purpose === "PROBLEM_FRAMING"
             ? imagePlaceholderText
             : undefined,
         imageContextNote:
-          purpose === "PROBLEM_FRAMING" && hasScreenshotContext(input)
-            ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${screenshotDetails(input)}`
+          purpose === "PROBLEM_FRAMING"
+            ? hasScreenshotContext(input)
+              ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${screenshotDetails(input)}`
+              : "Salesperson note: insert the relevant prospect SERP screenshot before sending. Do not claim unsupported observations."
             : undefined,
         claimsUsed: [
-          purpose === "SOCIAL_PROOF"
-            ? humanizeFact(caseStudyFacts[0] ?? secondaryFact)
-            : humanizeFact(primaryFact),
+          purpose === "METHODOLOGY_DIFFERENTIATION"
+            ? deterministicClaims[2]
+            : purpose === "FIRST_TOUCH_RELEVANCE"
+              ? deterministicClaims[0]
+              : humanizeFact(primaryFact),
         ],
         sourceIds,
       };
@@ -600,9 +463,9 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     return {
       ...generation,
       steps,
-      claimsUsed: Array.from(new Set(steps.flatMap((step) => step.claimsUsed))),
+      claimsUsed: Array.from(new Set([...deterministicClaims, ...steps.flatMap((step) => step.claimsUsed)])),
       overallStrategy: stripCommercialTerms(
-        `Use reply-backed patterns from the winning-message library: direct first-touch question, Google automation gap, method or lower-CPC angle, then a low-pressure close. Keep the sequence concise and anchored to ${emailAngle}.`,
+        `Use the deterministic four-step framework: live SERP visibility, screenshot evidence, capabilities with approved proof, then a soft follow-up. Keep the sequence concise and anchored to ${emailAngle}.`,
       ),
     };
   }
@@ -625,11 +488,6 @@ export function createBuildSequenceAiProvider(
       const fallback = new DeterministicBuildSequenceProvider();
       const result = await fallback.generate(request);
       const promptRecords = recordsForPrompt(request.records);
-      const selectedCaseStudyFacts = promptRecords
-        .filter((record) => record.type === "CASE_STUDY")
-        .map((record) => record.approvedText)
-        .filter(proofTextHasMetric);
-      const selectedStepTwoMode = stepTwoMode(request.input, selectedCaseStudyFacts);
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -665,7 +523,6 @@ export function createBuildSequenceAiProvider(
               observationDate: request.input.observationDate,
               screenshotShows: request.input.screenshotShows,
               selectedAngle: result.selectedAngle,
-              stepTwoMode: selectedStepTwoMode,
               approvedKnowledge: promptRecords.map((record) => ({
                 title: record.title,
                 type: record.type,
@@ -680,19 +537,10 @@ export function createBuildSequenceAiProvider(
               })),
             },
             writingInstructions: [
-              "Template-first task: do not invent a new sequence strategy. Return exactly four sequenceSteps matching brief.sequencePlan.",
-              "Use this approved reference as the primary style and structure. Step 1: Hi [First name], Quick question on [Company]'s branded search: how do you decide when brand ads are genuinely protecting the query, and when organic may have captured the click anyway? Signal monitors live Google and Bing results and adjusts branded coverage as competitor activity changes. Do you currently have visibility into those moments?",
-              "Reference Step 2 visual mode: Here's a simple example of the type of moment Signal monitors: [placeholder]. In this example, describe only what the user supplied. Signal can identify these conditions automatically and either pause the ad or reduce the bid, depending on the team's strategy. Ask whether they have visibility into similar moments.",
-              "Reference Step 3: Signal continuously checks competitor presence on branded queries. When the brand is the only advertiser, it can pause the ad or lower the bid. When competition returns, coverage is adjusted again automatically. End with a brief walkthrough CTA.",
-              "Reference Step 4: close the loop, acknowledge they may already manage this, offer one light next step, and do not add new proof or technical detail.",
-              "Step 2 mode is preselected by the application as brief.stepTwoMode. If VISUAL, use only supplied screenshot fields and include the exact placeholder through imagePlaceholder, not inside body text. If PROOF, use only the selected named approved case study and exact approved metric. If DIAGNOSTIC, use a conditional general insight with no customer, no metric, and no prospect-specific claim.",
-              "Allowed adaptation only: first name, company or brand, role context, supplied screenshot context, selected approved case study, approved product facts, and CTA wording within the approved intent.",
-              "Rejected bad example: 'At LELO, branded search can be doing more work than it should if competitors are taking slots or if your own ad is carrying spend when organic already covers the query.' Reject because it assumes competitor activity, wasted spend, and organic coverage.",
-              "Rejected bad example: 'A customer example we've seen...' Reject because it is anonymous and has no approved customer or metric.",
-              "Never claim the prospect has waste, competitors, crowded queries, high CPC, rising spend, poor incrementality, organic coverage, or inefficient coverage unless that exact verified context was supplied.",
-              "Avoid vague AI language: conversion-source data, outcome data, cleaner read, cleaner bid decision, the angle, setup pattern, plain example, real work, doing more work than it should.",
-              "Use concrete language: Google Ads, Search Console, conversion data, competitor presence, pause ads, reduce bids, restore coverage, branded-search process.",
-              "Keep each body close to the reference length. One idea per step. One CTA per step. No extra paragraphs. No anonymous stories. No repeated product explanation.",
+              "Do not return a free-form sequence. The application owns the four rendered emails.",
+              "Return only concise optional wording suggestions inside the provided sequenceSteps shape. The application may ignore any field that violates the deterministic renderer.",
+              "Do not change step purpose, CTA category, proof customers, savings range, screenshot placeholder, or sequence order.",
+              "Avoid organic-cannibalization claims unless explicitly supplied by the user.",
             ],
             approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),
             userProvidedContext: [
@@ -726,22 +574,13 @@ export function createBuildSequenceAiProvider(
         if (aiResult.sequenceSteps?.length !== result.steps.length) {
           throw new Error("MALFORMED_RESPONSE");
         }
-        const aiSteps =
-          result.steps.map((step, index) => {
-                const aiStep = aiResult.sequenceSteps?.[index];
-                if (!aiStep) {
-                  return step;
-                }
-                return normalizeAiStep(step, aiStep);
-              });
         return {
           ...result,
-          steps: aiSteps,
-          claimsUsed: aiResult.factualClaimsUsed.length
-            ? aiResult.factualClaimsUsed
-            : result.claimsUsed,
-          overallStrategy: aiResult.changeSummary ?? result.overallStrategy,
-          safetyNotes: [...result.safetyNotes, ...aiResult.uncertaintyNotes],
+          safetyNotes: [
+            ...result.safetyNotes,
+            ...aiResult.uncertaintyNotes,
+            "Deterministic renderer controlled the final sequence structure.",
+          ],
         };
       } catch (error) {
         const failure = mapAiProviderError(error);
@@ -749,7 +588,7 @@ export function createBuildSequenceAiProvider(
           ...result,
           safetyNotes: [
             ...result.safetyNotes,
-            `${failure.message} Deterministic fallback was used.`,
+            `${failure.message} Deterministic renderer controlled the final sequence structure.`,
           ],
         };
       }
