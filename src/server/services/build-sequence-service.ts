@@ -28,6 +28,7 @@ import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import {
   createBuildSequenceAiProvider,
+  DeterministicBuildSequenceProvider,
   type BuildSequenceAiProvider,
 } from "./build-sequence-provider";
 import { assertAccountCanGenerate } from "./account-status-service";
@@ -1160,7 +1161,7 @@ export async function generateBuildSequence(
     safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
     knowledgeLimitations: knowledgeLimitations(input, records),
   };
-  const generated = sanitizeSequenceGeneration(
+  let generated = sanitizeSequenceGeneration(
     await provider.generate({
       input,
       records,
@@ -1168,6 +1169,7 @@ export async function generateBuildSequence(
       generation: baseGeneration,
     }),
   );
+  let providerMetadata = provider.metadata;
   const fallbackReason = openAiFallbackReason(provider.metadata.providerName, generated.safetyNotes);
   if (fallbackReason) {
     return err(
@@ -1177,7 +1179,30 @@ export async function generateBuildSequence(
   }
 
   if (!validateSequenceGeneration(input, generated, records)) {
-    return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+    if (provider.metadata.providerName === "openai") {
+      const fallbackProvider = new DeterministicBuildSequenceProvider();
+      const fallbackGenerated = sanitizeSequenceGeneration(
+        await fallbackProvider.generate({
+          input,
+          records,
+          sourceReferences: sources,
+          generation: {
+            ...baseGeneration,
+            safetyNotes: [
+              ...baseGeneration.safetyNotes,
+              "OpenAI output failed sequence structure validation, so the approved fallback template was used.",
+            ],
+          },
+        }),
+      );
+      if (!validateSequenceGeneration(input, fallbackGenerated, records)) {
+        return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+      }
+      generated = fallbackGenerated;
+      providerMetadata = fallbackProvider.metadata;
+    } else {
+      return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+    }
   }
   const proofValidation = validateProofUsage({
     output: JSON.stringify({
@@ -1199,7 +1224,7 @@ export async function generateBuildSequence(
     overallDuration: input.desiredOverallDuration,
     recordsUsed: records,
     sourceReferences: sources,
-    provider: provider.metadata,
+    provider: providerMetadata,
   };
   const draftId = await persistence.persistDraft({
     creatorId,

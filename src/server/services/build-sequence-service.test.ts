@@ -1009,6 +1009,51 @@ describe("Build Sequence service", () => {
     });
   });
 
+  it("uses the approved fallback template when OpenAI output fails structure validation", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            steps: generated.steps.map((step) => ({
+              ...step,
+              cta: "Worth a quick look?",
+            })),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.provider.providerName).toBe("deterministic-development");
+      expect(result.data.safetyNotes).toContain(
+        "OpenAI output failed sequence structure validation, so the approved fallback template was used.",
+      );
+      expect(result.data.steps).toHaveLength(4);
+      expect(result.data.steps.map((step) => step.purpose)).toEqual([
+        "FIRST_TOUCH_RELEVANCE",
+        "PROBLEM_FRAMING",
+        "METHODOLOGY_DIFFERENTIATION",
+        "BREAKUP_CLOSE_LOOP",
+      ]);
+    }
+  });
+
   it("returns structured errors for invalid input and unauthorized users", async () => {
     const { adapter } = persistence([]);
     const invalid = await generateBuildSequence({ companyName: "" }, { persistence: adapter });
