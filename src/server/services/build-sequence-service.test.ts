@@ -540,6 +540,37 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("accepts managed-account promotion copy through full sequence validation", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Americaneagle",
+        companyWebsite: "americaneagle.com",
+        contactFirstName: undefined,
+        contactRole: "Head of Performance Marketing",
+        companyContext: "Digital agency managing multiple client accounts",
+        observedTrigger: "Promotion to PPC Team Lead",
+        prospectContext: "Mia Johnson\nPPC Team Lead\nAmericaneagle.com.\nFull-time · 3 yrs 3 mos.",
+        serpEvidence: "solo brand moments on all kws biiding",
+        brandKeyword: undefined,
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(result.data.steps[0].subjectLine).toBe("branded search across managed accounts");
+      expect(result.data.steps[0].messageBody).toContain("Hi Mia");
+      expect(result.data.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+      expect(rendered).toContain("across multiple accounts");
+      expect(rendered).not.toContain("35-60%");
+      expect(rendered).not.toContain("250 brands");
+    }
+  });
+
   it("rejects repeated or near-duplicate steps", async () => {
     const provider = new DeterministicBuildSequenceProvider();
     const originalGenerate = provider.generate.bind(provider);

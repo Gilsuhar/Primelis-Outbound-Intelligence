@@ -598,7 +598,7 @@ function validateStepOneReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
     /branded-search|brand(ed)? search|SERP|auction|CPC|bid|coverage|competitive landscape/i.test(text) &&
-    /question|snapshot|competitors?|solo|contested|visibility|bids should change|CPC may be/i.test(text) &&
+    /question|snapshot|competitors?|solo|contested|visibility|bids should change|CPC may be|same CPC|quiet brand auctions|branded-search efficiency/i.test(text) &&
     questionCount(text) <= 2 &&
     !/case study|screenshot|\{\{! Insert screenshot \}\}|use the screenshot|what it shows/i.test(text)
   );
