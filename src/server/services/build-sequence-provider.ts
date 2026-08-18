@@ -90,7 +90,9 @@ function hasScreenshotContext(input: BuildSequenceInput) {
 }
 
 function screenshotObservation(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const keyword = intelligence.serpEvidence.keywords[0] ?? input.brandKeyword;
+  const keyword = intelligence.serpEvidence.structuredKeywords.find((item) => item.status === "solo")?.term ??
+    intelligence.serpEvidence.keywords[0] ??
+    input.brandKeyword;
   const observedAt = input.observationDate ? ` at the time of the ${input.observationDate} check` : "";
   const market = input.marketCountry ? ` in ${input.marketCountry}` : "";
   const shows = input.screenshotShows?.trim();
@@ -305,6 +307,14 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
   return "The practical question is where paid brand is still changing the outcome.";
 }
 
+function contestedKeyword(intelligence: ProspectIntelligence) {
+  return intelligence.serpEvidence.structuredKeywords.find((keyword) => keyword.status === "contested");
+}
+
+function soloKeyword(intelligence: ProspectIntelligence) {
+  return intelligence.serpEvidence.structuredKeywords.find((keyword) => keyword.status === "solo");
+}
+
 function firstPersonalFact(intelligence: ProspectIntelligence) {
   return intelligence.relevantFacts.find(
     (fact) => !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()),
@@ -462,18 +472,32 @@ function bodyForPurpose({
         : approvedProofPointForStep(ctaIndex);
   const isManagedPpcSequence = managesMultipleAccounts(input) &&
     /paid search|sem|ppc|performance/.test(buyerRole(input, intelligence).toLowerCase());
+  const contested = contestedKeyword(intelligence);
+  const solo = soloKeyword(intelligence);
   const managedPpcStepOne = hasPromotionSignal(input)
     ? "One challenge that often becomes harder across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet."
     : "One challenge across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet.";
-  const managedPpcStepTwo = "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThat is the useful method: identify solo periods across the accounts your team manages, lower pressure only where coverage is still protected, and restore defense when competitors return.";
-  const managedPpcStepThree = [
-    "For a PPC team, the value is not another dashboard.",
-    "It is being able to identify solo and contested periods across multiple accounts, then act without manually checking every SERP.",
-    hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
-      ? screenshotObservation(input, intelligence)
-      : "Without account-specific SERP evidence, I would keep this as a visibility check: where does the auction change, and how quickly can bids react?",
-    "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
-  ].join("\n\n");
+  const managedPpcStepTwo = contested
+    ? [
+        `In the keyword data you supplied, "${contested.term}" was a contested brand auction${contested.competitor ? ` with ${contested.competitor} visible` : ""}.`,
+        "That is exactly where maintaining coverage can have defensive value.",
+        "The point is not to cut every branded bid. It is to tell contested and solo moments apart across the accounts your team manages.",
+      ].join("\n\n")
+    : "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThat is the useful method: identify solo periods across the accounts your team manages, lower pressure only where coverage is still protected, and restore defense when competitors return.";
+  const managedPpcStepThree = solo
+    ? [
+        `The useful sample to show is "${solo.term}". In the keyword data you supplied, it was a solo brand auction.`,
+        "That does not prove wasted spend, but it is the kind of moment worth checking before keeping one flat branded bid rule.",
+        "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+      ].join("\n\n")
+    : [
+        "For a PPC team, the value is not another dashboard.",
+        "It is being able to identify solo and contested periods across multiple accounts, then act without manually checking every SERP.",
+        hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
+          ? screenshotObservation(input, intelligence)
+          : "Without account-specific SERP evidence, I would keep this as a visibility check: where does the auction change, and how quickly can bids react?",
+        "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+      ].join("\n\n");
   const managedPpcProofAngle = "The simplest way to evaluate this is one account with meaningful branded-search spend: compare auction conditions, CPC, and paid coverage needs before discussing anything broader.";
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
@@ -705,6 +729,7 @@ export function createBuildSequenceAiProvider(
               observedTrigger: request.input.observedTrigger,
               prospectContext: request.input.prospectContext,
               serpEvidence: request.input.serpEvidence,
+              keywords: request.input.keywords,
               primaryChannel: request.input.primaryChannel,
               sequenceLength: request.input.sequenceLength,
               desiredTone: request.input.desiredTone,
@@ -760,6 +785,9 @@ export function createBuildSequenceAiProvider(
               request.input.marketCountry ? `Screenshot market/country from user: ${request.input.marketCountry}` : "",
               request.input.device ? `Screenshot device from user: ${request.input.device}` : "",
               request.input.observationDate ? `Screenshot observation date from user: ${request.input.observationDate}` : "",
+              ...(request.input.keywords ?? []).map((keyword) =>
+                `Structured keyword evidence from user: ${keyword.term} is ${keyword.status}${keyword.competitor ? ` with competitor ${keyword.competitor}` : ""}${keyword.note ? ` (${keyword.note})` : ""}`,
+              ),
             ].filter(Boolean),
             sourceReferences: request.sourceReferences,
             safetyPolicy: result.safetyNotes,

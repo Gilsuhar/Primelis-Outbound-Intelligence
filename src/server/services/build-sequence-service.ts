@@ -81,6 +81,26 @@ const buildSequenceSchema = z.object({
   accountStatusOverride: z.boolean().optional().default(false),
   prospectContext: z.string().trim().max(6000).optional(),
   serpEvidence: z.string().trim().max(3000).optional(),
+  keywords: z
+    .array(
+      z.object({
+        term: z.string().trim().max(120),
+        status: z.enum(["solo", "contested"]),
+        competitor: z.string().trim().max(120).optional(),
+        note: z.string().trim().max(240).optional(),
+      }),
+    )
+    .max(5)
+    .optional()
+    .transform((keywords) =>
+      keywords
+        ?.map((keyword) => ({
+          ...keyword,
+          competitor: keyword.competitor || undefined,
+          note: keyword.note || undefined,
+        }))
+        .filter((keyword) => keyword.term),
+    ),
   internalNotes: z.string().trim().max(1200).optional(),
   screenshotAvailable: z.boolean().optional().default(false),
   screenshotContext: z.string().trim().max(800).optional(),
@@ -292,6 +312,32 @@ function sourceReferences(records: SequenceKnowledgeRecord[]): SequenceSourceRef
   return Array.from(references.values());
 }
 
+function companyEvidenceTokens(input: BuildSequenceInput) {
+  const companyTokens = input.companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s.-]/g, " ")
+    .split(/\s+|[.-]/)
+    .filter((token) => token.length > 2);
+  const domainTokens = (input.companyWebsite ?? "")
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split(/[./-]/)
+    .filter((token) => token.length > 2);
+  return Array.from(new Set([...companyTokens, ...domainTokens])).filter(
+    (token) => !/^(com|net|org|inc|ltd|llc|group|global|the)$/.test(token),
+  );
+}
+
+function mismatchedKeywordEvidence(input: BuildSequenceInput) {
+  const tokens = companyEvidenceTokens(input);
+  if (tokens.length === 0) return [];
+  return (input.keywords ?? []).filter((keyword) => {
+    const term = keyword.term.toLowerCase();
+    return !tokens.some((token) => term.includes(token));
+  });
+}
+
 function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowledgeRecord[]) {
   const limitations = new Set<string>();
   if (!input.companyWebsite) {
@@ -313,8 +359,11 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
   if (records.length === 0) {
     limitations.add("No approved eligible Signal knowledge was available for this channel.");
   }
-  if (!input.serpEvidence && !hasVisualContext(input)) {
+  if (!input.serpEvidence && !hasVisualContext(input) && !input.keywords?.length) {
     limitations.add("No SERP evidence was provided, so account-specific search conditions were not claimed.");
+  }
+  if (mismatchedKeywordEvidence(input).length > 0) {
+    limitations.add("Some keyword evidence did not appear to match the prospect company and was not used for specific SERP claims.");
   }
   return Array.from(limitations);
 }
@@ -339,6 +388,9 @@ function safetyNotes(input: BuildSequenceInput, records: SequenceKnowledgeRecord
   }
   if (records.every((record) => record.type !== "OBJECTION")) {
     notes.add("Vendor objection records were not used.");
+  }
+  if (mismatchedKeywordEvidence(input).length > 0) {
+    notes.add("Mismatched keyword evidence was filtered before generation.");
   }
   return Array.from(notes);
 }
@@ -609,7 +661,7 @@ function validateStepTwoReference(step: SequenceStep) {
   return (
     /screenshot|visual|SERP/i.test(step.imageContextNote ?? "") &&
     /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction/i.test(text) &&
-    /evidence|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
+    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
     !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(text) &&
     !containsVagueAnonymousCustomerStory(text)
@@ -621,7 +673,7 @@ function validateStepThreeReference(step: SequenceStep) {
   return (
     /existing Google Ads setup/i.test(text) &&
     /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
-    /snapshot|supplied evidence|SERP evidence|without account-specific SERP evidence|at the time of the check/i.test(text) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|without account-specific SERP evidence|at the time of the check/i.test(text) &&
     /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );

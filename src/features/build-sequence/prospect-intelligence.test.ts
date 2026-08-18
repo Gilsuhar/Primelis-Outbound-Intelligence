@@ -62,6 +62,35 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.primaryAngle).toMatch(/one static rule/i);
   });
 
+  it("uses structured keyword evidence before free-text SERP notes", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      serpEvidence: "generic notes only",
+      keywords: [
+        { term: "Cursor pricing", status: "solo" },
+        { term: "Cursor AI editor", status: "contested", competitor: "Notion" },
+      ],
+    });
+
+    expect(intelligence.serpScenario).toBe("MIXED");
+    expect(intelligence.serpEvidence.soloKeywords).toEqual(["Cursor pricing"]);
+    expect(intelligence.serpEvidence.contestedKeywords).toEqual(["Cursor AI editor"]);
+    expect(intelligence.serpEvidence.competitors).toEqual(["Notion"]);
+  });
+
+  it("filters structured keyword evidence that does not match the prospect company", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      keywords: [
+        { term: "Nike running shoes", status: "contested", competitor: "Adidas" },
+      ],
+    });
+
+    expect(intelligence.serpScenario).toBe("UNKNOWN");
+    expect(intelligence.serpEvidence.structuredKeywords).toEqual([]);
+    expect(JSON.stringify(intelligence)).not.toContain("Nike running shoes");
+  });
+
   it("classifies UNKNOWN when no SERP evidence is supplied", () => {
     const intelligence = buildProspectIntelligence(input);
 

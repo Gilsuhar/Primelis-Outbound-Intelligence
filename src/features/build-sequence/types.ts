@@ -31,6 +31,13 @@ export type SequenceTone = (typeof sequenceTones)[number];
 export type SequencePurpose = (typeof sequencePurposes)[number];
 export type SequenceAngle = (typeof sequenceAngles)[number];
 
+export type SequenceKeywordEvidence = {
+  term: string;
+  status: "solo" | "contested";
+  competitor?: string;
+  note?: string;
+};
+
 export type BuildSequenceInput = {
   companyName: string;
   companyWebsite?: string;
@@ -50,6 +57,7 @@ export type BuildSequenceInput = {
   accountStatusOverride?: boolean;
   prospectContext?: string;
   serpEvidence?: string;
+  keywords?: SequenceKeywordEvidence[];
   internalNotes?: string;
   screenshotAvailable?: boolean;
   screenshotContext?: string;
@@ -150,6 +158,7 @@ export type ProspectIntelligence = {
     contestedKeywords: string[];
     competitors: string[];
     observations: string[];
+    structuredKeywords: SequenceKeywordEvidence[];
   };
   primaryAngle: string;
   secondaryAngle?: string;

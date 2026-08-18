@@ -31,6 +31,7 @@ import { translateUi, type UiTextKey } from "@/lib/ui-translations";
 import type {
   BuildSequenceResult,
   SequenceChannel,
+  SequenceKeywordEvidence,
   SequenceLength,
   SequenceStep,
   SequenceTone,
@@ -45,6 +46,12 @@ const tones: { label: string; value: SequenceTone }[] = [
 
 const lengths: { label: string; value: SequenceLength }[] = [
   { label: "4 steps", value: 4 },
+];
+
+const emptyKeywordEvidence: SequenceKeywordEvidence[] = [
+  { term: "", status: "solo" },
+  { term: "", status: "contested" },
+  { term: "", status: "solo" },
 ];
 
 const companySizeOptions = [
@@ -529,6 +536,7 @@ export function BuildSequenceClient() {
   const [observedTrigger, setObservedTrigger] = useState("");
   const [prospectContext, setProspectContext] = useState("");
   const [serpEvidence, setSerpEvidence] = useState("");
+  const [keywordEvidence, setKeywordEvidence] = useState<SequenceKeywordEvidence[]>(emptyKeywordEvidence);
   const [internalNotes, setInternalNotes] = useState("");
   const [screenshotAvailable, setScreenshotAvailable] = useState(false);
   const [screenshotContext, setScreenshotContext] = useState("");
@@ -616,6 +624,37 @@ export function BuildSequenceClient() {
     return buildFullSequenceText(displayedSteps);
   }
 
+  function updateKeywordEvidence(
+    index: number,
+    field: keyof SequenceKeywordEvidence,
+    value: string,
+  ) {
+    setKeywordEvidence((current) =>
+      current.map((keyword, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...keyword,
+              [field]: field === "status" ? (value as SequenceKeywordEvidence["status"]) : value,
+            }
+          : keyword,
+      ),
+    );
+    if (field === "term" && value.trim()) {
+      setScreenshotAvailable(true);
+    }
+  }
+
+  function cleanedKeywordEvidence() {
+    return keywordEvidence
+      .map((keyword) => ({
+        term: keyword.term.trim(),
+        status: keyword.status,
+        competitor: keyword.competitor?.trim() || undefined,
+        note: keyword.note?.trim() || undefined,
+      }))
+      .filter((keyword) => keyword.term);
+  }
+
   function regenerateSubject(step: SequenceStep) {
     const variants = subjectVariants(step, companyName || "this account");
     const nextIndex = variantIndex(
@@ -671,6 +710,7 @@ export function BuildSequenceClient() {
         accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
         prospectContext: formString(formData, "prospectContext") || undefined,
         serpEvidence: formString(formData, "serpEvidence") || undefined,
+        keywords: cleanedKeywordEvidence(),
         internalNotes: formString(formData, "internalNotes") || undefined,
         screenshotAvailable,
         screenshotContext: formString(formData, "screenshotContext") || undefined,
@@ -781,6 +821,47 @@ export function BuildSequenceClient() {
               value={serpEvidence}
             />
           </label>
+
+          <div className="space-y-3 rounded-lg border border-line bg-[#f8f5ef] p-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">Verified branded keywords</p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Add only keywords checked for this account. Specific SERP claims will use only
+                these rows.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {keywordEvidence.map((keyword, index) => (
+                <div
+                  className="grid gap-2 rounded-md border border-line bg-white p-2 sm:grid-cols-[1.25fr_0.7fr_1fr]"
+                  key={index}
+                >
+                  <input
+                    className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
+                    onChange={(event) => updateKeywordEvidence(index, "term", event.target.value)}
+                    placeholder="American Eagle baggy"
+                    value={keyword.term}
+                  />
+                  <select
+                    className="rounded-md border border-line bg-white px-3 py-2 text-sm"
+                    onChange={(event) => updateKeywordEvidence(index, "status", event.target.value)}
+                    value={keyword.status}
+                  >
+                    <option value="solo">Solo</option>
+                    <option value="contested">Contested</option>
+                  </select>
+                  <input
+                    className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
+                    onChange={(event) =>
+                      updateKeywordEvidence(index, "competitor", event.target.value)
+                    }
+                    placeholder="Competitor, if visible"
+                    value={keyword.competitor ?? ""}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
@@ -1224,6 +1305,15 @@ export function BuildSequenceClient() {
                               {step.imageContextNote}
                             </p>
                           ) : null}
+                        </div>
+                      ) : step.imageContextNote ? (
+                        <div className="mt-3 rounded-md border border-[#e1d6c4] bg-[#fffaf0] p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a5a2b]">
+                            Sales note
+                          </p>
+                          <p className="mt-2 text-xs leading-5 text-[#8a5a2b]">
+                            {step.imageContextNote}
+                          </p>
                         </div>
                       ) : null}
                       <div className="mt-3">

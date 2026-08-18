@@ -557,7 +557,10 @@ describe("Build Sequence service", () => {
         companyContext: "Digital agency managing multiple client accounts",
         observedTrigger: "Promotion to PPC Team Lead",
         prospectContext: "About\nMia Johnson\nPPC Team Lead\nAmericaneagle.com.\nOct 2025 - Present · 11 mos.",
-        serpEvidence: "solo brand moments on all kws biiding",
+        keywords: [
+          { term: "Americaneagle web design", status: "contested", competitor: "WebFX" },
+          { term: "Americaneagle ecommerce", status: "solo" },
+        ],
         brandKeyword: undefined,
       },
       { persistence: adapter },
@@ -569,13 +572,39 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].subjectLine).toBe("branded search across managed accounts");
       expect(result.data.steps[0].messageBody).toContain("Hi Mia");
       expect(result.data.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
-      expect(result.data.steps[1].messageBody).toContain("The same branded query can move between two different auctions");
-      expect(result.data.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard");
+      expect(result.data.steps[1].messageBody).toContain("\"Americaneagle web design\" was a contested brand auction with WebFX visible");
+      expect(result.data.steps[2].messageBody).toContain("\"Americaneagle ecommerce\"");
+      expect(result.data.steps[2].messageBody).toContain("solo brand auction");
       expect(rendered).toContain("across multiple accounts");
       expect(rendered).not.toContain("Hi About");
       expect(rendered).not.toContain("Oct 2025");
       expect(rendered).not.toContain("35-60%");
       expect(rendered).not.toContain("250 brands");
+    }
+  });
+
+  it("filters structured keyword evidence that does not match the prospect account", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Americaneagle",
+        companyWebsite: "americaneagle.com",
+        contactRole: "PPC Team Lead",
+        companyContext: "Digital agency managing multiple client accounts",
+        keywords: [
+          { term: "Nike running shoes", status: "contested", competitor: "Adidas" },
+        ],
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data);
+      expect(rendered).not.toContain("Nike running shoes");
+      expect(result.data.safetyNotes).toContain("Mismatched keyword evidence was filtered before generation.");
     }
   });
 

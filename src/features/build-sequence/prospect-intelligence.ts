@@ -1,6 +1,7 @@
 import type {
   BuildSequenceInput,
   ProspectIntelligence,
+  SequenceKeywordEvidence,
   SequenceKnowledgeRecord,
 } from "./types";
 
@@ -135,7 +136,54 @@ function isUsableKeyword(keyword: string) {
   return /[a-z0-9]/i.test(keyword);
 }
 
+function companyEvidenceTokens(input: BuildSequenceInput) {
+  const companyTokens = input.companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s.-]/g, " ")
+    .split(/\s+|[.-]/)
+    .filter((token) => token.length > 2);
+  const domainTokens = (input.companyWebsite ?? "")
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split(/[./-]/)
+    .filter((token) => token.length > 2);
+  return unique([...companyTokens, ...domainTokens]).filter(
+    (token) => !/^(com|net|org|inc|ltd|llc|group|global|the)$/.test(token),
+  );
+}
+
+function keywordMatchesCompany(input: BuildSequenceInput, term: string) {
+  const tokens = companyEvidenceTokens(input);
+  if (tokens.length === 0) return true;
+  const normalizedTerm = term.toLowerCase();
+  return tokens.some((token) => normalizedTerm.includes(token));
+}
+
+function structuredKeywordEvidence(input: BuildSequenceInput): SequenceKeywordEvidence[] {
+  const structured: SequenceKeywordEvidence[] = [];
+  for (const keyword of input.keywords ?? []) {
+    const term = compact(keyword.term);
+    if (
+      !term ||
+      (keyword.status !== "solo" && keyword.status !== "contested") ||
+      !isUsableKeyword(term) ||
+      !keywordMatchesCompany(input, term)
+    ) {
+      continue;
+    }
+    structured.push({
+      term,
+      status: keyword.status,
+      competitor: compact(keyword.competitor),
+      note: compact(keyword.note),
+    });
+  }
+  return structured.slice(0, 5);
+}
+
 function parseSerpEvidence(input: BuildSequenceInput) {
+  const structuredKeywords = structuredKeywordEvidence(input);
   const rawLines = [
     ...lines(input.serpEvidence),
     input.brandKeyword ? `${input.brandKeyword} ${input.screenshotShows ?? ""}` : "",
@@ -147,6 +195,29 @@ function parseSerpEvidence(input: BuildSequenceInput) {
   const competitors: string[] = [];
   const observations = unique(rawLines);
   const allText = rawLines.join(" ").toLowerCase();
+
+  for (const keyword of structuredKeywords) {
+    keywords.push(keyword.term);
+    if (keyword.status === "solo") {
+      soloKeywords.push(keyword.term);
+    }
+    if (keyword.status === "contested") {
+      contestedKeywords.push(keyword.term);
+      if (keyword.competitor) {
+        competitors.push(keyword.competitor);
+      }
+    }
+    observations.push(
+      [
+        keyword.term,
+        keyword.status === "solo" ? "solo branded auction" : "contested branded auction",
+        keyword.competitor ? `competitor: ${keyword.competitor}` : "",
+        keyword.note ?? "",
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    );
+  }
 
   for (const line of rawLines) {
     const normalized = line.toLowerCase();
@@ -178,6 +249,7 @@ function parseSerpEvidence(input: BuildSequenceInput) {
     contestedKeywords: unique(contestedKeywords),
     competitors: unique(competitors).slice(0, 6),
     observations,
+    structuredKeywords,
   };
 }
 
