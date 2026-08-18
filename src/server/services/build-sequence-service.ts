@@ -605,9 +605,9 @@ function validateStepOneReference(step: SequenceStep) {
 }
 
 function validateStepTwoReference(step: SequenceStep) {
-  const text = `${step.imagePlaceholder ?? ""} ${step.messageBody} ${step.cta}`;
+  const text = `${step.imageContextNote ?? ""} ${step.messageBody} ${step.cta}`;
   return (
-    step.imagePlaceholder === "{{! Insert screenshot }}" &&
+    /screenshot|visual|SERP/i.test(step.imageContextNote ?? "") &&
     /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction/i.test(text) &&
     /evidence|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
@@ -870,9 +870,6 @@ function validateSequenceGeneration(
   }
   if (hasVisualContext(input)) {
     const stepTwo = steps[1];
-    if (!stepTwo?.imagePlaceholder?.includes("{{! Insert screenshot }}")) {
-      return fail("image-placeholder");
-    }
     if (!stepTwo.imageContextNote) {
       return fail("image-note");
     }

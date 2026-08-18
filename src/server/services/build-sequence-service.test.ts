@@ -267,10 +267,12 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.purpose).toBe("PROBLEM_FRAMING");
-      expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
+      expect(stepTwo.imagePlaceholder).toBeUndefined();
       expect(stepTwo.imageContextNote).toContain("not from Acme");
       expect(stepTwo.imageContextNote).toContain("supplied example");
+      expect(stepTwo.imageContextNote).toContain("outside the email body");
       expect(stepTwo.messageBody).not.toMatch(/Acme is a solo bidder|Acme has no competitors/i);
+      expect(stepTwo.messageBody).not.toContain("{{! Insert screenshot }}");
     }
   });
 
@@ -307,7 +309,7 @@ describe("Build Sequence service", () => {
     }
   });
 
-  it("uses the Step 2 screenshot placeholder even when no visual has been supplied yet", async () => {
+  it("keeps the Step 2 screenshot reminder out of the rendered email body", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
@@ -324,8 +326,10 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
-      expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
+      expect(stepTwo.imagePlaceholder).toBeUndefined();
+      expect(stepTwo.imageContextNote).toContain("outside the email body");
       expect(stepTwo.messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
+      expect(stepTwo.messageBody).not.toContain("{{! Insert screenshot }}");
       expect(stepTwo.messageBody).not.toMatch(/\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b/i);
       expect(stepTwo.messageBody).not.toMatch(/customer example|one customer|one client/i);
     }

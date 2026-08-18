@@ -76,7 +76,6 @@ function stripSingleStepHeader(text: string) {
     .trim();
 }
 
-const imagePlaceholderText = "{{! Insert screenshot }}";
 const approvedProofPoints = [
   "AppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.",
   "Crocs reduced total branded-search spend by 71.2% while monitoring paid and organic performance.",
@@ -466,9 +465,9 @@ function bodyForPurpose({
   const managedPpcStepOne = hasPromotionSignal(input)
     ? "One challenge that often becomes harder across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet."
     : "One challenge across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet.";
-  const managedPpcStepTwo = "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThe useful method is to identify solo periods across the accounts your team manages, reduce CPC only where coverage is still protected, and restore defense when competitors return.";
+  const managedPpcStepTwo = "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThat is the useful method: identify solo periods across the accounts your team manages, lower pressure only where coverage is still protected, and restore defense when competitors return.";
   const managedPpcStepThree = [
-    "For a PPC team, the value is not another dashboard showing that competitors appeared.",
+    "For a PPC team, the value is not another dashboard.",
     "It is being able to identify solo and contested periods across multiple accounts, then act without manually checking every SERP.",
     hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
       ? screenshotObservation(input, intelligence)
@@ -635,15 +634,12 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           intelligence: generation.prospectIntelligence,
         }),
         cta,
-        imagePlaceholder:
-          purpose === "PROBLEM_FRAMING"
-            ? imagePlaceholderText
-            : undefined,
+        imagePlaceholder: undefined,
         imageContextNote:
           purpose === "PROBLEM_FRAMING"
             ? hasScreenshotContext(input)
-              ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${[input.screenshotContext?.trim(), screenshotObservation(input, generation.prospectIntelligence)].filter(Boolean).join(" ")}`
-              : "Salesperson note: insert the relevant prospect SERP screenshot before sending. Do not claim unsupported observations."
+              ? `Salesperson note: attach or insert the supplied SERP or Signal screenshot outside the email body. Use only the supplied context: ${[input.screenshotContext?.trim(), screenshotObservation(input, generation.prospectIntelligence)].filter(Boolean).join(" ")}`
+              : "Salesperson note: attach the relevant prospect SERP screenshot outside the email body before sending. Do not claim unsupported observations."
             : undefined,
         claimsUsed: [
           purpose === "METHODOLOGY_DIFFERENTIATION" && proofLine

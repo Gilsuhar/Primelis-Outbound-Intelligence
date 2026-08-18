@@ -108,7 +108,8 @@ describe("Build Sequence OpenAI provider", () => {
 
     expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
     expect(result.steps[0].messageBody).toContain("branded-search question");
-    expect(result.steps[1].imagePlaceholder).toBe("{{! Insert screenshot }}");
+    expect(result.steps[1].imagePlaceholder).toBeUndefined();
+    expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
     expect(JSON.stringify(result.steps)).not.toContain("Our tech");
     expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
@@ -296,7 +297,8 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[0].messageBody).toContain("Hi Mia");
     expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
     expect(result.steps[1].messageBody).toContain("The same branded query can move between two different auctions");
-    expect(result.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard");
+    expect(result.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard.");
+    expect(rendered).not.toContain("{{! Insert screenshot }}");
     expect(result.steps[0].messageBody).toContain("across multiple accounts");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
     expect(result.steps[3].messageBody).toContain("one account with meaningful branded-search spend");
