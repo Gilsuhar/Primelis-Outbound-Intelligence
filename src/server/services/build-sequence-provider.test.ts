@@ -222,6 +222,31 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
   });
 
+  it("accepts natural prospect-led hybrid copy without treating sentence starters as invented entities", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(responseStep("Branded search across managed accounts!", "Hi there,\n\nCongrats on your promotion to VP Performance Marketing.\n\nNike's branded search may be worth one narrow look."))
+      .mockResolvedValueOnce(responseStep("Re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
+      .mockResolvedValueOnce(responseStep("Re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
+      .mockResolvedValueOnce(responseStep("Paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion");
+    expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+  });
+
   it("falls back only the step whose hybrid rewrite uses an unrecognized entity", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",

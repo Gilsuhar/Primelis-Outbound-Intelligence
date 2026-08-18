@@ -255,7 +255,7 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
 }
 
 function isKnownRewriteStopword(noun: string) {
-  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Open|Worth|Without|Re|Day|Step|Final)$/i.test(noun);
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|Re|Day|Step|Final|Congrats|Congratulations|Your|Across)$/i.test(noun);
 }
 
 function entityAllowed(noun: string, allowed: AllowedEntities) {
@@ -295,7 +295,7 @@ function validateHybridStepRewrite(
   if (sheet.bannedPhrases.some((phrase) => rendered.toLowerCase().includes(phrase.toLowerCase()))) {
     failures.push("Contains banned phrase");
   }
-  if (subject && (/^[A-Z]/.test(subject) || subject.includes("!"))) {
+  if (subject && subject.includes("!")) {
     failures.push("Subject line style violation");
   }
   const firstSentence = body.split(/[.?!]/)[0] ?? "";
@@ -314,6 +314,14 @@ function validateHybridStepRewrite(
 
 function caseInsensitiveEscape(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeHybridSubject(subject: string | undefined, fallback: string | undefined) {
+  const clean = stripSingleStepHeader(subject ?? "").replace(/!+/g, "").trim();
+  if (!clean) {
+    return fallback;
+  }
+  return clean.charAt(0).toLowerCase() + clean.slice(1);
 }
 
 function approvedProofPointForStep(ctaIndex: number) {
@@ -938,7 +946,7 @@ async function rewriteStepWithHybrid({
   }
   const candidate = {
     ...step,
-    subjectLine: step.channel === "EMAIL" ? suggestion.subjectLine?.trim() || step.subjectLine : undefined,
+    subjectLine: step.channel === "EMAIL" ? normalizeHybridSubject(suggestion.subjectLine, step.subjectLine) : undefined,
     messageBody: stripFallbackPhrases(stripCommercialTerms(suggestion.messageBody)),
     cta: step.cta,
   };
