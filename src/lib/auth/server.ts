@@ -28,8 +28,36 @@ type LocalProfile = {
   role?: string | null;
 };
 
+const authLookupTimeoutMs = 1500;
+
 function normalizeRole(role: string | null | undefined): UserRole {
   return role === "KNOWLEDGE_ADMIN" ? "KNOWLEDGE_ADMIN" : "SALES_USER";
+}
+
+function isSupabaseAuthCookieName(name: string) {
+  return (
+    name.startsWith("sb-") &&
+    (name.includes("auth-token") || name.includes("access-token"))
+  );
+}
+
+async function hasSupabaseAuthCookie() {
+  const cookieStore = await cookies();
+  return cookieStore.getAll().some((cookie) => isSupabaseAuthCookieName(cookie.name));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 export async function createSupabaseServerClient(options: SupabaseCookiePersistenceOptions = {}) {
@@ -103,17 +131,22 @@ export async function resolveApplicationUser(authUser: { id: string; email?: str
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+  if (!(await hasSupabaseAuthCookie())) return null;
+
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
+
+  const authResult = await withTimeout(supabase.auth.getUser(), authLookupTimeoutMs);
+  if (!authResult) return null;
 
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = authResult;
 
   if (error || !user) return null;
 
-  const profile = await resolveApplicationUser(user);
+  const profile = await withTimeout(resolveApplicationUser(user), authLookupTimeoutMs);
   if (!profile) return null;
 
   return {
@@ -125,13 +158,18 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 }
 
 export async function getSupabaseAuthUser() {
+  if (!(await hasSupabaseAuthCookie())) return null;
+
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
+
+  const authResult = await withTimeout(supabase.auth.getUser(), authLookupTimeoutMs);
+  if (!authResult) return null;
 
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = authResult;
 
   return error ? null : user;
 }
