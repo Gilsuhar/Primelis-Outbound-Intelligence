@@ -81,6 +81,46 @@ const approvedProofPoints = [
   "Crocs reduced total branded-search spend by 71.2% while monitoring paid and organic performance.",
   "Dior reduced ad cost by 54% at equal performance.",
 ] as const;
+const bannedRewritePhrases = [
+  "our tech",
+  "our tool",
+  "our platform",
+  "leverage",
+  "unlock",
+  "synergy",
+  "seamless",
+  "let me know if interested",
+  "book a meeting",
+];
+
+type StepFactSheet = {
+  step: number;
+  purpose: SequencePurpose;
+  prospect: {
+    name: string;
+    company: string;
+    title: string;
+  };
+  personalHook: string | null;
+  proofPoint: {
+    company: string;
+    claim: string;
+    source: string;
+  } | null;
+  keywordEvidence: {
+    contested?: { term: string; competitor?: string };
+    solo?: { term: string };
+  };
+  cta: string;
+  deterministicSubject?: string;
+  deterministicBody: string;
+  bannedPhrases: string[];
+};
+
+type AllowedEntities = {
+  properNouns: string[];
+  numbers: string[];
+};
 
 function hasScreenshotContext(input: BuildSequenceInput) {
   return Boolean(
@@ -148,6 +188,134 @@ function customerProofLine(records: SequenceKnowledgeRecord[]) {
   return `${company} example: ${summary}`;
 }
 
+function proofPointForStep(records: SequenceKnowledgeRecord[], purpose: SequencePurpose, ctaIndex: number) {
+  const proof = selectedCaseStudy(records);
+  if (proof && purpose === "SOCIAL_PROOF") {
+    return {
+      company: caseStudyCompany(proof),
+      claim: proofSummary(proof),
+      source: proof.id,
+    };
+  }
+  if (purpose === "SOCIAL_PROOF") {
+    const claim = approvedProofPointForStep(ctaIndex);
+    return {
+      company: claim.split(/\s+/)[0],
+      claim,
+      source: "approved-static-proof",
+    };
+  }
+  return null;
+}
+
+function extractNumbers(text: string) {
+  return Array.from(text.matchAll(/\$?\b\d+(?:\.\d+)?%?|\b\d+(?:\.\d+)?\s*(?:days?|months?|years?)\b/gi))
+    .map((match) => match[0].trim());
+}
+
+function extractCapitalizedPhrases(text: string) {
+  return Array.from(
+    text.matchAll(/\b[A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3}\b/g),
+  ).map((match) => match[0].trim());
+}
+
+function allowedEntityVariants(value?: string) {
+  if (!value) return [];
+  const clean = value.trim();
+  if (!clean) return [];
+  const tokens = clean.split(/\s+/).filter((token) => /^[A-Z0-9]/.test(token));
+  return [clean, ...tokens].filter((item) => item.length > 1);
+}
+
+function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
+  const properNouns = [
+    ...allowedEntityVariants(sheet.prospect.name),
+    ...allowedEntityVariants(sheet.prospect.company),
+    ...allowedEntityVariants(sheet.prospect.title),
+    ...allowedEntityVariants(sheet.proofPoint?.company),
+    ...allowedEntityVariants(sheet.keywordEvidence.contested?.term),
+    ...allowedEntityVariants(sheet.keywordEvidence.contested?.competitor),
+    ...allowedEntityVariants(sheet.keywordEvidence.solo?.term),
+    "Signal",
+    "Primelis",
+    "Google",
+    "Bing",
+    "SERP",
+    "CPC",
+  ];
+  const numbers = [
+    ...extractNumbers(sheet.proofPoint?.claim ?? ""),
+    ...extractNumbers(sheet.keywordEvidence.contested?.term ?? ""),
+    ...extractNumbers(sheet.keywordEvidence.solo?.term ?? ""),
+  ];
+  return {
+    properNouns: Array.from(new Set(properNouns)),
+    numbers: Array.from(new Set(numbers)),
+  };
+}
+
+function isKnownRewriteStopword(noun: string) {
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Open|Worth|Without|Re|Day|Step|Final)$/i.test(noun);
+}
+
+function entityAllowed(noun: string, allowed: AllowedEntities) {
+  const normalized = noun.toLowerCase();
+  return allowed.properNouns.some((entity) => {
+    const allowedEntity = entity.toLowerCase();
+    return normalized.includes(allowedEntity) || allowedEntity.includes(normalized);
+  });
+}
+
+function wordCount(text: string) {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function validateHybridStepRewrite(
+  output: { subject?: string; body: string },
+  sheet: StepFactSheet,
+  allowed: AllowedEntities,
+) {
+  const failures: string[] = [];
+  const subject = output.subject?.trim() ?? "";
+  const body = output.body.trim();
+  const rendered = `${subject} ${body}`;
+  for (const noun of extractCapitalizedPhrases(rendered)) {
+    if (isKnownRewriteStopword(noun) || /^[A-Z]{2,5}$/.test(noun)) continue;
+    if (!entityAllowed(noun, allowed)) {
+      failures.push(`Unrecognized name/entity: ${noun}`);
+    }
+  }
+  for (const number of extractNumbers(rendered)) {
+    if (!allowed.numbers.includes(number)) {
+      failures.push(`Unrecognized number/stat: ${number}`);
+    }
+  }
+  if (wordCount(body) > 100) failures.push("Over word limit");
+  if (/[—–]/.test(rendered)) failures.push("Em dash used");
+  if (sheet.bannedPhrases.some((phrase) => rendered.toLowerCase().includes(phrase.toLowerCase()))) {
+    failures.push("Contains banned phrase");
+  }
+  if (subject && (/^[A-Z]/.test(subject) || subject.includes("!"))) {
+    failures.push("Subject line style violation");
+  }
+  const firstSentence = body.split(/[.?!]/)[0] ?? "";
+  if (/\b(Signal|Cross-Brand|Primelis)\b/.test(firstSentence)) {
+    failures.push("Opens on product, not prospect");
+  }
+  if (sheet.proofPoint) {
+    const mentions = body.match(new RegExp(`\\b${caseInsensitiveEscape(sheet.proofPoint.company)}\\b`, "gi")) ?? [];
+    if (mentions.length > 1) failures.push("Proof company mentioned more than once");
+  }
+  if (failures.length > 0) {
+    return { passed: false, failures };
+  }
+  return { passed: true, failures };
+}
+
+function caseInsensitiveEscape(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function approvedProofPointForStep(ctaIndex: number) {
   return approvedProofPoints[ctaIndex % approvedProofPoints.length];
 }
@@ -160,13 +328,6 @@ function approvedProofPointExcluding(customerName: string, ctaIndex: number) {
   return available[ctaIndex % available.length] ?? approvedProofPointForStep(ctaIndex);
 }
 
-function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
-  const firstCaseStudy = records.find((record) => record.type === "CASE_STUDY");
-  return records
-    .filter((record) => record.type !== "CASE_STUDY" || record.id === firstCaseStudy?.id)
-    .slice(0, 12);
-}
-
 function greeting(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
   const firstName = input.contactFirstName || intelligence?.prospectName;
   return firstName ? `Hi ${firstName},` : "Hi there,";
@@ -174,21 +335,6 @@ function greeting(input: BuildSequenceInput, intelligence?: ProspectIntelligence
 
 function displayCompany(input: BuildSequenceInput) {
   return displayCompanyName(input.companyName);
-}
-
-function cleanSelection(value?: string) {
-  if (!value) {
-    return undefined;
-  }
-  return value
-    .replace(/^Strong fit\s*-\s*/i, "")
-    .replace(/^Possible fit\s*-\s*/i, "")
-    .replace(/^Strong fit\s*—\s*/i, "")
-    .replace(/^Potential fit\s*—\s*/i, "")
-    .replace(/^Enterprise\s*—\s*/i, "")
-    .replace(/^Core ICP:\s*/i, "")
-    .replace(/^Quick discovery:\s*/i, "")
-    .trim();
 }
 
 function ctaForPurpose(
@@ -313,6 +459,45 @@ function contestedKeyword(intelligence: ProspectIntelligence) {
 
 function soloKeyword(intelligence: ProspectIntelligence) {
   return intelligence.serpEvidence.structuredKeywords.find((keyword) => keyword.status === "solo");
+}
+
+function buildStepFactSheet({
+  input,
+  records,
+  step,
+  intelligence,
+  ctaIndex,
+}: {
+  input: BuildSequenceInput;
+  records: SequenceKnowledgeRecord[];
+  step: SequenceStep;
+  intelligence: ProspectIntelligence;
+  ctaIndex: number;
+}): StepFactSheet {
+  const contested = contestedKeyword(intelligence);
+  const solo = soloKeyword(intelligence);
+  const firstName = input.contactFirstName || intelligence.prospectName || "there";
+  return {
+    step: step.stepNumber,
+    purpose: step.purpose,
+    prospect: {
+      name: firstName,
+      company: displayCompany(input),
+      title: buyerRole(input, intelligence),
+    },
+    personalHook: firstPersonalFact(intelligence) ?? null,
+    proofPoint: proofPointForStep(records, step.purpose, ctaIndex),
+    keywordEvidence: {
+      contested: contested
+        ? { term: contested.term, competitor: contested.competitor }
+        : undefined,
+      solo: solo ? { term: solo.term } : undefined,
+    },
+    cta: step.cta,
+    deterministicSubject: step.subjectLine,
+    deterministicBody: step.messageBody,
+    bannedPhrases: bannedRewritePhrases,
+  };
 }
 
 function firstPersonalFact(intelligence: ProspectIntelligence) {
@@ -687,6 +872,142 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
   }
 }
 
+async function rewriteStepWithHybrid({
+  provider,
+  request,
+  step,
+  sheet,
+  allowed,
+  priorFailures,
+}: {
+  provider: ReturnType<typeof createAiProvider>;
+  request: BuildSequenceProviderRequest;
+  step: SequenceStep;
+  sheet: StepFactSheet;
+  allowed: AllowedEntities;
+  priorFailures?: string[];
+}) {
+  const promptFailureLine = priorFailures?.length
+    ? `Previous rewrite failed validation for: ${priorFailures.join("; ")}. Fix only those issues.`
+    : "";
+  const aiResult = await provider.generateDraft({
+    workflow: "BUILD_SEQUENCE",
+    currentDraft: JSON.stringify({
+      subject: step.subjectLine,
+      body: step.messageBody,
+      cta: step.cta,
+    }),
+    userInstruction: promptFailureLine,
+    context: {
+      brief: {
+        sequenceLength: 1,
+        factSheet: sheet,
+        allowedEntities: allowed,
+      },
+      writingInstructions: [
+        "Rewrite only this one outbound step.",
+        "Use only the closed factSheet and allowedEntities. If a fact is not listed, it does not exist for this email.",
+        "Return exactly one sequenceSteps item.",
+        "Keep the required CTA meaning. The application will keep the deterministic CTA field.",
+        "Do not add company names, people, competitors, numbers, or claims outside allowedEntities.",
+        "Keep body under 100 words. No em dashes. No banned phrases.",
+      ],
+      approvedFacts: [
+        `Prospect: ${sheet.prospect.name}, ${sheet.prospect.title} at ${sheet.prospect.company}`,
+        sheet.personalHook ? `Personal detail: ${sheet.personalHook}` : "No personal detail provided.",
+        sheet.proofPoint
+          ? `Proof point: ${sheet.proofPoint.company}: ${sheet.proofPoint.claim}`
+          : "No proof point for this step.",
+        sheet.keywordEvidence.contested
+          ? `Contested keyword evidence: ${sheet.keywordEvidence.contested.term}${sheet.keywordEvidence.contested.competitor ? ` with ${sheet.keywordEvidence.contested.competitor}` : ""}`
+          : "No contested keyword evidence.",
+        sheet.keywordEvidence.solo
+          ? `Solo keyword evidence: ${sheet.keywordEvidence.solo.term}`
+          : "No solo keyword evidence.",
+        `Required CTA: ${sheet.cta}`,
+      ],
+      userProvidedContext: [],
+      sourceReferences: request.sourceReferences,
+      safetyPolicy: request.generation.safetyNotes,
+      outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
+    },
+  });
+  const suggestion = aiResult.sequenceSteps?.[0];
+  if (!suggestion) {
+    return { step, accepted: false, failures: ["Missing sequence step"] };
+  }
+  const candidate = {
+    ...step,
+    subjectLine: step.channel === "EMAIL" ? suggestion.subjectLine?.trim() || step.subjectLine : undefined,
+    messageBody: stripFallbackPhrases(stripCommercialTerms(suggestion.messageBody)),
+    cta: step.cta,
+  };
+  const validation = validateHybridStepRewrite(
+    { subject: candidate.subjectLine, body: candidate.messageBody },
+    sheet,
+    allowed,
+  );
+  if (!validation.passed) {
+    return { step, accepted: false, failures: validation.failures };
+  }
+  return { step: candidate, accepted: true, failures: [] };
+}
+
+async function hybridRewriteSequence({
+  provider,
+  request,
+  result,
+}: {
+  provider: ReturnType<typeof createAiProvider>;
+  request: BuildSequenceProviderRequest;
+  result: SequenceGeneration;
+}) {
+  const rewrittenSteps: SequenceStep[] = [];
+  const notes: string[] = [];
+  for (const [index, step] of result.steps.entries()) {
+    const sheet = buildStepFactSheet({
+      input: request.input,
+      records: request.records,
+      step,
+      intelligence: request.generation.prospectIntelligence,
+      ctaIndex: index,
+    });
+    const allowed = buildAllowedEntities(sheet);
+    try {
+      const first = await rewriteStepWithHybrid({ provider, request, step, sheet, allowed });
+      if (first.accepted) {
+        rewrittenSteps.push(first.step);
+        notes.push(`Hybrid rewrite accepted for step ${step.stepNumber}.`);
+        continue;
+      }
+      const retry = await rewriteStepWithHybrid({
+        provider,
+        request,
+        step,
+        sheet,
+        allowed,
+        priorFailures: first.failures,
+      });
+      if (retry.accepted) {
+        rewrittenSteps.push(retry.step);
+        notes.push(`Hybrid rewrite accepted on retry for step ${step.stepNumber}.`);
+        continue;
+      }
+      rewrittenSteps.push(step);
+      notes.push(`Hybrid rewrite fell back for step ${step.stepNumber}: ${retry.failures.join("; ") || first.failures.join("; ")}.`);
+    } catch (error) {
+      rewrittenSteps.push(step);
+      const failure = mapAiProviderError(error);
+      notes.push(`Hybrid rewrite fell back for step ${step.stepNumber}: ${failure.message}`);
+    }
+  }
+  return {
+    ...result,
+    steps: rewrittenSteps,
+    safetyNotes: [...result.safetyNotes, ...notes],
+  };
+}
+
 export function createBuildSequenceAiProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): BuildSequenceAiProvider {
@@ -703,7 +1024,6 @@ export function createBuildSequenceAiProvider(
     async generate(request) {
       const fallback = new DeterministicBuildSequenceProvider();
       const result = await fallback.generate(request);
-      const promptRecords = recordsForPrompt(request.records);
       const provider = createAiProvider(env);
       const providerStatus = await provider.getProviderStatus();
       if (providerStatus.status !== "CONFIGURED") {
@@ -713,98 +1033,7 @@ export function createBuildSequenceAiProvider(
         };
       }
       try {
-        const aiResult = await provider.generateDraft({
-          workflow: "BUILD_SEQUENCE",
-          context: {
-            brief: {
-              companyName: request.input.companyName,
-              companyWebsite: request.input.companyWebsite,
-              contactFirstName: request.input.contactFirstName,
-              contactRole: request.input.contactRole,
-              industry: request.input.industry,
-              companyContext: request.input.companyContext,
-              geographyOrMarkets: request.input.geographyOrMarkets,
-              paidSearchContext: request.input.paidSearchContext,
-              currentVendor: request.input.currentVendor,
-              observedTrigger: request.input.observedTrigger,
-              prospectContext: request.input.prospectContext,
-              serpEvidence: request.input.serpEvidence,
-              keywords: request.input.keywords,
-              primaryChannel: request.input.primaryChannel,
-              sequenceLength: request.input.sequenceLength,
-              desiredTone: request.input.desiredTone,
-              desiredOverallDuration: request.input.desiredOverallDuration,
-              screenshotAvailable: request.input.screenshotAvailable,
-              screenshotContext: request.input.screenshotContext,
-              brandKeyword: request.input.brandKeyword,
-              marketCountry: request.input.marketCountry,
-              device: request.input.device,
-              observationDate: request.input.observationDate,
-              screenshotShows: request.input.screenshotShows,
-              selectedAngle: result.selectedAngle,
-              prospectIntelligence: request.generation.prospectIntelligence,
-              approvedKnowledge: promptRecords.map((record) => ({
-                title: record.title,
-                type: record.type,
-                approvedText: record.approvedText,
-                sourceTitles: record.sourceTitles,
-              })),
-              sequencePlan: result.steps.map((step) => ({
-                stepNumber: step.stepNumber,
-                channel: step.channel,
-                delay: step.delay,
-                purpose: step.purpose,
-              })),
-            },
-            writingInstructions: [
-              "Do not return a free-form sequence. The application owns the four rendered emails.",
-              "Return only concise optional wording suggestions inside the provided sequenceSteps shape. The application may ignore any field that violates the deterministic renderer.",
-              "Do not change step purpose, CTA category, approved proof points, screenshot placeholder, or sequence order.",
-              "Avoid organic-cannibalization claims unless explicitly supplied by the user.",
-            ],
-            approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),
-            userProvidedContext: [
-              request.input.companyName ? `Company name: ${request.input.companyName}` : "",
-              request.input.companyWebsite ? `Company website: ${request.input.companyWebsite}` : "",
-              request.input.contactFirstName ? `Prospect first name: ${request.input.contactFirstName}` : "",
-              request.input.contactRole ? `Buyer role: ${request.input.contactRole}` : "",
-              request.input.industry ? `Industry selected by user: ${request.input.industry}` : "",
-              cleanSelection(request.input.companyContext)
-                ? `Company context from user: ${cleanSelection(request.input.companyContext)}`
-                : "",
-              request.input.geographyOrMarkets ? `Markets from user: ${request.input.geographyOrMarkets}` : "",
-              request.input.paidSearchContext ? `Paid-search context from user: ${request.input.paidSearchContext}` : "",
-              request.input.currentVendor ? `Current vendor from user: ${request.input.currentVendor}` : "",
-              cleanSelection(request.input.observedTrigger)
-                ? `Outreach reason from user: ${cleanSelection(request.input.observedTrigger)}`
-                : "",
-              request.input.screenshotAvailable ? "Screenshot or SERP context available: yes" : "Screenshot or SERP context available: no",
-              request.input.screenshotContext ? `Screenshot context from user: ${request.input.screenshotContext}` : "",
-              request.input.screenshotShows ? `Screenshot shows, according to user: ${request.input.screenshotShows}` : "",
-              request.input.brandKeyword ? `Brand keyword from user: ${request.input.brandKeyword}` : "",
-              request.input.marketCountry ? `Screenshot market/country from user: ${request.input.marketCountry}` : "",
-              request.input.device ? `Screenshot device from user: ${request.input.device}` : "",
-              request.input.observationDate ? `Screenshot observation date from user: ${request.input.observationDate}` : "",
-              ...(request.input.keywords ?? []).map((keyword) =>
-                `Structured keyword evidence from user: ${keyword.term} is ${keyword.status}${keyword.competitor ? ` with competitor ${keyword.competitor}` : ""}${keyword.note ? ` (${keyword.note})` : ""}`,
-              ),
-            ].filter(Boolean),
-            sourceReferences: request.sourceReferences,
-            safetyPolicy: result.safetyNotes,
-            outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
-          },
-        });
-        if (aiResult.sequenceSteps?.length !== result.steps.length) {
-          throw new Error("MALFORMED_RESPONSE");
-        }
-        return {
-          ...result,
-          safetyNotes: [
-            ...result.safetyNotes,
-            ...aiResult.uncertaintyNotes,
-            "Deterministic renderer controlled the final sequence structure.",
-          ],
-        };
+        return await hybridRewriteSequence({ provider, request, result });
       } catch (error) {
         const failure = mapAiProviderError(error);
         return {

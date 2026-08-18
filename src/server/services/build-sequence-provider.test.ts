@@ -50,6 +50,28 @@ function generation() {
   };
 }
 
+function responseStep(subjectLine: string, messageBody: string) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      output_text: JSON.stringify({
+        sequenceSteps: [
+          {
+            subjectLine,
+            messageBody,
+            cta: "ignored by hybrid renderer",
+          },
+        ],
+        sourceReferences: ["source-1"],
+        factualClaimsUsed: [],
+        uncertaintyNotes: [],
+        safetyFlags: [],
+      }),
+    }),
+  } as Response;
+}
+
 describe("Build Sequence OpenAI provider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -172,6 +194,59 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[1].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
+  });
+
+  it("accepts validated hybrid rewrites step by step", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(responseStep("nike brand coverage", "Hi there,\n\nNike's branded search may be worth one narrow look.\n\nA campaign can look healthy while the brand auction is quiet."))
+      .mockResolvedValueOnce(responseStep("re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
+      .mockResolvedValueOnce(responseStep("re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
+      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Nike's branded search may be worth");
+    expect(result.steps[2].messageBody).toContain("For Nike, the useful part");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
+    expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+  });
+
+  it("falls back only the step whose hybrid rewrite uses an unrecognized entity", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."))
+      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."))
+      .mockResolvedValueOnce(responseStep("re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
+      .mockResolvedValueOnce(responseStep("re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
+      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
+    expect(JSON.stringify(result.steps)).not.toContain("Gong");
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
   });
 
   it("does not fall back when OpenAI returns string safety flags", async () => {
