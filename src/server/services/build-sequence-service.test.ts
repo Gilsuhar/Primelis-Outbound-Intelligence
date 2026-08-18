@@ -552,7 +552,7 @@ describe("Build Sequence service", () => {
         contactRole: "Head of Performance Marketing",
         companyContext: "Digital agency managing multiple client accounts",
         observedTrigger: "Promotion to PPC Team Lead",
-        prospectContext: "Mia Johnson\nPPC Team Lead\nAmericaneagle.com.\nFull-time · 3 yrs 3 mos.",
+        prospectContext: "About\nMia Johnson\nPPC Team Lead\nAmericaneagle.com.\nOct 2025 - Present · 11 mos.",
         serpEvidence: "solo brand moments on all kws biiding",
         brandKeyword: undefined,
       },
@@ -566,6 +566,8 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).toContain("Hi Mia");
       expect(result.data.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
       expect(rendered).toContain("across multiple accounts");
+      expect(rendered).not.toContain("Hi About");
+      expect(rendered).not.toContain("Oct 2025");
       expect(rendered).not.toContain("35-60%");
       expect(rendered).not.toContain("250 brands");
     }

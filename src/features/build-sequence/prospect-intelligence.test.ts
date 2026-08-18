@@ -85,12 +85,25 @@ describe("Prospect Intelligence extraction", () => {
   it("keeps employment-duration metadata out of personalization facts", () => {
     const intelligence = buildProspectIntelligence({
       ...input,
-      prospectContext: "Full-time · 3 yrs 3 mos\nPosted about improving paid search measurement.",
+      prospectContext: "Full-time · 3 yrs 3 mos\nOct 2025 - Present · 11 mos\nPosted about improving paid search measurement.",
     });
 
     expect(intelligence.relevantFacts).toEqual([
       "Posted about improving paid search measurement.",
     ]);
+  });
+
+  it("does not treat LinkedIn section labels as prospect names", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      prospectContext: "About\nPPC Team Lead\nOct 2025 - Present · 11 mos",
+    });
+
+    expect(intelligence.prospectName).toBeUndefined();
+    expect(intelligence.jobTitle).toBe("PPC Team Lead");
+    expect(intelligence.relevantFacts).toEqual([]);
   });
 
   it("extracts a prospect name and role from pasted profile context without treating the role as a fact", () => {

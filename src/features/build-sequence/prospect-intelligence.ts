@@ -23,9 +23,26 @@ function sentenceFragments(value?: string, max = 4) {
   return unique(lines(value).flatMap((line) => line.split(/(?<=[.!?])\s+/))).slice(0, max);
 }
 
+function isLinkedInUiLabel(value: string) {
+  return /^(about|activity|experience|education|licenses|certifications|skills|interests|posts|comments|reactions|show all|contact info|followers|connections|message|follow|connect|more)$/i.test(
+    value.trim(),
+  );
+}
+
+function isTenureMetadata(value: string) {
+  const text = value.trim();
+  return (
+    /^(full-time|part-time|contract|self-employed|freelance|internship)\b/i.test(text) ||
+    /^\d+\s*(?:yrs?|years?|mos?|months?)\b/i.test(text) ||
+    /^[a-z -]+ · \d+\s*(?:yrs?|years?|mos?|months?)/i.test(text) ||
+    /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{4}\s*[-–]\s*(present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{4})\s*·\s*\d+\s*(?:yrs?|years?|mos?|months?)/i.test(text)
+  );
+}
+
 function isLikelyRoleLine(value: string) {
   const text = value.trim();
   if (!text || text.length > 90) return false;
+  if (isLinkedInUiLabel(text) || isTenureMetadata(text)) return false;
   if (/[.!?]/.test(text)) return false;
   return /\b(?:ppc|paid search|sem|performance|growth|marketing|media|acquisition|demand|ecommerce|e-commerce|digital)\b/i.test(text) &&
     /\b(?:lead|manager|director|head|vp|vice president|specialist|strategist|analyst|team lead|consultant)\b/i.test(text);
@@ -34,9 +51,9 @@ function isLikelyRoleLine(value: string) {
 function isLikelyPersonNameLine(value: string) {
   const text = value.trim();
   if (!text || text.length > 80) return false;
+  if (isLinkedInUiLabel(text) || isTenureMetadata(text)) return false;
   if (isLikelyRoleLine(text)) return false;
   if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(text)) return false;
-  if (/^(full-time|part-time|contract|self-employed|freelance|internship)\b/i.test(text)) return false;
   return /^[A-Z][a-z' -]{1,30}(?:\s+[A-Z][a-z' -]{1,40}){0,3}$/.test(text);
 }
 
@@ -46,13 +63,7 @@ function isUsableProspectFact(fact: string) {
   if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/.test(normalized)) {
     return false;
   }
-  if (/^(full-time|part-time|contract|self-employed|freelance|internship)\b/.test(normalized)) {
-    return false;
-  }
-  if (/^\d+\s*(?:yrs?|years?|mos?|months?)\b/.test(normalized)) {
-    return false;
-  }
-  if (/^[a-z -]+ · \d+\s*(?:yrs?|years?|mos?|months?)/i.test(fact.trim())) {
+  if (isLinkedInUiLabel(fact) || isTenureMetadata(fact)) {
     return false;
   }
   if (isLikelyPersonNameLine(fact)) {
