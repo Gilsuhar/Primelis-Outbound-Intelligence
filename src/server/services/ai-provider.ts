@@ -78,6 +78,12 @@ const rawSafetyFlagSchema = z.union([
   z.string().trim().min(1),
 ]).transform((value) => normalizeSafetyFlag(value));
 
+const rawSourceReferenceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) => value.slice(0, 160));
+
 const aiDraftResponseSchema = z.object({
   primaryContent: z.string().trim().max(5000).optional().default(""),
   shorterAlternative: z.string().trim().max(2500).optional(),
@@ -94,7 +100,7 @@ const aiDraftResponseSchema = z.object({
     )
     .max(8)
     .optional(),
-  sourceReferences: z.array(z.string().trim().max(160)).max(20).optional().default([]),
+  sourceReferences: z.array(rawSourceReferenceSchema).max(20).optional().default([]),
   factualClaimsUsed: z.array(z.string().trim().max(500)).max(20).optional().default([]),
   uncertaintyNotes: z.array(z.string().trim().max(500)).max(10).optional().default([]),
   safetyFlags: z.array(rawSafetyFlagSchema).max(20).optional().default([]),

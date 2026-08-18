@@ -147,6 +147,25 @@ describe("OpenAI provider output boundaries", () => {
     ]);
   });
 
+  it("truncates overlong source references returned by OpenAI", async () => {
+    const overlongSourceReference = `source-1:${" approved context".repeat(20)}`;
+    mockOpenAiResponse({
+      primaryContent: "Safe generated draft from approved Signal context.",
+      sourceReferences: [overlongSourceReference],
+      factualClaimsUsed: ["Signal monitors live search results."],
+      uncertaintyNotes: [],
+      safetyFlags: [],
+    });
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-test",
+    }).generateDraft(request());
+
+    expect(result.sourceReferences).toEqual([overlongSourceReference.slice(0, 160)]);
+  });
+
   it("normalizes string safety flags into canonical objects", async () => {
     mockOpenAiResponse({
       primaryContent: "Safe generated draft from approved Signal context.",
