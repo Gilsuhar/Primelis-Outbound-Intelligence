@@ -17,6 +17,19 @@ const loginSchema = z.object({
   email: z.string().trim().email(),
 });
 
+async function canReachSupabaseAuth(url: string) {
+  try {
+    await fetch(url, {
+      cache: "no-store",
+      method: "HEAD",
+      signal: AbortSignal.timeout(1500),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function requestLoginLink(
   _state: LoginState,
   formData: FormData,
@@ -70,7 +83,16 @@ export async function requestLoginLink(
 }
 
 export async function continueWithGoogle(formData: FormData) {
-  if (!getSupabaseAuthConfig()) {
+  const config = getSupabaseAuthConfig();
+  if (!config) {
+    logAuthDiagnostic("warn", {
+      operation: "google_oauth",
+      stage: "initiation_configuration_invalid",
+    });
+    redirect("/login?error=configuration_error");
+  }
+
+  if (!(await canReachSupabaseAuth(config.url))) {
     logAuthDiagnostic("warn", {
       operation: "google_oauth",
       stage: "initiation_configuration_invalid",

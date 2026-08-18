@@ -24,6 +24,7 @@ const redirectMock = vi.mocked(redirect);
 const getSupabaseAuthConfigMock = vi.mocked(getSupabaseAuthConfig);
 const createSupabaseServerClientMock = vi.mocked(createSupabaseServerClient);
 const getRequestOriginMock = vi.mocked(getRequestOrigin);
+const fetchMock = vi.fn();
 
 function formData(next?: string) {
   const data = new FormData();
@@ -48,6 +49,8 @@ function mockSupabaseOAuth(input: { error?: boolean; providerUrl?: string }) {
 describe("Google OAuth login action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
     getSupabaseAuthConfigMock.mockReturnValue({
       url: "https://project.supabase.co",
       anonKey: "anon-key",
@@ -71,6 +74,17 @@ describe("Google OAuth login action", () => {
     expect(createSupabaseServerClientMock).toHaveBeenCalledWith(
       expect.objectContaining({ requireCookieWrites: true }),
     );
+  });
+
+  it("stops initiation when the configured Supabase host cannot be reached", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(continueWithGoogle(formData())).rejects.toThrow(
+      "NEXT_REDIRECT:/login?error=configuration_error",
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith("/login?error=configuration_error");
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
   });
 
   it("preserves only a safe internal intended destination", async () => {
