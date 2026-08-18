@@ -269,7 +269,9 @@ function roleAngle(input: BuildSequenceInput) {
 }
 
 function firstPersonalFact(intelligence: ProspectIntelligence) {
-  return intelligence.relevantFacts[0];
+  return intelligence.relevantFacts.find(
+    (fact) => !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()),
+  );
 }
 
 function scenarioProblem(intelligence: ProspectIntelligence) {
@@ -461,7 +463,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       proofLine,
-      "Evidence first, logo second.",
+      "That is the practical benchmark.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),

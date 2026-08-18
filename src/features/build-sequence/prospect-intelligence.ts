@@ -58,6 +58,17 @@ function keywordFromLine(line: string) {
     .trim();
 }
 
+function isUsableKeyword(keyword: string) {
+  const normalized = keyword.toLowerCase();
+  if (!keyword.trim()) return false;
+  if (keyword.length > 100) return false;
+  if (/^(all|all keywords?|all kws?|all brand keywords?|all terms?)$/i.test(keyword)) return false;
+  if (/\bkws?\b|\bbi+d+ing\b|\bbidding\b|\ball\s+(?:keywords?|kws?|terms?)\b/i.test(normalized)) {
+    return false;
+  }
+  return /[a-z0-9]/i.test(keyword);
+}
+
 function parseSerpEvidence(input: BuildSequenceInput) {
   const rawLines = [
     ...lines(input.serpEvidence),
@@ -74,14 +85,14 @@ function parseSerpEvidence(input: BuildSequenceInput) {
   for (const line of rawLines) {
     const normalized = line.toLowerCase();
     const keyword = keywordFromLine(line);
-    if (keyword && keyword.length <= 100 && !/^brand was alone|no other advertiser/.test(normalized)) {
+    if (isUsableKeyword(keyword) && !/^brand was alone|no other advertiser/.test(normalized)) {
       keywords.push(keyword);
     }
     if (/alone|only advertiser|no other advertiser|without visible competition|solo/.test(normalized)) {
-      if (keyword) soloKeywords.push(keyword);
+      if (isUsableKeyword(keyword)) soloKeywords.push(keyword);
     }
     if (/competitor|contested|another advertiser|other advertiser/.test(normalized)) {
-      if (keyword && !/no other advertiser|without visible competition/.test(normalized)) {
+      if (isUsableKeyword(keyword) && !/no other advertiser|without visible competition/.test(normalized)) {
         contestedKeywords.push(keyword);
       }
       const afterCompetitor = line.match(/competitors?\s*(?:visible|present|:|-)?\s*([A-Za-z0-9, &.-]+)/i)?.[1];
@@ -111,6 +122,14 @@ function classifySerpScenario(
   if (evidence.contestedKeywords.length > 0) return "CONTESTED";
   if (evidence.soloKeywords.length > 0) return "SOLO";
   if (evidence.observations.some((observation) => /alone on all|brand was alone/i.test(observation))) {
+    return "SOLO";
+  }
+  if (
+    evidence.observations.some((observation) =>
+      /\b(?:alone|solo)\b/i.test(observation) &&
+      /\ball\s+(?:keywords?|kws?|terms?)\b/i.test(observation),
+    )
+  ) {
     return "SOLO";
   }
   return "UNKNOWN";

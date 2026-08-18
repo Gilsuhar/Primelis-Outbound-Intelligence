@@ -71,6 +71,17 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.serpEvidence.contestedKeywords).toEqual([]);
   });
 
+  it("keeps generic all-keyword notes out of rendered keyword samples", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      serpEvidence: "solo brand moments on all kws biiding",
+    });
+
+    expect(intelligence.serpScenario).toBe("SOLO");
+    expect(intelligence.serpEvidence.keywords).toEqual([]);
+    expect(intelligence.serpEvidence.soloKeywords).toEqual([]);
+  });
+
   it("extracts persona from supplied context without inventing responsibilities", () => {
     const intelligence = buildProspectIntelligence({
       ...input,
