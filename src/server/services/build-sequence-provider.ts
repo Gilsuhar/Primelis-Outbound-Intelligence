@@ -218,6 +218,9 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
     return pattern.subject;
   }
   const company = displayCompany(input);
+  if (purpose === "FIRST_TOUCH_RELEVANCE" && managesMultipleAccounts(input)) {
+    return "branded search across managed accounts";
+  }
   const subjects: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: `${company} branded search visibility`,
     PROBLEM_FRAMING: `Re: ${company} SERP visibility`,
@@ -252,8 +255,42 @@ function customerFacingAngle(angleLabel: string) {
     .replace(/solo.*ghost/i, "paid brand coverage");
 }
 
-function roleAngle(input: BuildSequenceInput) {
-  const role = input.contactRole.toLowerCase();
+function buyerRole(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  return intelligence?.jobTitle || input.contactRole;
+}
+
+function hasPromotionSignal(input: BuildSequenceInput) {
+  return /\b(promoted|promotion|new role|stepped into|recently became|congrats|congratulations)\b/i.test(
+    [
+      input.prospectContext,
+      input.observedTrigger,
+      input.internalNotes,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+function managesMultipleAccounts(input: BuildSequenceInput) {
+  return /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?|accounts your team manages)\b/i.test(
+    [
+      input.companyContext,
+      input.industry,
+      input.prospectContext,
+      input.paidSearchContext,
+      input.observedTrigger,
+      input.internalNotes,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  const role = buyerRole(input, intelligence).toLowerCase();
+  if (managesMultipleAccounts(input) && /paid search|sem|ppc|performance/.test(role)) {
+    return "For a PPC team managing several accounts, the practical decision is when coverage is defensive and when the auction is quiet enough to lower pressure.";
+  }
   if (/paid search|sem|ppc|performance/.test(role)) {
     return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
   }
@@ -275,35 +312,37 @@ function firstPersonalFact(intelligence: ProspectIntelligence) {
   );
 }
 
-function scenarioProblem(intelligence: ProspectIntelligence) {
+function scenarioProblem(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
   const evidence = intelligence.serpEvidence;
+  const scope = managesMultipleAccounts(input) ? " across multiple accounts" : "";
   if (intelligence.serpScenario === "SOLO") {
     const sample = evidence.soloKeywords.slice(0, 2).join(", ");
     return sample
-      ? `Your SERP notes point to solo brand moments on ${sample}. That is not a conclusion on efficiency, but it is exactly the kind of snapshot where CPC may be higher than required.`
-      : "Your SERP notes point to solo brand moments. That is not a conclusion on efficiency, but it is exactly the kind of snapshot where CPC may be higher than required.";
+      ? `One challenge${scope} is branded-search efficiency: ${sample} showed a quiet auction in the sample, where CPC may deserve a closer look.`
+      : `One challenge${scope} is branded-search efficiency. A campaign can look healthy while still paying the same CPC during quiet brand auctions.`;
   }
   if (intelligence.serpScenario === "CONTESTED") {
     const sample = evidence.contestedKeywords.slice(0, 2).join(", ");
     return sample
-      ? `Your SERP notes show competitors appearing on ${sample}. The useful question is what CPC is actually needed to defend those auctions.`
-      : "Your SERP notes show competitors appearing on the branded terms checked. The useful question is what CPC is actually needed to defend those auctions.";
+      ? `One challenge${scope} is deciding the right CPC when competitors appear on terms like ${sample}. Visibility may matter, but the defensive bid still has to be measured.`
+      : `One challenge${scope} is deciding the right CPC when competitors appear on branded terms. Visibility may matter, but the defensive bid still has to be measured.`;
   }
   if (intelligence.serpScenario === "MIXED") {
-    return "Your SERP notes show a mixed pattern: some branded queries look quiet, while others have visible competition. One static brand-bid rule will usually miss that difference.";
+    return `One challenge${scope} is that the same brand program can contain two auctions: some queries are quiet, while others have visible competition. One static brand-bid rule usually misses that difference.`;
   }
-  return "Without reliable SERP evidence, I would keep this as a visibility question: how quickly can the team see when branded-search competition changes?";
+  return `Without reliable SERP evidence, I would keep this as a visibility question${scope}: how quickly can the team see when branded-search competition changes and know whether bids should change with it?`;
 }
 
-function scenarioMethod(intelligence: ProspectIntelligence) {
+function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const accountScope = managesMultipleAccounts(input) ? " across the accounts your team manages" : "";
   if (intelligence.serpScenario === "SOLO") {
-    return "The useful method is to identify solo periods, reduce CPC only where coverage is still protected, and restore defense when competitors return.";
+    return `The useful method is to identify solo periods${accountScope}, reduce CPC only where coverage is still protected, and restore defense when competitors return.`;
   }
   if (intelligence.serpScenario === "CONTESTED") {
     return "When competitors are present, the goal is defensive efficiency: stay covered, but find the minimum CPC or position needed to maintain performance.";
   }
   if (intelligence.serpScenario === "MIXED") {
-    return "The practical move is to let different auctions behave differently: defend contested terms, and reduce pressure when the page is quiet.";
+    return `The same branded query can move between two very different auctions${accountScope}: defend contested terms, and reduce pressure when the page is quiet.`;
   }
   return "Signal monitors Google and Bing SERPs minute by minute, then connects that visibility with Google Ads, Search Console, and conversion signals so bid decisions follow the search page.";
 }
@@ -315,7 +354,10 @@ function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelli
     return `I noticed this about ${company}: ${fact.replace(/\.$/, "")}.`;
   }
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
-    return `Given your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
+    if (hasPromotionSignal(input)) {
+      return `Congrats on the move to ${intelligence.jobTitle}.`;
+    }
+    return `For your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
   }
   return `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`;
 }
@@ -325,6 +367,7 @@ function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
     "FIRST_TOUCH_RELEVANCE",
     "PROBLEM_FRAMING",
     "METHODOLOGY_DIFFERENTIATION",
+    "SOCIAL_PROOF",
     "BREAKUP_CLOSE_LOOP",
   ];
   if (referencePurposes.includes(purpose)) {
@@ -436,12 +479,12 @@ function bodyForPurpose({
       greeting(input, intelligence),
       "",
       accountOpening(input, intelligence),
-      scenarioProblem(intelligence),
+      scenarioProblem(input, intelligence),
     ],
     PROBLEM_FRAMING: [
       greeting(input, intelligence),
       "",
-      scenarioMethod(intelligence),
+      scenarioMethod(input, intelligence),
       intelligence.persona === "GROWTH"
         ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
         : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
@@ -464,7 +507,7 @@ function bodyForPurpose({
       greeting(input, intelligence),
       "",
       proofLine,
-      "That is the kind of measured example I had in mind.",
+      roleAngle(input, intelligence),
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input, intelligence),

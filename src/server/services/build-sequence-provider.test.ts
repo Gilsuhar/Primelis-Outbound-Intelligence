@@ -266,6 +266,8 @@ describe("Build Sequence OpenAI provider", () => {
       companyWebsite: "americaneagle.com",
       contactFirstName: undefined,
       contactRole: "Head of Performance Marketing",
+      companyContext: "Digital agency managing multiple client accounts",
+      observedTrigger: "Promotion to PPC Team Lead",
       prospectContext: "Mia Johnson\nPPC Team Lead\nAmericaneagle.com.\nFull-time · 3 yrs 3 mos.",
       serpEvidence: "solo brand moments on all kws biiding",
       brandKeyword: undefined,
@@ -288,10 +290,14 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).not.toMatch(/kws|biiding/i);
     expect(rendered).not.toContain("Evidence first, logo second");
     expect(rendered).not.toContain("That is the practical benchmark");
+    expect(rendered).not.toContain("250 brands");
+    expect(rendered).not.toContain("35-60%");
+    expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
     expect(result.steps[0].messageBody).toContain("Hi Mia");
-    expect(result.steps[0].messageBody).toContain("PPC Team Lead role at Americaneagle");
+    expect(result.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+    expect(result.steps[0].messageBody).toContain("across multiple accounts");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
-    expect(result.steps[3].messageBody).toContain("measured example");
+    expect(result.steps[3].messageBody).toContain("PPC team managing several accounts");
   });
 
   it("ignores leading Step headers from OpenAI body fields", async () => {
