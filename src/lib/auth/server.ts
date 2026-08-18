@@ -29,6 +29,7 @@ type LocalProfile = {
 };
 
 const authLookupTimeoutMs = 1500;
+const applicationProfileLookupTimeoutMs = 8000;
 
 function normalizeRole(role: string | null | undefined): UserRole {
   return role === "KNOWLEDGE_ADMIN" ? "KNOWLEDGE_ADMIN" : "SALES_USER";
@@ -146,7 +147,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 
   if (error || !user) return null;
 
-  const profile = await withTimeout(resolveApplicationUser(user), authLookupTimeoutMs);
+  const profile = await withTimeout(resolveApplicationUser(user), applicationProfileLookupTimeoutMs);
   if (!profile) return null;
 
   return {
