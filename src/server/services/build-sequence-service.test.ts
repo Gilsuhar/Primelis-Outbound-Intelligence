@@ -667,6 +667,43 @@ describe("Build Sequence service", () => {
     expect(persisted).toEqual([]);
   });
 
+  it("keeps hybrid-validated OpenAI copy instead of replacing the whole sequence with the template", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    provider.metadata = {
+      providerName: "openai",
+      modelName: "gpt-test",
+      deterministic: false,
+    };
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        safetyNotes: [...result.safetyNotes, "Hybrid rewrite accepted for step 1."],
+        steps: result.steps.map((step, index) =>
+          index === 0
+            ? {
+                ...step,
+                subjectLine: "acme brand coverage",
+                messageBody:
+                  "Hi Sam,\n\nAcme's branded search is worth one narrow look.\n\nA campaign can look healthy while the brand auction is quiet.",
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.provider.providerName).toBe("openai");
+      expect(result.data.steps[0].messageBody).toContain("Acme's branded search is worth one narrow look");
+      expect(result.data.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+    }
+  });
+
   it("normalizes a single leading step header but rejects step contamination", async () => {
     const cleanHeaderProvider = new DeterministicBuildSequenceProvider();
     const originalCleanGenerate = cleanHeaderProvider.generate.bind(cleanHeaderProvider);

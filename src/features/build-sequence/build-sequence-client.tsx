@@ -335,6 +335,12 @@ function providerLabel(result: BuildSequenceResult) {
       ? `Fallback sequence - OpenAI did not write this. Reason: ${reason}`
       : "Fallback sequence - OpenAI did not write this";
   }
+  const hybridAccepted = result.safetyNotes.filter((note) =>
+    /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
+  ).length;
+  if (hybridAccepted > 0) {
+    return `Hybrid OpenAI sequence - ${hybridAccepted}/${result.steps.length} steps rewritten`;
+  }
   if (result.provider.providerName === "openai") {
     return `OpenAI sequence - ${result.provider.modelName}`;
   }

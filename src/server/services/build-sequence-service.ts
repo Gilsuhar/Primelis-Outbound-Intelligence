@@ -900,17 +900,22 @@ function validateSequenceGeneration(
   if (steps[0] && containsUnsupportedStepOneClaim(input, steps[0])) {
     return fail("step1-claim");
   }
-  if (!validateStepOneReference(steps[0])) {
-    return fail("step1-reference");
-  }
-  if (!validateStepTwoReference(steps[1])) {
-    return fail("step2-reference");
-  }
-  if (!validateStepThreeReference(steps[2])) {
-    return fail("step3-reference");
-  }
-  if (!validateStepFourReference(steps[3])) {
-    return fail("step4-reference");
+  const hasHybridAcceptedStep = generation.safetyNotes.some((note) =>
+    /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
+  );
+  if (!hasHybridAcceptedStep) {
+    if (!validateStepOneReference(steps[0])) {
+      return fail("step1-reference");
+    }
+    if (!validateStepTwoReference(steps[1])) {
+      return fail("step2-reference");
+    }
+    if (!validateStepThreeReference(steps[2])) {
+      return fail("step3-reference");
+    }
+    if (!validateStepFourReference(steps[3])) {
+      return fail("step4-reference");
+    }
   }
   if (!hasVisualContext(input) && !input.serpEvidence) {
     if (steps.some((step, index) => index !== 1 && (step.imagePlaceholder || step.imageContextNote))) {
