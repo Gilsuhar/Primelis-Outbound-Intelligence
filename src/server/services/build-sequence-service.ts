@@ -8,6 +8,7 @@ import {
   getSequencePersonaGuidance,
   selectSequenceAngle,
 } from "@/features/build-sequence/sequence-policy";
+import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
 import {
   sequenceChannels,
   sequencePurposes,
@@ -78,6 +79,8 @@ const buildSequenceSchema = z.object({
     .transform((value) => value || "12 business days"),
   outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
   accountStatusOverride: z.boolean().optional().default(false),
+  prospectContext: z.string().trim().max(6000).optional(),
+  serpEvidence: z.string().trim().max(3000).optional(),
   internalNotes: z.string().trim().max(1200).optional(),
   screenshotAvailable: z.boolean().optional().default(false),
   screenshotContext: z.string().trim().max(800).optional(),
@@ -237,11 +240,17 @@ function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSe
 }
 
 function isCaseStudyEligible(record: SequenceKnowledgeRecord) {
+  const restrictionText = `${record.usageScope ?? ""} ${record.usageRestrictions ?? ""}`;
+  const hasBlockingRestriction =
+    /\b(internal only|internal_only|confidential|do not use|restricted|needs review|no real metrics)\b/i.test(
+      restrictionText,
+    ) && !/\bapproved\b.*\b(outbound|external|social proof)\b/i.test(restrictionText);
   return (
     record.type === "CASE_STUDY" &&
     (!record.approvalStatus || record.approvalStatus === "APPROVED") &&
     record.approvedText.trim().length > 0 &&
-    record.sourceIds.length > 0
+    record.sourceIds.length > 0 &&
+    !hasBlockingRestriction
   );
 }
 
@@ -291,7 +300,7 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
     );
   }
   if (!input.paidSearchContext) {
-    limitations.add("No verified paid-search context was provided.");
+    limitations.add("No structured paid-search context was provided; raw context was used conservatively.");
   }
   if (input.currentVendor) {
     limitations.add(
@@ -304,6 +313,9 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
   if (records.length === 0) {
     limitations.add("No approved eligible Signal knowledge was available for this channel.");
   }
+  if (!input.serpEvidence && !hasVisualContext(input)) {
+    limitations.add("No SERP evidence was provided, so account-specific search conditions were not claimed.");
+  }
   return Array.from(limitations);
 }
 
@@ -313,6 +325,8 @@ function safetyNotes(input: BuildSequenceInput, records: SequenceKnowledgeRecord
     input.currentVendor,
     input.paidSearchContext,
     input.observedTrigger,
+    input.prospectContext,
+    input.serpEvidence,
     input.internalNotes,
   ]
     .filter(Boolean)
@@ -410,11 +424,13 @@ function containsUnsupportedStepOneClaim(input: BuildSequenceInput, step: Sequen
     input.internalNotes,
     input.screenshotContext,
     input.screenshotShows,
+    input.serpEvidence,
+    input.prospectContext,
     input.observedTrigger,
   ]
     .filter(Boolean)
     .join(" ");
-  const hasSupport = /crowded|competitor|competition|auction|waste|unnecessary spend|spend is high|high spend|weak control|incremental|incrementality/i.test(
+  const hasSupport = /crowded|competitor|competition|auction|solo|alone|only advertiser|no other advertiser|waste|unnecessary spend|spend is high|high spend|weak control|incremental|incrementality/i.test(
     verified,
   );
   if (hasSupport) {
@@ -540,19 +556,33 @@ function hasFinalStepPitchRestart(finalStep: SequenceStep) {
   );
 }
 
+function hasSocialProofPitchRestart(finalStep: SequenceStep) {
+  const text = normalizedText(`${finalStep.messageBody} ${finalStep.cta}`);
+  return /\b(monitors?|google ads|search console|bing|competitors?|pause|reduce bids|restore coverage|walkthrough|framework|methodology)\b/.test(
+    text,
+  );
+}
+
 function containsVagueLanguage(text: string) {
   return /\b(conversion-source data|outcome data|paid brand line|cleaner read|cleaner bid decision|the angle|setup pattern|plain example|the point wasn(?:'|’)t to|the first question is simple|i haven(?:'|’)t tried to over-explain this|demand capture versus spend that is simply there|real work|doing more work than it should|live search-result monitoring to separate demand capture)\b/i.test(
     text,
   );
 }
 
-function containsUnsupportedOrganicClaim(input: BuildSequenceInput, text: string) {
+function containsUnsupportedOrganicClaim(
+  input: BuildSequenceInput,
+  text: string,
+  records: SequenceKnowledgeRecord[] = [],
+) {
   const support = [
     input.paidSearchContext,
     input.internalNotes,
     input.screenshotContext,
     input.screenshotShows,
     input.observedTrigger,
+    input.prospectContext,
+    input.serpEvidence,
+    ...records.map((record) => record.approvedText),
   ]
     .filter(Boolean)
     .join(" ");
@@ -567,11 +597,10 @@ function containsUnsupportedOrganicClaim(input: BuildSequenceInput, text: string
 function validateStepOneReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /how do you track|how do you currently|competitive landscape|bids should change/i.test(text) &&
-    /Signal monitors Google and Bing SERPs minute by minute|minute by minute/i.test(text) &&
-    /reduce CPC|maintain strong branded traffic|branded traffic/i.test(text) &&
+    /branded-search|brand(ed)? search|SERP|auction|CPC|bid|coverage|competitive landscape/i.test(text) &&
+    /question|snapshot|competitors?|solo|contested|visibility|bids should change|CPC may be/i.test(text) &&
     questionCount(text) <= 2 &&
-    !/organic|case study|example|screenshot|\{\{! Insert screenshot \}\}/i.test(text)
+    !/case study|screenshot|\{\{! Insert screenshot \}\}|use the screenshot|what it shows/i.test(text)
   );
 }
 
@@ -579,11 +608,10 @@ function validateStepTwoReference(step: SequenceStep) {
   const text = `${step.imagePlaceholder ?? ""} ${step.messageBody} ${step.cta}`;
   return (
     step.imagePlaceholder === "{{! Insert screenshot }}" &&
-    /Google doesn(?:'|’)t make it easy/i.test(text) &&
-    /only advertiser on the SERP/i.test(text) &&
-    /adjust the bid|adjust bids|CPC/i.test(text) &&
-    /detect these moments|visibility/i.test(text) &&
+    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction/i.test(text) &&
+    /evidence|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
+    !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(text) &&
     !containsVagueAnonymousCustomerStory(text)
   );
 }
@@ -593,24 +621,25 @@ function validateStepThreeReference(step: SequenceStep) {
   return (
     /existing Google Ads setup/i.test(text) &&
     /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
-    /live competition signals/i.test(text) &&
-    /blended CTR/i.test(text) &&
-    /adjust bids in real time/i.test(text) &&
-    /reduce CPC/i.test(text) &&
-    /Crocs/i.test(text) &&
-    /AppsFlyer/i.test(text) &&
-    /MyHeritage/i.test(text) &&
-    /40-60%/i.test(text) &&
-    /clicks, conversions, and revenue/i.test(text)
+    /snapshot|supplied evidence|SERP evidence|without account-specific SERP evidence|at the time of the check/i.test(text) &&
+    /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
+    !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );
 }
 
 function validateStepFourReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
+  if (step.purpose === "BREAKUP_CLOSE_LOOP") {
+    return (
+      /priority right now|timing/i.test(text) &&
+      /happy to share more|happy to send a short overview/i.test(text) &&
+      !/close the loop|close this out|final email|case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b|monitors?|Google Ads|Search Console|Bing|competitors?|pause|reduce bids|restore coverage|walkthrough|demo/i.test(text)
+    );
+  }
   return (
-    /priority right now|timing/i.test(text) &&
-    /happy to share more|happy to send a short overview/i.test(text) &&
-    !/close the loop|close this out|final email|case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b|monitors?|Google Ads|Search Console|Bing|competitors?|pause|reduce bids|restore coverage|walkthrough|demo/i.test(text)
+    step.purpose === "SOCIAL_PROOF" &&
+    /practical takeaway|paid coverage|quick overview|reduced|cut|customer example/i.test(text) &&
+    !/close the loop|close this out|final email/i.test(text)
   );
 }
 
@@ -621,7 +650,11 @@ function hasEntityMismatch(
 ) {
   const allowedCompany = normalizedEntity(input.companyName);
   const allowedDomain = input.companyWebsite ? normalizedEntity(input.companyWebsite) : "";
-  const proofCompanies = caseStudyCompanies(records).map(normalizedEntity);
+  const approvedDefaultProofCompanies = ["appsflyer", "crocs", "dior"];
+  const proofCompanies = [
+    ...caseStudyCompanies(records).map(normalizedEntity),
+    ...approvedDefaultProofCompanies,
+  ];
   const allowedEntities = new Set(
     [allowedCompany, allowedDomain, ...proofCompanies].filter((entity) => entity.length > 1),
   );
@@ -803,6 +836,7 @@ function validateSequenceGeneration(
       containsUnsupportedOrganicClaim(
         input,
         `${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`,
+        records,
       ),
     )
   ) {
@@ -826,7 +860,7 @@ function validateSequenceGeneration(
   if (!validateStepFourReference(steps[3])) {
     return fail("step4-reference");
   }
-  if (!hasVisualContext(input)) {
+  if (!hasVisualContext(input) && !input.serpEvidence) {
     if (steps.some((step, index) => index !== 1 && (step.imagePlaceholder || step.imageContextNote))) {
       return fail("unexpected-image");
     }
@@ -852,7 +886,8 @@ function validateSequenceGeneration(
       steps[0].purpose === "FIRST_TOUCH_RELEVANCE" &&
       steps[1].purpose === "PROBLEM_FRAMING" &&
       steps[2].purpose === "METHODOLOGY_DIFFERENTIATION" &&
-      steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP"
+      (steps.at(-1)?.purpose === "SOCIAL_PROOF" ||
+        steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP")
     )
   ) {
     return fail("progression");
@@ -865,14 +900,23 @@ function validateSequenceGeneration(
     return fail("final-length");
   }
   if (
-    finalStep.purpose !== "BREAKUP_CLOSE_LOOP" ||
-    !/priority right now|timing|happy to share more|happy to send/i.test(
-      `${finalStep.messageBody} ${finalStep.cta}`,
-    )
+    finalStep.purpose === "SOCIAL_PROOF"
+      ? !/quick overview|paid coverage|practical takeaway|customer example|reduced|decreased|cut/i.test(
+          `${finalStep.messageBody} ${finalStep.cta}`,
+        )
+      : finalStep.purpose === "BREAKUP_CLOSE_LOOP"
+        ? !/priority right now|timing|happy to share more|happy to send/i.test(
+            `${finalStep.messageBody} ${finalStep.cta}`,
+          )
+        : true
   ) {
     return fail("final-close");
   }
-  if (hasFinalStepPitchRestart(finalStep)) {
+  if (
+    finalStep.purpose === "SOCIAL_PROOF"
+      ? hasSocialProofPitchRestart(finalStep)
+      : hasFinalStepPitchRestart(finalStep)
+  ) {
     return fail("final-pitch");
   }
   const rendered = JSON.stringify({
@@ -1166,11 +1210,13 @@ export async function generateBuildSequence(
   const records = proofSelection.records as SequenceKnowledgeRecord[];
   const sources = sourceReferences(records);
   const selected = selectSequenceAngle(input);
+  const prospectIntelligence = buildProspectIntelligence(input, records);
   const baseGeneration = {
     overallStrategy: "",
     selectedAngle: selected.angle,
     angleRationale: selected.rationale,
     personaEmphasis: getSequencePersonaGuidance(input.contactRole),
+    prospectIntelligence,
     detectedAccountSignals: detectSequenceAccountSignals(input),
     safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
     knowledgeLimitations: knowledgeLimitations(input, records),

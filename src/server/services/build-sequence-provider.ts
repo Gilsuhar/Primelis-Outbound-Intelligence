@@ -7,6 +7,7 @@ import type {
   BuildSequenceInput,
   SequenceGeneration,
   SequenceKnowledgeRecord,
+  ProspectIntelligence,
   SequencePurpose,
   SequenceSourceReference,
   SequenceStep,
@@ -76,7 +77,11 @@ function stripSingleStepHeader(text: string) {
 }
 
 const imagePlaceholderText = "{{! Insert screenshot }}";
-const approvedProofCustomers = ["Crocs", "AppsFlyer", "MyHeritage"] as const;
+const approvedProofPoints = [
+  "AppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.",
+  "Crocs reduced total branded-search spend by 71.2% while monitoring paid and organic performance.",
+  "Dior reduced ad cost by 54% at equal performance.",
+] as const;
 
 function hasScreenshotContext(input: BuildSequenceInput) {
   return Boolean(
@@ -85,17 +90,73 @@ function hasScreenshotContext(input: BuildSequenceInput) {
   );
 }
 
-function screenshotDetails(input: BuildSequenceInput) {
-  return [
-    input.screenshotContext,
-    input.screenshotShows ? `What it shows: ${input.screenshotShows}` : "",
-    input.brandKeyword ? `Brand keyword: ${input.brandKeyword}` : "",
-    input.marketCountry ? `Market: ${input.marketCountry}` : "",
-    input.device ? `Device: ${input.device}` : "",
-    input.observationDate ? `Observed: ${input.observationDate}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+function screenshotObservation(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const keyword = intelligence.serpEvidence.keywords[0] ?? input.brandKeyword;
+  const observedAt = input.observationDate ? ` at the time of the ${input.observationDate} check` : "";
+  const market = input.marketCountry ? ` in ${input.marketCountry}` : "";
+  const shows = input.screenshotShows?.trim();
+  if (shows) {
+    return `At the time of the check${market}, the supplied evidence shows ${shows.replace(/\.$/, "")}. This is only a snapshot, but it is a useful reason to measure whether the bid should change over time.`;
+  }
+  if (keyword) {
+    return `At the time of the check${market}, "${keyword}" was part of the branded-query sample${observedAt}. That does not prove inefficiency, but it is worth measuring how the auction changes over time.`;
+  }
+  return "At the time of the check, the supplied SERP evidence gives a snapshot of branded-search conditions. That does not prove inefficiency, but it is worth measuring how those conditions change over time.";
+}
+
+function selectedCaseStudy(records: SequenceKnowledgeRecord[]) {
+  return records.find((record) => record.type === "CASE_STUDY");
+}
+
+function caseStudyCompany(record: SequenceKnowledgeRecord) {
+  const explicit = record.approvedText.match(/\bCase study:\s*([^.\n]+)[.\n]/i);
+  if (explicit?.[1]) {
+    return explicit[1].trim();
+  }
+  const approvedTextLead = record.approvedText.match(
+    /^\s*([A-Z][A-Za-z0-9&'. -]{1,60}?)\s+(?:cut|cuts|reduced|reduces|lowered|lowers|improved|improves|grew|increased|protected|saved|decreased)\b/,
+  );
+  if (approvedTextLead?.[1]) {
+    return approvedTextLead[1].trim();
+  }
+  const titleLead = record.title.split(/\s+(?:cuts|cut|reduces|reduced|lowers|lowered|improves|improved|leads|saved)\s+/i)[0];
+  return titleLead.trim();
+}
+
+function proofSummary(record: SequenceKnowledgeRecord) {
+  return trimSentences(
+    record.approvedText
+      .replace(/\bCase study:\s*([^.\n]+)[.\n]\s*/i, "")
+      .replace(/\s*Approved by Primelis for outbound social proof\..*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    2,
+  );
+}
+
+function customerProofLine(records: SequenceKnowledgeRecord[]) {
+  const proof = selectedCaseStudy(records);
+  if (!proof) {
+    return approvedProofPoints[0];
+  }
+  const company = caseStudyCompany(proof);
+  const summary = proofSummary(proof);
+  if (!summary) {
+    return approvedProofPoints[0];
+  }
+  return `${company} example: ${summary}`;
+}
+
+function approvedProofPointForStep(ctaIndex: number) {
+  return approvedProofPoints[ctaIndex % approvedProofPoints.length];
+}
+
+function approvedProofPointExcluding(customerName: string, ctaIndex: number) {
+  const normalizedCustomer = customerName.toLowerCase();
+  const available = approvedProofPoints.filter(
+    (proofPoint) => !proofPoint.toLowerCase().startsWith(normalizedCustomer),
+  );
+  return available[ctaIndex % available.length] ?? approvedProofPointForStep(ctaIndex);
 }
 
 function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
@@ -129,20 +190,14 @@ function cleanSelection(value?: string) {
 }
 
 function ctaForPurpose(
-  input: BuildSequenceInput,
   purpose: SequenceStep["purpose"],
-  stepNumber: number,
-  isFinal: boolean,
 ) {
-  if (isFinal) {
-    return "Happy to share more if useful.";
-  }
   const ctas: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: "Do you have anything in place for that today?",
     PROBLEM_FRAMING: "Is your team able to detect these moments automatically?",
     METHODOLOGY_DIFFERENTIATION: "Worth a quick look?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
-    SOCIAL_PROOF: "Would it be useful to compare this with your current branded-search process?",
+    SOCIAL_PROOF: "Open to a quick overview?",
     TECHNICAL_CLARIFICATION: "Would a brief walkthrough help?",
     LOW_PRESSURE_FOLLOW_UP: "Should I park this for later?",
     BREAKUP_CLOSE_LOOP: "Happy to share more if useful.",
@@ -213,6 +268,55 @@ function roleAngle(input: BuildSequenceInput) {
   return "The practical question is where paid brand is still changing the outcome.";
 }
 
+function firstPersonalFact(intelligence: ProspectIntelligence) {
+  return intelligence.relevantFacts[0];
+}
+
+function scenarioProblem(intelligence: ProspectIntelligence) {
+  const evidence = intelligence.serpEvidence;
+  if (intelligence.serpScenario === "SOLO") {
+    const sample = evidence.soloKeywords.slice(0, 2).join(", ");
+    return sample
+      ? `Your SERP notes point to solo brand moments on ${sample}. That is not a conclusion on efficiency, but it is exactly the kind of snapshot where CPC may be higher than required.`
+      : "Your SERP notes point to solo brand moments. That is not a conclusion on efficiency, but it is exactly the kind of snapshot where CPC may be higher than required.";
+  }
+  if (intelligence.serpScenario === "CONTESTED") {
+    const sample = evidence.contestedKeywords.slice(0, 2).join(", ");
+    return sample
+      ? `Your SERP notes show competitors appearing on ${sample}. The useful question is what CPC is actually needed to defend those auctions.`
+      : "Your SERP notes show competitors appearing on the branded terms checked. The useful question is what CPC is actually needed to defend those auctions.";
+  }
+  if (intelligence.serpScenario === "MIXED") {
+    return "Your SERP notes show a mixed pattern: some branded queries look quiet, while others have visible competition. One static brand-bid rule will usually miss that difference.";
+  }
+  return "Without reliable SERP evidence, I would keep this as a visibility question: how quickly can the team see when branded-search competition changes?";
+}
+
+function scenarioMethod(intelligence: ProspectIntelligence) {
+  if (intelligence.serpScenario === "SOLO") {
+    return "The useful method is to identify solo periods, reduce CPC only where coverage is still protected, and restore defense when competitors return.";
+  }
+  if (intelligence.serpScenario === "CONTESTED") {
+    return "When competitors are present, the goal is defensive efficiency: stay covered, but find the minimum CPC or position needed to maintain performance.";
+  }
+  if (intelligence.serpScenario === "MIXED") {
+    return "The practical move is to let different auctions behave differently: defend contested terms, and reduce pressure when the page is quiet.";
+  }
+  return "Signal monitors Google and Bing SERPs minute by minute, then connects that visibility with Google Ads, Search Console, and conversion signals so bid decisions follow the search page.";
+}
+
+function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const company = displayCompany(input);
+  const fact = firstPersonalFact(intelligence);
+  if (fact && intelligence.confidence.prospect !== "LOW") {
+    return `I noticed this about ${company}: ${fact.replace(/\.$/, "")}.`;
+  }
+  if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
+    return `Given your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
+  }
+  return `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`;
+}
+
 function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"], body: string) {
   const referencePurposes: SequenceStep["purpose"][] = [
     "FIRST_TOUCH_RELEVANCE",
@@ -243,7 +347,12 @@ function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 
   if (input.desiredTone === "DIRECT") {
     return stripCommercialTerms(
-      [hello, content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]
+      [
+        hello,
+        ...(content.length <= 2
+          ? content
+          : [content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]),
+      ]
         .filter(Boolean)
         .join("\n\n"),
     );
@@ -251,7 +360,12 @@ function tailorBody(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
 
   if (input.desiredTone === "EXECUTIVE") {
     return stripCommercialTerms(
-      [hello, content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]
+      [
+        hello,
+        ...(content.length <= 2
+          ? content
+          : [content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]),
+      ]
         .filter(Boolean)
         .join("\n\n"),
     );
@@ -280,15 +394,27 @@ function bodyForPurpose({
   purpose,
   channel,
   ctaIndex,
+  records,
+  intelligence,
 }: {
   input: BuildSequenceInput;
   purpose: SequenceStep["purpose"];
   channel: SequenceStep["channel"];
   ctaIndex: number;
+  records: SequenceKnowledgeRecord[];
+  intelligence: ProspectIntelligence;
 }) {
   const company = displayCompany(input);
   const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
   const patternBody = pattern.body;
+  const proof = selectedCaseStudy(records);
+  const selectedProofLine = proof ? customerProofLine(records) : undefined;
+  const proofLine =
+    proof && purpose === "SOCIAL_PROOF"
+      ? selectedProofLine ?? approvedProofPointForStep(ctaIndex)
+      : proof
+        ? approvedProofPointExcluding(caseStudyCompany(proof), ctaIndex)
+        : approvedProofPointForStep(ctaIndex);
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
       return stripCommercialTerms(
@@ -306,24 +432,24 @@ function bodyForPurpose({
     FIRST_TOUCH_RELEVANCE: [
       greeting(input),
       "",
-      `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`,
-      "Signal monitors Google and Bing SERPs minute by minute, giving teams the visibility to react in real time, reduce CPC, and maintain strong branded traffic.",
+      accountOpening(input, intelligence),
+      scenarioProblem(intelligence),
     ],
     PROBLEM_FRAMING: [
       greeting(input),
       "",
-      "Google doesn't make it easy to identify when your brand is the only advertiser on the SERP.",
-      `Here's an example from a recent search for ${company}:`,
-      hasScreenshotContext(input)
-        ? `At that moment, ${screenshotDetails(input)} This creates an opportunity to adjust the bid or CPC without losing coverage.`
-        : "Use the screenshot to call out only what is visible, then connect that moment to a possible bid or CPC adjustment without claiming waste.",
+      scenarioMethod(intelligence),
+      intelligence.persona === "GROWTH"
+        ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
+        : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input),
       "",
-      "Signal works alongside your existing Google Ads setup, without requiring your team to rebuild campaigns or change your current bidding strategy.",
-      "It uses live competition signals and blended CTR to adjust bids in real time, helping reduce CPC while maintaining visibility and performance.",
-      `Brands such as ${approvedProofCustomers.slice(0, -1).join(", ")}, and ${approvedProofCustomers.at(-1)} use Signal to save 40-60% on branded ads while maintaining or improving clicks, conversions, and revenue.`,
+      hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
+        ? screenshotObservation(input, intelligence)
+        : "Without account-specific SERP evidence, I would not claim what is happening on the page. The safer starting point is visibility: how often does the branded auction change, and how quickly can bids react?",
+      "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input),
@@ -334,9 +460,8 @@ function bodyForPurpose({
     SOCIAL_PROOF: [
       greeting(input),
       "",
-      "One concrete customer result is more useful than another broad brand-search explanation.",
-      `Brands such as ${approvedProofCustomers.slice(0, -1).join(", ")}, and ${approvedProofCustomers.at(-1)} use Signal to save 40-60% on branded ads while maintaining or improving clicks, conversions, and revenue.`,
-      "The practical takeaway is to test where paid coverage is protecting demand and where the bid can safely come down.",
+      proofLine,
+      "Evidence first, logo second.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
@@ -406,17 +531,17 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       : "I do not have enough approved Signal knowledge to make a specific factual claim.";
     const purposes: SequencePurpose[] = defaultPurposesForLength();
     const sourceIds = Array.from(new Set(records.flatMap((record) => record.sourceIds)));
+    const proofLine = customerProofLine(records);
     const deterministicClaims = [
       "Signal monitors Google and Bing SERPs minute by minute.",
       "Signal works alongside the existing Google Ads setup without rebuilding campaigns or changing the current bidding strategy.",
-      "Crocs, AppsFlyer, and MyHeritage are approved proof customers for the 40-60% branded-ad savings range.",
-    ];
+      proofLine,
+    ].filter((claim): claim is string => Boolean(claim));
 
     const steps = purposes.map((purpose, index): SequenceStep => {
       const stepNumber = index + 1;
       const channel = channelForStep(input.primaryChannel, index);
-      const isFinal = stepNumber === purposes.length;
-      const cta = ctaForPurpose(input, purpose, stepNumber, isFinal);
+      const cta = ctaForPurpose(purpose);
       return {
         stepNumber,
         channel,
@@ -437,6 +562,8 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
           purpose,
           channel,
           ctaIndex: index,
+          records,
+          intelligence: generation.prospectIntelligence,
         }),
         cta,
         imagePlaceholder:
@@ -446,12 +573,12 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
         imageContextNote:
           purpose === "PROBLEM_FRAMING"
             ? hasScreenshotContext(input)
-              ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${screenshotDetails(input)}`
+              ? `Salesperson note: replace the placeholder with the supplied SERP or Signal screenshot. Use only the supplied context: ${[input.screenshotContext?.trim(), screenshotObservation(input, generation.prospectIntelligence)].filter(Boolean).join(" ")}`
               : "Salesperson note: insert the relevant prospect SERP screenshot before sending. Do not claim unsupported observations."
             : undefined,
         claimsUsed: [
-          purpose === "METHODOLOGY_DIFFERENTIATION"
-            ? deterministicClaims[2]
+          purpose === "METHODOLOGY_DIFFERENTIATION" && proofLine
+            ? proofLine
             : purpose === "FIRST_TOUCH_RELEVANCE"
               ? deterministicClaims[0]
               : humanizeFact(primaryFact),
@@ -465,7 +592,7 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
       steps,
       claimsUsed: Array.from(new Set([...deterministicClaims, ...steps.flatMap((step) => step.claimsUsed)])),
       overallStrategy: stripCommercialTerms(
-        `Use the deterministic four-step framework: live SERP visibility, screenshot evidence, capabilities with approved proof, then a soft follow-up. Keep the sequence concise and anchored to ${emailAngle}.`,
+        `Use prospect intelligence first, then the ${generation.prospectIntelligence.serpScenario.toLowerCase()} SERP scenario: relevance, scenario method, account evidence, and one proof-led conversion step. Keep the sequence concise and anchored to ${emailAngle}.`,
       ),
     };
   }
@@ -511,6 +638,8 @@ export function createBuildSequenceAiProvider(
               paidSearchContext: request.input.paidSearchContext,
               currentVendor: request.input.currentVendor,
               observedTrigger: request.input.observedTrigger,
+              prospectContext: request.input.prospectContext,
+              serpEvidence: request.input.serpEvidence,
               primaryChannel: request.input.primaryChannel,
               sequenceLength: request.input.sequenceLength,
               desiredTone: request.input.desiredTone,
@@ -523,6 +652,7 @@ export function createBuildSequenceAiProvider(
               observationDate: request.input.observationDate,
               screenshotShows: request.input.screenshotShows,
               selectedAngle: result.selectedAngle,
+              prospectIntelligence: request.generation.prospectIntelligence,
               approvedKnowledge: promptRecords.map((record) => ({
                 title: record.title,
                 type: record.type,
@@ -539,7 +669,7 @@ export function createBuildSequenceAiProvider(
             writingInstructions: [
               "Do not return a free-form sequence. The application owns the four rendered emails.",
               "Return only concise optional wording suggestions inside the provided sequenceSteps shape. The application may ignore any field that violates the deterministic renderer.",
-              "Do not change step purpose, CTA category, proof customers, savings range, screenshot placeholder, or sequence order.",
+              "Do not change step purpose, CTA category, approved proof points, screenshot placeholder, or sequence order.",
               "Avoid organic-cannibalization claims unless explicitly supplied by the user.",
             ],
             approvedFacts: promptRecords.map((record) => record.approvedText).slice(0, 10),

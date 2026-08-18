@@ -269,12 +269,12 @@ describe("Build Sequence service", () => {
       expect(stepTwo.purpose).toBe("PROBLEM_FRAMING");
       expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
       expect(stepTwo.imageContextNote).toContain("not from Acme");
-      expect(stepTwo.messageBody).toContain("supplied example");
+      expect(stepTwo.imageContextNote).toContain("supplied example");
       expect(stepTwo.messageBody).not.toMatch(/Acme is a solo bidder|Acme has no competitors/i);
     }
   });
 
-  it("keeps approved proof in Step 3 instead of Step 2", async () => {
+  it("keeps approved proof in the final social-proof step instead of Step 2", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
@@ -298,9 +298,12 @@ describe("Build Sequence service", () => {
       expect(stepTwo.messageBody).not.toContain("Dior");
       expect(stepTwo.messageBody).not.toContain("54%");
       expect(stepTwo.messageBody).not.toMatch(/a customer example|one customer|a client/i);
-      expect(result.data.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
-      expect(result.data.steps[2].messageBody).toContain("40-60%");
-      expect(result.data.steps[3].messageBody).not.toMatch(/\b54%|Dior\b/i);
+      expect(result.data.steps[2].messageBody).toContain("existing Google Ads setup");
+      expect(result.data.steps[2].messageBody).not.toContain("Dior example");
+      expect(result.data.steps[3].purpose).toBe("SOCIAL_PROOF");
+      expect(result.data.steps[3].messageBody).toContain("Dior example");
+      expect(result.data.steps[3].messageBody).toContain("54%");
+      expect(result.data.steps[3].messageBody).not.toContain("AppsFlyer");
     }
   });
 
@@ -322,7 +325,7 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.imagePlaceholder).toBe("{{! Insert screenshot }}");
-      expect(stepTwo.messageBody).toMatch(/Google doesn't make it easy|only advertiser on the SERP/i);
+      expect(stepTwo.messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
       expect(stepTwo.messageBody).not.toMatch(/\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b/i);
       expect(stepTwo.messageBody).not.toMatch(/customer example|one customer|one client/i);
     }
@@ -457,12 +460,83 @@ describe("Build Sequence service", () => {
         "FIRST_TOUCH_RELEVANCE",
         "PROBLEM_FRAMING",
         "METHODOLOGY_DIFFERENTIATION",
-        "BREAKUP_CLOSE_LOOP",
+        "SOCIAL_PROOF",
       ]);
-      expect(result.data.steps[0].messageBody).toMatch(/how do you track/i);
-      expect(result.data.steps[1].messageBody).toMatch(/Google doesn't make it easy|only advertiser/i);
-      expect(result.data.steps[2].messageBody).toMatch(/existing Google Ads setup|40-60%/i);
-      expect(result.data.steps[3].messageBody).toMatch(/priority right now|happy to share more/i);
+      expect(result.data.steps[0].messageBody).toMatch(/narrow branded-search question|visibility question/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
+      expect(result.data.steps[2].messageBody).toMatch(/existing Google Ads setup|Google and Bing SERPs/i);
+      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
+      expect(result.data.steps[3].cta).toBe("Open to a quick overview?");
+    }
+  });
+
+  it("uses Prospect Intelligence SERP scenarios in the generated sequence", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const cases: Array<{
+      evidence?: string;
+      scenario: "SOLO" | "CONTESTED" | "MIXED" | "UNKNOWN";
+      expectedCopy: RegExp;
+      forbiddenCopy?: RegExp;
+    }> = [
+      {
+        evidence: "acme - brand bidding alone\nacme pricing - brand alone",
+        scenario: "SOLO",
+        expectedCopy: /solo brand moments|solo periods/i,
+        forbiddenCopy: /proof of waste/i,
+      },
+      {
+        evidence: "acme shoes - competitor visible\nacme coupon - competitor visible",
+        scenario: "CONTESTED",
+        expectedCopy: /competitors appearing|minimum CPC|defensive efficiency/i,
+        forbiddenCopy: /turn brand ads off/i,
+      },
+      {
+        evidence: "acme - brand alone\nacme shoes - competitor visible",
+        scenario: "MIXED",
+        expectedCopy: /mixed pattern|different auctions|static brand-bid rule/i,
+      },
+      {
+        scenario: "UNKNOWN",
+        expectedCopy: /Without reliable SERP evidence|visibility question/i,
+        forbiddenCopy: /only advertiser|competitors appearing/i,
+      },
+    ];
+
+    for (const item of cases) {
+      const result = await generateBuildSequence(
+        { ...baseInput, serpEvidence: item.evidence },
+        { persistence: adapter },
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const rendered = JSON.stringify(result.data.steps);
+        expect(result.data.prospectIntelligence.serpScenario).toBe(item.scenario);
+        expect(rendered).toMatch(item.expectedCopy);
+        if (item.forbiddenCopy) {
+          expect(rendered).not.toMatch(item.forbiddenCopy);
+        }
+      }
+    }
+  });
+
+  it("uses prospect context as personalization without inventing unsupported details", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        prospectContext:
+          "Sam posted about experimentation and growth efficiency across self-serve acquisition.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.prospectIntelligence.persona).toBe("GROWTH");
+      expect(result.data.steps[0].messageBody).toContain("experimentation and growth efficiency");
+      expect(JSON.stringify(result.data.steps)).not.toMatch(/budget owner|managed a .* budget|led paid search/i);
     }
   });
 
@@ -801,17 +875,17 @@ describe("Build Sequence service", () => {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.steps[0].subjectLine).toContain("Nike");
       expect(result.data.steps[0].messageBody).toContain("Nike");
-      expect(result.data.steps[0].messageBody).not.toContain("VP Performance Marketing");
+      expect(result.data.steps[0].messageBody).toContain("VP Performance Marketing");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
-      expect(result.data.steps[0].messageBody).toMatch(/how do you track changes/i);
+      expect(result.data.steps[0].messageBody).toMatch(/narrow branded-search question/i);
       expect(
-        result.data.steps[0].messageBody.match(/how do you track changes/gi)?.length,
+        result.data.steps[0].messageBody.match(/narrow branded-search question/gi)?.length,
       ).toBe(1);
-      expect(result.data.steps[1].messageBody).toMatch(/Google doesn't make it easy|only advertiser/i);
-      expect(result.data.steps[3].messageBody).toMatch(/priority/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
+      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
-      expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
+      expect(result.data.steps.at(-1)?.purpose).toBe("SOCIAL_PROOF");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
       expect(JSON.stringify(result.data.steps)).not.toMatch(
         /conversion-source|methodology gives|operational than|branded paid search is incremental/i,
@@ -894,7 +968,7 @@ describe("Build Sequence service", () => {
     }
   });
 
-  it("uses valid delays and a low-pressure final breakup step", async () => {
+  it("uses valid delays and a purpose-specific final social-proof step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
@@ -903,11 +977,47 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       expect(result.data.steps.every((step) => step.delay.length > 0)).toBe(true);
       expect(result.data.steps.at(-1)).toMatchObject({
-        purpose: "BREAKUP_CLOSE_LOOP",
+        purpose: "SOCIAL_PROOF",
+        cta: "Open to a quick overview?",
       });
       expect(`${result.data.steps.at(-1)?.messageBody} ${result.data.steps.at(-1)?.cta}`).toMatch(
-        /priority right now|happy to share more/i,
+        /AppsFlyer cut branded spend 29%|quick overview/i,
       );
+    }
+  });
+
+  it("allows an explicit final breakup step when selected by the provider", async () => {
+    const provider = new DeterministicBuildSequenceProvider();
+    const originalGenerate = provider.generate.bind(provider);
+    provider.generate = async (request) => {
+      const result = await originalGenerate(request);
+      return {
+        ...result,
+        steps: result.steps.map((step, index) =>
+          index === result.steps.length - 1
+            ? {
+                ...step,
+                purpose: "BREAKUP_CLOSE_LOOP",
+                subjectLine: "Quick follow-up",
+                messageBody: "Hi Sam,\n\nNot sure if this is a priority right now.",
+                cta: "Happy to share more if useful.",
+                claimsUsed: ["Signal evaluates paid and organic brand search together to support efficient decisions."],
+              }
+            : step,
+        ),
+      };
+    };
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps.at(-1)).toMatchObject({
+        purpose: "BREAKUP_CLOSE_LOOP",
+        cta: "Happy to share more if useful.",
+      });
+      expect(result.data.steps.at(-1)?.messageBody).toContain("Not sure if this is a priority right now");
     }
   });
 
@@ -927,10 +1037,11 @@ describe("Build Sequence service", () => {
       expect(result.data.knowledgeLimitations).toEqual(
         expect.arrayContaining([
           "Company website was not provided, so account facts are treated conservatively.",
-          "No verified paid-search context was provided.",
+          "No structured paid-search context was provided; raw context was used conservatively.",
+          "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("user-provided");
+      expect(JSON.stringify(result.data.steps)).toContain("Without reliable SERP evidence");
     }
   });
 
@@ -1050,7 +1161,7 @@ describe("Build Sequence service", () => {
         "FIRST_TOUCH_RELEVANCE",
         "PROBLEM_FRAMING",
         "METHODOLOGY_DIFFERENTIATION",
-        "BREAKUP_CLOSE_LOOP",
+        "SOCIAL_PROOF",
       ]);
     }
   });
@@ -1099,8 +1210,10 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[1].purpose).toBe("PROBLEM_FRAMING");
       expect(result.data.steps[1].messageBody).not.toContain("Dior");
       expect(result.data.steps[1].messageBody).not.toContain("54%");
-      expect(result.data.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
-      expect(result.data.steps[2].messageBody).toContain("40-60%");
+      expect(result.data.steps[2].messageBody).toContain("existing Google Ads setup");
+      expect(result.data.steps[2].messageBody).not.toContain("Dior");
+      expect(result.data.steps[3].messageBody).toContain("Dior example");
+      expect(result.data.steps[3].messageBody).toContain("54%");
     }
   });
 });

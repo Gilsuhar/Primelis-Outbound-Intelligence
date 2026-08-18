@@ -79,10 +79,12 @@ describe("Sales workflow UI", () => {
     expect((screen.getByLabelText("Website") as HTMLInputElement).value).toBe("nike.com");
   });
 
-  it("keeps Build Sequence focused on dropdown-first inputs", () => {
+  it("keeps Build Sequence focused on Prospect Intelligence inputs", () => {
     render(<BuildSequenceClient />);
 
-    expect(screen.getByRole("heading", { name: "Quick brief" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Prospect Intelligence" })).toBeTruthy();
+    expect(screen.getByText("Prospect Context")).toBeTruthy();
+    expect(screen.getByText("SERP Evidence")).toBeTruthy();
     expect(screen.getByText("Company")).toBeTruthy();
     expect(screen.getByText("Buyer role")).toBeTruthy();
     expect(screen.getByText("Fit / ICP")).toBeTruthy();
@@ -91,10 +93,6 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Steps")).toBeTruthy();
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Duration")).toBeTruthy();
-    expect(screen.getByText("Step 2 mode:")).toBeTruthy();
-    expect(
-      screen.getByText("Approved case study when available, otherwise diagnostic insight"),
-    ).toBeTruthy();
     expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
   });
 

@@ -48,6 +48,8 @@ export type BuildSequenceInput = {
   desiredOverallDuration: string;
   outputLanguage?: OutputLanguage;
   accountStatusOverride?: boolean;
+  prospectContext?: string;
+  serpEvidence?: string;
   internalNotes?: string;
   screenshotAvailable?: boolean;
   screenshotContext?: string;
@@ -118,11 +120,44 @@ export type SequenceGeneration = {
   selectedAngle: SequenceAngle;
   angleRationale: string;
   personaEmphasis: SequencePersonaGuidance;
+  prospectIntelligence: ProspectIntelligence;
   detectedAccountSignals: SequenceAccountSignal[];
   steps: SequenceStep[];
   claimsUsed: string[];
   safetyNotes: string[];
   knowledgeLimitations: string[];
+};
+
+export type ProspectIntelligence = {
+  prospectName?: string;
+  companyName?: string;
+  jobTitle?: string;
+  seniority?: string;
+  persona:
+    | "PAID_SEARCH"
+    | "PERFORMANCE"
+    | "GROWTH"
+    | "ECOMMERCE"
+    | "MARKETING_LEADERSHIP"
+    | "OTHER";
+  relevantFacts: string[];
+  companyContext: string[];
+  likelyPriorities: string[];
+  serpScenario: "SOLO" | "CONTESTED" | "MIXED" | "UNKNOWN";
+  serpEvidence: {
+    keywords: string[];
+    soloKeywords: string[];
+    contestedKeywords: string[];
+    competitors: string[];
+    observations: string[];
+  };
+  primaryAngle: string;
+  secondaryAngle?: string;
+  recommendedProofPoint?: string;
+  confidence: {
+    prospect: "HIGH" | "MEDIUM" | "LOW";
+    serp: "HIGH" | "MEDIUM" | "LOW";
+  };
 };
 
 export type BuildSequenceResult = SequenceGeneration & {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
 import type { BuildSequenceInput } from "@/features/build-sequence/types";
 
 import { createBuildSequenceAiProvider } from "./build-sequence-provider";
@@ -31,6 +32,23 @@ const records = [
     sourceDates: ["2026-01-01"],
   },
 ];
+
+function generation() {
+  return {
+    overallStrategy: "Fallback strategy.",
+    selectedAngle: "BRANDED_SEARCH_EFFICIENCY" as const,
+    angleRationale: "Fallback rationale.",
+    personaEmphasis: {
+      persona: "Performance Marketing",
+      emphasis: "efficiency" as const,
+      rationale: "Owns paid brand.",
+    },
+    prospectIntelligence: buildProspectIntelligence(input, records),
+    detectedAccountSignals: [],
+    safetyNotes: [],
+    knowledgeLimitations: [],
+  };
+}
 
 describe("Build Sequence OpenAI provider", () => {
   afterEach(() => {
@@ -85,30 +103,20 @@ describe("Build Sequence OpenAI provider", () => {
       input,
       records,
       sourceReferences: [{ id: "source-1", title: "Approved source" }],
-      generation: {
-        overallStrategy: "Fallback strategy.",
-        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
-        angleRationale: "Fallback rationale.",
-        personaEmphasis: {
-          persona: "Performance Marketing",
-          emphasis: "efficiency",
-          rationale: "Owns paid brand.",
-        },
-        detectedAccountSignals: [],
-        safetyNotes: [],
-        knowledgeLimitations: [],
-      },
+      generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain(
-      "Quick question on Nike's branded search: how do you track changes",
-    );
+    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[0].messageBody).toContain("branded-search question");
     expect(result.steps[1].imagePlaceholder).toBe("{{! Insert screenshot }}");
-    expect(result.steps[2].messageBody).toContain("Crocs, AppsFlyer, and MyHeritage");
-    expect(result.steps[2].messageBody).toContain("40-60%");
-    expect(result.steps[3].messageBody).toContain("Not sure if this is a priority right now");
+    expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
+    expect(JSON.stringify(result.steps)).not.toContain("Our tech");
+    expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
+    expect(result.steps[2].messageBody).not.toContain("40-60%");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
+    expect(result.steps[3].cta).toBe("Open to a quick overview?");
     expect(JSON.stringify(result.steps)).not.toContain("AI step one");
-    expect(result.overallStrategy).toContain("deterministic four-step framework");
+    expect(result.overallStrategy).toContain("prospect intelligence");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
     const body = JSON.parse(String(requestInit?.body));
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
@@ -156,22 +164,11 @@ describe("Build Sequence OpenAI provider", () => {
       input,
       records,
       sourceReferences: [{ id: "source-1", title: "Approved source" }],
-      generation: {
-        overallStrategy: "Fallback strategy.",
-        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
-        angleRationale: "Fallback rationale.",
-        personaEmphasis: {
-          persona: "Performance Marketing",
-          emphasis: "efficiency",
-          rationale: "Owns paid brand.",
-        },
-        detectedAccountSignals: [],
-        safetyNotes: [],
-        knowledgeLimitations: [],
-      },
+      generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
+    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[1].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
   });
@@ -223,24 +220,42 @@ describe("Build Sequence OpenAI provider", () => {
       input,
       records,
       sourceReferences: [{ id: "source-1", title: "Approved source" }],
-      generation: {
-        overallStrategy: "Fallback strategy.",
-        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
-        angleRationale: "Fallback rationale.",
-        personaEmphasis: {
-          persona: "Performance Marketing",
-          emphasis: "efficiency",
-          rationale: "Owns paid brand.",
-        },
-        detectedAccountSignals: [],
-        safetyNotes: [],
-        knowledgeLimitations: [],
-      },
+      generation: generation(),
     });
 
-    expect(result.overallStrategy).toContain("deterministic four-step framework");
+    expect(result.overallStrategy).toContain("prospect intelligence");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
     expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
+  });
+
+  it("uses only the selected approved case-study proof when one is supplied", async () => {
+    const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
+    const result = await provider.generate({
+      input,
+      records: [
+        ...records,
+        {
+          id: "proof-1",
+          title: "Dior approved proof",
+          type: "CASE_STUDY",
+          approvalStatus: "APPROVED",
+          approvedText: "Case study: Dior. Ad cost decreased by 54% while performance stayed stable.",
+          channels: ["EMAIL", "LINKEDIN"],
+          sourceIds: ["source-2"],
+          sourceTitles: ["Dior source"],
+          sourceDates: ["2026-01-02"],
+        },
+      ],
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
+    expect(result.steps[2].messageBody).not.toContain("Dior example");
+    expect(result.steps[3].messageBody).toContain("Dior example");
+    expect(result.steps[3].messageBody).toContain("54%");
+    expect(result.steps[3].messageBody).not.toContain("AppsFlyer");
+    expect(result.steps[2].messageBody).not.toContain("MyHeritage");
   });
 
   it("ignores leading Step headers from OpenAI body fields", async () => {
@@ -290,25 +305,14 @@ describe("Build Sequence OpenAI provider", () => {
       input,
       records,
       sourceReferences: [{ id: "source-1", title: "Approved source" }],
-      generation: {
-        overallStrategy: "Fallback strategy.",
-        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
-        angleRationale: "Fallback rationale.",
-        personaEmphasis: {
-          persona: "Performance Marketing",
-          emphasis: "efficiency",
-          rationale: "Owns paid brand.",
-        },
-        detectedAccountSignals: [],
-        safetyNotes: [],
-        knowledgeLimitations: [],
-      },
+      generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
-    expect(result.steps[1].messageBody).toContain("Google doesn't make it easy");
+    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[1].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
-    expect(result.steps[3].messageBody).toContain("Not sure if this is a priority right now");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
+    expect(result.steps[3].cta).toBe("Open to a quick overview?");
     expect(JSON.stringify(result.steps)).not.toContain("duplicated model heading");
   });
 
@@ -329,19 +333,7 @@ describe("Build Sequence OpenAI provider", () => {
       input,
       records,
       sourceReferences: [{ id: "source-1", title: "Approved source" }],
-      generation: {
-        overallStrategy: "Fallback strategy.",
-        selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
-        angleRationale: "Fallback rationale.",
-        personaEmphasis: {
-          persona: "Performance Marketing",
-          emphasis: "efficiency",
-          rationale: "Owns paid brand.",
-        },
-        detectedAccountSignals: [],
-        safetyNotes: [],
-        knowledgeLimitations: [],
-      },
+      generation: generation(),
     });
 
     expect(result.safetyNotes.join(" ")).toContain("OpenAI model was not found");

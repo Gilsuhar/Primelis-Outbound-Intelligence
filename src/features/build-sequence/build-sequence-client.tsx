@@ -147,7 +147,7 @@ function subjectVariants(step: SequenceStep, company: string) {
     ],
     PROBLEM_FRAMING: [
       "Re: deactivating branded ads",
-      `Paid brand waste at ${account}?`,
+      `Paid brand visibility at ${account}?`,
       "When brand clicks are already yours",
     ],
     METHODOLOGY_DIFFERENTIATION: [
@@ -214,7 +214,7 @@ function bodyVariants(step: SequenceStep, company: string) {
 
   if (step.purpose === "ACCOUNT_SPECIFIC_OBSERVATION") {
     return [
-      `${firstLine}\n\nI would keep the ${account} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is waste.`,
+      `${firstLine}\n\nI would keep the ${account} angle light: not a claim, just a reason to check whether paid brand is still doing work organic cannot do.\n\nThat makes the conversation safer and more useful than assuming there is a problem.`,
       `${firstLine}\n\nFor ${account}, I would frame this as a quick validation rather than a pitch: is paid coverage needed everywhere, or only when organic and search-page conditions make it useful?`,
       `${firstLine}\n\nI would not assume ${account} has a problem. I would only check the places where brand demand is already strong and paid clicks may not be changing the result.`,
     ];
@@ -527,6 +527,8 @@ export function BuildSequenceClient() {
   const [paidSearchContext, setPaidSearchContext] = useState("");
   const [currentVendor, setCurrentVendor] = useState("");
   const [observedTrigger, setObservedTrigger] = useState("");
+  const [prospectContext, setProspectContext] = useState("");
+  const [serpEvidence, setSerpEvidence] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [screenshotAvailable, setScreenshotAvailable] = useState(false);
   const [screenshotContext, setScreenshotContext] = useState("");
@@ -594,7 +596,10 @@ export function BuildSequenceClient() {
     if (market) setGeographyOrMarkets(market);
     if (paidContext) setPaidSearchContext(paidContext);
     if (trigger) setObservedTrigger(trigger);
-    if (researchNotes) setInternalNotes(researchNotes);
+    if (researchNotes) {
+      setProspectContext(researchNotes);
+      setInternalNotes(researchNotes);
+    }
   }, []);
 
   async function copyText(key: string, text: string) {
@@ -664,6 +669,8 @@ export function BuildSequenceClient() {
           formString(formData, "desiredOverallDuration") || "12 business days",
         outputLanguage,
         accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
+        prospectContext: formString(formData, "prospectContext") || undefined,
+        serpEvidence: formString(formData, "serpEvidence") || undefined,
         internalNotes: formString(formData, "internalNotes") || undefined,
         screenshotAvailable,
         screenshotContext: formString(formData, "screenshotContext") || undefined,
@@ -744,8 +751,36 @@ export function BuildSequenceClient() {
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <WorkflowSectionTitle
             icon={<Layers3 aria-hidden="true" className="h-5 w-5" />}
-            title={t("workflow.quickBrief")}
+            title="Prospect Intelligence"
           />
+
+          <label className="block space-y-1 text-sm font-medium text-stone-700">
+            Prospect Context
+            <textarea
+              className="min-h-44 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+              name="prospectContext"
+              onChange={(event) => setProspectContext(event.target.value)}
+              placeholder="Paste anything you know about the prospect — LinkedIn profile, About section, current role, experience, responsibilities, posts, company context, notes, or research."
+              value={prospectContext}
+            />
+            <span className="block text-xs leading-5 text-stone-500">
+              Paste anything you know about the prospect — LinkedIn profile, About section, current role, experience, responsibilities, posts, company context, notes, or research.
+            </span>
+          </label>
+
+          <label className="block space-y-1 text-sm font-medium text-stone-700">
+            SERP Evidence
+            <textarea
+              className="min-h-32 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+              name="serpEvidence"
+              onChange={(event) => {
+                setSerpEvidence(event.target.value);
+                setScreenshotAvailable(Boolean(event.target.value.trim()) || screenshotAvailable);
+              }}
+              placeholder={"cursor — brand bidding alone\ncursor pricing — brand alone\ncursor build — competitor visible\n\nor: Checked 6 branded keywords. Brand was alone on all 6."}
+              value={serpEvidence}
+            />
+          </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
@@ -761,56 +796,6 @@ export function BuildSequenceClient() {
               value={companyName}
             />
             <TextField label={t("workflow.firstName")} name="contactFirstName" />
-            <SmartField
-              label={t("workflow.buyerRole")}
-              name="contactRole"
-              onChange={setContactRole}
-              options={buyerRoleOptions}
-              value={contactRole}
-            />
-            <SmartField
-              label={t("workflow.industry")}
-              name="industry"
-              onChange={setIndustry}
-              options={industries.map((industry) => industry.name)}
-              value={industry}
-            />
-            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              {t("workflow.steps")}
-              <select
-                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-                onChange={(event) =>
-                  setSequenceLength(Number(event.target.value) as SequenceLength)
-                }
-                value={sequenceLength}
-              >
-                {lengths.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
-              {t("workflow.tone")}
-              <select
-                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
-                onChange={(event) => setTone(event.target.value as SequenceTone)}
-                value={tone}
-              >
-                {tones.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <SmartField
-              defaultValue="12 business days"
-              label={t("workflow.duration")}
-              name="desiredOverallDuration"
-              options={durationOptions}
-            />
           </div>
 
           <AccountStatusPanel
@@ -834,6 +819,56 @@ export function BuildSequenceClient() {
               {t("workflow.advancedOptionalDetails")}
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <SmartField
+                label={t("workflow.buyerRole")}
+                name="contactRole"
+                onChange={setContactRole}
+                options={buyerRoleOptions}
+                value={contactRole}
+              />
+              <SmartField
+                label={t("workflow.industry")}
+                name="industry"
+                onChange={setIndustry}
+                options={industries.map((industry) => industry.name)}
+                value={industry}
+              />
+              <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+                {t("workflow.steps")}
+                <select
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  onChange={(event) =>
+                    setSequenceLength(Number(event.target.value) as SequenceLength)
+                  }
+                  value={sequenceLength}
+                >
+                  {lengths.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0 space-y-1 text-sm font-medium text-stone-700">
+                {t("workflow.tone")}
+                <select
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  onChange={(event) => setTone(event.target.value as SequenceTone)}
+                  value={tone}
+                >
+                  {tones.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <SmartField
+                defaultValue="12 business days"
+                label={t("workflow.duration")}
+                name="desiredOverallDuration"
+                options={durationOptions}
+              />
               <TextField
                 label={t("workflow.website")}
                 name="companyWebsite"

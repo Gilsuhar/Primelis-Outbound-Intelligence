@@ -217,6 +217,6 @@ export function defaultPurposesForLength(): SequencePurpose[] {
     "FIRST_TOUCH_RELEVANCE",
     "PROBLEM_FRAMING",
     "METHODOLOGY_DIFFERENTIATION",
-    "BREAKUP_CLOSE_LOOP",
+    "SOCIAL_PROOF",
   ];
 }
