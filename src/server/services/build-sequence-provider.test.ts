@@ -258,7 +258,7 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[2].messageBody).not.toContain("MyHeritage");
   });
 
-  it("keeps domain-only facts and raw all-keyword notes out of rendered copy", async () => {
+  it("keeps domain-only facts, tenure metadata, and raw all-keyword notes out of rendered copy", async () => {
     const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
     const americaneagleInput: BuildSequenceInput = {
       ...input,
@@ -266,7 +266,7 @@ describe("Build Sequence OpenAI provider", () => {
       companyWebsite: "americaneagle.com",
       contactFirstName: "Mia",
       contactRole: "Director of Paid Search",
-      prospectContext: "Americaneagle.com.",
+      prospectContext: "Americaneagle.com.\nFull-time · 3 yrs 3 mos.",
       serpEvidence: "solo brand moments on all kws biiding",
       brandKeyword: undefined,
     };
@@ -282,10 +282,14 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(rendered).not.toContain("Americaneagle.com");
+    expect(rendered).not.toContain("Full-time");
+    expect(rendered).not.toContain("3 yrs 3 mos");
     expect(rendered).not.toMatch(/kws|biiding/i);
     expect(rendered).not.toContain("Evidence first, logo second");
+    expect(rendered).not.toContain("That is the practical benchmark");
     expect(result.steps[0].messageBody).toContain("Director of Paid Search role at Americaneagle");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
+    expect(result.steps[3].messageBody).toContain("measured example");
   });
 
   it("ignores leading Step headers from OpenAI body fields", async () => {

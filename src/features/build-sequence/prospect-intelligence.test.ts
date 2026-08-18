@@ -82,6 +82,17 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.serpEvidence.soloKeywords).toEqual([]);
   });
 
+  it("keeps employment-duration metadata out of personalization facts", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      prospectContext: "Full-time · 3 yrs 3 mos\nPosted about improving paid search measurement.",
+    });
+
+    expect(intelligence.relevantFacts).toEqual([
+      "Posted about improving paid search measurement.",
+    ]);
+  });
+
   it("extracts persona from supplied context without inventing responsibilities", () => {
     const intelligence = buildProspectIntelligence({
       ...input,

@@ -23,6 +23,28 @@ function sentenceFragments(value?: string, max = 4) {
   return unique(lines(value).flatMap((line) => line.split(/(?<=[.!?])\s+/))).slice(0, max);
 }
 
+function isUsableProspectFact(fact: string) {
+  const normalized = fact.trim().toLowerCase();
+  if (!normalized) return false;
+  if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/.test(normalized)) {
+    return false;
+  }
+  if (/^(full-time|part-time|contract|self-employed|freelance|internship)\b/.test(normalized)) {
+    return false;
+  }
+  if (/^\d+\s*(?:yrs?|years?|mos?|months?)\b/.test(normalized)) {
+    return false;
+  }
+  if (/^[a-z -]+ · \d+\s*(?:yrs?|years?|mos?|months?)/i.test(fact.trim())) {
+    return false;
+  }
+  return true;
+}
+
+function prospectFacts(value?: string, max = 5) {
+  return sentenceFragments(value, max).filter(isUsableProspectFact).slice(0, max);
+}
+
 function inferPersona(input: BuildSequenceInput): ProspectIntelligence["persona"] {
   const text = `${input.contactRole} ${input.prospectContext ?? ""}`.toLowerCase();
   if (/paid search|sem|ppc|google ads|search marketing/.test(text)) return "PAID_SEARCH";
@@ -172,7 +194,7 @@ export function buildProspectIntelligence(
   const persona = inferPersona(input);
   const serpEvidence = parseSerpEvidence(input);
   const serpScenario = classifySerpScenario(serpEvidence);
-  const contextFacts = sentenceFragments(input.prospectContext, 5);
+  const contextFacts = prospectFacts(input.prospectContext, 5);
   const companyFacts = unique(
     [
       compact(input.companyContext),

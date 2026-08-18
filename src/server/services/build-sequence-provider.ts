@@ -463,7 +463,7 @@ function bodyForPurpose({
       greeting(input),
       "",
       proofLine,
-      "That is the practical benchmark.",
+      "That is the kind of measured example I had in mind.",
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input),
