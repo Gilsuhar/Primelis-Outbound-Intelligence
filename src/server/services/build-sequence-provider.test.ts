@@ -294,10 +294,12 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).not.toContain("35-60%");
     expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
     expect(result.steps[0].messageBody).toContain("Hi Mia");
-    expect(result.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
+    expect(result.steps[1].messageBody).toContain("The same branded query can move between two different auctions");
+    expect(result.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard");
     expect(result.steps[0].messageBody).toContain("across multiple accounts");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
-    expect(result.steps[3].messageBody).toContain("PPC team managing several accounts");
+    expect(result.steps[3].messageBody).toContain("one account with meaningful branded-search spend");
   });
 
   it("turns raw promotion posts into a concise congratulations opener", async () => {
@@ -326,7 +328,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].messageBody).toContain("Hi Mia");
-    expect(result.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
     expect(rendered).not.toContain("I noticed this about American Eagle: I’m excited");
   });
 

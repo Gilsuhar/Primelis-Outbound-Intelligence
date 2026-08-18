@@ -289,7 +289,7 @@ function managesMultipleAccounts(input: BuildSequenceInput) {
 function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
   const role = buyerRole(input, intelligence).toLowerCase();
   if (managesMultipleAccounts(input) && /paid search|sem|ppc|performance/.test(role)) {
-    return "For a PPC team managing several accounts, the practical decision is when coverage is defensive and when the auction is quiet enough to lower pressure.";
+    return "The practical takeaway is not the logo. It is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
     return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
@@ -351,7 +351,7 @@ function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelli
   const company = displayCompany(input);
   const fact = firstPersonalFact(intelligence);
   if (intelligence.jobTitle && intelligence.persona !== "OTHER" && hasPromotionSignal(input)) {
-    return `Congrats on the move to ${intelligence.jobTitle}.`;
+    return `Congrats on your promotion to ${intelligence.jobTitle}.`;
   }
   if (fact && intelligence.confidence.prospect !== "LOW") {
     return `I noticed this about ${company}: ${fact.replace(/\.$/, "")}.`;
@@ -461,6 +461,21 @@ function bodyForPurpose({
       : proof
         ? approvedProofPointExcluding(caseStudyCompany(proof), ctaIndex)
         : approvedProofPointForStep(ctaIndex);
+  const isManagedPpcSequence = managesMultipleAccounts(input) &&
+    /paid search|sem|ppc|performance/.test(buyerRole(input, intelligence).toLowerCase());
+  const managedPpcStepOne = hasPromotionSignal(input)
+    ? "One challenge that often becomes harder across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet."
+    : "One challenge across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet.";
+  const managedPpcStepTwo = "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThe useful method is to identify solo periods across the accounts your team manages, reduce CPC only where coverage is still protected, and restore defense when competitors return.";
+  const managedPpcStepThree = [
+    "For a PPC team, the value is not another dashboard showing that competitors appeared.",
+    "It is being able to identify solo and contested periods across multiple accounts, then act without manually checking every SERP.",
+    hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
+      ? screenshotObservation(input, intelligence)
+      : "Without account-specific SERP evidence, I would keep this as a visibility check: where does the auction change, and how quickly can bids react?",
+    "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+  ].join("\n\n");
+  const managedPpcProofAngle = "The simplest way to evaluate this is one account with meaningful branded-search spend: compare auction conditions, CPC, and paid coverage needs before discussing anything broader.";
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
       return stripCommercialTerms(
@@ -479,23 +494,31 @@ function bodyForPurpose({
       greeting(input, intelligence),
       "",
       accountOpening(input, intelligence),
-      scenarioProblem(input, intelligence),
+      isManagedPpcSequence ? managedPpcStepOne : scenarioProblem(input, intelligence),
     ],
     PROBLEM_FRAMING: [
       greeting(input, intelligence),
       "",
-      scenarioMethod(input, intelligence),
-      intelligence.persona === "GROWTH"
-        ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
-        : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
+      isManagedPpcSequence
+        ? managedPpcStepTwo
+        : scenarioMethod(input, intelligence),
+      isManagedPpcSequence
+        ? ""
+        : intelligence.persona === "GROWTH"
+          ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
+          : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input, intelligence),
       "",
-      hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
-        ? screenshotObservation(input, intelligence)
-        : "Without account-specific SERP evidence, I would not claim what is happening on the page. The safer starting point is visibility: how often does the branded auction change, and how quickly can bids react?",
-      "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+      isManagedPpcSequence
+        ? managedPpcStepThree
+        : hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
+          ? screenshotObservation(input, intelligence)
+          : "Without account-specific SERP evidence, I would not claim what is happening on the page. The safer starting point is visibility: how often does the branded auction change, and how quickly can bids react?",
+      isManagedPpcSequence
+        ? ""
+        : "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input, intelligence),
@@ -507,7 +530,7 @@ function bodyForPurpose({
       greeting(input, intelligence),
       "",
       proofLine,
-      roleAngle(input, intelligence),
+      isManagedPpcSequence ? managedPpcProofAngle : roleAngle(input, intelligence),
     ],
     TECHNICAL_CLARIFICATION: [
       greeting(input, intelligence),

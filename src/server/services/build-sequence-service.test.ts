@@ -564,7 +564,9 @@ describe("Build Sequence service", () => {
       const rendered = JSON.stringify(result.data.steps);
       expect(result.data.steps[0].subjectLine).toBe("branded search across managed accounts");
       expect(result.data.steps[0].messageBody).toContain("Hi Mia");
-      expect(result.data.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+      expect(result.data.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
+      expect(result.data.steps[1].messageBody).toContain("The same branded query can move between two different auctions");
+      expect(result.data.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard");
       expect(rendered).toContain("across multiple accounts");
       expect(rendered).not.toContain("Hi About");
       expect(rendered).not.toContain("Oct 2025");
