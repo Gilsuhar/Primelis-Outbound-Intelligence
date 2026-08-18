@@ -11,17 +11,54 @@ type CookieToSet = {
   options: CookieOptions;
 };
 
+const authCheckTimeoutMs = 1500;
+
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        cookie.name.startsWith("sb-") &&
+        (cookie.name.includes("auth-token") || cookie.name.includes("access-token")),
+    );
+}
+
+function redirectToLogin(request: NextRequest, pathname: string) {
+  const loginUrl = request.nextUrl.clone();
+  loginUrl.pathname = "/login";
+  loginUrl.searchParams.set("next", pathname);
+  return NextResponse.redirect(loginUrl);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   const config = getSupabaseAuthConfig();
   const pathname = request.nextUrl.pathname;
   let response = NextResponse.next({ request });
 
+  if (isPublicRoute(pathname)) {
+    return response;
+  }
+
   if (!config) {
-    if (isPublicRoute(pathname)) return response;
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    return redirectToLogin(request, pathname);
+  }
+
+  if (!hasSupabaseAuthCookie(request)) {
+    return redirectToLogin(request, pathname);
   }
 
   const supabase = createServerClient(config.url, config.anonKey, {
@@ -42,14 +79,16 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const { data, error } = await supabase.auth.getClaims();
+  const result = await withTimeout(supabase.auth.getClaims(), authCheckTimeoutMs);
+  if (!result) {
+    return redirectToLogin(request, pathname);
+  }
+
+  const { data, error } = result;
   const user = error ? null : data?.claims;
 
-  if (!user && !isPublicRoute(pathname)) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+  if (!user) {
+    return redirectToLogin(request, pathname);
   }
 
   return response;

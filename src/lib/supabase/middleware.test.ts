@@ -94,21 +94,22 @@ describe("Supabase middleware session refresh", () => {
   it("lets an authenticated linked user continue to the app root", async () => {
     mockSupabaseUser({ id: "auth-user-id", email: "user@example.com" });
 
-    const response = await updateSession(request("/", "sb-access-token=callback-cookie"));
+    const response = await updateSession(request("/", "sb-project-auth-token=callback-cookie"));
 
     expect(response.headers.get("location")).toBeNull();
     expect(response.headers.get("set-cookie")).toContain("sb-access-token=refreshed-cookie");
   });
 
-  it("does not redirect authenticated users from login back to the app root", async () => {
+  it("does not call Supabase for public login routes", async () => {
     mockSupabaseUser({ id: "auth-user-id", email: "user@example.com" });
 
-    const response = await updateSession(request("/login", "sb-access-token=callback-cookie"));
+    const response = await updateSession(request("/login", "sb-project-auth-token=callback-cookie"));
 
     expect(response.headers.get("location")).toBeNull();
+    expect(createServerClientMock).not.toHaveBeenCalled();
   });
 
-  it("redirects unauthenticated protected requests to login", async () => {
+  it("redirects protected requests without auth cookies before calling Supabase", async () => {
     mockSupabaseUser(null);
 
     const response = await updateSession(request("/reply-to-prospect"));
@@ -116,5 +117,37 @@ describe("Supabase middleware session refresh", () => {
     expect(response.headers.get("location")).toBe(
       "https://preview.example/login?next=%2Freply-to-prospect",
     );
+    expect(createServerClientMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects unauthenticated protected requests to login", async () => {
+    mockSupabaseUser(null);
+
+    const response = await updateSession(request("/reply-to-prospect", "sb-project-auth-token=stale-cookie"));
+
+    expect(response.headers.get("location")).toBe(
+      "https://preview.example/login?next=%2Freply-to-prospect",
+    );
+  });
+
+  it("redirects protected requests when the Supabase auth check times out", async () => {
+    vi.useFakeTimers();
+    createServerClientMock.mockReturnValue({
+      auth: {
+        getClaims: vi.fn(() => new Promise(() => {})),
+      },
+    } as never);
+
+    const responsePromise = updateSession(
+      request("/reply-to-prospect", "sb-project-auth-token=callback-cookie"),
+    );
+
+    await vi.advanceTimersByTimeAsync(1500);
+    const response = await responsePromise;
+
+    expect(response.headers.get("location")).toBe(
+      "https://preview.example/login?next=%2Freply-to-prospect",
+    );
+    vi.useRealTimers();
   });
 });
