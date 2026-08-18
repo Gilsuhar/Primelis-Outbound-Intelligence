@@ -350,13 +350,13 @@ function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelli
 function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
   const company = displayCompany(input);
   const fact = firstPersonalFact(intelligence);
+  if (intelligence.jobTitle && intelligence.persona !== "OTHER" && hasPromotionSignal(input)) {
+    return `Congrats on the move to ${intelligence.jobTitle}.`;
+  }
   if (fact && intelligence.confidence.prospect !== "LOW") {
     return `I noticed this about ${company}: ${fact.replace(/\.$/, "")}.`;
   }
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
-    if (hasPromotionSignal(input)) {
-      return `Congrats on the move to ${intelligence.jobTitle}.`;
-    }
     return `For your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
   }
   return `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`;

@@ -300,6 +300,36 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[3].messageBody).toContain("PPC team managing several accounts");
   });
 
+  it("turns raw promotion posts into a concise congratulations opener", async () => {
+    const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
+    const americaneagleInput: BuildSequenceInput = {
+      ...input,
+      companyName: "American Eagle",
+      companyWebsite: "americaneagle.com",
+      contactFirstName: "Mia",
+      contactRole: "PPC Team Lead",
+      companyContext: "Digital agency managing multiple client accounts",
+      observedTrigger: "Promotion to PPC Team Lead",
+      prospectContext: "Mia Johnson\nI’m excited to share that I’ve been promoted to PPC Team Lead at Americaneagle.com!",
+      serpEvidence: "solo brand moments",
+      brandKeyword: "American Eagle baggy",
+    };
+    const result = await provider.generate({
+      input: americaneagleInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        ...generation(),
+        prospectIntelligence: buildProspectIntelligence(americaneagleInput, records),
+      },
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("Hi Mia");
+    expect(result.steps[0].messageBody).toContain("Congrats on the move to PPC Team Lead");
+    expect(rendered).not.toContain("I noticed this about American Eagle: I’m excited");
+  });
+
   it("ignores leading Step headers from OpenAI body fields", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
