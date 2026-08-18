@@ -23,6 +23,23 @@ function sentenceFragments(value?: string, max = 4) {
   return unique(lines(value).flatMap((line) => line.split(/(?<=[.!?])\s+/))).slice(0, max);
 }
 
+function isLikelyRoleLine(value: string) {
+  const text = value.trim();
+  if (!text || text.length > 90) return false;
+  if (/[.!?]/.test(text)) return false;
+  return /\b(?:ppc|paid search|sem|performance|growth|marketing|media|acquisition|demand|ecommerce|e-commerce|digital)\b/i.test(text) &&
+    /\b(?:lead|manager|director|head|vp|vice president|specialist|strategist|analyst|team lead|consultant)\b/i.test(text);
+}
+
+function isLikelyPersonNameLine(value: string) {
+  const text = value.trim();
+  if (!text || text.length > 80) return false;
+  if (isLikelyRoleLine(text)) return false;
+  if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(text)) return false;
+  if (/^(full-time|part-time|contract|self-employed|freelance|internship)\b/i.test(text)) return false;
+  return /^[A-Z][a-z' -]{1,30}(?:\s+[A-Z][a-z' -]{1,40}){0,3}$/.test(text);
+}
+
 function isUsableProspectFact(fact: string) {
   const normalized = fact.trim().toLowerCase();
   if (!normalized) return false;
@@ -36,6 +53,12 @@ function isUsableProspectFact(fact: string) {
     return false;
   }
   if (/^[a-z -]+ · \d+\s*(?:yrs?|years?|mos?|months?)/i.test(fact.trim())) {
+    return false;
+  }
+  if (isLikelyPersonNameLine(fact)) {
+    return false;
+  }
+  if (isLikelyRoleLine(fact)) {
     return false;
   }
   return true;
@@ -69,7 +92,17 @@ function inferSeniority(input: BuildSequenceInput) {
 function inferProspectName(input: BuildSequenceInput) {
   if (input.contactFirstName) return input.contactFirstName;
   const match = input.prospectContext?.match(/\b(?:name|prospect)\s*[:\-]\s*([A-Z][a-z]+)\b/);
-  return match?.[1];
+  if (match?.[1]) return match[1];
+  const nameLine = lines(input.prospectContext).find(isLikelyPersonNameLine);
+  return nameLine?.split(/\s+/)[0];
+}
+
+function inferJobTitle(input: BuildSequenceInput) {
+  const suppliedRole = compact(input.contactRole);
+  if (suppliedRole && suppliedRole !== "Head of Performance Marketing") {
+    return suppliedRole;
+  }
+  return lines(input.prospectContext).find(isLikelyRoleLine) ?? suppliedRole;
 }
 
 function keywordFromLine(line: string) {
@@ -207,7 +240,7 @@ export function buildProspectIntelligence(
   return {
     prospectName: inferProspectName(input),
     companyName: compact(input.companyName),
-    jobTitle: compact(input.contactRole),
+    jobTitle: inferJobTitle(input),
     seniority: inferSeniority(input),
     persona,
     relevantFacts: contextFacts,

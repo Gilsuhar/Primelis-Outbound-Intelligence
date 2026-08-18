@@ -166,8 +166,9 @@ function recordsForPrompt(records: SequenceKnowledgeRecord[]) {
     .slice(0, 12);
 }
 
-function greeting(input: BuildSequenceInput) {
-  return input.contactFirstName ? `Hi ${input.contactFirstName},` : "Hi there,";
+function greeting(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  const firstName = input.contactFirstName || intelligence?.prospectName;
+  return firstName ? `Hi ${firstName},` : "Hi there,";
 }
 
 function displayCompany(input: BuildSequenceInput) {
@@ -432,13 +433,13 @@ function bodyForPurpose({
 
   const linesByPurpose: Record<SequenceStep["purpose"], string[]> = {
     FIRST_TOUCH_RELEVANCE: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       accountOpening(input, intelligence),
       scenarioProblem(intelligence),
     ],
     PROBLEM_FRAMING: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       scenarioMethod(intelligence),
       intelligence.persona === "GROWTH"
@@ -446,7 +447,7 @@ function bodyForPurpose({
         : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
         ? screenshotObservation(input, intelligence)
@@ -454,31 +455,31 @@ function bodyForPurpose({
       "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       `The only assumption I would make about ${company} is a light one: branded-search process may be worth checking.`,
       "I would not pitch that as proof. I would use it as a reason to check whether paid brand is still doing work organic cannot do.",
     ],
     SOCIAL_PROOF: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       proofLine,
       "That is the kind of measured example I had in mind.",
     ],
     TECHNICAL_CLARIFICATION: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       "The methodology question is straightforward: before lowering or pausing anything, check paid ads, organic results, and search-page conditions together.",
       "That keeps the conversation away from generic cost-cutting and focused on where paid coverage is actually needed.",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       `Keeping this narrow: if paid-brand efficiency becomes relevant at ${input.companyName}, it may be worth a quick check.`,
       "If it is not a current priority, no problem.",
     ],
     BREAKUP_CLOSE_LOOP: [
-      greeting(input),
+      greeting(input, intelligence),
       "",
       "Not sure if this is a priority right now.",
     ],

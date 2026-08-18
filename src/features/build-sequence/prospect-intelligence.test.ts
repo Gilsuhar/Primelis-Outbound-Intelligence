@@ -93,6 +93,19 @@ describe("Prospect Intelligence extraction", () => {
     ]);
   });
 
+  it("extracts a prospect name and role from pasted profile context without treating the role as a fact", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      prospectContext: "Mia Johnson\nPPC Team Lead\nFull-time · 3 yrs 3 mos",
+    });
+
+    expect(intelligence.prospectName).toBe("Mia");
+    expect(intelligence.jobTitle).toBe("PPC Team Lead");
+    expect(intelligence.relevantFacts).toEqual([]);
+  });
+
   it("extracts persona from supplied context without inventing responsibilities", () => {
     const intelligence = buildProspectIntelligence({
       ...input,
