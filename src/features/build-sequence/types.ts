@@ -123,12 +123,60 @@ export type SequenceStep = {
   sourceIds: string[];
 };
 
+export type OutreachOutcome =
+  | "SENT"
+  | "OPENED"
+  | "REPLIED"
+  | "POSITIVE_REPLY"
+  | "MEETING_BOOKED"
+  | "NOT_RELEVANT"
+  | "NO_RESPONSE";
+
+export type GoldStandardExample = {
+  id: string;
+  prospectPersona: ProspectIntelligence["persona"][];
+  serpScenario?: ProspectIntelligence["serpScenario"];
+  outcome: OutreachOutcome | "STRONG_INTERNAL_EXAMPLE";
+  subject?: string;
+  body: string;
+  reasoningTags: string[];
+  whyItWorked: string[];
+  approvedForLearning: boolean;
+};
+
+export type MessageStrategy = {
+  prospectInsight: string;
+  businessQuestion: string;
+  productGap: string;
+  primaryAngle: string;
+  secondaryAngle?: string;
+  relevantCapability: string;
+  proofPoint?: string;
+  whyThisShouldResonate: string;
+  openingStyle:
+    | "PROSPECT_FACT"
+    | "ACCOUNT_OBSERVATION"
+    | "BUSINESS_QUESTION"
+    | "SERP_EVIDENCE"
+    | "MARKET_INSIGHT";
+  sequenceNarrative: Array<{
+    step: 1 | 2 | 3 | 4;
+    objective: string;
+    newInformation: string;
+    ctaIntent: string;
+  }>;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  selectedGoldStandardExampleIds: string[];
+};
+
 export type SequenceGeneration = {
   overallStrategy: string;
   selectedAngle: SequenceAngle;
   angleRationale: string;
   personaEmphasis: SequencePersonaGuidance;
   prospectIntelligence: ProspectIntelligence;
+  messageStrategy: MessageStrategy;
+  selectedGoldStandardExamples: GoldStandardExample[];
   detectedAccountSignals: SequenceAccountSignal[];
   steps: SequenceStep[];
   claimsUsed: string[];

@@ -9,6 +9,8 @@ import {
   selectSequenceAngle,
 } from "@/features/build-sequence/sequence-policy";
 import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
+import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
+import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
 import {
   sequenceChannels,
   sequencePurposes,
@@ -185,8 +187,29 @@ function stripLeadingStepHeader(text: string) {
   return text.replace(/^\s*step\s+\d+\s*(?:[-:–—].*)?\r?\n+/i, "").trim();
 }
 
-function sanitizeGeneratedText(text: string) {
-  return stripLeadingStepHeader(text)
+function protectedKeywordPhrases(generation: SequenceGeneration) {
+  const evidence = generation.prospectIntelligence.serpEvidence;
+  return Array.from(
+    new Set([
+      ...evidence.keywords,
+      ...evidence.soloKeywords,
+      ...evidence.contestedKeywords,
+      ...evidence.structuredKeywords.map((keyword) => keyword.term),
+    ].filter(Boolean)),
+  );
+}
+
+function sanitizeGeneratedText(text: string, protectedPhrases: string[] = []) {
+  const masks = new Map<string, string>();
+  let masked = stripLeadingStepHeader(text);
+  protectedPhrases
+    .filter((phrase) => phrase.trim().length > 1)
+    .forEach((phrase, index) => {
+      const token = `__SAFE_KEYWORD_${index}__`;
+      masks.set(token, phrase);
+      masked = masked.replace(new RegExp(escapeRegExp(phrase), "gi"), token);
+    });
+  const sanitized = masked
     .replace(
       /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
       "commercial details",
@@ -195,6 +218,10 @@ function sanitizeGeneratedText(text: string) {
     .replace(/\bbetter than\b/gi, "different from")
     .replace(/\bbeats\b/gi, "differs from")
     .replace(/\b(adthena|revvim|auction insights)\b/gi, "current tools");
+  return Array.from(masks.entries()).reduce(
+    (value, [token, phrase]) => value.replaceAll(token, phrase),
+    sanitized,
+  );
 }
 
 function mapKnowledgeRow(row: Row): SequenceKnowledgeRecord {
@@ -673,7 +700,7 @@ function validateStepThreeReference(step: SequenceStep) {
   return (
     /existing Google Ads setup/i.test(text) &&
     /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|without account-specific SERP evidence|at the time of the check/i.test(text) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|without account-specific (?:SERP|auction) evidence|at the time of the check/i.test(text) &&
     /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );
@@ -759,6 +786,42 @@ function similarity(a: string, b: string) {
   return intersection / Math.min(aWords.size, bWords.size);
 }
 
+function hasTemplateLikeStructure(steps: SequenceStep[]) {
+  const openingKeys = steps
+    .map((step) =>
+      step.messageBody
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .find((line) => !/^hi\b/i.test(line)),
+    )
+    .filter((line): line is string => Boolean(line))
+    .map((line) => normalizedText(line).split(" ").slice(0, 4).join(" "));
+  const counts = new Map<string, number>();
+  for (const key of openingKeys) {
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Array.from(counts.values()).some((count) => count >= 3);
+}
+
+function copiesGoldStandardExample(generation: SequenceGeneration, steps: SequenceStep[]) {
+  const generatedText = normalizedText(renderedSequenceText(steps));
+  return generation.selectedGoldStandardExamples.some((example) => {
+    const exampleText = normalizedText(`${example.subject ?? ""} ${example.body}`);
+    return similarity(generatedText, exampleText) > 0.85 ||
+      steps.some((step) => similarity(normalizedText(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`), exampleText) > 0.9);
+  });
+}
+
+function hasNarrativeProgression(generation: SequenceGeneration, steps: SequenceStep[]) {
+  const narrative = generation.messageStrategy.sequenceNarrative;
+  if (narrative.length !== steps.length) {
+    return false;
+  }
+  const objectives = narrative.map((item) => normalizedText(item.objective));
+  return new Set(objectives).size === objectives.length;
+}
+
 function caseStudyCompanies(records: SequenceKnowledgeRecord[]) {
   return records
     .filter((record) => record.type === "CASE_STUDY")
@@ -825,6 +888,15 @@ function validateSequenceGeneration(
   }
   if (hasDuplicateCompleteSequence(steps, generation)) {
     return fail("duplicate-sequence");
+  }
+  if (hasTemplateLikeStructure(steps)) {
+    return fail("template-like");
+  }
+  if (!hasNarrativeProgression(generation, steps)) {
+    return fail("narrative");
+  }
+  if (copiesGoldStandardExample(generation, steps)) {
+    return fail("gold-standard-copy");
   }
   if (steps.some((step) => containsStepContamination(step, input.sequenceLength))) {
     return fail("contamination");
@@ -978,7 +1050,11 @@ function validateSequenceGeneration(
     claimsUsed: generation.claimsUsed,
     steps: generation.steps,
   });
-  if (containsCommercialTerms(rendered) || containsCompetitorClaim(rendered)) {
+  const renderedForRestrictedChecks = protectedKeywordPhrases(generation).reduce(
+    (value, phrase) => value.replace(new RegExp(escapeRegExp(phrase), "gi"), ""),
+    rendered,
+  );
+  if (containsCommercialTerms(renderedForRestrictedChecks) || containsCompetitorClaim(rendered)) {
     return fail("restricted");
   }
   if (hasMultipleProofCompanies(generation, records)) {
@@ -988,19 +1064,41 @@ function validateSequenceGeneration(
 }
 
 function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {
+  const safeKeywords = protectedKeywordPhrases(generation);
   return {
     ...generation,
-    overallStrategy: sanitizeGeneratedText(generation.overallStrategy),
-    claimsUsed: generation.claimsUsed.map(sanitizeGeneratedText),
+    overallStrategy: sanitizeGeneratedText(generation.overallStrategy, safeKeywords),
+    messageStrategy: {
+      ...generation.messageStrategy,
+      prospectInsight: sanitizeGeneratedText(generation.messageStrategy.prospectInsight, safeKeywords),
+      businessQuestion: sanitizeGeneratedText(generation.messageStrategy.businessQuestion, safeKeywords),
+      productGap: sanitizeGeneratedText(generation.messageStrategy.productGap, safeKeywords),
+      primaryAngle: sanitizeGeneratedText(generation.messageStrategy.primaryAngle, safeKeywords),
+      secondaryAngle: generation.messageStrategy.secondaryAngle
+        ? sanitizeGeneratedText(generation.messageStrategy.secondaryAngle, safeKeywords)
+        : undefined,
+      relevantCapability: sanitizeGeneratedText(generation.messageStrategy.relevantCapability, safeKeywords),
+      proofPoint: generation.messageStrategy.proofPoint
+        ? sanitizeGeneratedText(generation.messageStrategy.proofPoint, safeKeywords)
+        : undefined,
+      whyThisShouldResonate: sanitizeGeneratedText(generation.messageStrategy.whyThisShouldResonate, safeKeywords),
+      sequenceNarrative: generation.messageStrategy.sequenceNarrative.map((item) => ({
+        ...item,
+        objective: sanitizeGeneratedText(item.objective, safeKeywords),
+        newInformation: sanitizeGeneratedText(item.newInformation, safeKeywords),
+        ctaIntent: sanitizeGeneratedText(item.ctaIntent, safeKeywords),
+      })),
+    },
+    claimsUsed: generation.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
     steps: generation.steps.map((step) => ({
       ...step,
-      subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine) : undefined,
+      subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine, safeKeywords) : undefined,
       connectionRequest: step.connectionRequest
-        ? sanitizeGeneratedText(step.connectionRequest)
+        ? sanitizeGeneratedText(step.connectionRequest, safeKeywords)
         : undefined,
-      messageBody: sanitizeGeneratedText(step.messageBody),
-      cta: sanitizeGeneratedText(step.cta),
-      claimsUsed: step.claimsUsed.map(sanitizeGeneratedText),
+      messageBody: sanitizeGeneratedText(step.messageBody, safeKeywords),
+      cta: sanitizeGeneratedText(step.cta, safeKeywords),
+      claimsUsed: step.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
     })),
   };
 }
@@ -1265,12 +1363,23 @@ export async function generateBuildSequence(
   const sources = sourceReferences(records);
   const selected = selectSequenceAngle(input);
   const prospectIntelligence = buildProspectIntelligence(input, records);
+  const messageStrategy = planMessageStrategy({
+    input,
+    intelligence: prospectIntelligence,
+    records,
+  });
+  const selectedGoldStandardExamples = selectGoldStandardExamples({
+    intelligence: prospectIntelligence,
+    primaryAngle: messageStrategy.primaryAngle,
+  }).filter((example) => messageStrategy.selectedGoldStandardExampleIds.includes(example.id));
   const baseGeneration = {
     overallStrategy: "",
     selectedAngle: selected.angle,
     angleRationale: selected.rationale,
     personaEmphasis: getSequencePersonaGuidance(input.contactRole),
     prospectIntelligence,
+    messageStrategy,
+    selectedGoldStandardExamples,
     detectedAccountSignals: detectSequenceAccountSignals(input),
     safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
     knowledgeLimitations: knowledgeLimitations(input, records),

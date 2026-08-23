@@ -1139,6 +1139,50 @@ export function BuildSequenceClient() {
                   </div>
                 </div>
                 <p className="text-sm leading-6 text-stone-700">{result.angleRationale}</p>
+                <details className="rounded-lg border border-line bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                    Strategy debug
+                  </summary>
+                  <div className="mt-3 grid gap-3 text-sm leading-6 text-stone-700">
+                    <p>
+                      <span className="font-semibold text-ink">Prospect insight:</span>{" "}
+                      {result.messageStrategy.prospectInsight}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-ink">Business question:</span>{" "}
+                      {result.messageStrategy.businessQuestion}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-ink">Product gap:</span>{" "}
+                      {result.messageStrategy.productGap}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-ink">Capability:</span>{" "}
+                      {result.messageStrategy.relevantCapability}
+                    </p>
+                    {result.messageStrategy.proofPoint ? (
+                      <p>
+                        <span className="font-semibold text-ink">Proof:</span>{" "}
+                        {result.messageStrategy.proofPoint}
+                      </p>
+                    ) : null}
+                    <p>
+                      <span className="font-semibold text-ink">Gold standards:</span>{" "}
+                      {result.selectedGoldStandardExamples.length > 0
+                        ? result.selectedGoldStandardExamples.map((example) => example.id).join(", ")
+                        : "none selected"}
+                    </p>
+                    <ol className="grid gap-2">
+                      {result.messageStrategy.sequenceNarrative.map((item) => (
+                        <li className="rounded-md bg-[#f8f5ef] p-2" key={item.step}>
+                          <span className="font-semibold text-ink">Step {item.step}:</span>{" "}
+                          {item.objective}{" "}
+                          <span className="text-stone-500">({item.newInformation})</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </details>
                 {quality ? (
                   <div className="rounded-lg border border-line bg-white p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">

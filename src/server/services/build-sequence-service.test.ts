@@ -501,7 +501,7 @@ describe("Build Sequence service", () => {
       },
       {
         scenario: "UNKNOWN",
-        expectedCopy: /Without reliable SERP evidence|visibility question/i,
+        expectedCopy: /Without account-specific auction evidence|visibility question/i,
         forbiddenCopy: /only advertiser|competitors appearing/i,
       },
     ];
@@ -1066,8 +1066,8 @@ describe("Build Sequence service", () => {
     if (directOperator.ok && executiveGrowth.ok) {
       const directBody = directOperator.data.steps[0].messageBody;
       const executiveBody = executiveGrowth.data.steps[0].messageBody;
-      expect(directBody).toMatch(/how do you decide|visibility/i);
-      expect(executiveBody).toMatch(/how do you decide|visibility/i);
+      expect(directBody).toMatch(/how do you decide|how do you see|visibility/i);
+      expect(executiveBody).toMatch(/how do you decide|how do you see|visibility/i);
       expect(directOperator.data.personaEmphasis.emphasis).toBe("operational control");
       expect(executiveGrowth.data.personaEmphasis.emphasis).toBe("governance");
     }
@@ -1146,7 +1146,7 @@ describe("Build Sequence service", () => {
           "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("Without reliable SERP evidence");
+      expect(JSON.stringify(result.data.steps)).toContain("Without account-specific auction evidence");
     }
   });
 
@@ -1268,6 +1268,152 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "SOCIAL_PROOF",
       ]);
+    }
+  });
+
+  it("falls back when generated copy is too close to a gold standard example", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const chrisInput: BuildSequenceInput = {
+      ...baseInput,
+      companyName: "Remofirst",
+      companyWebsite: "remofirst.com",
+      contactFirstName: "Chris",
+      contactRole: "Head of Paid Search",
+      prospectContext:
+        "Chris has managed over $50M in ad spend and is actively exploring how AI and automation can improve paid-search decisions.",
+    };
+    const result = await generateBuildSequence(chrisInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            steps: generated.steps.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    subjectLine: "the branded search question google ads can't answer",
+                    messageBody:
+                      "Hi Chris,\n\nI'm reaching out because you've managed over $50M in ad spend and are actively exploring how AI and automation can improve paid-search decisions.\n\nOne area Google Ads still doesn't handle well is adapting branded bids to live SERP competition. It reports performance, but doesn't clearly distinguish between moments when Remofirst is defending against another advertiser and moments when it's paying alone.",
+                    cta: "Curious if you've already explored this?",
+                  }
+                : step,
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.provider.providerName).toBe("deterministic-development");
+      expect(result.data.steps[0].messageBody).not.toContain(
+        "I'm reaching out because you've managed over $50M",
+      );
+    }
+  });
+
+  it("turns the Chris Remofirst strategy into specific copy instead of generic positioning", async () => {
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "zoominfo-proof",
+        title: "ZoomInfo reduced branded CPC",
+        type: "CASE_STUDY",
+        approvedText:
+          "ZoomInfo used Signal to reduce branded CPC by 40% while increasing MQL volume by 20%.",
+        sourceIds: ["source-zoominfo"],
+        sourceTitles: ["ZoomInfo approved proof"],
+      }),
+    ]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Remofirst",
+        companyWebsite: "remofirst.com",
+        contactFirstName: "Chris",
+        contactRole: "Head of Paid Search",
+        prospectContext:
+          "Chris has managed over $50M in ad spend and is actively exploring how AI and automation can improve paid-search decisions.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(rendered).toContain("$50M");
+      expect(rendered).toMatch(/AI and automation/i);
+      expect(rendered).toMatch(/Google Ads reports performance/i);
+      expect(rendered).toMatch(/defending against another advertiser/i);
+      expect(rendered).toMatch(/paying alone/i);
+      expect(rendered).toContain("ZoomInfo used Signal to reduce branded CPC by 40%");
+      expect(rendered).not.toContain("I noticed this about Remofirst");
+    }
+  });
+
+  it("preserves safe supplied keyword phrases that contain commercial words", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Cursor",
+        companyWebsite: "cursor.com",
+        contactFirstName: "Taylor",
+        contactRole: "Head of Growth",
+        companyContext: "Fast-growing AI developer tool",
+        keywords: [
+          { term: "Cursor pricing", status: "solo" },
+          { term: "Cursor AI editor", status: "contested", competitor: "Notion" },
+        ],
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data);
+      expect(rendered).toContain("Cursor pricing");
+      expect(rendered).not.toContain("Cursor commercial details");
+    }
+  });
+
+  it("uses SOLO evidence concretely without claiming wasted spend", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Merrell",
+        companyWebsite: "merrell.com",
+        contactFirstName: "Alex",
+        contactRole: "Director of Ecommerce",
+        keywords: [{ term: "merrell shoes", status: "solo" }],
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(rendered).toContain("merrell shoes");
+      expect(rendered).toMatch(/brand appeared alone/i);
+      expect(rendered).toMatch(/does not prove wasted spend|does not prove inefficiency/i);
+      expect(rendered).not.toMatch(/\bis wasted\b|\bwasting money\b/i);
     }
   });
 

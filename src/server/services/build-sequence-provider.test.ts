@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
+import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
+import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
 import type { BuildSequenceInput } from "@/features/build-sequence/types";
 
 import { createBuildSequenceAiProvider } from "./build-sequence-provider";
@@ -34,6 +36,8 @@ const records = [
 ];
 
 function generation() {
+  const prospectIntelligence = buildProspectIntelligence(input, records);
+  const messageStrategy = planMessageStrategy({ input, intelligence: prospectIntelligence, records });
   return {
     overallStrategy: "Fallback strategy.",
     selectedAngle: "BRANDED_SEARCH_EFFICIENCY" as const,
@@ -43,7 +47,12 @@ function generation() {
       emphasis: "efficiency" as const,
       rationale: "Owns paid brand.",
     },
-    prospectIntelligence: buildProspectIntelligence(input, records),
+    prospectIntelligence,
+    messageStrategy,
+    selectedGoldStandardExamples: selectGoldStandardExamples({
+      intelligence: prospectIntelligence,
+      primaryAngle: messageStrategy.primaryAngle,
+    }).filter((example) => messageStrategy.selectedGoldStandardExampleIds.includes(example.id)),
     detectedAccountSignals: [],
     safetyNotes: [],
     knowledgeLimitations: [],
@@ -139,7 +148,7 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
     expect(result.steps[3].cta).toBe("Open to a quick overview?");
     expect(JSON.stringify(result.steps)).not.toContain("AI step one");
-    expect(result.overallStrategy).toContain("prospect intelligence");
+    expect(result.overallStrategy).toContain("Strategy planner");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
     const body = JSON.parse(String(requestInit?.body));
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
@@ -191,7 +200,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
-    expect(result.steps[1].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
+    expect(result.steps[1].messageBody).toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
   });
@@ -324,7 +333,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.overallStrategy).toContain("prospect intelligence");
+    expect(result.overallStrategy).toContain("Strategy planner");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
     expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
   });
@@ -485,7 +494,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
-    expect(result.steps[1].messageBody).toContain("Signal monitors Google and Bing SERPs minute by minute");
+    expect(result.steps[1].messageBody).toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
     expect(result.steps[3].cta).toBe("Open to a quick overview?");
