@@ -12,12 +12,27 @@ import { buildProspectIntelligence } from "@/features/build-sequence/prospect-in
 import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
 import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
 import {
+  extractProspect,
+  factsFromExtraction,
+  mergeProspectRecord,
+  normalizeDomain,
+  normalizeLinkedInUrl,
+  resolveIdentity,
+} from "@/features/build-sequence/prospect-memory";
+import {
   sequenceChannels,
   sequencePurposes,
   sequenceStepChannels,
   sequenceTones,
   type BuildSequenceInput,
   type BuildSequenceResult,
+  type ExtractedFact,
+  type IdentityResolution,
+  type ProspectExtraction,
+  type ProspectMemory,
+  type ProspectRecord,
+  type ProspectSource,
+  type ProspectSourceType,
   type SequenceGeneration,
   type SequenceKnowledgeRecord,
   type SequenceSourceReference,
@@ -41,78 +56,90 @@ import {
 } from "./draft-versioning-service";
 import { err, ok } from "./result";
 
-const buildSequenceSchema = z.object({
-  companyName: z.string().trim().min(1).max(180),
-  companyWebsite: z.string().trim().max(240).optional(),
-  contactFirstName: z.string().trim().max(80).optional(),
-  contactRole: z
-    .string()
-    .trim()
-    .max(160)
-    .optional()
-    .transform((value) => value || "Head of Performance Marketing"),
-  industry: z.string().trim().max(160).optional(),
-  companyContext: z
-    .string()
-    .trim()
-    .max(240)
-    .optional()
-    .transform((value) => value || "Potential fit - validate spend/demand"),
-  geographyOrMarkets: z.string().trim().max(240).optional(),
-  paidSearchContext: z.string().trim().max(500).optional(),
-  currentVendor: z.string().trim().max(160).optional(),
-  observedTrigger: z
-    .string()
-    .trim()
-    .max(600)
-    .optional()
-    .transform((value) => value || "Light discovery before pitching Signal"),
-  primaryChannel: z.enum(sequenceChannels),
-  sequenceLength: z.union([
-    z.literal(4),
-    z.coerce.number().pipe(z.literal(4)),
-  ]),
-  desiredTone: z.enum(sequenceTones),
-  desiredOverallDuration: z
-    .string()
-    .trim()
-    .max(120)
-    .optional()
-    .transform((value) => value || "12 business days"),
-  outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
-  accountStatusOverride: z.boolean().optional().default(false),
-  prospectContext: z.string().trim().max(6000).optional(),
-  serpEvidence: z.string().trim().max(3000).optional(),
-  keywords: z
-    .array(
-      z.object({
-        term: z.string().trim().max(120),
-        status: z.enum(["solo", "contested"]),
-        competitor: z.string().trim().max(120).optional(),
-        note: z.string().trim().max(240).optional(),
-      }),
-    )
-    .max(5)
-    .optional()
-    .transform((keywords) =>
-      keywords
-        ?.map((keyword) => ({
-          ...keyword,
-          competitor: keyword.competitor || undefined,
-          note: keyword.note || undefined,
-        }))
-        .filter((keyword) => keyword.term),
-    ),
-  internalNotes: z.string().trim().max(1200).optional(),
-  screenshotAvailable: z.boolean().optional().default(false),
-  screenshotContext: z.string().trim().max(800).optional(),
-  brandKeyword: z.string().trim().max(120).optional(),
-  marketCountry: z.string().trim().max(120).optional(),
-  device: z.string().trim().max(80).optional(),
-  observationDate: z.string().trim().max(80).optional(),
-  screenshotShows: z.string().trim().max(500).optional(),
-  creatorId: z.string().trim().min(1).optional(),
-});
+const buildSequenceSchema = z
+  .object({
+    rawProspectContext: z.string().trim().max(12000).optional(),
+    prospectId: z.string().trim().max(120).optional(),
+    companyName: z.string().trim().max(180).optional().default(""),
+    companyWebsite: z.string().trim().max(240).optional(),
+    contactFirstName: z.string().trim().max(80).optional(),
+    contactRole: z
+      .string()
+      .trim()
+      .max(160)
+      .optional()
+      .transform((value) => value || "Head of Performance Marketing"),
+    industry: z.string().trim().max(160).optional(),
+    companyContext: z
+      .string()
+      .trim()
+      .max(240)
+      .optional()
+      .transform((value) => value || "Potential fit - validate spend/demand"),
+    geographyOrMarkets: z.string().trim().max(240).optional(),
+    paidSearchContext: z.string().trim().max(500).optional(),
+    currentVendor: z.string().trim().max(160).optional(),
+    observedTrigger: z
+      .string()
+      .trim()
+      .max(600)
+      .optional()
+      .transform((value) => value || "Light discovery before pitching Signal"),
+    primaryChannel: z.enum(sequenceChannels),
+    sequenceLength: z.union([
+      z.literal(4),
+      z.coerce.number().pipe(z.literal(4)),
+    ]),
+    desiredTone: z.enum(sequenceTones),
+    desiredOverallDuration: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .transform((value) => value || "12 business days"),
+    outputLanguage: z.enum(outputLanguages).optional().default(defaultOutputLanguage),
+    accountStatusOverride: z.boolean().optional().default(false),
+    prospectContext: z.string().trim().max(6000).optional(),
+    serpEvidence: z.string().trim().max(3000).optional(),
+    keywords: z
+      .array(
+        z.object({
+          term: z.string().trim().max(120),
+          status: z.enum(["solo", "contested"]),
+          competitor: z.string().trim().max(120).optional(),
+          note: z.string().trim().max(240).optional(),
+        }),
+      )
+      .max(5)
+      .optional()
+      .transform((keywords) =>
+        keywords
+          ?.map((keyword) => ({
+            ...keyword,
+            competitor: keyword.competitor || undefined,
+            note: keyword.note || undefined,
+          }))
+          .filter((keyword) => keyword.term),
+      ),
+    internalNotes: z.string().trim().max(1200).optional(),
+    screenshotAvailable: z.boolean().optional().default(false),
+    screenshotContext: z.string().trim().max(800).optional(),
+    brandKeyword: z.string().trim().max(120).optional(),
+    marketCountry: z.string().trim().max(120).optional(),
+    device: z.string().trim().max(80).optional(),
+    observationDate: z.string().trim().max(80).optional(),
+    screenshotShows: z.string().trim().max(500).optional(),
+    creatorId: z.string().trim().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.companyName && !value.rawProspectContext) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["companyName"],
+        message: "Company or prospect context is required.",
+      });
+    }
+  });
 
 const sequenceStepSchema = z.object({
   stepNumber: z.number().int().min(1).max(6),
@@ -147,8 +174,24 @@ export type BuildSequencePersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
   getSuppressionRecords(): Promise<DoNotContactRecord[]>;
   retrieveEligibleKnowledge(input: BuildSequenceInput): Promise<SequenceKnowledgeRecord[]>;
+  listProspects?(creatorId: string): Promise<ProspectRecord[]>;
+  createProspectMemory?(input: {
+    creatorId: string;
+    extraction: ProspectExtraction;
+    rawText: string;
+    sourceType?: ProspectSourceType;
+    identityResolution: IdentityResolution;
+  }): Promise<ProspectMemory>;
+  updateProspectMemory?(input: {
+    prospectId: string;
+    extraction: ProspectExtraction;
+    rawText: string;
+    sourceType?: ProspectSourceType;
+    identityResolution: IdentityResolution;
+  }): Promise<ProspectMemory>;
   persistDraft(input: {
     creatorId: string;
+    prospectId?: string;
     request: BuildSequenceInput;
     result: Omit<BuildSequenceResult, "draftId">;
   }): Promise<string>;
@@ -167,10 +210,170 @@ function asOptionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function asIsoString(value: unknown) {
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === "string" && value.length > 0 ? value : new Date().toISOString();
+}
+
 function asStringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function mapProspectRow(row: Row): ProspectRecord {
+  return {
+    id: asString(row.id),
+    firstName: asOptionalString(row.firstName),
+    lastName: asOptionalString(row.lastName),
+    fullName: asOptionalString(row.fullName),
+    email: asOptionalString(row.email),
+    jobTitle: asOptionalString(row.jobTitle),
+    companyName: asOptionalString(row.companyName),
+    companyDomain: asOptionalString(row.companyDomain),
+    linkedinUrl: asOptionalString(row.linkedinUrl),
+    status: asString(row.status) as ProspectRecord["status"],
+    createdAt: asIsoString(row.createdAt),
+    updatedAt: asIsoString(row.updatedAt),
+  };
+}
+
+function mapProspectSourceRow(row: Row): ProspectSource {
+  return {
+    id: asString(row.id),
+    prospectId: asString(row.prospectId),
+    type: asString(row.type) as ProspectSource["type"],
+    rawContent: asString(row.rawContent),
+    sourceLabel: asOptionalString(row.sourceLabel),
+    sourceUrl: asOptionalString(row.sourceUrl),
+    createdAt: asIsoString(row.createdAt),
+  };
+}
+
+function serpEvidenceText(extraction: ProspectExtraction) {
+  return extraction.serpEvidence
+    .map((item) =>
+      [
+        item.keyword,
+        item.status === "SOLO"
+          ? "solo"
+          : item.status === "CONTESTED"
+            ? `${item.competitors?.join(", ") || "competitor"} appeared`
+            : "unknown",
+        item.observation,
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    )
+    .join("\n");
+}
+
+function keywordEvidenceFromExtraction(extraction: ProspectExtraction) {
+  return extraction.serpEvidence
+    .filter((item) => item.status === "SOLO" || item.status === "CONTESTED")
+    .map((item) => ({
+      term: item.keyword,
+      status: item.status === "SOLO" ? "solo" as const : "contested" as const,
+      competitor: item.competitors?.[0],
+      note: item.observation,
+    }))
+    .slice(0, 5);
+}
+
+function normalizedInputFromExtraction(
+  input: BuildSequenceInput,
+  extraction?: ProspectExtraction,
+): BuildSequenceInput {
+  if (!extraction) {
+    return {
+      ...input,
+      companyName: input.companyName,
+      companyContext: input.companyContext || "Potential fit - validate spend/demand",
+      observedTrigger: input.observedTrigger || "Light discovery before pitching Signal",
+    };
+  }
+  const extractedContext = [
+    ...extraction.prospectFacts,
+    ...extraction.linkedinInsights,
+    ...extraction.notes,
+  ].join("\n");
+  const extractedCompanyContext = extraction.companyFacts.join("\n");
+  const extractedSerp = serpEvidenceText(extraction);
+  return {
+    ...input,
+    companyName: input.companyName || extraction.companyName || "",
+    companyWebsite: input.companyWebsite || extraction.companyDomain,
+    contactFirstName: input.contactFirstName || extraction.firstName,
+    contactRole:
+      input.contactRole && input.contactRole !== "Head of Performance Marketing"
+        ? input.contactRole
+        : extraction.jobTitle || input.contactRole,
+    companyContext:
+      input.companyContext || extractedCompanyContext || "Potential fit - validate spend/demand",
+    observedTrigger:
+      input.observedTrigger ||
+      extraction.prospectFacts[0] ||
+      "Light discovery before pitching Signal",
+    prospectContext: [input.prospectContext, extractedContext].filter(Boolean).join("\n"),
+    serpEvidence: input.serpEvidence || extractedSerp || undefined,
+    keywords: input.keywords?.length ? input.keywords : keywordEvidenceFromExtraction(extraction),
+  };
+}
+
+async function persistProspectMemory({
+  creatorId,
+  input,
+  persistence,
+}: {
+  creatorId: string;
+  input: BuildSequenceInput;
+  persistence: BuildSequencePersistence;
+}) {
+  const rawText = input.rawProspectContext?.trim();
+  if (!rawText) {
+    return { input: normalizedInputFromExtraction(input), memory: undefined as ProspectMemory | undefined };
+  }
+  const extraction = extractProspect({ rawText });
+  const candidates = persistence.listProspects ? await persistence.listProspects(creatorId) : [];
+  const explicitCandidate = input.prospectId
+    ? candidates.find((prospect) => prospect.id === input.prospectId)
+    : undefined;
+  const identityResolution = explicitCandidate
+    ? {
+        status: "EXACT_MATCH" as const,
+        prospectId: explicitCandidate.id,
+        matchedBy: ["prospectId"],
+        confidence: 1,
+      }
+    : resolveIdentity(extraction, candidates);
+  const canUpdate =
+    Boolean(identityResolution.prospectId) &&
+    identityResolution.status !== "AMBIGUOUS" &&
+    persistence.updateProspectMemory;
+  const memory = canUpdate
+    ? await persistence.updateProspectMemory!({
+        prospectId: identityResolution.prospectId!,
+        extraction,
+        rawText,
+        sourceType: "MANUAL_PASTE",
+        identityResolution,
+      })
+    : persistence.createProspectMemory
+      ? await persistence.createProspectMemory({
+          creatorId,
+          extraction,
+          rawText,
+          sourceType: "MANUAL_PASTE",
+          identityResolution:
+            identityResolution.status === "AMBIGUOUS"
+              ? identityResolution
+              : { status: "NEW_PROSPECT", confidence: 0.85 },
+        })
+      : undefined;
+  return {
+    input: normalizedInputFromExtraction(input, extraction),
+    memory,
+  };
 }
 
 function containsCompetitorClaim(text: string) {
@@ -1242,12 +1445,196 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       .sort((a, b) => knowledgeRank(a, input) - knowledgeRank(b, input));
   }
 
+  async listProspects(creatorId: string) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "firstName", "lastName", "fullName", email, "jobTitle", "companyName",
+        "companyDomain", "linkedinUrl", status, "createdAt"::text AS "createdAt",
+        "updatedAt"::text AS "updatedAt"
+      FROM "Prospect"
+      WHERE "userId" = ${creatorId}
+      ORDER BY "updatedAt" DESC
+      LIMIT 500
+    `;
+    return rows.map(mapProspectRow);
+  }
+
+  private async prospectSourceCount(prospectId: string) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT COUNT(*)::int AS count
+      FROM "ProspectSource"
+      WHERE "prospectId" = ${prospectId}
+    `;
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private async insertFacts(prospectId: string, source: ProspectSource, facts: ExtractedFact[]) {
+    for (const fact of facts) {
+      await this.client.$executeRaw`
+        INSERT INTO "ProspectFact" (id, "prospectId", "sourceId", value, category, "createdAt")
+        VALUES (
+          ${randomUUID()},
+          ${prospectId},
+          ${source.id},
+          ${fact.value},
+          ${fact.category}::"ExtractedFactCategory",
+          NOW()
+        )
+      `;
+    }
+  }
+
+  async createProspectMemory({
+    creatorId,
+    extraction,
+    rawText,
+    sourceType = "MANUAL_PASTE",
+    identityResolution,
+  }: {
+    creatorId: string;
+    extraction: ProspectExtraction;
+    rawText: string;
+    sourceType?: ProspectSourceType;
+    identityResolution: IdentityResolution;
+  }) {
+    const prospectId = randomUUID();
+    const sourceId = randomUUID();
+    await this.client.$executeRaw`
+      INSERT INTO "Prospect" (
+        id, "userId", "firstName", "lastName", "fullName", email, "jobTitle",
+        "companyName", "companyDomain", "linkedinUrl", status, "createdAt", "updatedAt"
+      )
+      VALUES (
+        ${prospectId},
+        ${creatorId},
+        ${extraction.firstName ?? null},
+        ${extraction.lastName ?? null},
+        ${extraction.fullName ?? null},
+        ${extraction.email ?? null},
+        ${extraction.jobTitle ?? null},
+        ${extraction.companyName ?? null},
+        ${normalizeDomain(extraction.companyDomain) ?? null},
+        ${normalizeLinkedInUrl(extraction.linkedinUrl) ?? null},
+        'CONTEXT_READY'::"ProspectStatus",
+        NOW(),
+        NOW()
+      )
+    `;
+    await this.client.$executeRaw`
+      INSERT INTO "ProspectSource" (id, "prospectId", type, "rawContent", "sourceLabel", "sourceUrl", "createdAt")
+      VALUES (${sourceId}, ${prospectId}, ${sourceType}::"ProspectSourceType", ${rawText}, 'Manual paste', ${extraction.linkedinUrl ?? null}, NOW())
+    `;
+    const prospectRows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "firstName", "lastName", "fullName", email, "jobTitle", "companyName",
+        "companyDomain", "linkedinUrl", status, "createdAt"::text AS "createdAt",
+        "updatedAt"::text AS "updatedAt"
+      FROM "Prospect"
+      WHERE id = ${prospectId}
+      LIMIT 1
+    `;
+    const sourceRows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "prospectId", type, "rawContent", "sourceLabel", "sourceUrl", "createdAt"::text AS "createdAt"
+      FROM "ProspectSource"
+      WHERE id = ${sourceId}
+      LIMIT 1
+    `;
+    const prospect = mapProspectRow(prospectRows[0]);
+    const source = mapProspectSourceRow(sourceRows[0]);
+    const facts = factsFromExtraction(source, extraction);
+    await this.insertFacts(prospect.id, source, facts);
+    return {
+      prospect,
+      source,
+      sourceCount: await this.prospectSourceCount(prospect.id),
+      extraction,
+      facts,
+      identityResolution,
+      conflicts: [],
+    };
+  }
+
+  async updateProspectMemory({
+    prospectId,
+    extraction,
+    rawText,
+    sourceType = "MANUAL_PASTE",
+    identityResolution,
+  }: {
+    prospectId: string;
+    extraction: ProspectExtraction;
+    rawText: string;
+    sourceType?: ProspectSourceType;
+    identityResolution: IdentityResolution;
+  }) {
+    const rows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "firstName", "lastName", "fullName", email, "jobTitle", "companyName",
+        "companyDomain", "linkedinUrl", status, "createdAt"::text AS "createdAt",
+        "updatedAt"::text AS "updatedAt"
+      FROM "Prospect"
+      WHERE id = ${prospectId}
+      LIMIT 1
+    `;
+    const existing = mapProspectRow(rows[0]);
+    const merged = mergeProspectRecord(existing, {
+      ...extraction,
+      companyDomain: normalizeDomain(extraction.companyDomain),
+      linkedinUrl: normalizeLinkedInUrl(extraction.linkedinUrl),
+    });
+    await this.client.$executeRaw`
+      UPDATE "Prospect"
+      SET "firstName" = ${merged.prospect.firstName ?? null},
+        "lastName" = ${merged.prospect.lastName ?? null},
+        "fullName" = ${merged.prospect.fullName ?? null},
+        email = ${merged.prospect.email ?? null},
+        "jobTitle" = ${merged.prospect.jobTitle ?? null},
+        "companyName" = ${merged.prospect.companyName ?? null},
+        "companyDomain" = ${merged.prospect.companyDomain ?? null},
+        "linkedinUrl" = ${merged.prospect.linkedinUrl ?? null},
+        status = 'CONTEXT_READY'::"ProspectStatus",
+        "updatedAt" = NOW()
+      WHERE id = ${prospectId}
+    `;
+    const sourceId = randomUUID();
+    await this.client.$executeRaw`
+      INSERT INTO "ProspectSource" (id, "prospectId", type, "rawContent", "sourceLabel", "sourceUrl", "createdAt")
+      VALUES (${sourceId}, ${prospectId}, ${sourceType}::"ProspectSourceType", ${rawText}, 'Manual paste', ${extraction.linkedinUrl ?? null}, NOW())
+    `;
+    const prospectRows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "firstName", "lastName", "fullName", email, "jobTitle", "companyName",
+        "companyDomain", "linkedinUrl", status, "createdAt"::text AS "createdAt",
+        "updatedAt"::text AS "updatedAt"
+      FROM "Prospect"
+      WHERE id = ${prospectId}
+      LIMIT 1
+    `;
+    const sourceRows = await this.client.$queryRaw<Row[]>`
+      SELECT id, "prospectId", type, "rawContent", "sourceLabel", "sourceUrl", "createdAt"::text AS "createdAt"
+      FROM "ProspectSource"
+      WHERE id = ${sourceId}
+      LIMIT 1
+    `;
+    const prospect = mapProspectRow(prospectRows[0]);
+    const source = mapProspectSourceRow(sourceRows[0]);
+    const facts = factsFromExtraction(source, extraction);
+    await this.insertFacts(prospect.id, source, facts);
+    return {
+      prospect,
+      source,
+      sourceCount: await this.prospectSourceCount(prospect.id),
+      extraction,
+      facts,
+      identityResolution,
+      conflicts: merged.conflicts,
+    };
+  }
+
   async persistDraft({
     creatorId,
+    prospectId,
     request,
     result,
   }: {
     creatorId: string;
+    prospectId?: string;
     request: BuildSequenceInput;
     result: Omit<BuildSequenceResult, "draftId">;
   }) {
@@ -1256,6 +1643,7 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       INSERT INTO "GeneratedDraft" (
         id,
         "userId",
+        "prospectId",
         workflow,
         "promptSnapshot",
         "inputSnapshot",
@@ -1272,6 +1660,7 @@ export class PrismaBuildSequencePersistence implements BuildSequencePersistence 
       VALUES (
         ${id},
         ${creatorId},
+        ${prospectId ?? null},
         'BUILD_SEQUENCE',
         ${JSON.stringify({
           workflow: "BUILD_SEQUENCE",
@@ -1322,12 +1711,21 @@ export async function generateBuildSequence(
     return err("VALIDATION_ERROR", message);
   }
 
-  const input = parsed.data;
-  const creatorId = input.creatorId ?? "seed-sales-user";
+  const parsedInput = parsed.data;
+  const creatorId = parsedInput.creatorId ?? "seed-sales-user";
   const persistence = dependencies.persistence ?? new PrismaBuildSequencePersistence();
   const actor = await persistence.getActor(creatorId);
   if (!actor || !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(actor.role)) {
     return err("FORBIDDEN", "Only authorized sales or knowledge users can build sequences.");
+  }
+  const memoryResult = await persistProspectMemory({
+    creatorId,
+    input: parsedInput,
+    persistence,
+  });
+  const input = memoryResult.input;
+  if (!input.companyName.trim()) {
+    return err("VALIDATION_ERROR", "Build Sequence needs: Company or prospect context with a company.");
   }
 
   const accountStatus = await assertAccountCanGenerate(
@@ -1431,12 +1829,15 @@ export async function generateBuildSequence(
     ...generated,
     sequenceLength: input.sequenceLength,
     overallDuration: input.desiredOverallDuration,
+    prospectId: memoryResult.memory?.prospect.id,
+    prospectMemory: memoryResult.memory,
     recordsUsed: records,
     sourceReferences: sources,
     provider: providerMetadata,
   };
   const draftId = await persistence.persistDraft({
     creatorId,
+    prospectId: memoryResult.memory?.prospect.id,
     request: input,
     result: resultWithoutId,
   });

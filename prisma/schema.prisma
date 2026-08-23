@@ -97,6 +97,32 @@ enum GeneratedDraftStatus {
   ARCHIVED
 }
 
+enum ProspectStatus {
+  NEW
+  CONTEXT_READY
+  INTELLIGENCE_READY
+  SEQUENCE_DRAFT
+  SEQUENCE_APPROVED
+}
+
+enum ProspectSourceType {
+  MANUAL_PASTE
+  LINKEDIN_PROFILE
+  LINKEDIN_POST
+  SERP_EVIDENCE
+  MANUAL_NOTE
+  FILE_IMPORT
+  ACCOUNT_RESEARCH
+}
+
+enum ExtractedFactCategory {
+  PROSPECT
+  COMPANY
+  LINKEDIN
+  SERP
+  NOTE
+}
+
 model User {
   id                  String                @id @default(cuid())
   authUserId          String?               @unique
@@ -120,6 +146,7 @@ model User {
   websiteResearchRuns WebsiteResearchRun[]
   companyEnrichmentRuns CompanyEnrichmentRun[]
   providerSyncAudits    ProviderSyncAudit[]
+  prospects              Prospect[]
 }
 
 model Product {
@@ -454,6 +481,7 @@ model InteractionOutcome {
 model GeneratedDraft {
   id                    String               @id @default(cuid())
   userId                String
+  prospectId            String?
   workflow              String
   promptSnapshot        String?
   inputSnapshot         Json?
@@ -469,11 +497,71 @@ model GeneratedDraft {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   user                  User                 @relation(fields: [userId], references: [id])
+  prospect              Prospect?            @relation(fields: [prospectId], references: [id])
   versions              DraftVersion[]
 
   @@index([userId])
+  @@index([prospectId])
   @@index([workflow])
   @@index([draftStatus])
+}
+
+model Prospect {
+  id            String           @id @default(cuid())
+  userId        String
+  firstName     String?
+  lastName      String?
+  fullName      String?
+  email         String?
+  jobTitle      String?
+  companyName   String?
+  companyDomain String?
+  linkedinUrl   String?
+  status        ProspectStatus   @default(NEW)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  user          User             @relation(fields: [userId], references: [id])
+  sources       ProspectSource[]
+  facts         ProspectFact[]  @relation("ProspectFacts")
+  generatedDrafts GeneratedDraft[]
+
+  @@index([userId])
+  @@index([userId, email])
+  @@index([userId, linkedinUrl])
+  @@index([userId, fullName, companyDomain])
+  @@index([userId, fullName, companyName])
+}
+
+model ProspectSource {
+  id          String             @id @default(cuid())
+  prospectId  String
+  type        ProspectSourceType @default(MANUAL_PASTE)
+  rawContent  String
+  sourceLabel String?
+  sourceUrl   String?
+  createdAt   DateTime           @default(now())
+  prospect    Prospect           @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  facts       ProspectFact[]    @relation("ProspectSourceFacts")
+
+  @@unique([id, prospectId])
+  @@index([prospectId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model ProspectFact {
+  id         String                @id @default(cuid())
+  prospectId String
+  sourceId   String
+  value      String
+  category   ExtractedFactCategory
+  createdAt  DateTime              @default(now())
+  prospect   Prospect              @relation("ProspectFacts", fields: [prospectId], references: [id], onDelete: Cascade)
+  source     ProspectSource        @relation("ProspectSourceFacts", fields: [sourceId, prospectId], references: [id, prospectId], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([sourceId])
+  @@index([category])
 }
 
 model DraftVersion {

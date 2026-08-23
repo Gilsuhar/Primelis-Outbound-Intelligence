@@ -200,7 +200,8 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
-    expect(result.steps[1].messageBody).toContain("Google Ads reports performance");
+    expect(result.steps[1].messageBody).toContain("Google and Bing SERPs in real time");
+    expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
   });
@@ -494,7 +495,8 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
-    expect(result.steps[1].messageBody).toContain("Google Ads reports performance");
+    expect(result.steps[1].messageBody).toContain("Google and Bing SERPs in real time");
+    expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
     expect(result.steps[3].cta).toBe("Open to a quick overview?");

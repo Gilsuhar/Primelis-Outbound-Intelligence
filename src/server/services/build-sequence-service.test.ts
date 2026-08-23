@@ -3,9 +3,17 @@ import { describe, expect, it } from "vitest";
 import type {
   BuildSequenceInput,
   BuildSequenceResult,
+  ProspectMemory,
+  ProspectRecord,
+  ProspectSource,
   SequenceKnowledgeRecord,
 } from "@/features/build-sequence/types";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
+import {
+  factsFromExtraction,
+  mergeProspectRecord,
+  resolveIdentity,
+} from "@/features/build-sequence/prospect-memory";
 
 import { DeterministicBuildSequenceProvider } from "./build-sequence-provider";
 import { generateBuildSequence, type BuildSequencePersistence } from "./build-sequence-service";
@@ -76,6 +84,7 @@ function persistence(
 ) {
   const persisted: Array<{
     creatorId: string;
+    prospectId?: string;
     request: BuildSequenceInput;
     result: Omit<BuildSequenceResult, "draftId">;
   }> = [];
@@ -90,6 +99,114 @@ function persistence(
     },
   };
   return { adapter, persisted };
+}
+
+function prospectPersistence({
+  records = [knowledge({ id: "product-truth" })],
+  initialProspects = [],
+}: {
+  records?: SequenceKnowledgeRecord[];
+  initialProspects?: ProspectRecord[];
+} = {}) {
+  const base = persistence(records);
+  const prospects = [...initialProspects];
+  const sources: ProspectSource[] = [];
+  const facts: ProspectMemory["facts"] = [];
+  let nextId = prospects.length + 1;
+  const sourceCounts = new Map<string, number>();
+  const adapter: BuildSequencePersistence = {
+    ...base.adapter,
+    listProspects: async () => prospects,
+    createProspectMemory: async ({ creatorId, extraction, rawText, identityResolution }) => {
+      const prospect: ProspectRecord = {
+        id: `prospect-${nextId++}`,
+        firstName: extraction.firstName,
+        lastName: extraction.lastName,
+        fullName: extraction.fullName,
+        email: extraction.email,
+        jobTitle: extraction.jobTitle,
+        companyName: extraction.companyName,
+        companyDomain: extraction.companyDomain,
+        linkedinUrl: extraction.linkedinUrl,
+        status: "CONTEXT_READY",
+        createdAt: "2026-08-23T00:00:00.000Z",
+        updatedAt: "2026-08-23T00:00:00.000Z",
+      };
+      void creatorId;
+      prospects.push(prospect);
+      const source: ProspectSource = {
+        id: `source-${sources.length + 1}`,
+        prospectId: prospect.id,
+        type: "MANUAL_PASTE",
+        rawContent: rawText,
+        sourceLabel: "Manual paste",
+        createdAt: "2026-08-23T00:00:00.000Z",
+      };
+      sources.push(source);
+      sourceCounts.set(prospect.id, (sourceCounts.get(prospect.id) ?? 0) + 1);
+      const extractedFacts = factsFromExtraction(source, extraction);
+      facts.push(...extractedFacts);
+      return {
+        prospect,
+        source,
+        sourceCount: sourceCounts.get(prospect.id) ?? 1,
+        extraction,
+        facts: extractedFacts,
+        identityResolution,
+        conflicts: [],
+      };
+    },
+    updateProspectMemory: async ({ prospectId, extraction, rawText, identityResolution }) => {
+      const existingIndex = prospects.findIndex((prospect) => prospect.id === prospectId);
+      const existing = prospects[existingIndex];
+      const merged = mergeProspectRecord(existing, extraction);
+      prospects[existingIndex] = merged.prospect;
+      const source: ProspectSource = {
+        id: `source-${sources.length + 1}`,
+        prospectId,
+        type: "MANUAL_PASTE",
+        rawContent: rawText,
+        sourceLabel: "Manual paste",
+        createdAt: "2026-08-23T00:00:00.000Z",
+      };
+      sources.push(source);
+      sourceCounts.set(prospectId, (sourceCounts.get(prospectId) ?? 0) + 1);
+      const extractedFacts = factsFromExtraction(source, extraction);
+      facts.push(...extractedFacts);
+      return {
+        prospect: prospects[existingIndex],
+        source,
+        sourceCount: sourceCounts.get(prospectId) ?? 1,
+        extraction,
+        facts: extractedFacts,
+        identityResolution,
+        conflicts: merged.conflicts,
+      };
+    },
+    persistDraft: async (draft) => {
+      base.persisted.push(draft);
+      return "sequence-draft-id";
+    },
+  };
+  return { adapter, persisted: base.persisted, prospects, sources, facts };
+}
+
+function existingProspect(overrides: Partial<ProspectRecord>): ProspectRecord {
+  return {
+    id: "existing-prospect",
+    firstName: "Chris",
+    lastName: "Example",
+    fullName: "Chris Example",
+    email: undefined,
+    jobTitle: "Head of Growth",
+    companyName: "Remofirst",
+    companyDomain: "remofirst.com",
+    linkedinUrl: undefined,
+    status: "CONTEXT_READY",
+    createdAt: "2026-08-22T00:00:00.000Z",
+    updatedAt: "2026-08-22T00:00:00.000Z",
+    ...overrides,
+  };
 }
 
 describe("Build Sequence service", () => {
@@ -1365,6 +1482,53 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("does not leak structured intake labels into Chris Remofirst copy", async () => {
+    const { adapter } = persistence([
+      knowledge({ id: "product-truth" }),
+      knowledge({
+        id: "zoominfo-proof",
+        title: "ZoomInfo reduced branded CPC",
+        type: "CASE_STUDY",
+        approvedText:
+          "ZoomInfo used Signal to reduce branded CPC by 40% while increasing MQL volume by 20%.",
+        sourceIds: ["source-zoominfo"],
+        sourceTitles: ["ZoomInfo approved proof"],
+      }),
+    ]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Remofirst",
+        companyWebsite: "remofirst.com",
+        contactFirstName: "Chris",
+        contactRole: "Head of Paid Search",
+        prospectContext:
+          "Prospect: Chris.\nContext: Chris has managed over $50M+ in paid media and is actively exploring AI and automation for paid-search decisions.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const bodies = result.data.steps.map((step) => step.messageBody);
+      const rendered = bodies.join("\n\n");
+      expect(rendered).not.toMatch(/\b(?:Prospect|Company|Role|Context|Notes|SERP|Keywords|Important):/);
+      expect(rendered).not.toContain("I saw that Prospect: Chris.");
+      expect(bodies[0]).toContain("you've managed over $50M in paid media");
+      expect(rendered).not.toMatch(/\bChris has\b|\bChris is\b/);
+      expect(rendered).not.toContain("I noticed this about Remofirst");
+      expect(rendered).not.toContain("over $50M+");
+      expect(rendered).toMatch(/AI and automation/i);
+      expect(bodies[0]).toMatch(/Google Ads reports performance/i);
+      expect(bodies[1]).toMatch(/Google and Bing/i);
+      expect(bodies[1]).not.toMatch(/Google Ads reports performance/i);
+      expect(bodies[2]).toMatch(/Without account-specific auction evidence/i);
+      expect(rendered).not.toMatch(/organic is already enough|organic would have captured|organic cannot do/i);
+      expect(rendered).toContain("ZoomInfo used Signal to reduce branded CPC by 40%");
+    }
+  });
+
   it("preserves safe supplied keyword phrases that contain commercial words", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
 
@@ -1417,6 +1581,212 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("creates a prospect, source, extracted facts, and prospect-linked sequence from one paste", async () => {
+    const { adapter, prospects, sources, persisted } = prospectPersistence();
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Chris Example\nHead of Growth at Remofirst\nchris@example.com\nChris has managed over $50M in ad spend and is exploring AI and automation for paid-search decisions.\nCompany: Remofirst\nWebsite: remofirst.com",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(prospects).toHaveLength(1);
+      expect(sources).toHaveLength(1);
+      expect(result.data.prospectId).toBe(prospects[0].id);
+      expect(result.data.prospectMemory?.sourceCount).toBe(1);
+      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).toMatch(/\$50M|AI and automation/i);
+      expect(persisted[0].prospectId).toBe(prospects[0].id);
+    }
+  });
+
+  it("reuses an existing prospect by exact email and appends a new source", async () => {
+    const { adapter, prospects, sources } = prospectPersistence({
+      initialProspects: [existingProspect({ email: "chris@example.com", fullName: "Chris Example" })],
+    });
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Chris Example\nEmail: chris@example.com\nCompany: Remofirst\nChris is exploring AI and automation in paid search.",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(prospects).toHaveLength(1);
+    expect(sources).toHaveLength(1);
+    if (result.ok) {
+      expect(result.data.prospectMemory?.identityResolution.status).toBe("EXACT_MATCH");
+      expect(result.data.prospectMemory?.identityResolution.matchedBy).toContain("email");
+      expect(result.data.prospectMemory?.sourceCount).toBe(1);
+    }
+  });
+
+  it("reuses an existing prospect by normalized LinkedIn URL", async () => {
+    const { adapter, prospects } = prospectPersistence({
+      initialProspects: [
+        existingProspect({
+          linkedinUrl: "linkedin.com/in/chris-example",
+          fullName: "Chris Example",
+          email: undefined,
+        }),
+      ],
+    });
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Chris Example\nhttps://www.linkedin.com/in/chris-example/\nCompany: Remofirst\nHead of Growth",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(prospects).toHaveLength(1);
+    if (result.ok) {
+      expect(result.data.prospectMemory?.identityResolution.matchedBy).toContain("linkedinUrl");
+      expect(result.data.prospectId).toBe("existing-prospect");
+    }
+  });
+
+  it("matches by exact full name plus company and does not merge ambiguous name-only matches", async () => {
+    const exact = resolveIdentity(
+      {
+        firstName: "Chris",
+        lastName: "Example",
+        fullName: "Chris Example",
+        companyName: "Remofirst",
+        prospectFacts: [],
+        companyFacts: [],
+        linkedinInsights: [],
+        notes: [],
+        serpEvidence: [],
+        confidence: { identity: 0.8, company: 0.8, extraction: 0.8 },
+      },
+      [existingProspect({ fullName: "Chris Example", companyName: "Remofirst" })],
+    );
+    const ambiguous = resolveIdentity(
+      {
+        firstName: "Chris",
+        lastName: "Example",
+        fullName: "Chris Example",
+        prospectFacts: [],
+        companyFacts: [],
+        linkedinInsights: [],
+        notes: [],
+        serpEvidence: [],
+        confidence: { identity: 0.8, company: 0.2, extraction: 0.8 },
+      },
+      [existingProspect({ fullName: "Chris Example", companyName: "Remofirst" })],
+    );
+
+    expect(exact.status).toBe("HIGH_CONFIDENCE_MATCH");
+    expect(exact.matchedBy).toEqual(["fullName", "companyName"]);
+    expect(ambiguous.status).toBe("AMBIGUOUS");
+  });
+
+  it("appends a new source without destroying previous sources", async () => {
+    const { adapter, prospects, sources } = prospectPersistence({
+      initialProspects: [existingProspect({ email: "chris@example.com", fullName: "Chris Example" })],
+    });
+
+    await generateBuildSequence(
+      { ...baseInput, companyName: "", rawProspectContext: "Chris Example\nEmail: chris@example.com\nCompany: Remofirst" },
+      { persistence: adapter },
+    );
+    await generateBuildSequence(
+      { ...baseInput, companyName: "", rawProspectContext: "Chris Example\nEmail: chris@example.com\nNew LinkedIn post about AI automation.\nCompany: Remofirst" },
+      { persistence: adapter },
+    );
+
+    expect(prospects).toHaveLength(1);
+    expect(sources).toHaveLength(2);
+  });
+
+  it("preserves conflicting existing values instead of silently overwriting them", async () => {
+    const { adapter, prospects } = prospectPersistence({
+      initialProspects: [
+        existingProspect({
+          email: "chris@example.com",
+          jobTitle: "Head of Growth",
+        }),
+      ],
+    });
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Chris Example\nEmail: chris@example.com\nTitle: VP Marketing\nCompany: Remofirst",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(prospects[0].jobTitle).toBe("Head of Growth");
+    if (result.ok) {
+      expect(result.data.prospectMemory?.conflicts.some((conflict) => conflict.field === "jobTitle")).toBe(true);
+    }
+  });
+
+  it("extracts mixed SERP evidence while preserving exact Cursor keywords", async () => {
+    const { adapter } = prospectPersistence();
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Taylor Growth\nHead of Growth\nCompany: Cursor\nWebsite: cursor.com\nCursor pricing — solo\nCursor AI editor — Notion appeared",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const extraction = result.data.prospectMemory?.extraction;
+      expect(extraction?.serpEvidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyword: "Cursor pricing", status: "SOLO" }),
+          expect.objectContaining({ keyword: "Cursor AI editor", status: "CONTESTED" }),
+        ]),
+      );
+      expect(JSON.stringify(result.data.steps)).toContain("Cursor pricing");
+      expect(JSON.stringify(result.data.steps)).not.toContain("Cursor commercial details");
+    }
+  });
+
+  it("safely saves weak context without inventing achievements", async () => {
+    const { adapter } = prospectPersistence();
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext: "Mia Chen\nPPC Team Lead\nCompany: Americaneagle\nWebsite: americaneagle.com",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.prospectId).toBeTruthy();
+      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).not.toMatch(/\$50M|managed over|AI and automation/i);
+      expect(JSON.stringify(result.data.steps)).not.toMatch(/\$50M|managed over/i);
+    }
+  });
+
   it("returns structured errors for invalid input and unauthorized users", async () => {
     const { adapter } = persistence([]);
     const invalid = await generateBuildSequence({ companyName: "" }, { persistence: adapter });
@@ -1427,7 +1797,7 @@ describe("Build Sequence service", () => {
     expect(invalid).toEqual({
       ok: false,
       code: "VALIDATION_ERROR",
-      message: "Build Sequence needs: Company, Channel, Steps, Tone.",
+      message: "Build Sequence needs: Channel, Steps, Tone.",
     });
     expect(forbidden).toEqual({
       ok: false,

@@ -436,6 +436,44 @@ function humanizeFact(fact: string) {
   return fact;
 }
 
+function stripStructuredLeadLabel(value: string) {
+  return value
+    .replace(
+      /^\s*(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/i,
+      "",
+    )
+    .trim();
+}
+
+function sanitizeProspectFacingFact(value: string) {
+  return stripStructuredLeadLabel(value)
+    .replace(
+      /\b(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/gi,
+      "",
+    )
+    .replace(/\bover\s+(\$\d+(?:\.\d+)?[KMB])\+/gi, "over $1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function directProspectFact(input: BuildSequenceInput, fact: string) {
+  const firstName = input.contactFirstName?.trim();
+  const sanitized = sanitizeProspectFacingFact(fact).replace(/\.$/, "");
+  if (!firstName || !sanitized) {
+    return sanitized;
+  }
+  const namePrefix = new RegExp(`^${escapeRegExp(firstName)}\\s+`, "i");
+  if (!namePrefix.test(sanitized)) {
+    return sanitized;
+  }
+  return sanitized
+    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+has\\b`, "i"), "you've")
+    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+is\\b`, "i"), "you're")
+    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+recently\\s+joined\\b`, "i"), "you recently joined")
+    .replace(namePrefix, "you ")
+    .replace(/\band is\b/gi, "and are");
+}
+
 function customerFacingAngle(angleLabel: string) {
   return angleLabel
     .replace(/methodology comparison/i, "paid and organic search")
@@ -480,7 +518,7 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
     return "The practical takeaway is not the logo. It is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
-    return "For paid search, the practical decision is when to stay covered, when to lower bids, and when organic is already enough.";
+    return "For paid search, the practical decision is when to stay covered, and when bids can potentially be reduced while maintaining coverage.";
   }
   if (/cmo|chief|vp|head|director/.test(role)) {
     return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
@@ -489,7 +527,7 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
     return "For growth, the sharper question is whether paid brand improves acquisition efficiency or just re-buys existing demand.";
   }
   if (/ecommerce|e-commerce|digital/.test(role)) {
-    return "For digital commerce, the useful angle is protecting high-intent brand demand without paying for clicks the site would get anyway.";
+    return "For digital commerce, the useful angle is protecting high-intent brand demand when competitive pressure is real, without keeping the same pressure in quieter auctions.";
   }
   return "The practical question is where paid brand is still changing the outcome.";
 }
@@ -542,9 +580,13 @@ function buildStepFactSheet({
 }
 
 function firstPersonalFact(intelligence: ProspectIntelligence) {
-  return intelligence.relevantFacts.find(
-    (fact) => !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()),
-  );
+  return intelligence.relevantFacts
+    .map((fact) => sanitizeProspectFacingFact(fact))
+    .find((fact) =>
+      fact &&
+      !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()) &&
+      !(/^[A-Z][A-Za-z' -]{1,50}\.?$/.test(fact) && !/[0-9$]|\b(has|managed|exploring|built|led|owns|runs|responsible)\b/i.test(fact)),
+    );
 }
 
 function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
@@ -568,7 +610,7 @@ function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelli
     return `Congrats on your promotion to ${intelligence.jobTitle}.`;
   }
   if (fact && intelligence.confidence.prospect !== "LOW") {
-    return `I noticed this about ${company}: ${fact.replace(/\.$/, "")}.`;
+    return `I saw that ${directProspectFact(input, fact)}.`;
   }
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
     return `For your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
@@ -581,14 +623,9 @@ function prospectLedInsight(input: BuildSequenceInput, strategy: MessageStrategy
     return undefined;
   }
   const firstName = input.contactFirstName?.trim();
-  const insight = strategy.prospectInsight.replace(/\.$/, "");
-  if (firstName) {
-    const personalized = insight
-      .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+has\\b`, "i"), "you have")
-      .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+is\\b`, "i"), "you are")
-      .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+`, "i"), "")
-      .replace(/\band is\b/gi, "and are");
-    return `I saw that ${personalized}.`;
+  const insight = directProspectFact(input, strategy.prospectInsight);
+  if (!insight || (firstName && insight.toLowerCase() === firstName.toLowerCase())) {
+    return undefined;
   }
   return `I saw that ${insight}.`;
 }
@@ -614,8 +651,8 @@ function strategyMethodLine(
   if (intelligence.serpScenario === "UNKNOWN") {
     return [
       strategy.primaryAngle,
-      strategy.productGap,
       strategy.relevantCapability,
+      "That changes the workflow from reading lagging campaign reports to deciding coverage from live Google and Bing search-page conditions.",
     ].join("\n\n");
   }
   return [
@@ -670,7 +707,7 @@ function tailorBody(
     const middle =
       input.desiredTone === "EXECUTIVE"
         ? "If paid-brand efficiency becomes relevant later, the useful starting point is budget visibility: where paid coverage protects demand, and where it is only adding cost."
-        : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where organic would have captured the click anyway.";
+        : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where paid coverage may be broader than needed.";
     return stripCommercialTerms(
       [hello, "I will close the loop here.", middle, "If this is not relevant right now, no problem."]
         .filter(Boolean)
@@ -836,7 +873,7 @@ function bodyForPurpose({
       greeting(input, intelligence),
       "",
       `The only assumption I would make about ${company} is a light one: branded-search process may be worth checking.`,
-      "I would not pitch that as proof. I would use it as a reason to check whether paid brand is still doing work organic cannot do.",
+      "I would not pitch that as proof. I would use it as a reason to check whether paid coverage still matches the actual auction pressure.",
     ],
     SOCIAL_PROOF: [
       greeting(input, intelligence),

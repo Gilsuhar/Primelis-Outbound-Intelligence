@@ -413,7 +413,10 @@ function formString(formData: FormData, name: string) {
 }
 
 function missingQuickBriefFields(formData: FormData) {
-  return [["companyName", "Company"]]
+  if (formString(formData, "rawProspectContext") || formString(formData, "companyName")) {
+    return [];
+  }
+  return [["rawProspectContext", "Prospect Context"]]
     .filter(([name]) => !formString(formData, name))
     .map(([, label]) => label);
 }
@@ -714,7 +717,8 @@ export function BuildSequenceClient() {
           formString(formData, "desiredOverallDuration") || "12 business days",
         outputLanguage,
         accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
-        prospectContext: formString(formData, "prospectContext") || undefined,
+        rawProspectContext: formString(formData, "rawProspectContext") || undefined,
+        prospectContext: formString(formData, "rawProspectContext") || undefined,
         serpEvidence: formString(formData, "serpEvidence") || undefined,
         keywords: cleanedKeywordEvidence(),
         internalNotes: formString(formData, "internalNotes") || undefined,
@@ -804,16 +808,21 @@ export function BuildSequenceClient() {
             Prospect Context
             <textarea
               className="min-h-44 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
-              name="prospectContext"
+              name="rawProspectContext"
               onChange={(event) => setProspectContext(event.target.value)}
-              placeholder="Paste anything you know about the prospect — LinkedIn profile, About section, current role, experience, responsibilities, posts, company context, notes, or research."
+              placeholder="Paste anything you know about the prospect — LinkedIn profile, role, company context, posts, SERP observations, keywords or your own notes."
               value={prospectContext}
             />
             <span className="block text-xs leading-5 text-stone-500">
-              Paste anything you know about the prospect — LinkedIn profile, About section, current role, experience, responsibilities, posts, company context, notes, or research.
+              Paste context first. The system will extract the prospect, company, role, keywords and useful facts before generating the sequence.
             </span>
           </label>
 
+          <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              Advanced details
+            </summary>
+            <div className="mt-3 space-y-3">
           <label className="block space-y-1 text-sm font-medium text-stone-700">
             SERP Evidence
             <textarea
@@ -900,6 +909,8 @@ export function BuildSequenceClient() {
               ? "Visual example"
               : "Approved case study when available, otherwise diagnostic insight"}
           </div>
+            </div>
+          </details>
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
@@ -1096,7 +1107,7 @@ export function BuildSequenceClient() {
             type="submit"
           >
             <Send aria-hidden="true" className="h-4 w-4" />
-            {isPending ? t("workflow.building") : t("workflow.buildSequence")}
+            {isPending ? t("workflow.building") : "Generate intelligence & sequence"}
           </button>
         </form>
 
@@ -1119,6 +1130,45 @@ export function BuildSequenceClient() {
                 >
                   {providerLabel(result)}
                 </p>
+                {result.prospectMemory ? (
+                  <div className="rounded-lg border border-line bg-[#f8f5ef] p-3 text-sm leading-6 text-stone-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                      Intake preview
+                    </p>
+                    <p className="mt-1 font-semibold text-ink">
+                      {result.prospectMemory.prospect.fullName ||
+                        result.prospectMemory.prospect.firstName ||
+                        "Prospect"}{" "}
+                      {result.prospectMemory.prospect.companyName
+                        ? `— ${result.prospectMemory.prospect.companyName}`
+                        : ""}
+                    </p>
+                    {result.prospectMemory.prospect.jobTitle ? (
+                      <p>{result.prospectMemory.prospect.jobTitle}</p>
+                    ) : null}
+                    {result.prospectMemory.extraction.prospectFacts.length > 0 ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {result.prospectMemory.extraction.prospectFacts.slice(0, 3).map((fact) => (
+                          <li key={fact}>{fact}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="mt-2 text-stone-500">
+                      SERP:{" "}
+                      {result.prospectIntelligence.serpScenario.toLowerCase().replaceAll("_", " ")}
+                      {" · "}
+                      {result.prospectMemory.sourceCount} context source
+                      {result.prospectMemory.sourceCount === 1 ? "" : "s"} saved
+                    </p>
+                    {result.prospectMemory.conflicts.length > 0 ? (
+                      <p className="mt-1 text-[#8a5a2b]">
+                        {result.prospectMemory.conflicts.length} conflicting field
+                        {result.prospectMemory.conflicts.length === 1 ? "" : "s"} preserved for
+                        later review.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <p className="text-sm leading-6 text-stone-700">{result.overallStrategy}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md bg-[#f8f5ef] p-3">

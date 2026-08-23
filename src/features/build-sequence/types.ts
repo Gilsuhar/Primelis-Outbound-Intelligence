@@ -38,7 +38,110 @@ export type SequenceKeywordEvidence = {
   note?: string;
 };
 
+export type ProspectStatus =
+  | "NEW"
+  | "CONTEXT_READY"
+  | "INTELLIGENCE_READY"
+  | "SEQUENCE_DRAFT"
+  | "SEQUENCE_APPROVED";
+
+export type ProspectSourceType =
+  | "MANUAL_PASTE"
+  | "LINKEDIN_PROFILE"
+  | "LINKEDIN_POST"
+  | "SERP_EVIDENCE"
+  | "MANUAL_NOTE"
+  | "FILE_IMPORT"
+  | "ACCOUNT_RESEARCH";
+
+export type ExtractedFactCategory = "PROSPECT" | "COMPANY" | "LINKEDIN" | "SERP" | "NOTE";
+
+export type ProspectRecord = {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  jobTitle?: string;
+  companyName?: string;
+  companyDomain?: string;
+  linkedinUrl?: string;
+  status: ProspectStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProspectSource = {
+  id: string;
+  prospectId: string;
+  type: ProspectSourceType;
+  rawContent: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  createdAt: string;
+};
+
+export type ExtractedFact = {
+  value: string;
+  sourceId: string;
+  category: ExtractedFactCategory;
+};
+
+export type ProspectExtraction = {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  jobTitle?: string;
+  companyName?: string;
+  companyDomain?: string;
+  linkedinUrl?: string;
+  prospectFacts: string[];
+  companyFacts: string[];
+  linkedinInsights: string[];
+  notes: string[];
+  serpEvidence: Array<{
+    keyword: string;
+    status?: "SOLO" | "CONTESTED" | "UNKNOWN";
+    competitors?: string[];
+    observation?: string;
+  }>;
+  confidence: {
+    identity: number;
+    company: number;
+    extraction: number;
+  };
+};
+
+export type IdentityResolution = {
+  status: "EXACT_MATCH" | "HIGH_CONFIDENCE_MATCH" | "NEW_PROSPECT" | "AMBIGUOUS";
+  prospectId?: string;
+  matchedBy?: string[];
+  confidence: number;
+};
+
+export type ProspectConflict = {
+  field: keyof Pick<
+    ProspectRecord,
+    "firstName" | "lastName" | "fullName" | "email" | "jobTitle" | "companyName" | "companyDomain" | "linkedinUrl"
+  >;
+  existingValue?: string;
+  incomingValue?: string;
+};
+
+export type ProspectMemory = {
+  prospect: ProspectRecord;
+  source: ProspectSource;
+  sourceCount: number;
+  extraction: ProspectExtraction;
+  facts: ExtractedFact[];
+  identityResolution: IdentityResolution;
+  conflicts: ProspectConflict[];
+};
+
 export type BuildSequenceInput = {
+  rawProspectContext?: string;
+  prospectId?: string;
   companyName: string;
   companyWebsite?: string;
   contactFirstName?: string;
@@ -219,6 +322,8 @@ export type ProspectIntelligence = {
 
 export type BuildSequenceResult = SequenceGeneration & {
   draftId: string;
+  prospectId?: string;
+  prospectMemory?: ProspectMemory;
   sequenceLength: SequenceLength;
   overallDuration: string;
   recordsUsed: SequenceKnowledgeRecord[];
