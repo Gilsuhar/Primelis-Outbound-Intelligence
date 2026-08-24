@@ -49,8 +49,15 @@ function productGapFor(intelligence: ProspectIntelligence) {
 }
 
 function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const currentScopeText = [
+    input.companyContext,
+    input.internalNotes,
+    ...intelligence.contextInterpretation.currentResponsibilities.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentPrioritiesOrInterests.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentToolsOrChannels.map((item) => item.text),
+  ].join(" ");
   const scope = /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?)\b/i.test(
-    `${input.companyContext ?? ""} ${input.prospectContext ?? ""} ${input.internalNotes ?? ""}`,
+    currentScopeText,
   )
     ? " across the accounts your team manages"
     : "";
@@ -79,10 +86,13 @@ function openingStyleFor(intelligence: ProspectIntelligence): MessageStrategy["o
 function prospectInsightFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
   const fact = firstProspectFact(intelligence);
   if (fact) return fact;
-  if (intelligence.jobTitle) {
-    return `${intelligence.jobTitle} at ${compact(input.companyName) ?? "the account"}`;
+  if (intelligence.contextInterpretation.currentRole) {
+    return `${intelligence.contextInterpretation.currentRole} at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
   }
-  return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${compact(input.companyName) ?? "the account"}`;
+  if (intelligence.jobTitle) {
+    return `${intelligence.jobTitle} at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
+  }
+  return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
 }
 
 function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boolean): MessageStrategy["sequenceNarrative"] {

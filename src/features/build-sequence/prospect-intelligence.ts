@@ -1,5 +1,7 @@
 import type {
   BuildSequenceInput,
+  ProspectContextInterpretation,
+  ProspectContextItem,
   ProspectIntelligence,
   SelectedProspectInsight,
   SequenceKeywordEvidence,
@@ -27,7 +29,7 @@ function normalize(value?: string) {
 
 function stripSourceLabel(value: string) {
   return value
-    .replace(/^\s*(?:about|linkedin|notes?|prospect|company|serp|role|title|context|keywords?|important)\s*:\s*/i, "")
+    .replace(/^\s*(?:about|linkedin|notes?|prospect|company|serp|role|title|context|keywords?|important|current|historical|previous|past|former|background)\s*:\s*/i, "")
     .trim();
 }
 
@@ -114,7 +116,7 @@ function isUsableProspectFact(fact: string) {
   }
   if (
     /^[A-Z][A-Za-z0-9&'. -]{2,80}$/.test(fact.trim()) &&
-    !/[0-9$]|\b(?:has|managed|build|built|led|owns|runs|responsible|focused|reviewing|expanded|testing|joined|promoted|posted|post|documents|documenting|improving|measurement|teams?)\b/i.test(fact)
+    !/[0-9$]|\b(?:has|work|works|worked|working|manage|manages|managed|managing|build|built|led|owns|runs|responsible|hands-on|focused|reviewing|expanded|testing|joined|promoted|posted|post|documents|documenting|improving|measurement|teams?)\b/i.test(fact)
   ) {
     return false;
   }
@@ -148,8 +150,221 @@ function isLowValuePersonalHistory(fact: string) {
   );
 }
 
-function rankCommercialFact(fact: string, input: BuildSequenceInput, index: number) {
+function isBareRoleCompanyFact(fact: string) {
+  const text = fact.trim();
+  if (text.length > 120) return false;
+  if (
+    /\b(?:recently\s+joined|joined|promoted\s+to)\b/i.test(text) &&
+    /\b(?:as|to)\s+[A-Z][A-Za-z/&' -]{1,80}\.?$/i.test(text) &&
+    !/\b(?:manag|own|leads|leading|run|responsib|campaign|reporting|optimis|optimiz|focused|improving)\b/i.test(text)
+  ) {
+    return true;
+  }
+  return text.split(/\s+/).length <= 8 &&
+    /\b(?:cmo|founder|head|lead|manager|director|vp|coordinator|specialist|strategist|analyst|ppc|paid search|growth|performance)\b/i.test(text) &&
+    /(?:\s@|\sat\s+)[A-Za-z0-9&' -]{2,80}\.?$/i.test(text) &&
+    !/\b(?:manag|own|leads|leading|run|responsib|campaign|reporting|optimis|optimiz|focused|improving)\b/i.test(text);
+}
+
+function currentSectionText(input: BuildSequenceInput) {
+  const raw = input.prospectContext ?? "";
+  const currentMatch = raw.match(/\bcurrent\s*:\s*([\s\S]*?)(?:\n\s*(?:historical|previous|past|former|background)\s*:|$)/i);
+  return currentMatch?.[1]?.trim();
+}
+
+function historicalSectionText(input: BuildSequenceInput) {
+  const raw = input.prospectContext ?? "";
+  const historicalMatch = raw.match(/\b(?:historical|previous|past|former|background)\s*:\s*([\s\S]*)/i);
+  return historicalMatch?.[1]?.trim();
+}
+
+function companyFromRoleLine(value?: string) {
+  const text = lines(value)[0] ?? compact(value);
+  if (!text) return undefined;
+  const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,80})\s+(?:@|at)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:$|[.,;])/);
+  return compact(match?.[1]);
+}
+
+function roleFromRoleLine(value?: string) {
+  const text = lines(value)[0] ?? compact(value);
+  if (!text) return undefined;
+  const promoted = text.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  if (promoted) return compact(promoted);
+  const joinedAs = text.match(/\brecently\s+joined\s+[A-Z][A-Za-z0-9&' -]{1,80}\s+as\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  if (joinedAs) return compact(joinedAs);
+  const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,80})\s+(?:@|at)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:$|[.,;])/);
+  return compact(match?.[1]);
+}
+
+function companyMentions(value: string) {
+  return unique(
+    Array.from(value.matchAll(/\b(?:at|@)\s+([A-Za-z0-9][A-Za-z0-9&'. -]{1,80})(?:$|[.,;\n])/g))
+      .map((match) => compact(match[1]))
+      .filter((item): item is string => Boolean(item))
+      .map((item) =>
+        item
+          .replace(/\s+(?:for|where|while|during|as)\b.*$/i, "")
+          .replace(/\s+(?:led|built|managed|launched|scaled|grew|owned|ran|drove)\b.*$/i, "")
+          .replace(/\s+\d+\s*(?:yrs?|years?)\b.*$/i, "")
+          .replace(/[.]+$/g, "")
+          .trim(),
+      ),
+  );
+}
+
+function temporalStatusForText(text: string, input: BuildSequenceInput) {
+  const historicalText = historicalSectionText(input);
+  const currentText = currentSectionText(input);
+  if (historicalText && historicalText.includes(text)) return "HISTORICAL" as const;
+  if (currentText && currentText.includes(text)) return "CURRENT" as const;
+  if (/\b(?:previously|former|past|prior|historical|earlier|before|during tenure|tenure at|years? at|\d+\s+years?\s+at)\b/i.test(text)) {
+    return "HISTORICAL" as const;
+  }
+  if (/\b(?:current|currently|now works|works at|today|present|recently joined|promoted to|@)\b/i.test(text)) {
+    return "CURRENT" as const;
+  }
+  return "UNKNOWN" as const;
+}
+
+function relevanceScopeForText(
+  text: string,
+  temporalStatus: ProspectContextItem["temporalStatus"],
+) {
+  if (isLowValuePersonalHistory(text)) return "PERSONAL" as const;
+  if (temporalStatus === "HISTORICAL") return "HISTORICAL_BACKGROUND" as const;
+  if (/\b(?:company|market|industry|b2b|saas|ecommerce|retail|account)\b/i.test(text)) {
+    return "CURRENT_COMPANY" as const;
+  }
+  if (/\b(?:role|responsib|manag|lead|own|run|hands-on|campaign|reporting|optimis|optimiz|automation|paid|growth|demand|performance)\b/i.test(text)) {
+    return "CURRENT_ROLE" as const;
+  }
+  return "GENERAL" as const;
+}
+
+function contextItem(
+  text: string,
+  input: BuildSequenceInput,
+  fallbackStatus?: ProspectContextItem["temporalStatus"],
+): ProspectContextItem {
+  const status = fallbackStatus ?? temporalStatusForText(text, input);
+  return {
+    text,
+    sourceText: text,
+    groundingReference: text,
+    confidence: status === "UNKNOWN" ? "MEDIUM" : "HIGH",
+    temporalStatus: status,
+    relevanceScope: relevanceScopeForText(text, status),
+  };
+}
+
+function currentCompanyFor(input: BuildSequenceInput) {
+  const currentText = currentSectionText(input);
+  return (
+    companyFromRoleLine(currentText) ??
+    companyFromRoleLine(input.prospectContext) ??
+    compact(input.companyName)
+  );
+}
+
+function promotedRole(value?: string) {
+  return lines(value)
+    .map((line) => line.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;!])/i)?.[1])
+    .find((role): role is string => Boolean(role));
+}
+
+function currentRoleFor(input: BuildSequenceInput) {
+  const currentText = currentSectionText(input);
+  return roleFromRoleLine(currentText) ?? roleFromRoleLine(input.prospectContext) ?? promotedRole(input.prospectContext) ?? inferJobTitle(input);
+}
+
+export function interpretProspectContext(
+  input: BuildSequenceInput,
+  facts: string[],
+): ProspectContextInterpretation {
+  const currentCompany = currentCompanyFor(input);
+  const currentRole = currentRoleFor(input);
+  const rawLines = lines(input.prospectContext);
+  const historicalText = historicalSectionText(input) ?? "";
+  const historicalCompanies = unique([
+    ...companyMentions(historicalText),
+    ...rawLines
+      .filter((line) => temporalStatusForText(line, input) === "HISTORICAL")
+      .flatMap(companyMentions),
+  ]).filter((company) => normalize(company) !== normalize(currentCompany));
+  const historicalRawItems = rawLines
+    .filter((line) => temporalStatusForText(line, input) === "HISTORICAL")
+    .filter((line) => !/^(?:historical|previous|past|former|background)\s*:?\s*$/i.test(line));
+  const interpretedFacts = facts.map((fact) => contextItem(fact, input));
+  const personalRawItems = rawLines
+    .filter(isLowValuePersonalHistory)
+    .map((line) => contextItem(stripSourceLabel(line), input, "HISTORICAL"));
+  const currentResponsibilities = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      item.relevanceScope === "CURRENT_ROLE" &&
+      /\b(?:manag|lead|own|run|responsib|hands-on|campaign|optimis|optimiz|reporting|strategy|paid|growth|demand|performance)\b/i.test(item.text),
+  );
+  const currentPrioritiesOrInterests = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      /\b(?:focused|interest|priority|exploring|improving|efficien|automation|ai|scale|growth|measurement|analytical|data-driven)\b/i.test(item.text),
+  );
+  const currentToolsOrChannels = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      /\b(?:google ads|microsoft ads|sa360|bing|paid search|display|youtube|programmatic|marketing automation|serp|cpc)\b/i.test(item.text),
+  );
+  const historicalExperience = [
+    ...interpretedFacts.filter((item) => item.temporalStatus === "HISTORICAL"),
+    ...historicalRawItems.map((line) => contextItem(stripSourceLabel(line), input, "HISTORICAL")),
+  ];
+  const personalBackground = [
+    ...interpretedFacts.filter((item) => item.relevanceScope === "PERSONAL"),
+    ...personalRawItems,
+  ];
+  const credibilitySignals = historicalExperience.filter((item) =>
+    /\b(?:built|led|managed|scaled|launched|grew|enterprise|demand|growth|performance|marketing)\b/i.test(item.text),
+  );
+  const commercialSignals = interpretedFacts.filter(
+    (item) => item.relevanceScope !== "PERSONAL" && item.temporalStatus !== "HISTORICAL",
+  );
+  const uncertainFacts = interpretedFacts.filter((item) => item.temporalStatus === "UNKNOWN");
+  const rejectedHistoricalProjections = historicalExperience
+    .filter((item) =>
+      /\b(?:agency|accounts?|international|markets?|budget|tool|stack|team|managed|expansion)\b/i.test(item.text),
+    )
+    .map((item) => `Historical context was kept supporting-only: ${item.text}`);
+
+  return {
+    currentCompany,
+    currentRole,
+    currentResponsibilities,
+    currentPrioritiesOrInterests,
+    currentToolsOrChannels,
+    historicalExperience,
+    historicalCompanies: historicalCompanies.map((company) =>
+      contextItem(company, input, "HISTORICAL"),
+    ),
+    credibilitySignals,
+    personalBackground,
+    commercialSignals,
+    uncertainFacts,
+    rejectedHistoricalProjections,
+  };
+}
+
+function rankCommercialFact(
+  fact: string,
+  input: BuildSequenceInput,
+  index: number,
+  interpretation?: ProspectContextInterpretation,
+) {
   const normalized = normalize(fact);
+  const interpretedItem =
+    interpretation?.commercialSignals.find((item) => item.text === fact) ??
+    interpretation?.historicalExperience.find((item) => item.text === fact) ??
+    interpretation?.personalBackground.find((item) => item.text === fact) ??
+    interpretation?.uncertainFacts.find((item) => item.text === fact);
   const responsibilityPatterns = [
     /\bmanag(?:e|es|ing|ed)\b/i,
     /\bresponsible\b/i,
@@ -157,6 +372,7 @@ function rankCommercialFact(fact: string, input: BuildSequenceInput, index: numb
     /\bleads?\b/i,
     /\bhands-on\b/i,
     /\bexpanded\b/i,
+    /\bfocused\b/i,
     /\btesting\b/i,
     /\breviewing\b/i,
     /\bruns?\b/i,
@@ -176,6 +392,8 @@ function rankCommercialFact(fact: string, input: BuildSequenceInput, index: numb
     /\bcpc\b/i,
     /\bbid(?:s|ding)?\b/i,
     /\bperformance reporting\b/i,
+    /\bpipeline\b/i,
+    /\bconversion\b/i,
     /\bprogrammatic\b/i,
     /\bdisplay\b/i,
     /\byoutube\b/i,
@@ -188,6 +406,9 @@ function rankCommercialFact(fact: string, input: BuildSequenceInput, index: numb
     /\bautomation\b/i,
     /\bai\b/i,
     /\bbudget\b/i,
+    /\bpipeline\b/i,
+    /\bconversion\b/i,
+    /\bdemand\b/i,
     /\bscale\b/i,
     /\bexpan/i,
     /\breporting\b/i,
@@ -238,6 +459,12 @@ function rankCommercialFact(fact: string, input: BuildSequenceInput, index: numb
     commercialUsefulness -= 2;
     conversationalUsefulness -= 2;
   }
+  if (isBareRoleCompanyFact(fact)) {
+    relevanceToSignal -= 1;
+    specificity -= 1.5;
+    commercialUsefulness -= 2;
+    conversationalUsefulness -= 2;
+  }
   if (includesAny(fact, genericPatterns)) {
     commercialUsefulness -= 1;
     conversationalUsefulness -= 1;
@@ -247,6 +474,21 @@ function rankCommercialFact(fact: string, input: BuildSequenceInput, index: numb
     specificity -= 1;
     commercialUsefulness -= 2;
     conversationalUsefulness -= 2;
+  }
+  if (interpretedItem?.temporalStatus === "CURRENT") {
+    commercialUsefulness += 1;
+    conversationalUsefulness += 0.5;
+  }
+  if (interpretedItem?.relevanceScope === "CURRENT_ROLE") {
+    commercialUsefulness += 1;
+  }
+  if (interpretedItem?.temporalStatus === "HISTORICAL") {
+    commercialUsefulness -= 1.25;
+    conversationalUsefulness -= 0.5;
+  }
+  if (interpretedItem?.relevanceScope === "PERSONAL") {
+    relevanceToSignal -= 1;
+    commercialUsefulness -= 1.5;
   }
 
   const scores = {
@@ -281,17 +523,25 @@ function reasonForSelectedInsight(fact: string) {
 export function rankProspectInsights(
   facts: string[],
   input: BuildSequenceInput,
+  interpretation?: ProspectContextInterpretation,
   max = 3,
 ): SelectedProspectInsight[] {
   return facts
     .map((fact, index) => {
-      const score = rankCommercialFact(fact, input, index);
+      const score = rankCommercialFact(fact, input, index, interpretation);
+      const interpretedItem =
+        interpretation?.commercialSignals.find((item) => item.text === fact) ??
+        interpretation?.historicalExperience.find((item) => item.text === fact) ??
+        interpretation?.personalBackground.find((item) => item.text === fact) ??
+        interpretation?.uncertainFacts.find((item) => item.text === fact);
       const confidence: SelectedProspectInsight["confidence"] =
         score.total >= 3.6 ? "HIGH" : score.total >= 2 ? "MEDIUM" : "LOW";
       return {
         factId: `prospect-fact-${index + 1}`,
         groundingReference: fact,
         text: fact,
+        temporalStatus: interpretedItem?.temporalStatus,
+        relevanceScope: interpretedItem?.relevanceScope,
         relevanceToSignal: score.relevanceToSignal,
         specificity: score.specificity,
         commercialUsefulness: score.commercialUsefulness,
@@ -301,13 +551,15 @@ export function rankProspectInsights(
         total: score.total,
       };
     })
-    .filter((insight) => insight.confidence !== "LOW" && !isLikelyRawHeadline(insight.text))
+    .filter((insight) => insight.confidence !== "LOW" && !isLikelyRawHeadline(insight.text) && !isBareRoleCompanyFact(insight.text))
     .sort((a, b) => b.total - a.total)
     .slice(0, max)
     .map((insight) => ({
       factId: insight.factId,
       groundingReference: insight.groundingReference,
       text: insight.text,
+      temporalStatus: insight.temporalStatus,
+      relevanceScope: insight.relevanceScope,
       relevanceToSignal: insight.relevanceToSignal,
       specificity: insight.specificity,
       commercialUsefulness: insight.commercialUsefulness,
@@ -562,7 +814,8 @@ export function buildProspectIntelligence(
   const serpEvidence = parseSerpEvidence(input);
   const serpScenario = classifySerpScenario(serpEvidence);
   const contextFacts = prospectFacts(input.prospectContext, 8);
-  const selectedInsights = rankProspectInsights(contextFacts, input);
+  const contextInterpretation = interpretProspectContext(input, contextFacts);
+  const selectedInsights = rankProspectInsights(contextFacts, input, contextInterpretation);
   const companyFacts = unique(
     [
       compact(input.companyContext),
@@ -574,12 +827,13 @@ export function buildProspectIntelligence(
 
   return {
     prospectName: inferProspectName(input),
-    companyName: compact(input.companyName),
-    jobTitle: inferJobTitle(input),
+    companyName: contextInterpretation.currentCompany ?? compact(input.companyName),
+    jobTitle: contextInterpretation.currentRole ?? inferJobTitle(input),
     seniority: inferSeniority(input),
     persona,
     relevantFacts: contextFacts,
     selectedInsights,
+    contextInterpretation,
     companyContext: companyFacts,
     likelyPriorities: prioritiesFor(persona, serpScenario),
     serpScenario,

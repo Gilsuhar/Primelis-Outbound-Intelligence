@@ -392,6 +392,10 @@ function displayCompany(input: BuildSequenceInput) {
   return displayCompanyName(input.companyName);
 }
 
+function displayCompanyFor(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  return displayCompanyName(intelligence?.contextInterpretation.currentCompany ?? intelligence?.companyName ?? input.companyName);
+}
+
 function ctaForPurpose(
   purpose: SequenceStep["purpose"],
 ) {
@@ -408,7 +412,12 @@ function ctaForPurpose(
   return ctas[purpose];
 }
 
-function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"], stepNumber: number) {
+function subjectFor(
+  input: BuildSequenceInput,
+  purpose: SequenceStep["purpose"],
+  stepNumber: number,
+  intelligence?: ProspectIntelligence,
+) {
   const pattern = winningPatternForPurpose(input, purpose, stepNumber - 1);
   const referencePurposes: SequencePurpose[] = [
     "FIRST_TOUCH_RELEVANCE",
@@ -419,8 +428,8 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
   if (pattern.subject && !referencePurposes.includes(purpose)) {
     return pattern.subject;
   }
-  const company = displayCompany(input);
-  if (purpose === "FIRST_TOUCH_RELEVANCE" && managesMultipleAccounts(input)) {
+  const company = displayCompanyFor(input, intelligence);
+  if (purpose === "FIRST_TOUCH_RELEVANCE" && managesMultipleAccounts(input, intelligence)) {
     return "branded search across managed accounts";
   }
   const subjects: Record<SequenceStep["purpose"], string> = {
@@ -436,8 +445,8 @@ function subjectFor(input: BuildSequenceInput, purpose: SequenceStep["purpose"],
   return subjects[purpose] ?? `Thought for ${company} ${stepNumber}`;
 }
 
-function connectionRequestFor(input: BuildSequenceInput) {
-  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${displayCompany(input)}. Open to connecting?`;
+function connectionRequestFor(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${displayCompanyFor(input, intelligence)}. Open to connecting?`;
 }
 
 function humanizeFact(fact: string) {
@@ -523,15 +532,23 @@ function hasPromotionSignal(input: BuildSequenceInput) {
   );
 }
 
-function managesMultipleAccounts(input: BuildSequenceInput) {
+function managesMultipleAccounts(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
+  const interpretedCurrentContext = intelligence
+    ? [
+        ...intelligence.contextInterpretation.currentResponsibilities,
+        ...intelligence.contextInterpretation.currentPrioritiesOrInterests,
+        ...intelligence.contextInterpretation.currentToolsOrChannels,
+        ...intelligence.contextInterpretation.commercialSignals,
+      ].map((item) => item.text)
+    : [];
   return /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?|accounts your team manages)\b/i.test(
     [
       input.companyContext,
       input.industry,
-      input.prospectContext,
       input.paidSearchContext,
       input.observedTrigger,
       input.internalNotes,
+      ...interpretedCurrentContext,
     ]
       .filter(Boolean)
       .join(" "),
@@ -540,7 +557,7 @@ function managesMultipleAccounts(input: BuildSequenceInput) {
 
 function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
   const role = buyerRole(input, intelligence).toLowerCase();
-  if (managesMultipleAccounts(input) && /paid search|sem|ppc|performance/.test(role)) {
+  if (managesMultipleAccounts(input, intelligence) && /paid search|sem|ppc|performance/.test(role)) {
     return "The practical takeaway is not the logo. It is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
@@ -587,7 +604,7 @@ function buildStepFactSheet({
     purpose: step.purpose,
     prospect: {
       name: firstName,
-      company: displayCompany(input),
+      company: displayCompanyFor(input, intelligence),
       title: buyerRole(input, intelligence),
     },
     personalHook: firstPersonalFact(intelligence) ?? null,
@@ -640,7 +657,7 @@ function responsibilityOpening({
 }
 
 function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const accountScope = managesMultipleAccounts(input) ? " across the accounts your team manages" : "";
+  const accountScope = managesMultipleAccounts(input, intelligence) ? " across the accounts your team manages" : "";
   if (intelligence.serpScenario === "SOLO") {
     return `The useful method is to identify solo periods${accountScope}, reduce CPC only where coverage is still protected, and restore defense when competitors return.`;
   }
@@ -654,7 +671,7 @@ function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelli
 }
 
 function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const company = displayCompany(input);
+  const company = displayCompanyFor(input, intelligence);
   const fact = firstPersonalFact(intelligence);
   if (intelligence.jobTitle && intelligence.persona !== "OTHER" && hasPromotionSignal(input)) {
     return `Congrats on your promotion to ${intelligence.jobTitle}.`;
@@ -842,7 +859,7 @@ function bodyForPurpose({
   intelligence: ProspectIntelligence;
   strategy: MessageStrategy;
 }) {
-  const company = displayCompany(input);
+  const company = displayCompanyFor(input, intelligence);
   const safeKeywordPhrases = protectedKeywordPhrases(intelligence);
   const pattern = winningPatternForPurpose(input, purpose, ctaIndex);
   const patternBody = pattern.body;
@@ -854,7 +871,7 @@ function bodyForPurpose({
       : proof
         ? approvedProofPointExcluding(caseStudyCompany(proof), ctaIndex)
         : approvedProofPointForStep(ctaIndex);
-  const isManagedPpcSequence = managesMultipleAccounts(input) &&
+  const isManagedPpcSequence = managesMultipleAccounts(input, intelligence) &&
     /paid search|sem|ppc|performance/.test(buyerRole(input, intelligence).toLowerCase());
   const contested = contestedKeyword(intelligence);
   const solo = soloKeyword(intelligence);
@@ -1034,9 +1051,9 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
               : "LinkedIn keeps the touch lighter and different from the email copy."
             : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`) +
           " Account context is user-provided until verified.",
-        subjectLine: channel === "EMAIL" ? subjectFor(input, purpose, stepNumber) : undefined,
+        subjectLine: channel === "EMAIL" ? subjectFor(input, purpose, stepNumber, generation.prospectIntelligence) : undefined,
         connectionRequest:
-          channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input) : undefined,
+          channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input, generation.prospectIntelligence) : undefined,
         messageBody: bodyForPurpose({
           input,
           purpose,

@@ -187,6 +187,40 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[0].messageBody).not.toMatch(/wanted to be a doctor|chemistry/i);
   });
 
+  it("targets the current company instead of historical employers in sequence copy", async () => {
+    const shacharInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Buildots",
+      companyWebsite: "buildots.com",
+      contactFirstName: "Shachar",
+      contactRole: "CMO",
+      prospectContext: [
+        "Shachar Radin Shomrat",
+        "Current:",
+        "CMO @ Buildots",
+        "B2B SaaS, performance-driven growth marketing, paid search, marketing automation, demand generation, data-driven and analytical.",
+        "Historical:",
+        "5 years at McCann Erickson agency managing client accounts.",
+        "Built demand generation at Voxbone.",
+        "During tenure as CMO at myThings led performance marketing.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: shacharInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(shacharInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toContain("Buildots");
+    expect(rendered).not.toMatch(/McCann Erickson SERP visibility|McCann branded search/i);
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+    expect(rendered).toMatch(/Buildots|CMO|B2B SaaS|performance-driven growth/i);
+  });
+
   it("accepts OpenAI schema without letting model text replace rendered steps", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",

@@ -347,12 +347,38 @@ export type SelectedProspectInsight = {
   factId: string;
   groundingReference: string;
   text: string;
+  temporalStatus?: "CURRENT" | "HISTORICAL" | "UNKNOWN";
+  relevanceScope?: "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
   relevanceToSignal: number;
   specificity: number;
   commercialUsefulness: number;
   conversationalUsefulness: number;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   reasonSelected: string;
+};
+
+export type ProspectContextItem = {
+  text: string;
+  sourceText: string;
+  groundingReference: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  temporalStatus: "CURRENT" | "HISTORICAL" | "UNKNOWN";
+  relevanceScope: "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
+};
+
+export type ProspectContextInterpretation = {
+  currentCompany?: string;
+  currentRole?: string;
+  currentResponsibilities: ProspectContextItem[];
+  currentPrioritiesOrInterests: ProspectContextItem[];
+  currentToolsOrChannels: ProspectContextItem[];
+  historicalExperience: ProspectContextItem[];
+  historicalCompanies: ProspectContextItem[];
+  credibilitySignals: ProspectContextItem[];
+  personalBackground: ProspectContextItem[];
+  commercialSignals: ProspectContextItem[];
+  uncertainFacts: ProspectContextItem[];
+  rejectedHistoricalProjections: string[];
 };
 
 export type ProspectIntelligence = {
@@ -369,6 +395,7 @@ export type ProspectIntelligence = {
     | "OTHER";
   relevantFacts: string[];
   selectedInsights: SelectedProspectInsight[];
+  contextInterpretation: ProspectContextInterpretation;
   companyContext: string[];
   likelyPriorities: string[];
   serpScenario: "SOLO" | "CONTESTED" | "MIXED" | "UNKNOWN";

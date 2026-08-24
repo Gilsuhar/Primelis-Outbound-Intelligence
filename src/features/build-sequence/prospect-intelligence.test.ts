@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BuildSequenceInput, SequenceKnowledgeRecord } from "./types";
-import { buildProspectIntelligence, rankProspectInsights } from "./prospect-intelligence";
+import { buildProspectIntelligence, interpretProspectContext, rankProspectInsights } from "./prospect-intelligence";
 
 const input: BuildSequenceInput = {
   companyName: "Cursor",
@@ -347,6 +347,168 @@ describe("Prospect Intelligence extraction", () => {
       }
       expect(item.top3[0], item.label).toMatch(item.expectedTop);
       expect(item.top3[0], item.label).not.toMatch(/\|.*\||wanted to be|forensic|chemistry|^hush$/i);
+    }
+  });
+
+  it("interprets current company and historical background without projecting history onto the current account", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "Buildots",
+      contactFirstName: "Shachar",
+      contactRole: "CMO",
+      prospectContext: [
+        "Shachar Radin Shomrat",
+        "Current:",
+        "CMO @ Buildots",
+        "B2B SaaS, performance-driven growth marketing, paid search, marketing automation, demand generation, data-driven and analytical.",
+        "Historical:",
+        "5 years at McCann Erickson.",
+        "Built demand generation at Voxbone.",
+        "During tenure as CMO at myThings led performance marketing.",
+      ].join("\n"),
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBe("Buildots");
+    expect(intelligence.contextInterpretation.currentRole).toBe("CMO");
+    expect(intelligence.contextInterpretation.historicalCompanies.map((item) => item.text)).toContain("McCann Erickson");
+    expect(intelligence.contextInterpretation.historicalCompanies.map((item) => item.text)).toContain("Voxbone");
+    expect(intelligence.contextInterpretation.historicalCompanies.map((item) => item.text)).toContain("myThings");
+    expect(intelligence.selectedInsights[0]?.text).toMatch(/B2B SaaS|performance-driven growth|paid search/i);
+    expect(intelligence.selectedInsights[0]?.temporalStatus).not.toBe("HISTORICAL");
+  });
+
+  it("keeps Tanvi's current paid-search context above unrelated personal history", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "Hush",
+      contactFirstName: "Tanvi",
+      contactRole: "Paid Search Coordinator",
+      prospectContext: [
+        "Tanvi Mhatre",
+        "Current:",
+        "Paid Search Coordinator at Hush.",
+        "Manages paid search across Google Ads, Microsoft Ads, and SA360.",
+        "Hands-on campaign optimisation and performance reporting.",
+        "Historical/personal:",
+        "Wanted to be a doctor.",
+        "Chemistry degree.",
+        "Forensic science diploma.",
+        "Moved to London at 22.",
+      ].join("\n"),
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBe("Hush");
+    expect(intelligence.contextInterpretation.currentRole).toBe("Paid Search Coordinator");
+    expect(intelligence.selectedInsights.map((insight) => insight.text).slice(0, 2)).toEqual([
+      "Manages paid search across Google Ads, Microsoft Ads, and SA360.",
+      "Hands-on campaign optimisation and performance reporting.",
+    ]);
+    expect(intelligence.contextInterpretation.personalBackground.map((item) => item.text).join(" ")).toMatch(
+      /doctor|chemistry|forensic|London/i,
+    );
+  });
+
+  it("handles varied current and historical contexts without unsupported historical-to-current projection", () => {
+    const cases = [
+      {
+        label: "current CMO with historical agency background",
+        context: "Current:\nCMO @ Constructly\nRuns B2B SaaS demand generation and performance marketing.\nHistorical:\n6 years at a creative agency managing client accounts.",
+        company: "Constructly",
+        role: "CMO",
+        historical: /creative agency/i,
+        top: /B2B SaaS demand generation|performance marketing/i,
+      },
+      {
+        label: "current paid-search manager with academic history",
+        context: "Current:\nPaid Search Manager at RetailFlow.\nOwns Google Ads and Microsoft Ads reporting.\nHistorical:\nStudied chemistry and forensic science.",
+        company: "RetailFlow",
+        role: "Paid Search Manager",
+        historical: /chemistry|forensic/i,
+        top: /Google Ads and Microsoft Ads reporting/i,
+      },
+      {
+        label: "founder with previous enterprise role",
+        context: "Current:\nFounder @ LedgerPath\nFocused on efficient acquisition for B2B buyers.\nHistorical:\nPreviously led enterprise marketing at CloudScale.",
+        company: "LedgerPath",
+        role: "Founder",
+        historical: /CloudScale/i,
+        top: /efficient acquisition/i,
+      },
+      {
+        label: "growth leader with previous expansion",
+        context: "Current:\nGrowth Lead at FitMarket.\nImproving paid-search efficiency.\nHistorical:\nExpanded international campaigns at a prior company.",
+        company: "FitMarket",
+        role: "Growth Lead",
+        historical: /international campaigns/i,
+        top: /paid-search efficiency/i,
+      },
+      {
+        label: "current agency employee",
+        context: "Current:\nPPC Team Lead at North Agency.\nManages multiple client accounts across Google Ads and Bing.\nHistorical:\nStarted in SEO.",
+        company: "North Agency",
+        role: "PPC Team Lead",
+        historical: /SEO/i,
+        top: /multiple client accounts/i,
+      },
+      {
+        label: "in-house marketer with previous agency background",
+        context: "Current:\nPerformance Marketing Manager at HomeCart.\nOwns branded paid search.\nHistorical:\nPreviously worked at an agency managing client accounts.",
+        company: "HomeCart",
+        role: "Performance Marketing Manager",
+        historical: /agency managing client accounts/i,
+        top: /branded paid search/i,
+      },
+      {
+        label: "recent job change",
+        context: "Current:\nRecently joined DataDock as Head of Demand Generation.\nFocused on pipeline quality.\nHistorical:\nFormer VP Marketing at OldStack.",
+        company: "DataDock",
+        role: "Head of Demand Generation",
+        historical: /OldStack/i,
+        top: /pipeline quality/i,
+      },
+      {
+        label: "many previous employers",
+        context: "Current:\nDigital Marketing Director at BrightOps.\nRuns performance reporting.\nHistorical:\nPreviously at AlphaCo, BetaCo, and GammaCo.",
+        company: "BrightOps",
+        role: "Digital Marketing Director",
+        historical: /AlphaCo|BetaCo|GammaCo/i,
+        top: /performance reporting/i,
+      },
+      {
+        label: "weak current role context",
+        context: "Current:\nMarketing Lead @ QuietCRM\nHistorical:\nBuilt growth programs at a previous employer.",
+        company: "QuietCRM",
+        role: "Marketing Lead",
+        historical: /previous employer/i,
+        top: /Marketing Lead|growth programs/i,
+      },
+      {
+        label: "ambiguous dates",
+        context: "Head of Growth @ PagePilot\nWorked on Google Ads reporting.\nEarlier role at DemoWare.",
+        company: "PagePilot",
+        role: "Head of Growth",
+        historical: /DemoWare/i,
+        top: /Google Ads reporting/i,
+      },
+    ];
+
+    for (const item of cases) {
+      const intelligence = buildProspectIntelligence({
+        ...input,
+        companyName: item.company,
+        contactRole: "Head of Performance Marketing",
+        prospectContext: item.context,
+      });
+      const interpreted = interpretProspectContext(
+        { ...input, companyName: item.company, prospectContext: item.context },
+        intelligence.relevantFacts,
+      );
+
+      expect(interpreted.currentCompany, item.label).toBe(item.company);
+      expect(interpreted.currentRole, item.label).toContain(item.role.split(" ")[0]);
+      expect(JSON.stringify(interpreted.historicalExperience), item.label).toMatch(item.historical);
+      expect(intelligence.selectedInsights[0]?.text ?? `${intelligence.jobTitle} at ${intelligence.companyName}`, item.label).toMatch(item.top);
+      expect(intelligence.selectedInsights[0]?.text ?? "", item.label).not.toMatch(/managing client accounts.*previously|prior company/i);
     }
   });
 });

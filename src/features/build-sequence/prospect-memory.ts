@@ -132,7 +132,11 @@ function inferredRole(rawText: string) {
 function inferredCompany(rawText: string, domain?: string) {
   const labeled = labeledValue(rawText, ["company", "account", "employer"]);
   if (labeled) return compact(labeled);
-  const atRole = rawText.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1];
+  const currentSection = rawText.match(/\bcurrent\s*:\s*([\s\S]*?)(?:\n\s*(?:historical|previous|past|former|background)\s*:|$)/i)?.[1];
+  const currentAtRole = currentSection?.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1];
+  if (currentAtRole) return compact(currentAtRole);
+  const atRole = rawText.match(/\b(?:current(?:ly)?|now works|works)\b[^.\n]{0,80}\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/i)?.[1] ??
+    rawText.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1];
   if (atRole) return compact(atRole);
   if (domain) {
     const token = domain.split(".")[0];
