@@ -49,6 +49,38 @@ function normalizeName(value?: string) {
   return compact(value)?.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ");
 }
 
+function stripSourceLabel(value: string) {
+  return value
+    .replace(/^\s*(?:about|linkedin|notes?|prospect|company|serp|role|title|context|keywords?|important)\s*:\s*/i, "")
+    .trim();
+}
+
+function isRoleOrSeniorityFragment(value?: string) {
+  const normalized = normalizeName(value);
+  if (!normalized) return false;
+  const roleWords = new Set([
+    "head",
+    "senior",
+    "paid",
+    "director",
+    "manager",
+    "vp",
+    "vice",
+    "president",
+    "lead",
+    "growth",
+    "performance",
+    "search",
+    "marketing",
+    "acquisition",
+    "demand",
+    "ppc",
+    "sem",
+  ]);
+  const tokens = normalized.split(" ").filter(Boolean);
+  return tokens.length > 0 && tokens.every((token) => roleWords.has(token));
+}
+
 function labeledValue(rawText: string, labels: string[]) {
   const labelPattern = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   return rawText.match(new RegExp(`(?:^|\\n)\\s*(?:${labelPattern})\\s*[:\\-]\\s*([^\\n]+)`, "i"))?.[1]?.trim();
@@ -56,18 +88,34 @@ function labeledValue(rawText: string, labels: string[]) {
 
 function inferredFullName(rawText: string) {
   const labeled = labeledValue(rawText, ["name", "prospect", "full name"]);
-  if (labeled) return compact(labeled);
-  return lines(rawText).find((line) =>
+  if (labeled && !isRoleOrSeniorityFragment(labeled)) return compact(labeled);
+  const rawLines = lines(rawText);
+  const fullName = rawLines.find((line) =>
     /^[A-Z][a-z' -]{1,30}(?:\s+[A-Z][a-z' -]{1,40}){1,3}$/.test(line) &&
+    !isRoleOrSeniorityFragment(line) &&
     !/\b(?:company|role|title|about|experience|education|activity|posted|linkedin)\b/i.test(line),
   );
+  if (fullName) return fullName;
+  const firstLine = rawLines[0];
+  if (
+    firstLine &&
+    rawLines.length > 1 &&
+    /^[A-Z][a-z' -]{1,40}$/.test(firstLine) &&
+    !isUiNoise(firstLine) &&
+    !isRoleOrSeniorityFragment(firstLine) &&
+    !/\b(?:company|role|title|about|experience|education|activity|posted|linkedin|google|serp|ads|keyword)\b/i.test(firstLine)
+  ) {
+    return compact(firstLine);
+  }
+  return undefined;
 }
 
 function splitName(fullName?: string) {
   const parts = compact(fullName)?.split(/\s+/).filter(Boolean) ?? [];
+  const firstName = isRoleOrSeniorityFragment(parts[0]) ? undefined : parts[0];
   return {
-    firstName: parts[0],
-    lastName: parts.length > 1 ? parts.slice(1).join(" ") : undefined,
+    firstName,
+    lastName: firstName && parts.length > 1 ? parts.slice(1).join(" ") : undefined,
   };
 }
 
@@ -90,7 +138,16 @@ function inferredCompany(rawText: string, domain?: string) {
     const token = domain.split(".")[0];
     return token ? token.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) : undefined;
   }
-  return undefined;
+  const fullName = inferredFullName(rawText);
+  const role = inferredRole(rawText);
+  return lines(rawText).find((line, index) =>
+    index > 0 &&
+    line !== fullName &&
+    line !== role &&
+    /^[A-Z][A-Za-z0-9&'. -]{2,80}$/.test(line) &&
+    !isUiNoise(line) &&
+    !/\b(?:managed|interested|exploring|google|ads|context|serp|paid|search|automation|ai|keyword|competition|competitor|solo|contested)\b/i.test(line),
+  );
 }
 
 function sentenceFragments(rawText: string) {
@@ -112,9 +169,11 @@ function isUiNoise(value: string) {
 
 function prospectFacts(rawText: string) {
   return sentenceFragments(rawText)
+    .map(stripSourceLabel)
     .filter((fact) =>
       fact.length <= 220 &&
       !isUiNoise(fact) &&
+      !isRoleOrSeniorityFragment(fact) &&
       !/^https?:\/\//i.test(fact) &&
       /\b(?:managed|built|led|promoted|promotion|responsible|owns|exploring|interested|ai|automation|\$?\d+[mk+]?|spend|budget|growth|paid search|ppc|google ads)\b/i.test(
         fact,
@@ -125,6 +184,7 @@ function prospectFacts(rawText: string) {
 
 function companyFacts(rawText: string) {
   return sentenceFragments(rawText)
+    .map(stripSourceLabel)
     .filter((fact) =>
       fact.length <= 220 &&
       /\b(?:company|market|brand|retail|saas|ecommerce|e-commerce|global|customers|category|team|accounts?)\b/i.test(fact),
@@ -134,11 +194,15 @@ function companyFacts(rawText: string) {
 
 function linkedinInsights(rawText: string) {
   return sentenceFragments(rawText)
+    .map(stripSourceLabel)
     .filter((fact) => /\b(?:linkedin|posted|post|about|promoted|promotion|followers|activity)\b/i.test(fact))
     .slice(0, 6);
 }
 
 function parseSerpLine(line: string) {
+  if (/\b(?:no|without|none|not)\s+(?:verified\s+)?(?:serp|keyword|keywords?|evidence|screenshot)\b/i.test(line)) {
+    return undefined;
+  }
   const normalized = line.toLowerCase();
   if (!/\b(?:solo|alone|competitor|appeared|visible|contested|serp|keyword|pricing|editor|brand)\b/i.test(line)) {
     return undefined;
@@ -158,7 +222,14 @@ function parseSerpLine(line: string) {
       line.match(/\b([A-Z][A-Za-z0-9&'. -]{1,50})\s+(?:appeared|visible)\b/)?.[1],
       line.match(/\bcompetitor\s*[:\-]\s*([A-Z][A-Za-z0-9&'. -]{1,50})/i)?.[1],
     ].filter((value): value is string => Boolean(value)),
-  ).filter((competitor) => normalizeName(competitor) !== normalizeName(keyword));
+  )
+    .map((competitor) =>
+      competitor
+        .replace(new RegExp(`^${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*-\\s*competitor\\s*`, "i"), "")
+        .replace(/\s+(?:appeared|visible)\b.*$/i, "")
+        .trim(),
+    )
+    .filter((competitor) => normalizeName(competitor) !== normalizeName(keyword));
   return {
     keyword,
     status: status as "SOLO" | "CONTESTED" | "UNKNOWN",

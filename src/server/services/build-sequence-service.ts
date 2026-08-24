@@ -10,9 +10,7 @@ import {
 } from "@/features/build-sequence/sequence-policy";
 import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
 import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
-import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
 import {
-  extractProspect,
   factsFromExtraction,
   mergeProspectRecord,
   normalizeDomain,
@@ -24,6 +22,7 @@ import {
   sequencePurposes,
   sequenceStepChannels,
   sequenceTones,
+  type BuildSequenceDiagnostics,
   type BuildSequenceInput,
   type BuildSequenceResult,
   type ExtractedFact,
@@ -38,6 +37,7 @@ import {
   type SequenceSourceReference,
   type SequenceStep,
 } from "@/features/build-sequence/types";
+import type { AccountStatusResult } from "@/features/account-status/types";
 import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
 import { selectProofForContext } from "@/features/proof/proof-policy";
@@ -49,11 +49,19 @@ import {
   DeterministicBuildSequenceProvider,
   type BuildSequenceAiProvider,
 } from "./build-sequence-provider";
-import { assertAccountCanGenerate } from "./account-status-service";
+import { checkAccountStatus } from "./account-status-service";
 import {
   createInitialDraftVersion,
   PrismaDraftVersionPersistence,
 } from "./draft-versioning-service";
+import {
+  extractProspectSemantic,
+  type SemanticExtractionProvider,
+} from "./prospect-semantic-intake";
+import {
+  planAiMessageStrategy,
+  type AiMessageStrategyProvider,
+} from "./message-strategy-planner";
 import { err, ok } from "./result";
 
 const buildSequenceSchema = z
@@ -173,6 +181,25 @@ const requiredBuildSequenceFieldLabels: Record<string, string> = {
 export type BuildSequencePersistence = {
   getActor(actorId: string): Promise<{ id: string; role: string } | null>;
   getSuppressionRecords(): Promise<DoNotContactRecord[]>;
+  getRecentDrafts?(): Promise<
+    Array<{
+      id: string;
+      workflow: string;
+      companyName?: string;
+      companyDomain?: string;
+      createdAt?: string;
+    }>
+  >;
+  getRecentAssessments?(): Promise<
+    Array<{
+      id: string;
+      companyName: string;
+      domain?: string;
+      qualificationResult: string;
+      recommendedNextAction?: string;
+      createdAt?: string;
+    }>
+  >;
   retrieveEligibleKnowledge(input: BuildSequenceInput): Promise<SequenceKnowledgeRecord[]>;
   listProspects?(creatorId: string): Promise<ProspectRecord[]>;
   createProspectMemory?(input: {
@@ -200,6 +227,8 @@ export type BuildSequencePersistence = {
 export type BuildSequenceDependencies = {
   provider?: BuildSequenceAiProvider;
   persistence?: BuildSequencePersistence;
+  semanticExtractionProvider?: SemanticExtractionProvider;
+  messageStrategyProvider?: AiMessageStrategyProvider;
 };
 
 function asString(value: unknown) {
@@ -252,6 +281,7 @@ function mapProspectSourceRow(row: Row): ProspectSource {
 
 function serpEvidenceText(extraction: ProspectExtraction) {
   return extraction.serpEvidence
+    .filter((item) => item.status === "SOLO" || item.status === "CONTESTED")
     .map((item) =>
       [
         item.keyword,
@@ -301,7 +331,7 @@ function normalizedInputFromExtraction(
   const extractedSerp = serpEvidenceText(extraction);
   return {
     ...input,
-    companyName: input.companyName || extraction.companyName || "",
+    companyName: input.companyName || extraction.companyName || "the account",
     companyWebsite: input.companyWebsite || extraction.companyDomain,
     contactFirstName: input.contactFirstName || extraction.firstName,
     contactRole:
@@ -324,16 +354,23 @@ async function persistProspectMemory({
   creatorId,
   input,
   persistence,
+  semanticExtractionProvider,
 }: {
   creatorId: string;
   input: BuildSequenceInput;
   persistence: BuildSequencePersistence;
+  semanticExtractionProvider?: SemanticExtractionProvider;
 }) {
   const rawText = input.rawProspectContext?.trim();
   if (!rawText) {
     return { input: normalizedInputFromExtraction(input), memory: undefined as ProspectMemory | undefined };
   }
-  const extraction = extractProspect({ rawText });
+  const semanticStarted = nowMs();
+  const semanticResult = await extractProspectSemantic(rawText, {
+    provider: semanticExtractionProvider,
+  });
+  const semanticIntakeDurationMs = nowMs() - semanticStarted;
+  const extraction = semanticResult.extraction;
   const candidates = persistence.listProspects ? await persistence.listProspects(creatorId) : [];
   const explicitCandidate = input.prospectId
     ? candidates.find((prospect) => prospect.id === input.prospectId)
@@ -373,7 +410,29 @@ async function persistProspectMemory({
   return {
     input: normalizedInputFromExtraction(input, extraction),
     memory,
+    extractionMode: semanticResult.mode,
+    rejectedFacts: semanticResult.rejectedFacts,
+    extractionFallbackReason: semanticResult.fallbackReason,
+    semanticIntakeDurationMs,
   };
+}
+
+function semanticIntakeSafetyNotes(input: {
+  mode?: string;
+  rejectedFacts?: string[];
+  fallbackReason?: string;
+}) {
+  const notes: string[] = [];
+  void input.mode;
+  void input.fallbackReason;
+  if (input.rejectedFacts?.length) {
+    notes.push(
+      `${input.rejectedFacts.length} unsupported semantic intake extraction${
+        input.rejectedFacts.length === 1 ? "" : "s"
+      } were dropped before Prospect Memory persistence.`,
+    );
+  }
+  return notes;
 }
 
 function containsCompetitorClaim(text: string) {
@@ -455,9 +514,19 @@ function accountStatusPersistence(persistence: BuildSequencePersistence) {
   return {
     getActor: persistence.getActor.bind(persistence),
     getSuppressionRecords: persistence.getSuppressionRecords.bind(persistence),
-    getRecentDrafts: async () => [],
-    getRecentAssessments: async () => [],
+    getRecentDrafts: persistence.getRecentDrafts
+      ? persistence.getRecentDrafts.bind(persistence)
+      : async () => [],
+    getRecentAssessments: persistence.getRecentAssessments
+      ? persistence.getRecentAssessments.bind(persistence)
+      : async () => [],
   };
+}
+
+function accountStatusDraftWarning(status?: AccountStatusResult) {
+  if (!status || status.severity !== "WARNING") return undefined;
+  const company = status.companyName ?? "this account";
+  return `Existing ownership or recent outreach activity found for ${company}. Review this before sending or pushing to CRM.`;
 }
 
 function isKnowledgeItemEligible(record: SequenceKnowledgeRecord, input: BuildSequenceInput) {
@@ -789,7 +858,6 @@ function hasDuplicateCompleteSequence(steps: SequenceStep[], generation: Sequenc
   const allText = [
     generation.overallStrategy,
     generation.claimsUsed.join("\n"),
-    generation.safetyNotes.join("\n"),
     generation.knowledgeLimitations.join("\n"),
     rendered,
   ].join("\n");
@@ -888,8 +956,9 @@ function validateStepOneReference(step: SequenceStep) {
 
 function validateStepTwoReference(step: SequenceStep) {
   const text = `${step.imageContextNote ?? ""} ${step.messageBody} ${step.cta}`;
+  const hasImageReference = /screenshot|visual|SERP/i.test(step.imageContextNote ?? "");
   return (
-    /screenshot|visual|SERP/i.test(step.imageContextNote ?? "") &&
+    (hasImageReference || !step.imageContextNote) &&
     /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction/i.test(text) &&
     /evidence|keyword data|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
@@ -1059,53 +1128,203 @@ function hasMultipleProofCompanies(generation: SequenceGeneration, records: Sequ
   return mentioned.size > 1;
 }
 
-function validateSequenceGeneration(
+function nowMs() {
+  return Date.now();
+}
+
+type SequenceValidationIssue = {
+  reason: string;
+  scope: "sequence" | "step";
+  stepIndexes: number[];
+  recoverable: boolean;
+};
+
+const recoverableSequenceFailureReasons = new Set([
+  "duplicate-sequence",
+  "template-like",
+  "narrative",
+  "contamination",
+  "similarity",
+  "duplicate-cta",
+  "cta-intent",
+  "questions",
+  "cta-questions",
+  "word-count",
+  "anonymous",
+  "vague",
+  "step1-reference",
+  "step2-reference",
+  "step3-reference",
+  "step4-reference",
+  "final-length",
+  "final-close",
+  "final-pitch",
+]);
+
+function issue(
+  reason: string,
+  stepIndexes: number[] = [],
+  recoverable = recoverableSequenceFailureReasons.has(reason),
+): SequenceValidationIssue {
+  return {
+    reason,
+    scope: stepIndexes.length > 0 ? "step" : "sequence",
+    stepIndexes,
+    recoverable,
+  };
+}
+
+function firstStepIndex(steps: SequenceStep[], predicate: (step: SequenceStep, index: number) => boolean) {
+  const index = steps.findIndex(predicate);
+  return index >= 0 ? [index] : [];
+}
+
+function repeatedMessageStepIndexes(steps: SequenceStep[]) {
+  const seen = new Map<string, number>();
+  for (let index = 0; index < steps.length; index += 1) {
+    const body = normalizedMessage(steps[index]);
+    const first = seen.get(body);
+    if (first !== undefined) {
+      return [index];
+    }
+    seen.set(body, index);
+  }
+  return [];
+}
+
+function repeatedCtaStepIndexes(steps: SequenceStep[]) {
+  const seen = new Map<string, number>();
+  for (let index = 0; index < steps.length; index += 1) {
+    const cta = normalizedCta(steps[index]);
+    if (!cta) continue;
+    const first = seen.get(cta);
+    if (first !== undefined) {
+      return [index];
+    }
+    seen.set(cta, index);
+  }
+  return [];
+}
+
+function similarStepIndexes(steps: SequenceStep[]) {
+  const normalized = steps.map(normalizedMessage);
+  for (let index = 0; index < normalized.length; index += 1) {
+    for (let compare = index + 1; compare < normalized.length; compare += 1) {
+      if (similarity(normalized[index], normalized[compare]) > 0.9) {
+        return [compare];
+      }
+    }
+  }
+  return [];
+}
+
+function templateLikeStepIndexes(steps: SequenceStep[]) {
+  const seen = new Map<string, number>();
+  const repeated: number[] = [];
+  for (let index = 0; index < steps.length; index += 1) {
+    const opening = steps[index].messageBody
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .find((line) => !/^hi\b/i.test(line));
+    if (!opening) continue;
+    const key = normalizedText(opening).split(" ").slice(0, 4).join(" ");
+    if (!key) continue;
+    if (seen.has(key)) {
+      repeated.push(index);
+    } else {
+      seen.set(key, index);
+    }
+  }
+  return repeated;
+}
+
+function ctaIntentRecoveryStepIndexes(steps: SequenceStep[]) {
+  const intents = steps.map((step) => ctaIntent(step.cta)).filter(Boolean);
+  const nonCloseIndexes = intents
+    .map((intent, index) => ({ intent, index }))
+    .filter((item) => item.intent !== "close");
+  const showOrSend = nonCloseIndexes.filter((item) => item.intent === "show_or_send");
+  if (nonCloseIndexes.length >= 3 && showOrSend.length >= nonCloseIndexes.length - 1) {
+    return showOrSend.slice(1).map((item) => item.index);
+  }
+  return [];
+}
+
+function duplicateCompleteSequenceStepIndexes(steps: SequenceStep[], generation: SequenceGeneration) {
+  const contaminated = firstStepIndex(steps, (step) => containsStepContamination(step, steps.length));
+  if (contaminated.length > 0) {
+    return contaminated;
+  }
+  const duplicateBody = repeatedMessageStepIndexes(steps);
+  if (duplicateBody.length > 0) {
+    return duplicateBody;
+  }
+  const rendered = renderedSequenceText(steps);
+  if (containsRepeatedStepOrder(rendered, steps.length)) {
+    return firstStepIndex(steps, (step) => containsRepeatedStepOrder(step.messageBody, steps.length));
+  }
+  const allText = [
+    generation.overallStrategy,
+    generation.claimsUsed.join("\n"),
+    generation.knowledgeLimitations.join("\n"),
+    rendered,
+  ].join("\n");
+  if (containsRepeatedStepOrder(allText, steps.length)) {
+    return firstStepIndex(steps, (step) => containsRepeatedStepOrder(step.messageBody, steps.length));
+  }
+  return [];
+}
+
+function sequenceValidationIssueDetails(
   input: BuildSequenceInput,
   generation: SequenceGeneration,
   records: SequenceKnowledgeRecord[] = [],
 ) {
-  const fail = (reason?: string) => {
-    void reason;
-    return false;
+  const issues: SequenceValidationIssue[] = [];
+  const fail = (detail: SequenceValidationIssue) => {
+    issues.push(detail);
+    return issues;
   };
   const parsedSteps = z.array(sequenceStepSchema).safeParse(generation.steps);
   if (!parsedSteps.success) {
-    return fail("schema");
+    return fail(issue("schema", [], false));
   }
 
   const steps = parsedSteps.data;
   if (steps.length !== input.sequenceLength) {
-    return fail("length");
+    return fail(issue("length", [], false));
   }
   const stepNumbers = steps.map((step) => step.stepNumber);
   if (!stepNumbers.every((stepNumber, index) => stepNumber === index + 1)) {
-    return fail("order");
+    return fail(issue("order", [], false));
   }
   const purposes = new Set(steps.map((step) => step.purpose));
   if (purposes.size !== steps.length) {
-    return fail("purposes");
+    return fail(issue("purposes", [], false));
   }
   const allowedChannels = channelsForSequence(input.primaryChannel);
   if (!steps.every((step) => allowedChannels.includes(step.channel))) {
-    return fail("channel");
+    return fail(issue("channel", [], false));
   }
   if (hasDuplicateCompleteSequence(steps, generation)) {
-    return fail("duplicate-sequence");
+    return fail(issue("duplicate-sequence", duplicateCompleteSequenceStepIndexes(steps, generation)));
   }
   if (hasTemplateLikeStructure(steps)) {
-    return fail("template-like");
+    return fail(issue("template-like", templateLikeStepIndexes(steps)));
   }
   if (!hasNarrativeProgression(generation, steps)) {
-    return fail("narrative");
+    return fail(issue("narrative", [1, 2]));
   }
   if (copiesGoldStandardExample(generation, steps)) {
-    return fail("gold-standard-copy");
+    return fail(issue("gold-standard-copy", [], false));
   }
-  if (steps.some((step) => containsStepContamination(step, input.sequenceLength))) {
-    return fail("contamination");
+  const contaminatedStep = firstStepIndex(steps, (step) => containsStepContamination(step, input.sequenceLength));
+  if (contaminatedStep.length > 0) {
+    return fail(issue("contamination", contaminatedStep));
   }
   if (hasEntityMismatch(input, steps, records)) {
-    return fail("entity");
+    return fail(issue("entity", [], false));
   }
   if (
     input.primaryChannel === "MIXED" &&
@@ -1114,100 +1333,110 @@ function validateSequenceGeneration(
       steps.some((step) => step.channel === "LINKEDIN")
     )
   ) {
-    return fail("mixed");
+    return fail(issue("mixed", [], false));
   }
-  const normalized = steps.map(normalizedMessage);
-  for (let index = 0; index < normalized.length; index += 1) {
-    for (let compare = index + 1; compare < normalized.length; compare += 1) {
-      if (similarity(normalized[index], normalized[compare]) > 0.9) {
-        return fail("similarity");
-      }
-    }
+  const similaritySteps = similarStepIndexes(steps);
+  if (similaritySteps.length > 0) {
+    return fail(issue("similarity", similaritySteps));
   }
-  const ctas = steps.map(normalizedCta).filter(Boolean);
-  if (new Set(ctas).size !== ctas.length) {
-    return fail("duplicate-cta");
+  const duplicateCtas = repeatedCtaStepIndexes(steps);
+  if (duplicateCtas.length > 0) {
+    return fail(issue("duplicate-cta", duplicateCtas));
   }
   if (hasRepeatedCtaIntent(steps)) {
-    return fail("cta-intent");
+    return fail(issue("cta-intent", ctaIntentRecoveryStepIndexes(steps)));
   }
-  if (steps.some((step) => questionCount(`${step.messageBody} ${step.cta}`) > 2)) {
-    return fail("questions");
+  const questionStep = firstStepIndex(steps, (step) => questionCount(`${step.messageBody} ${step.cta}`) > 2);
+  if (questionStep.length > 0) {
+    return fail(issue("questions", questionStep));
   }
-  if (steps.some((step) => questionCount(step.cta) > 1)) {
-    return fail("cta-questions");
+  const ctaQuestionStep = firstStepIndex(steps, (step) => questionCount(step.cta) > 1);
+  if (ctaQuestionStep.length > 0) {
+    return fail(issue("cta-questions", ctaQuestionStep));
   }
-  if (
-    steps.some(
-      (step) =>
-        wordCount(
-          [
-            step.subjectLine,
-            step.connectionRequest,
-            step.imagePlaceholder,
-            step.messageBody,
-            step.cta,
-          ]
-            .filter(Boolean)
-            .join(" "),
-        ) > 110,
-    )
-  ) {
-    return fail("word-count");
+  const wordyStep = firstStepIndex(
+    steps,
+    (step) =>
+      wordCount(
+        [
+          step.subjectLine,
+          step.connectionRequest,
+          step.imagePlaceholder,
+          step.messageBody,
+          step.cta,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ) > 110,
+  );
+  if (wordyStep.length > 0) {
+    return fail(issue("word-count", wordyStep));
   }
-  if (steps.some((step) => containsVagueAnonymousCustomerStory(step.messageBody))) {
-    return fail("anonymous");
+  const anonymousStep = firstStepIndex(steps, (step) => containsVagueAnonymousCustomerStory(step.messageBody));
+  if (anonymousStep.length > 0) {
+    return fail(issue("anonymous", anonymousStep));
   }
-  if (
-    steps.some((step) =>
-      containsUnsupportedOrganicClaim(
-        input,
-        `${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`,
-        records,
-      ),
-    )
-  ) {
-    return fail("organic");
+  const organicStep = firstStepIndex(steps, (step) =>
+    containsUnsupportedOrganicClaim(
+      input,
+      `${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`,
+      records,
+    ),
+  );
+  if (organicStep.length > 0) {
+    return fail(issue("organic", organicStep, false));
   }
-  if (steps.some((step) => containsVagueLanguage(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`))) {
-    return fail("vague");
+  const vagueStep = firstStepIndex(steps, (step) =>
+    containsVagueLanguage(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`),
+  );
+  if (vagueStep.length > 0) {
+    return fail(issue("vague", vagueStep));
   }
   if (steps[0] && containsUnsupportedStepOneClaim(input, steps[0])) {
-    return fail("step1-claim");
+    return fail(issue("step1-claim", [0], false));
   }
   const hasHybridAcceptedStep = generation.safetyNotes.some((note) =>
     /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
   );
   if (!hasHybridAcceptedStep) {
     if (!validateStepOneReference(steps[0])) {
-      return fail("step1-reference");
+      return fail(issue("step1-reference", [0]));
     }
     if (!validateStepTwoReference(steps[1])) {
-      return fail("step2-reference");
+      return fail(issue("step2-reference", [1]));
     }
     if (!validateStepThreeReference(steps[2])) {
-      return fail("step3-reference");
+      return fail(issue("step3-reference", [2]));
     }
     if (!validateStepFourReference(steps[3])) {
-      return fail("step4-reference");
+      return fail(issue("step4-reference", [3]));
     }
   }
   if (!hasVisualContext(input) && !input.serpEvidence) {
-    if (steps.some((step, index) => index !== 1 && (step.imagePlaceholder || step.imageContextNote))) {
-      return fail("unexpected-image");
+    const unexpectedImageStep = firstStepIndex(
+      steps,
+      (step, index) => index !== 1 && Boolean(step.imagePlaceholder || step.imageContextNote),
+    );
+    if (unexpectedImageStep.length > 0) {
+      return fail(issue("unexpected-image", unexpectedImageStep, false));
     }
-    if (steps.some((step, index) => index !== 1 && containsUnsupportedVisualClaim(step.messageBody))) {
-      return fail("unsupported-visual");
+    const unsupportedVisualStep = firstStepIndex(
+      steps,
+      (step, index) => index !== 1 && containsUnsupportedVisualClaim(step.messageBody),
+    );
+    if (unsupportedVisualStep.length > 0) {
+      return fail(issue("unsupported-visual", unsupportedVisualStep, false));
     }
   }
   if (hasVisualContext(input)) {
     const stepTwo = steps[1];
     if (!stepTwo.imageContextNote) {
-      return fail("image-note");
+      return fail(issue("image-note", [1], false));
     }
   }
-  if (steps.some((step) => containsProspectWasteClaim(input, step.messageBody))) {
-    return fail("waste");
+  const wasteStep = firstStepIndex(steps, (step) => containsProspectWasteClaim(input, step.messageBody));
+  if (wasteStep.length > 0) {
+    return fail(issue("waste", wasteStep, false));
   }
   if (
     steps.length >= 4 &&
@@ -1219,14 +1448,14 @@ function validateSequenceGeneration(
         steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP")
     )
   ) {
-    return fail("progression");
+    return fail(issue("progression", [], false));
   }
   const finalStep = steps[steps.length - 1];
   const longestEarlierLength = Math.max(
     ...steps.slice(0, -1).map((step) => step.messageBody.length),
   );
   if (finalStep.messageBody.length > longestEarlierLength) {
-    return fail("final-length");
+    return fail(issue("final-length", [steps.length - 1]));
   }
   if (
     finalStep.purpose === "SOCIAL_PROOF"
@@ -1239,14 +1468,14 @@ function validateSequenceGeneration(
           )
         : true
   ) {
-    return fail("final-close");
+    return fail(issue("final-close", [steps.length - 1]));
   }
   if (
     finalStep.purpose === "SOCIAL_PROOF"
       ? hasSocialProofPitchRestart(finalStep)
       : hasFinalStepPitchRestart(finalStep)
   ) {
-    return fail("final-pitch");
+    return fail(issue("final-pitch", [steps.length - 1]));
   }
   const rendered = JSON.stringify({
     overallStrategy: generation.overallStrategy,
@@ -1258,12 +1487,20 @@ function validateSequenceGeneration(
     rendered,
   );
   if (containsCommercialTerms(renderedForRestrictedChecks) || containsCompetitorClaim(rendered)) {
-    return fail("restricted");
+    return fail(issue("restricted", [], false));
   }
   if (hasMultipleProofCompanies(generation, records)) {
-    return fail("proof-companies");
+    return fail(issue("proof-companies", [], false));
   }
-  return true;
+  return issues;
+}
+
+function sequenceValidationIssues(
+  input: BuildSequenceInput,
+  generation: SequenceGeneration,
+  records: SequenceKnowledgeRecord[] = [],
+) {
+  return sequenceValidationIssueDetails(input, generation, records).map((detail) => detail.reason);
 }
 
 function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {
@@ -1306,11 +1543,60 @@ function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGen
   };
 }
 
+function recoverSequenceSteps(
+  generated: SequenceGeneration,
+  fallbackGenerated: SequenceGeneration,
+  issues: SequenceValidationIssue[],
+  alreadyRecovered = new Set<number>(),
+) {
+  if (issues.length === 0) {
+    return undefined;
+  }
+  if (issues.some((detail) => !detail.recoverable || detail.stepIndexes.length === 0)) {
+    return undefined;
+  }
+  const stepIndexes = Array.from(
+    new Set(issues.flatMap((detail) => detail.stepIndexes)),
+  )
+    .filter((index) => !alreadyRecovered.has(index))
+    .sort((left, right) => left - right);
+  if (stepIndexes.length === 0 || stepIndexes.length >= generated.steps.length) {
+    return undefined;
+  }
+  const fallbackByNumber = new Map(
+    fallbackGenerated.steps.map((step) => [step.stepNumber, step]),
+  );
+  const recoveredSteps = generated.steps.map((step, index) =>
+    stepIndexes.includes(index) ? fallbackByNumber.get(step.stepNumber) ?? fallbackGenerated.steps[index] ?? step : step,
+  );
+  if (recoveredSteps.some((step) => !step)) {
+    return undefined;
+  }
+  return {
+    ...generated,
+    steps: recoveredSteps,
+    safetyNotes: [
+      ...generated.safetyNotes,
+      `Final validation recovered step${stepIndexes.length === 1 ? "" : "s"} ${stepIndexes
+        .map((index) => index + 1)
+        .join(", ")} with deterministic step fallback: ${issues.map((detail) => detail.reason).join(", ")}.`,
+    ],
+    diagnostics: {
+      ...generated.diagnostics,
+      finalRecoveryReason: issues.map((detail) => detail.reason).join(", "),
+      finalRecoveredStepNumbers: stepIndexes.map((index) => index + 1),
+      aiStepsPreserved: generated.steps.length - stepIndexes.length,
+      finalFullSequenceFallbackUsed: false,
+    },
+  };
+}
+
 function openAiFallbackReason(providerName: string, notes: string[]) {
   if (providerName !== "openai") {
     return undefined;
   }
   return notes.find((note) =>
+    !/^Hybrid rewrite fell back for step \d+:/i.test(note) &&
     /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse|did not match the app schema/i.test(
       note,
     ),
@@ -1695,6 +1981,7 @@ export async function generateBuildSequence(
   rawInput: unknown,
   dependencies: BuildSequenceDependencies = {},
 ) {
+  const totalStarted = nowMs();
   const parsed = buildSequenceSchema.safeParse(rawInput);
   if (!parsed.success) {
     const missingOrInvalidFields = Array.from(
@@ -1722,17 +2009,17 @@ export async function generateBuildSequence(
     creatorId,
     input: parsedInput,
     persistence,
+    semanticExtractionProvider: dependencies.semanticExtractionProvider,
   });
   const input = memoryResult.input;
   if (!input.companyName.trim()) {
     return err("VALIDATION_ERROR", "Build Sequence needs: Company or prospect context with a company.");
   }
 
-  const accountStatus = await assertAccountCanGenerate(
+  const accountStatus = await checkAccountStatus(
     {
       companyName: input.companyName,
       companyDomain: input.companyWebsite,
-      overrideRequested: input.accountStatusOverride,
       creatorId,
     },
     dependencies.persistence ? { persistence: accountStatusPersistence(persistence) } : {},
@@ -1740,6 +2027,10 @@ export async function generateBuildSequence(
   if (!accountStatus.ok) {
     return accountStatus;
   }
+  if (accountStatus.data.severity === "BLOCKED") {
+    return err("ACCOUNT_STATUS_BLOCKED", accountStatus.data.message);
+  }
+  const accountStatusWarning = accountStatusDraftWarning(accountStatus.data);
 
   const provider = dependencies.provider ?? createBuildSequenceAiProvider();
   const eligibleRecords = (await persistence.retrieveEligibleKnowledge(input)).filter((record) => {
@@ -1761,11 +2052,14 @@ export async function generateBuildSequence(
   const sources = sourceReferences(records);
   const selected = selectSequenceAngle(input);
   const prospectIntelligence = buildProspectIntelligence(input, records);
-  const messageStrategy = planMessageStrategy({
+  const strategyStarted = nowMs();
+  const messageStrategy = await planAiMessageStrategy({
     input,
     intelligence: prospectIntelligence,
     records,
+    provider: dependencies.messageStrategyProvider,
   });
+  const strategyDurationMs = nowMs() - strategyStarted;
   const selectedGoldStandardExamples = selectGoldStandardExamples({
     intelligence: prospectIntelligence,
     primaryAngle: messageStrategy.primaryAngle,
@@ -1779,9 +2073,19 @@ export async function generateBuildSequence(
     messageStrategy,
     selectedGoldStandardExamples,
     detectedAccountSignals: detectSequenceAccountSignals(input),
-    safetyNotes: [...safetyNotes(input, records), ...proofSelection.notes],
+    safetyNotes: [
+      ...safetyNotes(input, records),
+      ...proofSelection.notes,
+      ...(accountStatusWarning ? [accountStatusWarning] : []),
+      ...semanticIntakeSafetyNotes({
+        mode: memoryResult.extractionMode,
+        rejectedFacts: memoryResult.rejectedFacts,
+        fallbackReason: memoryResult.extractionFallbackReason,
+      }),
+    ],
     knowledgeLimitations: knowledgeLimitations(input, records),
   };
+  const sequenceStarted = nowMs();
   let generated = sanitizeSequenceGeneration(
     await provider.generate({
       input,
@@ -1790,6 +2094,7 @@ export async function generateBuildSequence(
       generation: baseGeneration,
     }),
   );
+  const sequenceGenerationDurationMs = nowMs() - sequenceStarted;
   let providerMetadata = provider.metadata;
   const fallbackReason = openAiFallbackReason(provider.metadata.providerName, generated.safetyNotes);
   if (fallbackReason) {
@@ -1799,7 +2104,12 @@ export async function generateBuildSequence(
     );
   }
 
-  if (!validateSequenceGeneration(input, generated, records)) {
+  const firstValidationStarted = nowMs();
+  let validationIssueDetails = sequenceValidationIssueDetails(input, generated, records);
+  let validationIssues = validationIssueDetails.map((detail) => detail.reason);
+  let finalValidationDurationMs = nowMs() - firstValidationStarted;
+  let finalFullSequenceFallbackUsed = false;
+  if (validationIssues.length > 0) {
     if (provider.metadata.providerName === "openai") {
       const fallbackProvider = new DeterministicBuildSequenceProvider();
       const fallbackGenerated = sanitizeSequenceGeneration(
@@ -1816,24 +2126,122 @@ export async function generateBuildSequence(
           },
         }),
       );
-      if (!validateSequenceGeneration(input, fallbackGenerated, records)) {
-        return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+      const recoveryValidationStarted = nowMs();
+      let recovered: SequenceGeneration | undefined;
+      const recoveredStepIndexes = new Set<number>();
+      for (let attempt = 0; attempt < generated.steps.length - 1 && validationIssueDetails.length > 0; attempt += 1) {
+        const nextRecovered = recoverSequenceSteps(
+          recovered ?? generated,
+          fallbackGenerated,
+          validationIssueDetails,
+          recoveredStepIndexes,
+        );
+        if (!nextRecovered) {
+          recovered = undefined;
+          break;
+        }
+        for (const stepNumber of nextRecovered.diagnostics?.finalRecoveredStepNumbers ?? []) {
+          recoveredStepIndexes.add(stepNumber - 1);
+        }
+        recovered = {
+          ...nextRecovered,
+          diagnostics: {
+            ...nextRecovered.diagnostics,
+            finalRecoveredStepNumbers: Array.from(recoveredStepIndexes)
+              .sort((left, right) => left - right)
+              .map((index) => index + 1),
+            aiStepsPreserved: generated.steps.length - recoveredStepIndexes.size,
+          },
+        };
+        validationIssueDetails = sequenceValidationIssueDetails(input, recovered, records);
+        validationIssues = validationIssueDetails.map((detail) => detail.reason);
       }
-      generated = fallbackGenerated;
-      providerMetadata = fallbackProvider.metadata;
+      finalValidationDurationMs += nowMs() - recoveryValidationStarted;
+      if (recovered && validationIssueDetails.length === 0) {
+        generated = recovered;
+        validationIssueDetails = [];
+        validationIssues = [];
+      }
+      if (validationIssues.length > 0) {
+        const fallbackValidationStarted = nowMs();
+        const fallbackValidationIssues = sequenceValidationIssues(input, fallbackGenerated, records);
+        finalValidationDurationMs += nowMs() - fallbackValidationStarted;
+        if (fallbackValidationIssues.length > 0) {
+          const diagnosticIssues = [
+            ...validationIssues.map((issue) => `openai:${issue}`),
+            ...fallbackValidationIssues.map((issue) => `fallback:${issue}`),
+          ];
+          return err(
+            "GENERATION_REJECTED",
+            `Generated sequence failed safety or quality validation: ${diagnosticIssues.join(", ")}.`,
+          );
+        }
+        generated = {
+          ...fallbackGenerated,
+          diagnostics: {
+            ...generated.diagnostics,
+            finalRecoveryReason: validationIssues.join(", "),
+            finalFullSequenceFallbackUsed: true,
+            aiStepsPreserved: 0,
+          },
+        };
+        providerMetadata = fallbackProvider.metadata;
+        finalFullSequenceFallbackUsed = true;
+        validationIssues = [];
+      }
     } else {
-      return err("GENERATION_REJECTED", "Generated sequence failed safety or quality validation.");
+      return err(
+        "GENERATION_REJECTED",
+        `Generated sequence failed safety or quality validation: ${validationIssues.join(", ")}.`,
+      );
     }
   }
+  const stepDiagnostics = generated.diagnostics?.stepRewriteDiagnostics ?? [];
+  const strategyDiagnostics = messageStrategy.diagnostics;
+  const diagnostics: BuildSequenceDiagnostics = {
+    totalDurationMs: nowMs() - totalStarted,
+    semanticIntakeDurationMs: memoryResult.semanticIntakeDurationMs,
+    strategyDurationMs,
+    strategyFirstCallDurationMs: strategyDiagnostics?.firstCallDurationMs,
+    strategyRetryDurationMs: strategyDiagnostics?.retryDurationMs,
+    strategyRetryUsed: strategyDiagnostics?.retryUsed,
+    strategyFallbackUsed: strategyDiagnostics?.fallbackUsed,
+    strategyFirstIssues: strategyDiagnostics?.firstIssues,
+    strategyRetryIssues: strategyDiagnostics?.retryIssues,
+    sequenceGenerationDurationMs,
+    finalValidationDurationMs,
+    totalAiCalls:
+      (memoryResult.semanticIntakeDurationMs ? 1 : 0) +
+      (strategyDiagnostics?.firstCallDurationMs ? 1 : 0) +
+      (strategyDiagnostics?.retryDurationMs ? 1 : 0) +
+      stepDiagnostics.reduce(
+        (total, step) => total + (step.firstCallDurationMs ? 1 : 0) + (step.retryDurationMs ? 1 : 0),
+        0,
+      ),
+    totalRetries:
+      (strategyDiagnostics?.retryUsed ? 1 : 0) +
+      stepDiagnostics.filter((step) => step.retryUsed).length,
+    stepRewriteDiagnostics: stepDiagnostics,
+    validationIssues,
+    finalRecoveryReason: generated.diagnostics?.finalRecoveryReason,
+    finalRecoveredStepNumbers: generated.diagnostics?.finalRecoveredStepNumbers,
+    finalFullSequenceFallbackUsed:
+      generated.diagnostics?.finalFullSequenceFallbackUsed ?? finalFullSequenceFallbackUsed,
+    aiStepsPreserved:
+      generated.diagnostics?.aiStepsPreserved ??
+      generated.steps.length - stepDiagnostics.filter((step) => step.fallbackUsed).length,
+  };
   const resultWithoutId = {
     ...generated,
     sequenceLength: input.sequenceLength,
     overallDuration: input.desiredOverallDuration,
     prospectId: memoryResult.memory?.prospect.id,
     prospectMemory: memoryResult.memory,
+    semanticIntakeMode: memoryResult.extractionMode,
     recordsUsed: records,
     sourceReferences: sources,
     provider: providerMetadata,
+    diagnostics,
   };
   const draftId = await persistence.persistDraft({
     creatorId,

@@ -102,6 +102,8 @@ function persistence(
 }
 
 describe("Phase N draft provider and versioning", () => {
+  const deterministicProvider = new DeterministicAiProvider();
+
   it("exposes not-configured fallback and configured OpenAI status without secrets", async () => {
     await expect(new DeterministicAiProvider().getProviderStatus()).resolves.toMatchObject({
       status: "NOT_CONFIGURED",
@@ -166,7 +168,7 @@ describe("Phase N draft provider and versioning", () => {
         workflow: "CREATE_OUTREACH",
         command: "SHORTEN",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -192,7 +194,7 @@ describe("Phase N draft provider and versioning", () => {
         workflow: "CREATE_OUTREACH",
         command: "LESS_SALESY",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
     const changedCta = await refineDraftVersion(
       {
@@ -200,7 +202,7 @@ describe("Phase N draft provider and versioning", () => {
         workflow: "CREATE_OUTREACH",
         command: "CHANGE_CTA",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
 
     expect(lessSalesy.ok).toBe(true);
@@ -223,7 +225,7 @@ describe("Phase N draft provider and versioning", () => {
         generatedDraftId: "draft-1",
         workflow: "CREATE_OUTREACH",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
 
     expect(result.ok).toBe(true);
@@ -303,7 +305,7 @@ describe("Phase N draft provider and versioning", () => {
         command: "CUSTOM",
         customFeedback: "Make it less salesy.",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
     expect(custom.ok && custom.data.versions).toHaveLength(2);
 
@@ -323,7 +325,7 @@ describe("Phase N draft provider and versioning", () => {
         workflow: "CREATE_OUTREACH",
         command: "FIX_SAFETY",
       },
-      { persistence: store },
+      { persistence: store, provider: deterministicProvider },
     );
     expect(fixed.ok && fixed.data.currentVersion.generatedContent).not.toMatch(
       /always reduce|50%/i,

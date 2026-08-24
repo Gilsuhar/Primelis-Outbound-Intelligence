@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/ask-signal-brain/actions", () => ({
@@ -49,12 +49,81 @@ import {
   __buildSequenceVariantTest,
   BuildSequenceClient,
 } from "@/features/build-sequence/build-sequence-client";
-import type { SequenceStep } from "@/features/build-sequence/types";
+import type { BuildSequenceResult, SequenceStep } from "@/features/build-sequence/types";
 import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
 import { ReplyToProspectClient } from "@/features/reply-to-prospect/reply-to-prospect-client";
 import { AccountResearchClient } from "@/features/account-research/account-research-client";
+import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
+
+function buildSequenceResult(overrides: Partial<BuildSequenceResult> = {}): BuildSequenceResult {
+  return {
+    draftId: "draft-test",
+    overallStrategy: "Build a concise paid-search sequence.",
+    selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+    angleRationale: "The account context points to branded-search efficiency.",
+    personaEmphasis: {
+      persona: "PAID_SEARCH_LEADER",
+      emphasis: "operational control",
+      rationale: "Keep it practical and tied to campaign decisions.",
+    },
+    prospectIntelligence: {
+      prospectName: "Morgan Lee",
+      companyName: "Cisco",
+      jobTitle: "Director of Paid Search",
+      persona: "PAID_SEARCH",
+      relevantFacts: [],
+      selectedInsights: [],
+      companyContext: [],
+      likelyPriorities: [],
+      serpScenario: "UNKNOWN",
+      serpEvidence: {
+        keywords: [],
+        soloKeywords: [],
+        contestedKeywords: [],
+        competitors: [],
+        observations: [],
+        structuredKeywords: [],
+      },
+      primaryAngle: "Brand efficiency",
+      confidence: { prospect: "MEDIUM", serp: "LOW" },
+    },
+    messageStrategy: {
+      prospectInsight: "Paid-search leader at Cisco.",
+      businessQuestion: "Where does live competition change branded bidding?",
+      productGap: "Google Ads does not make live SERP competition obvious.",
+      primaryAngle: "Brand efficiency",
+      relevantCapability: "Live SERP monitoring",
+      whyThisShouldResonate: "It maps to paid-search operations.",
+      openingStyle: "BUSINESS_QUESTION",
+      sequenceNarrative: [
+        { step: 1, objective: "Open relevance", newInformation: "Prospect context", ctaIntent: "Discovery" },
+        { step: 2, objective: "Frame problem", newInformation: "Auction changes", ctaIntent: "Assess process" },
+        { step: 3, objective: "Explain method", newInformation: "Signal capability", ctaIntent: "Invite review" },
+        { step: 4, objective: "Proof", newInformation: "Approved proof", ctaIntent: "Soft CTA" },
+      ],
+      confidence: "MEDIUM",
+      selectedGoldStandardExampleIds: [],
+    },
+    selectedGoldStandardExamples: [],
+    detectedAccountSignals: [],
+    steps: [],
+    claimsUsed: [],
+    safetyNotes: [],
+    knowledgeLimitations: [],
+    sequenceLength: 4,
+    overallDuration: "12 business days",
+    recordsUsed: [],
+    sourceReferences: [],
+    provider: {
+      providerName: "deterministic-development",
+      modelName: "deterministic",
+      deterministic: true,
+    },
+    ...overrides,
+  };
+}
 
 describe("Sales workflow UI", () => {
   it("keeps Create Outreach focused on a quick brief", () => {
@@ -93,22 +162,87 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Steps")).toBeTruthy();
     expect(screen.getByText("Tone")).toBeTruthy();
     expect(screen.getByText("Duration")).toBeTruthy();
-    expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
+    expect(screen.getByText("Edit extracted details").closest("details")?.open).toBe(false);
+    expect(document.querySelector("form")?.noValidate).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('input[name="companyName"]')?.required).toBe(false);
   });
 
   it("keeps Build Sequence screenshot context optional and tucked into advanced details", () => {
     render(<BuildSequenceClient />);
 
-    const advanced = screen.getByText("Advanced optional details").closest("details");
+    const advanced = screen.getByText("Edit extracted details").closest("details");
     expect(advanced?.open).toBe(false);
 
-    fireEvent.click(screen.getByText("Advanced optional details"));
+    fireEvent.click(screen.getByText("Edit extracted details"));
     expect(screen.getByText("Screenshot or SERP context available")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Screenshot or SERP context available"));
     expect(screen.getByLabelText("Screenshot context")).toBeTruthy();
     expect(screen.getByLabelText("What the screenshot shows")).toBeTruthy();
     expect(screen.getByLabelText("Brand keyword")).toBeTruthy();
+  });
+
+  it("submits Build Sequence from Prospect Context only and renders action errors", async () => {
+    const action = vi.mocked(generateBuildSequenceAction);
+    action.mockResolvedValueOnce({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: {
+        value:
+          "Chris\nRemofirst\nmanaged over $50M in paid media\ninterested in AI / automation for paid search\nGoogle Ads live SERP competition context",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    expect(screen.getByText("Understanding prospect... Building strategy... Generating sequence...")).toBeTruthy();
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(action.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        companyName: "",
+        contactFirstName: undefined,
+        industry: undefined,
+        accountStatusOverride: false,
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("Test-visible generation failure.")).toBeTruthy());
+  });
+
+  it("renders existing-activity warnings after successful Build Sequence generation", async () => {
+    const action = vi.mocked(generateBuildSequenceAction);
+    action.mockResolvedValueOnce({
+      ok: true,
+      data: buildSequenceResult({
+        safetyNotes: [
+          "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
+        ],
+      }),
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
+        ),
+      ).toBeTruthy(),
+    );
   });
 
   it("gives Build Sequence Generate buttons materially different local variants", () => {

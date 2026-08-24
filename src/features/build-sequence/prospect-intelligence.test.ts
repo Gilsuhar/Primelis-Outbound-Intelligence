@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BuildSequenceInput, SequenceKnowledgeRecord } from "./types";
-import { buildProspectIntelligence } from "./prospect-intelligence";
+import { buildProspectIntelligence, rankProspectInsights } from "./prospect-intelligence";
 
 const input: BuildSequenceInput = {
   companyName: "Cursor",
@@ -135,6 +135,55 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.relevantFacts).toEqual([]);
   });
 
+  it("does not accept role fragments as prospect first names", () => {
+    for (const roleFragment of ["Head", "Senior", "Paid", "Director", "VP", "Growth"]) {
+      const intelligence = buildProspectIntelligence({
+        ...input,
+        contactFirstName: roleFragment,
+        prospectContext: `${roleFragment}\nCursor\nPaid Search Lead`,
+      });
+
+      expect(intelligence.prospectName, roleFragment).not.toBe(roleFragment);
+    }
+  });
+
+  it("does not treat bare company names or source labels as personalization facts", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      prospectContext:
+        "About: I build performance marketing teams across paid search.\nCursor\nSERP:\nCursor pricing - solo",
+    });
+
+    expect(intelligence.relevantFacts).toEqual([
+      "I build performance marketing teams across paid search.",
+    ]);
+    expect(intelligence.relevantFacts).not.toContain("Cursor");
+    expect(intelligence.relevantFacts.join(" ")).not.toContain("About:");
+  });
+
+  it("does not treat absence of SERP evidence as SERP evidence", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      serpEvidence: "No verified SERP evidence supplied.\nNo verified screenshot yet.",
+    });
+
+    expect(intelligence.serpScenario).toBe("UNKNOWN");
+    expect(intelligence.serpEvidence.keywords).toEqual([]);
+    expect(intelligence.serpEvidence.observations).toEqual([]);
+  });
+
+  it("normalizes dash competitor syntax without including the keyword in the competitor", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      serpEvidence: "Cursor accounting - competitor BookPilot appeared",
+    });
+
+    expect(intelligence.serpScenario).toBe("CONTESTED");
+    expect(intelligence.serpEvidence.contestedKeywords).toEqual(["Cursor accounting"]);
+    expect(intelligence.serpEvidence.competitors).toContain("BookPilot");
+    expect(intelligence.serpEvidence.competitors).not.toContain("Cursor accounting - competitor BookPilot");
+  });
+
   it("extracts a prospect name and role from pasted profile context without treating the role as a fact", () => {
     const intelligence = buildProspectIntelligence({
       ...input,
@@ -165,5 +214,139 @@ describe("Prospect Intelligence extraction", () => {
 
     expect(intelligence.recommendedProofPoint).toContain("AppsFlyer");
     expect(intelligence.recommendedProofPoint).toContain("29%");
+  });
+
+  it("ranks Tanvi's commercial paid-search responsibilities above her raw LinkedIn headline", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "Hush",
+      contactFirstName: "Tanvi",
+      contactRole: "Paid Search Coordinator",
+      prospectContext: [
+        "Tanvi Mhatre",
+        "Performance Marketer | Google Ads · Microsoft Ads · Programmatic · Display | Documenting & building my career in public",
+        "Paid Search Coordinator",
+        "Hush",
+        "Now works at Hush managing paid search, display, YouTube, and programmatic campaigns across Google Ads, Microsoft Ads, and SA360.",
+        "Hands-on across campaign strategy, optimisation, and performance reporting.",
+        "Also documents her marketing career in public.",
+        "Wanted to be a doctor.",
+        "Chemistry degree.",
+        "Forensic science diploma.",
+        "Anchoring qualification.",
+        "Moved to London at 22.",
+      ].join("\n"),
+    });
+
+    expect(intelligence.selectedInsights.map((insight) => insight.text).slice(0, 3)).toEqual([
+      "Now works at Hush managing paid search, display, YouTube, and programmatic campaigns across Google Ads, Microsoft Ads, and SA360.",
+      "Hands-on across campaign strategy, optimisation, and performance reporting.",
+      "Also documents her marketing career in public.",
+    ]);
+    expect(intelligence.selectedInsights[0]?.text).not.toMatch(/^Performance Marketer \|/i);
+    expect(intelligence.selectedInsights.map((insight) => insight.text).join(" ")).not.toMatch(
+      /wanted to be a doctor|chemistry|forensic|anchoring|moved to london/i,
+    );
+  });
+
+  it("selects commercially useful top facts across varied prospect contexts", () => {
+    const cases = [
+      {
+        label: "strong paid-search responsibilities",
+        facts: [
+          "Performance Marketer | Google Ads · Microsoft Ads · Programmatic · Display",
+          "Manages paid search across Google Ads, Microsoft Ads, and SA360.",
+          "Has a chemistry degree.",
+        ],
+        expectedTop: /manages paid search across google ads, microsoft ads, and sa360/i,
+      },
+      {
+        label: "AI automation interest",
+        facts: [
+          "Exploring AI and automation for paid-search decisions.",
+          "Likes building personal productivity systems.",
+          "Head of Growth | SaaS | AI",
+        ],
+        expectedTop: /ai and automation for paid-search decisions/i,
+      },
+      {
+        label: "international expansion",
+        facts: [
+          "Expanded paid search into five international markets this year.",
+          "Moved to London at 22.",
+          "Senior Performance Marketer",
+        ],
+        expectedTop: /international markets/i,
+      },
+      {
+        label: "efficiency pressure",
+        facts: [
+          "Under budget pressure to improve paid-search efficiency without losing coverage.",
+          "Documents career lessons publicly.",
+          "Marketing Lead",
+        ],
+        expectedTop: /budget pressure.*paid-search efficiency/i,
+      },
+      {
+        label: "strong SERP adjacent evidence",
+        facts: [
+          "Reviewing branded SERP changes for high-CPC terms each week.",
+          "Studied forensic science.",
+          "Performance Marketer | Search",
+        ],
+        expectedTop: /branded serp changes/i,
+      },
+      {
+        label: "weak context",
+        facts: ["Paid Search Manager", "Hush", "About"],
+        expectedTop: undefined,
+      },
+      {
+        label: "only title company",
+        facts: ["Senior Paid Search Manager", "RetailCo"],
+        expectedTop: undefined,
+      },
+      {
+        label: "irrelevant personal history",
+        facts: [
+          "Wanted to be a doctor before moving into marketing.",
+          "Has a forensic science diploma.",
+          "Runs Google Ads budget reviews.",
+        ],
+        expectedTop: /google ads budget reviews/i,
+      },
+      {
+        label: "noisy LinkedIn headline",
+        facts: [
+          "Head of Growth | SaaS | AI | Advisor | Speaker",
+          "Owns paid acquisition reporting across Google Ads and Bing.",
+        ],
+        expectedTop: /owns paid acquisition reporting/i,
+      },
+      {
+        label: "multiple plausible facts",
+        facts: [
+          "Leads performance reporting for branded-search campaigns.",
+          "Testing automation for bid changes.",
+          "Recently promoted to Growth Lead.",
+        ],
+        expectedTop: /branded-search campaigns|automation for bid changes/i,
+      },
+    ];
+
+    const ranked = cases.map((item) => ({
+      label: item.label,
+      top3: rankProspectInsights(item.facts, input).map((insight) => insight.text),
+      expectedTop: item.expectedTop,
+    }));
+
+    for (const item of ranked) {
+      if (!item.expectedTop) {
+        expect(item.top3, item.label).toEqual([]);
+        continue;
+      }
+      expect(item.top3[0], item.label).toMatch(item.expectedTop);
+      expect(item.top3[0], item.label).not.toMatch(/\|.*\||wanted to be|forensic|chemistry|^hush$/i);
+    }
   });
 });

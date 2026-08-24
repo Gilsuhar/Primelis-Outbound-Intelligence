@@ -4,6 +4,7 @@ import {
   labelForSequenceAngle,
 } from "@/features/build-sequence/sequence-policy";
 import type {
+  BuildSequenceDiagnostics,
   BuildSequenceInput,
   MessageStrategy,
   SequenceGeneration,
@@ -16,7 +17,7 @@ import type {
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
-import { createAiProvider, mapAiProviderError } from "./ai-provider";
+import { createAiProvider, mapAiProviderError, shouldUseOpenAiProvider } from "./ai-provider";
 import {
   displayCompanyName,
   winningPatternForPurpose,
@@ -46,6 +47,10 @@ function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function nowMs() {
+  return Date.now();
+}
+
 function protectedKeywordPhrases(intelligence?: ProspectIntelligence) {
   return Array.from(
     new Set(
@@ -71,7 +76,7 @@ function stripCommercialTerms(text: string, protectedPhrases: string[] = []) {
     });
   const sanitized = masked
     .replace(
-      /\b(pricing|price|poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
+      /\b(pricing|price)\b(?![-\s]page)\b|\b(poc|proof of concept|trial|discount|guarantee|guaranteed)\b/gi,
       "commercial details",
     )
     .replace(/\bversus\b/gi, "and")
@@ -247,7 +252,10 @@ function extractNumbers(text: string) {
 function extractCapitalizedPhrases(text: string) {
   return Array.from(
     text.matchAll(/\b[A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3}\b/g),
-  ).map((match) => match[0].trim());
+  )
+    .flatMap((match) => match[0].split(/\.\s+/))
+    .map((match) => match.trim())
+    .filter(Boolean);
 }
 
 function allowedEntityVariants(value?: string) {
@@ -271,9 +279,15 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
     "Signal",
     "Primelis",
     "Google",
+    "Google Ads",
+    "Ads",
+    "Search Console",
     "Bing",
     "SERP",
     "CPC",
+    "CAC",
+    "KPIs",
+    "EMEA",
   ];
   const numbers = [
     ...extractNumbers(sheet.personalHook ?? ""),
@@ -288,7 +302,7 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
 }
 
 function isKnownRewriteStopword(noun: string) {
-  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|Re|Day|Step|Final|Congrats|Congratulations|Your|Across)$/i.test(noun);
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Standard|Adjust|Separating|Want)$/i.test(noun);
 }
 
 function entityAllowed(noun: string, allowed: AllowedEntities) {
@@ -456,8 +470,9 @@ function sanitizeProspectFacingFact(value: string) {
     .trim();
 }
 
-function directProspectFact(input: BuildSequenceInput, fact: string) {
-  const firstName = input.contactFirstName?.trim();
+function directProspectFact(input: BuildSequenceInput, fact: string, prospectName?: string) {
+  const firstName = input.contactFirstName?.trim() || prospectName?.trim();
+  const company = displayCompany(input);
   const sanitized = sanitizeProspectFacingFact(fact).replace(/\.$/, "");
   if (!firstName || !sanitized) {
     return sanitized;
@@ -467,16 +482,27 @@ function directProspectFact(input: BuildSequenceInput, fact: string) {
     return sanitized;
   }
   return sanitized
+    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+has\\b`, "i"), "you have")
+    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+is\\b`, "i"), "you're")
     .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+has\\b`, "i"), "you've")
     .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+is\\b`, "i"), "you're")
     .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+recently\\s+joined\\b`, "i"), "you recently joined")
+    .replace(new RegExp(`^(?:now\\s+)?works\\s+at\\s+${escapeRegExp(company)}\\s+managing\\b`, "i"), "you're managing")
+    .replace(/^manages\b/i, "you manage")
+    .replace(/^owns\b/i, "you own")
+    .replace(/^leads\b/i, "you lead")
+    .replace(/^runs\b/i, "you run")
+    .replace(/^hands-on\b/i, "you're hands-on")
     .replace(namePrefix, "you ")
-    .replace(/\band is\b/gi, "and are");
+    .replace(/\band is\b/gi, "and are")
+    .replace(/\bmaking him\b/gi, "which may make you")
+    .replace(/\bmaking her\b/gi, "which may make you")
+    .replace(/\bmaking them\b/gi, "which may make you");
 }
 
 function customerFacingAngle(angleLabel: string) {
   return angleLabel
-    .replace(/methodology comparison/i, "paid and organic search")
+    .replace(/methodology comparison/i, "paid-brand search conditions")
     .replace(/market control and visibility/i, "brand-search visibility")
     .replace(/solo.*ghost/i, "paid brand coverage");
 }
@@ -580,13 +606,37 @@ function buildStepFactSheet({
 }
 
 function firstPersonalFact(intelligence: ProspectIntelligence) {
-  return intelligence.relevantFacts
+  const rankedFacts =
+    intelligence.selectedInsights.length > 0
+      ? intelligence.selectedInsights.map((insight) => insight.text)
+      : intelligence.relevantFacts;
+  return rankedFacts
     .map((fact) => sanitizeProspectFacingFact(fact))
     .find((fact) =>
       fact &&
+      fact.toLowerCase() !== intelligence.companyName?.toLowerCase() &&
+      fact.toLowerCase() !== intelligence.prospectName?.toLowerCase() &&
+      fact.toLowerCase() !== intelligence.jobTitle?.toLowerCase() &&
       !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()) &&
       !(/^[A-Z][A-Za-z' -]{1,50}\.?$/.test(fact) && !/[0-9$]|\b(has|managed|exploring|built|led|owns|runs|responsible)\b/i.test(fact)),
     );
+}
+
+function responsibilityOpening({
+  input,
+  intelligence,
+  insight,
+}: {
+  input: BuildSequenceInput;
+  intelligence: ProspectIntelligence;
+  insight: string;
+}) {
+  const normalizedInsight = directProspectFact(input, insight, intelligence.prospectName).replace(/\.$/, "");
+  if (!normalizedInsight) return undefined;
+  if (/^you(?:'ve| are|'re| have|\s)/i.test(normalizedInsight)) {
+    return `${normalizedInsight}, so I wanted to ask one narrow branded-search question.`;
+  }
+  return `Given ${normalizedInsight}, I wanted to ask one narrow branded-search question.`;
 }
 
 function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
@@ -610,24 +660,35 @@ function accountOpening(input: BuildSequenceInput, intelligence: ProspectIntelli
     return `Congrats on your promotion to ${intelligence.jobTitle}.`;
   }
   if (fact && intelligence.confidence.prospect !== "LOW") {
-    return `I saw that ${directProspectFact(input, fact)}.`;
+    return (
+      responsibilityOpening({ input, intelligence, insight: fact }) ??
+      `For your ${buyerRole(input, intelligence)} role at ${company}, I would keep this to one narrow branded-search question.`
+    );
   }
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
     return `For your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
   }
-  return `Quick question on ${company}'s branded search: how do you track changes in the competitive landscape and know when your bids should change?`;
+  return `I had ${company} on my list for one narrow branded-search visibility check.`;
 }
 
-function prospectLedInsight(input: BuildSequenceInput, strategy: MessageStrategy) {
+function prospectLedInsight(
+  input: BuildSequenceInput,
+  intelligence: ProspectIntelligence,
+  strategy: MessageStrategy,
+) {
   if (strategy.openingStyle !== "PROSPECT_FACT") {
     return undefined;
   }
-  const firstName = input.contactFirstName?.trim();
-  const insight = directProspectFact(input, strategy.prospectInsight);
+  const firstName = input.contactFirstName?.trim() || intelligence.prospectName?.trim();
+  const insight = directProspectFact(input, strategy.prospectInsight, firstName);
   if (!insight || (firstName && insight.toLowerCase() === firstName.toLowerCase())) {
     return undefined;
   }
-  return `I saw that ${insight}.`;
+  return responsibilityOpening({
+    input,
+    intelligence,
+    insight,
+  });
 }
 
 function strategyFirstTouch(
@@ -635,7 +696,7 @@ function strategyFirstTouch(
   intelligence: ProspectIntelligence,
   strategy: MessageStrategy,
 ) {
-  const prospectInsight = prospectLedInsight(input, strategy) ?? accountOpening(input, intelligence);
+  const prospectInsight = prospectLedInsight(input, intelligence, strategy) ?? accountOpening(input, intelligence);
   return [
     prospectInsight,
     strategy.productGap,
@@ -884,7 +945,7 @@ function bodyForPurpose({
     TECHNICAL_CLARIFICATION: [
       greeting(input, intelligence),
       "",
-      "The methodology question is straightforward: before lowering or pausing anything, check paid ads, organic results, and search-page conditions together.",
+      "The methodology question is straightforward: before lowering or pausing anything, check live search-page conditions and paid coverage signals together.",
       "That keeps the conversation away from generic cost-cutting and focused on where paid coverage is actually needed.",
     ],
     LOW_PRESSURE_FOLLOW_UP: [
@@ -1125,9 +1186,7 @@ async function hybridRewriteSequence({
   request: BuildSequenceProviderRequest;
   result: SequenceGeneration;
 }) {
-  const rewrittenSteps: SequenceStep[] = [];
-  const notes: string[] = [];
-  for (const [index, step] of result.steps.entries()) {
+  const rewritten = await Promise.all(result.steps.map(async (step, index) => {
     const sheet = buildStepFactSheet({
       input: request.input,
       records: request.records,
@@ -1136,13 +1195,27 @@ async function hybridRewriteSequence({
       ctaIndex: index,
     });
     const allowed = buildAllowedEntities(sheet);
+    const diagnostics: NonNullable<BuildSequenceDiagnostics["stepRewriteDiagnostics"]>[number] = {
+      stepNumber: step.stepNumber,
+      retryUsed: false,
+      fallbackUsed: false,
+      firstFailures: [],
+      retryFailures: [],
+    };
     try {
+      const firstStarted = nowMs();
       const first = await rewriteStepWithHybrid({ provider, request, step, sheet, allowed });
+      diagnostics.firstCallDurationMs = nowMs() - firstStarted;
       if (first.accepted) {
-        rewrittenSteps.push(first.step);
-        notes.push(`Hybrid rewrite accepted for step ${step.stepNumber}.`);
-        continue;
+        return {
+          step: first.step,
+          note: `Hybrid rewrite accepted for step ${step.stepNumber}.`,
+          diagnostics,
+        };
       }
+      diagnostics.firstFailures = first.failures;
+      diagnostics.retryUsed = true;
+      const retryStarted = nowMs();
       const retry = await rewriteStepWithHybrid({
         provider,
         request,
@@ -1151,37 +1224,54 @@ async function hybridRewriteSequence({
         allowed,
         priorFailures: first.failures,
       });
+      diagnostics.retryDurationMs = nowMs() - retryStarted;
       if (retry.accepted) {
-        rewrittenSteps.push(retry.step);
-        notes.push(`Hybrid rewrite accepted on retry for step ${step.stepNumber}.`);
-        continue;
+        return {
+          step: retry.step,
+          note: `Hybrid rewrite accepted on retry for step ${step.stepNumber}.`,
+          diagnostics,
+        };
       }
-      rewrittenSteps.push(step);
-      notes.push(`Hybrid rewrite fell back for step ${step.stepNumber}: ${retry.failures.join("; ") || first.failures.join("; ")}.`);
+      diagnostics.retryFailures = retry.failures;
+      diagnostics.fallbackUsed = true;
+      return {
+        step,
+        note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${retry.failures.join("; ") || first.failures.join("; ")}.`,
+        diagnostics,
+      };
     } catch (error) {
-      rewrittenSteps.push(step);
       const failure = mapAiProviderError(error);
-      notes.push(`Hybrid rewrite fell back for step ${step.stepNumber}: ${failure.message}`);
+      diagnostics.fallbackUsed = true;
+      diagnostics.retryFailures = [failure.message];
+      return {
+        step,
+        note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${failure.message}`,
+        diagnostics,
+      };
     }
-  }
+  }));
   return {
     ...result,
-    steps: rewrittenSteps,
-    safetyNotes: [...result.safetyNotes, ...notes],
+    steps: rewritten.map((item) => item.step),
+    safetyNotes: [...result.safetyNotes, ...rewritten.map((item) => item.note)],
+    diagnostics: {
+      ...result.diagnostics,
+      stepRewriteDiagnostics: rewritten.map((item) => item.diagnostics),
+    },
   };
 }
 
 export function createBuildSequenceAiProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): BuildSequenceAiProvider {
-  if (env.AI_PROVIDER !== "openai") {
+  if (!shouldUseOpenAiProvider(env)) {
     return new DeterministicBuildSequenceProvider();
   }
 
   return {
     metadata: {
       providerName: "openai",
-      modelName: env.OPENAI_MODEL ?? "not-configured",
+      modelName: env.OPENAI_MODEL ?? "gpt-5-mini",
       deterministic: false,
     },
     async generate(request) {

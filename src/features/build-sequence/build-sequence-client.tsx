@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -17,7 +17,6 @@ import {
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
-import { AccountStatusPanel } from "@/features/account-status/account-status-panel";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
 import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
@@ -557,9 +556,6 @@ export function BuildSequenceClient() {
   const [primaryChannel, setPrimaryChannel] = useState<SequenceChannel>("EMAIL");
   const [sequenceLength, setSequenceLength] = useState<SequenceLength>(4);
   const [tone, setTone] = useState<SequenceTone>("CONSULTATIVE");
-  const [accountStatusOverride, setAccountStatusOverride] = useState(false);
-  const accountStatusOverrideRef = useRef(false);
-  const [accountStatusRefreshKey, setAccountStatusRefreshKey] = useState(0);
   const [result, setResult] = useState<BuildSequenceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -575,7 +571,9 @@ export function BuildSequenceClient() {
     state: "idle" | "sending" | "success" | "error";
     message?: string;
   }>({ state: "idle" });
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const generationInProgress = isPending || isGenerating;
 
   const displayedSteps =
     result?.steps.map((step) => ({
@@ -585,14 +583,10 @@ export function BuildSequenceClient() {
       cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
     })) ?? [];
   const quality = result ? sequenceQuality(displayedSteps, result.safetyNotes) : null;
-
-  function setOverride(value: boolean) {
-    accountStatusOverrideRef.current = value;
-    setAccountStatusOverride(value);
-    if (value) {
-      setError(null);
-    }
-  }
+  const draftWarnings =
+    result?.safetyNotes.filter((note) =>
+      note.startsWith("Existing ownership or recent outreach activity found"),
+    ) ?? [];
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -690,67 +684,73 @@ export function BuildSequenceClient() {
 
   function onSubmit(formData: FormData) {
     setError(null);
+    setResult(null);
     const missingFields = missingQuickBriefFields(formData);
     if (missingFields.length > 0) {
       setResult(null);
       setError(`Complete these fields first: ${missingFields.join(", ")}.`);
       return;
     }
+    setIsGenerating(true);
     startTransition(async () => {
-      const response = await generateBuildSequenceAction({
-        companyName: formString(formData, "companyName"),
-        companyWebsite: formString(formData, "companyWebsite") || undefined,
-        contactFirstName: formString(formData, "contactFirstName") || undefined,
-        contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
-        industry: formString(formData, "industry") || undefined,
-        companyContext:
-          formString(formData, "companyContext") || "Potential fit - validate spend/demand",
-        geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
-        paidSearchContext: formString(formData, "paidSearchContext") || undefined,
-        currentVendor: formString(formData, "currentVendor") || undefined,
-        observedTrigger:
-          formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
-        primaryChannel,
-        sequenceLength,
-        desiredTone: tone,
-        desiredOverallDuration:
-          formString(formData, "desiredOverallDuration") || "12 business days",
-        outputLanguage,
-        accountStatusOverride: accountStatusOverride || accountStatusOverrideRef.current,
-        rawProspectContext: formString(formData, "rawProspectContext") || undefined,
-        prospectContext: formString(formData, "rawProspectContext") || undefined,
-        serpEvidence: formString(formData, "serpEvidence") || undefined,
-        keywords: cleanedKeywordEvidence(),
-        internalNotes: formString(formData, "internalNotes") || undefined,
-        screenshotAvailable,
-        screenshotContext: formString(formData, "screenshotContext") || undefined,
-        brandKeyword: formString(formData, "brandKeyword") || undefined,
-        marketCountry: formString(formData, "marketCountry") || undefined,
-        device: formString(formData, "device") || undefined,
-        observationDate: formString(formData, "observationDate") || undefined,
-        screenshotShows: formString(formData, "screenshotShows") || undefined,
-      });
+      try {
+        const response = await generateBuildSequenceAction({
+          companyName: formString(formData, "companyName"),
+          companyWebsite: formString(formData, "companyWebsite") || undefined,
+          contactFirstName: formString(formData, "contactFirstName") || undefined,
+          contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
+          industry: formString(formData, "industry") || undefined,
+          companyContext:
+            formString(formData, "companyContext") || "Potential fit - validate spend/demand",
+          geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
+          paidSearchContext: formString(formData, "paidSearchContext") || undefined,
+          currentVendor: formString(formData, "currentVendor") || undefined,
+          observedTrigger:
+            formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
+          primaryChannel,
+          sequenceLength,
+          desiredTone: tone,
+          desiredOverallDuration:
+            formString(formData, "desiredOverallDuration") || "12 business days",
+          outputLanguage,
+          accountStatusOverride: false,
+          rawProspectContext: formString(formData, "rawProspectContext") || undefined,
+          prospectContext: formString(formData, "rawProspectContext") || undefined,
+          serpEvidence: formString(formData, "serpEvidence") || undefined,
+          keywords: cleanedKeywordEvidence(),
+          internalNotes: formString(formData, "internalNotes") || undefined,
+          screenshotAvailable,
+          screenshotContext: formString(formData, "screenshotContext") || undefined,
+          brandKeyword: formString(formData, "brandKeyword") || undefined,
+          marketCountry: formString(formData, "marketCountry") || undefined,
+          device: formString(formData, "device") || undefined,
+          observationDate: formString(formData, "observationDate") || undefined,
+          screenshotShows: formString(formData, "screenshotShows") || undefined,
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          setResult(null);
+          setError(safeClientErrorMessage(response.message));
+          return;
+        }
+
+        setResult(response.data);
+        setStepBodyDrafts({});
+        setStepSubjectDrafts({});
+        setStepCtaDrafts({});
+        setStepBodyVariantIndexes({});
+        setStepSubjectVariantIndexes({});
+        setStepCtaVariantIndexes({});
+      } catch (caught) {
         setResult(null);
         setError(
-          response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED"
-            ? `${response.message} Click "Continue with override" above, then build again.`
-            : safeClientErrorMessage(response.message),
+          safeClientErrorMessage(
+            caught instanceof Error ? caught.message : "Sequence generation failed.",
+          ),
         );
-        if (response.code === "ACCOUNT_STATUS_OVERRIDE_REQUIRED") {
-          setAccountStatusRefreshKey((current) => current + 1);
-        }
-        return;
+      } finally {
+        setIsGenerating(false);
       }
-
-      setResult(response.data);
-      setStepBodyDrafts({});
-      setStepSubjectDrafts({});
-      setStepCtaDrafts({});
-      setStepBodyVariantIndexes({});
-      setStepSubjectVariantIndexes({});
-      setStepCtaVariantIndexes({});
     });
   }
 
@@ -797,6 +797,7 @@ export function BuildSequenceClient() {
         <form
           action={onSubmit}
           className="space-y-4 rounded-2xl border border-line bg-white/95 p-5 shadow-[0_16px_45px_rgba(20,20,20,0.07)]"
+          noValidate
         >
           <input name="outputLanguage" type="hidden" value={outputLanguage} />
           <WorkflowSectionTitle
@@ -818,15 +819,10 @@ export function BuildSequenceClient() {
             </span>
           </label>
 
-          <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-ink">
-              Advanced details
-            </summary>
-            <div className="mt-3 space-y-3">
           <label className="block space-y-1 text-sm font-medium text-stone-700">
             SERP Evidence
             <textarea
-              className="min-h-32 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
+              className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
               name="serpEvidence"
               onChange={(event) => {
                 setSerpEvidence(event.target.value);
@@ -835,88 +831,70 @@ export function BuildSequenceClient() {
               placeholder={"cursor — brand bidding alone\ncursor pricing — brand alone\ncursor build — competitor visible\n\nor: Checked 6 branded keywords. Brand was alone on all 6."}
               value={serpEvidence}
             />
+            <span className="block text-xs leading-5 text-stone-500">
+              Optional. Leave blank if you do not have verified SERP evidence.
+            </span>
           </label>
-
-          <div className="space-y-3 rounded-lg border border-line bg-[#f8f5ef] p-3">
-            <div>
-              <p className="text-sm font-semibold text-ink">Verified branded keywords</p>
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                Add only keywords checked for this account. Specific SERP claims will use only
-                these rows.
-              </p>
-            </div>
-            <div className="space-y-2">
-              {keywordEvidence.map((keyword, index) => (
-                <div
-                  className="grid gap-2 rounded-md border border-line bg-white p-2 sm:grid-cols-[1.25fr_0.7fr_1fr]"
-                  key={index}
-                >
-                  <input
-                    className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
-                    onChange={(event) => updateKeywordEvidence(index, "term", event.target.value)}
-                    placeholder="American Eagle baggy"
-                    value={keyword.term}
-                  />
-                  <select
-                    className="rounded-md border border-line bg-white px-3 py-2 text-sm"
-                    onChange={(event) => updateKeywordEvidence(index, "status", event.target.value)}
-                    value={keyword.status}
-                  >
-                    <option value="solo">Solo</option>
-                    <option value="contested">Contested</option>
-                  </select>
-                  <input
-                    className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
-                    onChange={(event) =>
-                      updateKeywordEvidence(index, "competitor", event.target.value)
-                    }
-                    placeholder="Competitor, if visible"
-                    value={keyword.competitor ?? ""}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextField
-              label={t("workflow.company")}
-              name="companyName"
-              onChange={(value) => {
-                setCompanyName(value);
-                setCompanyWebsite(inferDomain(value));
-                accountStatusOverrideRef.current = false;
-                setAccountStatusOverride(false);
-              }}
-              required
-              value={companyName}
-            />
-            <TextField label={t("workflow.firstName")} name="contactFirstName" />
-          </div>
-
-          <AccountStatusPanel
-            companyDomain={companyWebsite}
-            companyName={companyName}
-            onOverrideChange={setOverride}
-            overrideActive={accountStatusOverride}
-            refreshKey={accountStatusRefreshKey}
-            submitOnOverride
-          />
-
-          <div className="rounded-lg border border-line bg-[#f8f5ef] px-3 py-2 text-sm text-stone-700">
-            <span className="font-semibold text-ink">Step 2 mode: </span>
-            {screenshotAvailable
-              ? "Visual example"
-              : "Approved case study when available, otherwise diagnostic insight"}
-          </div>
-            </div>
-          </details>
 
           <details className="rounded-lg border border-line bg-[#f8f5ef] p-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink">
-              {t("workflow.advancedOptionalDetails")}
+              Edit extracted details
             </summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-3 rounded-lg border border-line bg-white p-3 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Verified branded keywords</p>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">
+                    Optional override. Add only keywords checked for this account. Specific SERP
+                    claims will use only these rows.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {keywordEvidence.map((keyword, index) => (
+                    <div
+                      className="grid gap-2 rounded-md border border-line bg-white p-2 sm:grid-cols-[1.25fr_0.7fr_1fr]"
+                      key={index}
+                    >
+                      <input
+                        className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
+                        onChange={(event) =>
+                          updateKeywordEvidence(index, "term", event.target.value)
+                        }
+                        placeholder="American Eagle baggy"
+                        value={keyword.term}
+                      />
+                      <select
+                        className="rounded-md border border-line bg-white px-3 py-2 text-sm"
+                        onChange={(event) =>
+                          updateKeywordEvidence(index, "status", event.target.value)
+                        }
+                        value={keyword.status}
+                      >
+                        <option value="solo">Solo</option>
+                        <option value="contested">Contested</option>
+                      </select>
+                      <input
+                        className="min-w-0 rounded-md border border-line px-3 py-2 text-sm"
+                        onChange={(event) =>
+                          updateKeywordEvidence(index, "competitor", event.target.value)
+                        }
+                        placeholder="Competitor, if visible"
+                        value={keyword.competitor ?? ""}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <TextField
+                label={t("workflow.company")}
+                name="companyName"
+                onChange={(value) => {
+                  setCompanyName(value);
+                  setCompanyWebsite(inferDomain(value));
+                }}
+                value={companyName}
+              />
+              <TextField label={t("workflow.firstName")} name="contactFirstName" />
               <SmartField
                 label={t("workflow.buyerRole")}
                 name="contactRole"
@@ -970,11 +948,7 @@ export function BuildSequenceClient() {
               <TextField
                 label={t("workflow.website")}
                 name="companyWebsite"
-                onChange={(value) => {
-                  setCompanyWebsite(value);
-                  accountStatusOverrideRef.current = false;
-                  setAccountStatusOverride(false);
-                }}
+                onChange={setCompanyWebsite}
                 value={companyWebsite}
               />
               <SmartField
@@ -1012,6 +986,12 @@ export function BuildSequenceClient() {
                 options={paidSearchOptions}
                 value={paidSearchContext}
               />
+              <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-stone-700 sm:col-span-2">
+                <span className="font-semibold text-ink">Step 2 mode: </span>
+                {screenshotAvailable
+                  ? "Visual example"
+                  : "Approved case study when available, otherwise diagnostic insight"}
+              </div>
               <div className="sm:col-span-2 rounded-lg border border-line bg-white p-3">
                 <label className="flex items-start gap-2 text-sm font-semibold text-ink">
                   <input
@@ -1101,13 +1081,19 @@ export function BuildSequenceClient() {
             </p>
           ) : null}
 
+          {generationInProgress ? (
+            <div className="rounded-md border border-[#d9ecdd] bg-[#f2faf3] px-3 py-2 text-sm text-[#2f6f3a]">
+              Understanding prospect... Building strategy... Generating sequence...
+            </div>
+          ) : null}
+
           <button
             className="inline-flex items-center justify-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1d4e5f] disabled:cursor-not-allowed disabled:bg-stone-300"
-            disabled={isPending}
+            disabled={generationInProgress}
             type="submit"
           >
             <Send aria-hidden="true" className="h-4 w-4" />
-            {isPending ? t("workflow.building") : "Generate intelligence & sequence"}
+            {generationInProgress ? "Generating sequence..." : "Generate intelligence & sequence"}
           </button>
         </form>
 
@@ -1130,6 +1116,18 @@ export function BuildSequenceClient() {
                 >
                   {providerLabel(result)}
                 </p>
+                {draftWarnings.length > 0 ? (
+                  <div className="space-y-2" aria-label="Warnings">
+                    {draftWarnings.map((warning) => (
+                      <p
+                        className="rounded-md border border-[#e6c47c] bg-[#fff9eb] px-3 py-2 text-sm font-semibold text-[#765012]"
+                        key={warning}
+                      >
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
                 {result.prospectMemory ? (
                   <div className="rounded-lg border border-line bg-[#f8f5ef] p-3 text-sm leading-6 text-stone-700">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
@@ -1477,7 +1475,9 @@ export function BuildSequenceClient() {
                   <h2 className="text-lg font-semibold text-ink">Sources and safety</h2>
                 </div>
                 <div className="space-y-3">
-                  {result.safetyNotes.map((note) => (
+                  {result.safetyNotes
+                    .filter((note) => !draftWarnings.includes(note))
+                    .map((note) => (
                     <p
                       className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]"
                       key={note}

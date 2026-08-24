@@ -249,6 +249,7 @@ export type GoldStandardExample = {
 
 export type MessageStrategy = {
   prospectInsight: string;
+  whyNow?: string;
   businessQuestion: string;
   productGap: string;
   primaryAngle: string;
@@ -266,10 +267,34 @@ export type MessageStrategy = {
     step: 1 | 2 | 3 | 4;
     objective: string;
     newInformation: string;
+    angle?: string;
+    evidenceToUse?: string;
+    proofToUse?: string;
     ctaIntent: string;
+    avoidRepeating?: string;
+  }>;
+  emailStepPlans?: Array<{
+    stepNumber: 1 | 2 | 3 | 4;
+    objective: string;
+    newInformation: string;
+    angle: string;
+    evidenceToUse: string;
+    proofToUse?: string;
+    CTAIntent: string;
+    avoidRepeating: string;
   }>;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   selectedGoldStandardExampleIds: string[];
+  groundingReferences?: string[];
+  plannerMode?: "AI_STRATEGY" | "DETERMINISTIC_FALLBACK";
+  diagnostics?: {
+    firstCallDurationMs?: number;
+    retryDurationMs?: number;
+    retryUsed: boolean;
+    fallbackUsed: boolean;
+    firstIssues: string[];
+    retryIssues: string[];
+  };
 };
 
 export type SequenceGeneration = {
@@ -285,6 +310,49 @@ export type SequenceGeneration = {
   claimsUsed: string[];
   safetyNotes: string[];
   knowledgeLimitations: string[];
+  diagnostics?: BuildSequenceDiagnostics;
+};
+
+export type BuildSequenceDiagnostics = {
+  totalDurationMs?: number;
+  semanticIntakeDurationMs?: number;
+  strategyDurationMs?: number;
+  strategyFirstCallDurationMs?: number;
+  strategyRetryDurationMs?: number;
+  strategyRetryUsed?: boolean;
+  strategyFallbackUsed?: boolean;
+  strategyFirstIssues?: string[];
+  strategyRetryIssues?: string[];
+  sequenceGenerationDurationMs?: number;
+  finalValidationDurationMs?: number;
+  totalAiCalls?: number;
+  totalRetries?: number;
+  stepRewriteDiagnostics?: Array<{
+    stepNumber: number;
+    firstCallDurationMs?: number;
+    retryDurationMs?: number;
+    retryUsed: boolean;
+    fallbackUsed: boolean;
+    firstFailures: string[];
+    retryFailures: string[];
+  }>;
+  validationIssues?: string[];
+  finalRecoveryReason?: string;
+  finalFullSequenceFallbackUsed?: boolean;
+  finalRecoveredStepNumbers?: number[];
+  aiStepsPreserved?: number;
+};
+
+export type SelectedProspectInsight = {
+  factId: string;
+  groundingReference: string;
+  text: string;
+  relevanceToSignal: number;
+  specificity: number;
+  commercialUsefulness: number;
+  conversationalUsefulness: number;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  reasonSelected: string;
 };
 
 export type ProspectIntelligence = {
@@ -300,6 +368,7 @@ export type ProspectIntelligence = {
     | "MARKETING_LEADERSHIP"
     | "OTHER";
   relevantFacts: string[];
+  selectedInsights: SelectedProspectInsight[];
   companyContext: string[];
   likelyPriorities: string[];
   serpScenario: "SOLO" | "CONTESTED" | "MIXED" | "UNKNOWN";
@@ -324,9 +393,11 @@ export type BuildSequenceResult = SequenceGeneration & {
   draftId: string;
   prospectId?: string;
   prospectMemory?: ProspectMemory;
+  semanticIntakeMode?: "AI_SEMANTIC" | "DETERMINISTIC_FALLBACK";
   sequenceLength: SequenceLength;
   overallDuration: string;
   recordsUsed: SequenceKnowledgeRecord[];
   sourceReferences: SequenceSourceReference[];
   provider: ReplyProviderMetadata;
+  diagnostics?: BuildSequenceDiagnostics;
 };

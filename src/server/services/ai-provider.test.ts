@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { OpenAiProvider, type AiDraftRequest } from "./ai-provider";
+import { createAiProvider, OpenAiProvider, shouldUseOpenAiProvider, type AiDraftRequest } from "./ai-provider";
 
 function request(overrides: Partial<AiDraftRequest> = {}): AiDraftRequest {
   return {
@@ -36,6 +36,19 @@ function mockOpenAiResponse(payload: unknown) {
 describe("OpenAI provider output boundaries", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("uses OpenAI when an API key is configured even without AI_PROVIDER", () => {
+    const env = { OPENAI_API_KEY: "redacted" } as unknown as NodeJS.ProcessEnv;
+
+    expect(shouldUseOpenAiProvider(env)).toBe(true);
+    expect(createAiProvider(env)).toBeInstanceOf(OpenAiProvider);
+  });
+
+  it("respects an explicit non-OpenAI provider override", () => {
+    const env = { AI_PROVIDER: "deterministic", OPENAI_API_KEY: "redacted" } as unknown as NodeJS.ProcessEnv;
+
+    expect(shouldUseOpenAiProvider(env)).toBe(false);
   });
 
   it("rejects empty primary content instead of treating it as a valid draft", async () => {

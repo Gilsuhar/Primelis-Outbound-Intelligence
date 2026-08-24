@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
   BuildSequenceInput,
@@ -36,6 +36,20 @@ const baseInput: BuildSequenceInput = {
   internalNotes: "Keep this conservative.",
   creatorId: "seed-sales-user",
 };
+
+const originalAiProvider = process.env.AI_PROVIDER;
+
+beforeEach(() => {
+  process.env.AI_PROVIDER = "deterministic-development";
+});
+
+afterEach(() => {
+  if (originalAiProvider === undefined) {
+    delete process.env.AI_PROVIDER;
+  } else {
+    process.env.AI_PROVIDER = originalAiProvider;
+  }
+});
 
 function knowledge(overrides: Partial<SequenceKnowledgeRecord>): SequenceKnowledgeRecord {
   return {
@@ -501,7 +515,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -530,7 +544,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -558,7 +572,7 @@ describe("Build Sequence service", () => {
     expect(rejected).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
     expect(accepted.ok).toBe(true);
     if (accepted.ok) {
@@ -745,7 +759,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -779,7 +793,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
     expect(persisted).toEqual([]);
   });
@@ -874,7 +888,7 @@ describe("Build Sequence service", () => {
     expect(rejected).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
     expect(rejectedStore.persisted).toEqual([]);
   });
@@ -902,7 +916,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
     expect(persisted).toEqual([]);
   });
@@ -935,7 +949,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -964,7 +978,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: "Generated sequence failed safety or quality validation.",
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -1041,9 +1055,7 @@ describe("Build Sequence service", () => {
     expect(result).toEqual({
       ok: false,
       code: "GENERATION_REJECTED",
-      message: expect.stringMatching(
-        /Generated sequence failed (safety or quality|proof) validation\./,
-      ),
+      message: expect.stringContaining("Generated sequence failed safety or quality validation"),
     });
   });
 
@@ -1116,7 +1128,7 @@ describe("Build Sequence service", () => {
     }
   });
 
-  it("builds a sequence with conservative defaults after a recent-outreach override", async () => {
+  it("builds a draft with conservative defaults and a warning when recent outreach exists", async () => {
     const { adapter, persisted } = persistence(
       [knowledge({ id: "product-truth" })],
       "SALES_USER",
@@ -1142,7 +1154,6 @@ describe("Build Sequence service", () => {
         primaryChannel: "EMAIL",
         sequenceLength: 4,
         desiredTone: "CONSULTATIVE",
-        accountStatusOverride: true,
         creatorId: "seed-sales-user",
       },
       { persistence: recentAwareAdapter },
@@ -1151,9 +1162,75 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
+      expect(result.data.safetyNotes).toContain(
+        "Existing ownership or recent outreach activity found for Nike. Review this before sending or pushing to CRM.",
+      );
       expect(persisted[0].request.contactRole).toBe("Head of Performance Marketing");
       expect(persisted[0].request.companyContext).toBe("Potential fit - validate spend/demand");
       expect(persisted[0].request.observedTrigger).toBe("Light discovery before pitching Signal");
+    }
+  });
+
+  it("generates Cisco from pasted context despite existing activity and surfaces a warning", async () => {
+    const { adapter } = prospectPersistence({ records: [knowledge({ id: "product-truth" })] });
+    const recentAwareAdapter = {
+      ...adapter,
+      getRecentDrafts: async () => [
+        {
+          id: "recent-cisco",
+          workflow: "BUILD_SEQUENCE",
+          companyName: "Cisco",
+          companyDomain: "cisco.com",
+          createdAt: "2026-08-01T08:00:00.000Z",
+        },
+      ],
+      getRecentAssessments: async () => [],
+    };
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        companyWebsite: undefined,
+        contactFirstName: undefined,
+        rawProspectContext:
+          "Morgan Lee\nCisco\nDirector of Paid Search\nGoogle Ads live SERP competition context",
+      },
+      { persistence: recentAwareAdapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps).toHaveLength(4);
+      expect(result.data.prospectMemory?.prospect.companyName).toBe("Cisco");
+      expect(result.data.safetyNotes).toContain(
+        "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
+      );
+    }
+  });
+
+  it("does not add an account-activity warning for a clean account", async () => {
+    const { adapter } = prospectPersistence({ records: [knowledge({ id: "product-truth" })] });
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        companyWebsite: undefined,
+        contactFirstName: undefined,
+        rawProspectContext: "Avery Stone\nCleanCo\nDirector of Paid Search",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps).toHaveLength(4);
+      expect(result.data.safetyNotes).not.toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("Existing ownership or recent outreach activity found"),
+        ]),
+      );
     }
   });
 
@@ -1343,7 +1420,7 @@ describe("Build Sequence service", () => {
     });
   });
 
-  it("uses the approved fallback template when OpenAI output fails structure validation", async () => {
+  it("recovers repeated OpenAI CTAs without replacing the full sequence", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {
       persistence: adapter,
@@ -1363,10 +1440,14 @@ describe("Build Sequence service", () => {
           });
           return {
             ...generated,
-            steps: generated.steps.map((step) => ({
-              ...step,
-              cta: "Worth a quick look?",
-            })),
+            steps: generated.steps.map((step, index) =>
+              index === 1
+                ? {
+                    ...step,
+                    cta: generated.steps[0].cta,
+                  }
+                : step,
+            ),
           };
         },
       },
@@ -1374,10 +1455,10 @@ describe("Build Sequence service", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.provider.providerName).toBe("deterministic-development");
-      expect(result.data.safetyNotes).toContain(
-        "OpenAI output failed sequence structure validation, so the approved fallback template was used.",
-      );
+      expect(result.data.provider.providerName).toBe("openai");
+      expect(result.data.safetyNotes.join(" ")).toContain("Final validation recovered");
+      expect(result.data.diagnostics?.finalFullSequenceFallbackUsed).toBe(false);
+      expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([2]);
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.steps.map((step) => step.purpose)).toEqual([
         "FIRST_TOUCH_RELEVANCE",
@@ -1385,6 +1466,70 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "SOCIAL_PROOF",
       ]);
+    }
+  });
+
+  it("preserves valid AI steps while replacing only a locally invalid step", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            safetyNotes: [
+              ...generated.safetyNotes,
+              "Hybrid rewrite accepted for step 1.",
+              "Hybrid rewrite accepted for step 3.",
+              "Hybrid rewrite accepted for step 4.",
+            ],
+            steps: generated.steps.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    messageBody:
+                      "Hi Sam,\n\nAcme's branded-search visibility is worth one narrow look.\n\nA campaign can look healthy while the auction changes underneath it.",
+                  }
+                : index === 1
+                  ? {
+                      ...step,
+                      messageBody:
+                        "Hi Sam,\n\nCan you see this today? Do you check this manually? Would that change how you bid?",
+                    }
+                  : index === 2
+                    ? {
+                        ...step,
+                        messageBody:
+                          "Hi Sam,\n\nThe useful method is comparing live search-page conditions before changing bids.\n\nSignal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+                      }
+                    : step,
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.provider.providerName).toBe("openai");
+      expect(result.data.steps[0].messageBody).toContain("Acme's branded-search visibility");
+      expect(result.data.steps[1].messageBody).not.toContain("Can you see this today?");
+      expect(result.data.steps[2].messageBody).toContain("comparing live search-page conditions");
+      expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([2]);
+      expect(result.data.diagnostics?.aiStepsPreserved).toBe(3);
+      expect(result.data.diagnostics?.finalFullSequenceFallbackUsed).toBe(false);
     }
   });
 
@@ -1605,6 +1750,230 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("generates from prospect context only without requiring legacy company or role fields", async () => {
+    const { adapter, prospects, sources, facts, persisted } = prospectPersistence();
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        companyWebsite: undefined,
+        contactFirstName: undefined,
+        contactRole: "Head of Performance Marketing",
+        industry: undefined,
+        rawProspectContext:
+          "Chris\nRemofirst\nmanaged over $50M in paid media\ninterested in AI / automation for paid search\nGoogle Ads live SERP competition context",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(prospects).toHaveLength(1);
+      expect(sources).toHaveLength(1);
+      expect(facts.length).toBeGreaterThan(0);
+      expect(facts.every((fact) => fact.sourceId === sources[0].id)).toBe(true);
+      expect(result.data.prospectMemory?.prospect.firstName).toBe("Chris");
+      expect(result.data.prospectMemory?.prospect.companyName).toBe("Remofirst");
+      expect(result.data.prospectIntelligence.serpScenario).toBe("UNKNOWN");
+      expect(result.data.steps).toHaveLength(4);
+      expect(persisted[0].prospectId).toBe(prospects[0].id);
+    }
+  });
+
+  it("uses grounded AI semantic intake before persisting Prospect Memory facts", async () => {
+    const { adapter, prospects, sources, facts, persisted } = prospectPersistence();
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "",
+        companyWebsite: undefined,
+        contactFirstName: undefined,
+        rawProspectContext:
+          "Chris\nRemofirst\nChris has managed over $50M in paid media.\nHe is actively exploring AI and automation for paid-search decisions.\nSERP:\nremofirst - solo",
+      },
+      {
+        persistence: adapter,
+        semanticExtractionProvider: async () => ({
+          identity: { firstName: "Chris" },
+          company: { companyName: "Remofirst" },
+          prospectFacts: [
+            {
+              text: "managed over $50M in paid media",
+              sourceEvidence: "Chris has managed over $50M in paid media.",
+              confidence: "HIGH",
+            },
+            {
+              text: "leading a global AI transformation",
+              sourceEvidence: "global AI transformation",
+              confidence: "LOW",
+            },
+          ],
+          serpEvidence: [
+            {
+              keyword: "remofirst",
+              observation: "remofirst - solo",
+              scenarioHint: "SOLO",
+              sourceEvidence: "remofirst - solo",
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(prospects).toHaveLength(1);
+      expect(sources).toHaveLength(1);
+      expect(persisted[0].prospectId).toBe(prospects[0].id);
+      expect(facts.map((fact) => fact.value).join("\n")).toContain("managed over $50M in paid media");
+      expect(facts.map((fact) => fact.value).join("\n")).not.toContain("global AI transformation");
+      expect(facts.every((fact) => fact.sourceId === sources[0].id)).toBe(true);
+      expect(result.data.prospectIntelligence.serpScenario).toBe("SOLO");
+      expect(result.data.safetyNotes).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("unsupported semantic intake extraction"),
+        ]),
+      );
+    }
+  });
+
+  it("uses a validated AI message strategy before sequence generation", async () => {
+    const { adapter } = prospectPersistence({
+      records: [
+        knowledge({ id: "product-truth" }),
+        knowledge({
+          id: "proof-zoominfo",
+          title: "ZoomInfo proof",
+          type: "CASE_STUDY",
+          approvedText:
+            "ZoomInfo used Signal to reduce branded CPC by 40% while increasing MQL volume by 20%.",
+        }),
+      ],
+    });
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Remofirst",
+        contactFirstName: "Chris",
+        contactRole: "Head of Paid Search",
+        prospectContext:
+          "Chris has managed over $50M in paid media and is exploring AI and automation for paid-search decisions.",
+      },
+      {
+        persistence: adapter,
+        messageStrategyProvider: async (request) => ({
+          prospectInsight: "managed over $50M in paid media",
+          whyNow:
+            "The supplied context connects paid-media scale and AI automation interest to a live SERP decision gap.",
+          primaryAngle: "Live decision gap between Google Ads reporting and SERP competition.",
+          secondaryAngle: "Live decision gap with a narrower operational follow-up.",
+          businessQuestion:
+            "How do you know when branded bids should change because live competition changed?",
+          productGapId: "GOOGLE_ADS_LIVE_COMPETITION_GAP",
+          relevantCapabilityId: "LIVE_SERP_COMPETITION",
+          proofPointId: "proof-zoominfo",
+          openingStyle: "PROSPECT_FACT",
+          sequenceNarrative: ([1, 2, 3, 4] as const).map((stepNumber) => ({
+            stepNumber,
+            objective: [
+              "Open with the prospect-specific reason this is relevant.",
+              "Explain the live competition decision gap.",
+              "Show how Signal uses live Google and Bing visibility.",
+              "Use one approved proof point and keep the ask soft.",
+            ][stepNumber - 1],
+            newInformation: [
+              "Live decision gap between Google Ads reporting and SERP competition.",
+              "How live SERP visibility changes bid and coverage decisions.",
+              "Signal monitors Google and Bing SERPs in real time.",
+              "ZoomInfo approved result as the single proof point.",
+            ][stepNumber - 1],
+            angle: [
+              "Live decision gap between Google Ads reporting and SERP competition.",
+              "How live SERP visibility changes bid and coverage decisions.",
+              "Signal monitors Google and Bing SERPs in real time.",
+              "Proof-backed low-pressure evaluation.",
+            ][stepNumber - 1],
+            evidenceToUse: [
+              "managed over $50M in paid media",
+              "AI and automation for paid-search decisions",
+              "Signal monitors Google and Bing SERPs in real time",
+              "ZoomInfo used Signal to reduce branded CPC by 40% while increasing MQL volume by 20%.",
+            ][stepNumber - 1],
+            proofToUseId: stepNumber === 4 ? "proof-zoominfo" : undefined,
+            CTAIntent: [
+              "Ask whether this question is already handled.",
+              "Ask how the team detects the moment.",
+              "Ask whether a narrow review would help.",
+              "Offer a quick overview.",
+            ][stepNumber - 1],
+            avoidRepeating: [
+              "Do not explain methodology yet.",
+              "Do not repeat the prospect fact.",
+              "Do not restate the Google Ads gap.",
+              "Do not introduce another proof point.",
+            ][stepNumber - 1],
+          })),
+          emailStepPlans: ([1, 2, 3, 4] as const).map((stepNumber) => ({
+            stepNumber,
+            objective: [
+              "Open with the prospect-specific reason this is relevant.",
+              "Explain the live competition decision gap.",
+              "Show how Signal uses live Google and Bing visibility.",
+              "Use one approved proof point and keep the ask soft.",
+            ][stepNumber - 1],
+            newInformation: [
+              "Live decision gap between Google Ads reporting and SERP competition.",
+              "How live SERP visibility changes bid and coverage decisions.",
+              "Signal monitors Google and Bing SERPs in real time.",
+              "ZoomInfo approved result as the single proof point.",
+            ][stepNumber - 1],
+            angle: [
+              "Live decision gap between Google Ads reporting and SERP competition.",
+              "How live SERP visibility changes bid and coverage decisions.",
+              "Signal monitors Google and Bing SERPs in real time.",
+              "Proof-backed low-pressure evaluation.",
+            ][stepNumber - 1],
+            evidenceToUse: [
+              "managed over $50M in paid media",
+              "AI and automation for paid-search decisions",
+              "Signal monitors Google and Bing SERPs in real time",
+              "ZoomInfo used Signal to reduce branded CPC by 40% while increasing MQL volume by 20%.",
+            ][stepNumber - 1],
+            proofToUseId: stepNumber === 4 ? "proof-zoominfo" : undefined,
+            CTAIntent: [
+              "Ask whether this question is already handled.",
+              "Ask how the team detects the moment.",
+              "Ask whether a narrow review would help.",
+              "Offer a quick overview.",
+            ][stepNumber - 1],
+            avoidRepeating: [
+              "Do not explain methodology yet.",
+              "Do not repeat the prospect fact.",
+              "Do not restate the Google Ads gap.",
+              "Do not introduce another proof point.",
+            ][stepNumber - 1],
+          })),
+          whyThisShouldResonate:
+            "The plan uses Chris's supplied paid-media scale and AI automation interest.",
+          confidence: "HIGH",
+          groundingReferences: ["managed over $50M in paid media"],
+          selectedGoldStandardExampleIds: request.goldStandardExamples.map((example) => example.id),
+        }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.messageStrategy.plannerMode).toBe("AI_STRATEGY");
+      expect(result.data.messageStrategy.primaryAngle).toContain("Live decision gap");
+      expect(result.data.messageStrategy.businessQuestion).toContain("live competition changed");
+      expect(result.data.steps).toHaveLength(4);
+    }
+  });
+
   it("reuses an existing prospect by exact email and appends a new source", async () => {
     const { adapter, prospects, sources } = prospectPersistence({
       initialProspects: [existingProspect({ email: "chris@example.com", fullName: "Chris Example" })],
@@ -1783,6 +2152,8 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       expect(result.data.prospectId).toBeTruthy();
       expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).not.toMatch(/\$50M|managed over|AI and automation/i);
+      expect(result.data.prospectMemory?.extraction.serpEvidence).toEqual([]);
+      expect(result.data.prospectIntelligence.serpScenario).toBe("UNKNOWN");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\$50M|managed over/i);
     }
   });

@@ -11,7 +11,11 @@ function compact(value?: string) {
 }
 
 function firstProspectFact(intelligence: ProspectIntelligence) {
-  return intelligence.relevantFacts.find(Boolean);
+  return intelligence.selectedInsights[0]?.text ?? intelligence.relevantFacts.find(Boolean);
+}
+
+function hasSelectedInsight(intelligence: ProspectIntelligence) {
+  return intelligence.selectedInsights.length > 0;
 }
 
 function firstCaseStudy(records: SequenceKnowledgeRecord[]) {
@@ -63,7 +67,7 @@ function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIn
 }
 
 function openingStyleFor(intelligence: ProspectIntelligence): MessageStrategy["openingStyle"] {
-  if (firstProspectFact(intelligence)) return "PROSPECT_FACT";
+  if (hasSelectedInsight(intelligence)) return "PROSPECT_FACT";
   if (intelligence.serpScenario !== "UNKNOWN") return "SERP_EVIDENCE";
   if (intelligence.companyContext.length > 0) return "ACCOUNT_OBSERVATION";
   if (intelligence.persona === "PAID_SEARCH" || intelligence.persona === "PERFORMANCE") {
@@ -116,6 +120,24 @@ function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boole
   ];
 }
 
+function stepPlansFromNarrative(
+  narrative: MessageStrategy["sequenceNarrative"],
+  strategy: Pick<MessageStrategy, "primaryAngle" | "relevantCapability" | "proofPoint">,
+): NonNullable<MessageStrategy["emailStepPlans"]> {
+  return narrative.map((item) => ({
+    stepNumber: item.step,
+    objective: item.objective,
+    newInformation: item.newInformation,
+    angle: item.step === 2 ? strategy.relevantCapability : strategy.primaryAngle,
+    evidenceToUse: item.newInformation,
+    proofToUse: item.step === 4 ? strategy.proofPoint : undefined,
+    CTAIntent: item.ctaIntent,
+    avoidRepeating: item.step === 1
+      ? "Do not explain the full methodology yet."
+      : "Do not restate the prior step's opening or business question.",
+  }));
+}
+
 export function planMessageStrategy({
   input,
   intelligence,
@@ -129,7 +151,8 @@ export function planMessageStrategy({
   const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
   const primaryAngle = intelligence.primaryAngle;
   const selectedGoldStandards = selectGoldStandardExamples({ intelligence, primaryAngle });
-  const hasProspectFact = Boolean(firstProspectFact(intelligence));
+  const hasProspectFact = hasSelectedInsight(intelligence);
+  const sequenceNarrative = narrativeFor(intelligence, hasProspectFact);
   const confidence: MessageStrategy["confidence"] =
     hasProspectFact && intelligence.confidence.serp !== "LOW"
       ? "HIGH"
@@ -139,6 +162,9 @@ export function planMessageStrategy({
 
   return {
     prospectInsight,
+    whyNow: hasProspectFact
+      ? "The supplied prospect context gives a real reason to connect their work to branded-search decision quality."
+      : "The supplied context is light, so the safest reason to reach out is a narrow paid-brand visibility question.",
     businessQuestion: businessQuestionFor(input, intelligence),
     productGap: productGapFor(intelligence),
     primaryAngle,
@@ -149,8 +175,16 @@ export function planMessageStrategy({
       ? "The sequence can start from a real supplied prospect fact, then connect it to a specific branded-search decision."
       : "The supplied prospect context is light, so the sequence should stay role- and account-level instead of inventing achievements.",
     openingStyle: openingStyleFor(intelligence),
-    sequenceNarrative: narrativeFor(intelligence, hasProspectFact),
+    sequenceNarrative,
+    emailStepPlans: stepPlansFromNarrative(sequenceNarrative, { primaryAngle, relevantCapability: capabilityFor(intelligence), proofPoint }),
     confidence,
     selectedGoldStandardExampleIds: selectedGoldStandards.map((example) => example.id),
+    groundingReferences: [
+      prospectInsight,
+      ...intelligence.selectedInsights.map((insight) => insight.groundingReference),
+      ...intelligence.relevantFacts,
+      ...intelligence.serpEvidence.observations,
+    ].filter(Boolean).slice(0, 8),
+    plannerMode: "DETERMINISTIC_FALLBACK",
   };
 }

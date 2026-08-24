@@ -35,9 +35,9 @@ const records = [
   },
 ];
 
-function generation() {
-  const prospectIntelligence = buildProspectIntelligence(input, records);
-  const messageStrategy = planMessageStrategy({ input, intelligence: prospectIntelligence, records });
+function generation(generationInput = input) {
+  const prospectIntelligence = buildProspectIntelligence(generationInput, records);
+  const messageStrategy = planMessageStrategy({ input: generationInput, intelligence: prospectIntelligence, records });
   return {
     overallStrategy: "Fallback strategy.",
     selectedAngle: "BRANDED_SEARCH_EFFICIENCY" as const,
@@ -154,6 +154,39 @@ describe("Build Sequence OpenAI provider", () => {
     expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
   });
 
+  it("uses ranked commercial insight instead of raw LinkedIn headline in the first touch", async () => {
+    const tanviInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Hush",
+      companyWebsite: "hush-uk.com",
+      contactFirstName: "Tanvi",
+      contactRole: "Paid Search Coordinator",
+      prospectContext: [
+        "Tanvi Mhatre",
+        "Performance Marketer | Google Ads · Microsoft Ads · Programmatic · Display | Documenting & building my career in public",
+        "Paid Search Coordinator",
+        "Hush",
+        "Now works at Hush managing paid search, display, YouTube, and programmatic campaigns across Google Ads, Microsoft Ads, and SA360.",
+        "Hands-on across campaign strategy, optimisation, and performance reporting.",
+        "Wanted to be a doctor.",
+        "Chemistry degree.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: tanviInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(tanviInput),
+    });
+
+    expect(result.steps[0].messageBody).toMatch(/Google Ads|Microsoft Ads|SA360|optimisation|performance reporting/i);
+    expect(result.steps[0].messageBody).not.toMatch(/^Hi Tanvi,\s+I saw that/i);
+    expect(result.steps[0].messageBody).not.toMatch(/Performance Marketer \|/i);
+    expect(result.steps[0].messageBody).not.toMatch(/wanted to be a doctor|chemistry/i);
+  });
+
   it("accepts OpenAI schema without letting model text replace rendered steps", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
@@ -266,10 +299,10 @@ describe("Build Sequence OpenAI provider", () => {
 
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."))
-      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."))
       .mockResolvedValueOnce(responseStep("re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
       .mockResolvedValueOnce(responseStep("re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
-      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."))
+      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."));
 
     const result = await provider.generate({
       input,

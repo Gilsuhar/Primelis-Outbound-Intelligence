@@ -84,27 +84,36 @@ const rawSourceReferenceSchema = z
   .min(1)
   .transform((value) => value.slice(0, 160));
 
+const optionalText = (max: number) =>
+  z.preprocess((value) => (value === null ? undefined : value), z.string().trim().max(max).optional());
+
 const aiDraftResponseSchema = z.object({
-  primaryContent: z.string().trim().max(5000).optional().default(""),
-  shorterAlternative: z.string().trim().max(2500).optional(),
-  cta: z.string().trim().max(300).optional(),
-  subjectLines: z.array(z.string().trim().max(120)).max(5).optional(),
-  sequenceSteps: z
+  primaryContent: optionalText(5000).default(""),
+  shorterAlternative: optionalText(2500),
+  cta: optionalText(300),
+  subjectLines: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.array(z.string().trim().max(120)).max(5).optional(),
+  ),
+  sequenceSteps: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z
     .array(
       z.object({
-        subjectLine: z.string().trim().max(160).optional(),
-        connectionRequest: z.string().trim().max(300).optional(),
+        subjectLine: optionalText(160),
+        connectionRequest: optionalText(300),
         messageBody: z.string().trim().min(1).max(1600),
         cta: z.string().trim().min(1).max(300),
       }),
     )
     .max(8)
     .optional(),
+  ),
   sourceReferences: z.array(rawSourceReferenceSchema).max(20).optional().default([]),
   factualClaimsUsed: z.array(z.string().trim().max(500)).max(20).optional().default([]),
   uncertaintyNotes: z.array(z.string().trim().max(500)).max(10).optional().default([]),
   safetyFlags: z.array(rawSafetyFlagSchema).max(20).optional().default([]),
-  changeSummary: z.string().trim().max(800).optional(),
+  changeSummary: optionalText(800),
 });
 
 function hasUsablePrimaryContent(response: AiDraftResponse) {
@@ -388,7 +397,7 @@ export class OpenAiProvider implements AiProvider {
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.apiKey = env.OPENAI_API_KEY;
-    this.model = env.OPENAI_MODEL || "gpt-5.4-mini";
+    this.model = env.OPENAI_MODEL || "gpt-5-mini";
   }
 
   async getProviderStatus() {
@@ -475,6 +484,7 @@ export class OpenAiProvider implements AiProvider {
             },
           ],
           text: { format: { type: "json_object" } },
+          reasoning: { effort: "minimal" },
           max_output_tokens: request.workflow === "BUILD_SEQUENCE" ? 3600 : 1800,
         }),
       });
@@ -513,10 +523,18 @@ export class OpenAiProvider implements AiProvider {
 }
 
 export function createAiProvider(env: NodeJS.ProcessEnv = process.env): AiProvider {
-  if (env.AI_PROVIDER === "openai") {
+  if (shouldUseOpenAiProvider(env)) {
     return new OpenAiProvider(env);
   }
   return new DeterministicAiProvider();
+}
+
+export function shouldUseOpenAiProvider(env: NodeJS.ProcessEnv = process.env) {
+  const configuredProvider = env.AI_PROVIDER?.trim().toLowerCase();
+  if (configuredProvider) {
+    return configuredProvider === "openai";
+  }
+  return Boolean(env.OPENAI_API_KEY);
 }
 
 export function mapAiProviderError(error: unknown): AiProviderStatusResult {
