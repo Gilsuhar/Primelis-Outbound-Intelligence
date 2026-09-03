@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
-import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
+import { buildProspectBrief, planMessageStrategy } from "@/features/build-sequence/strategy-planner";
 import type {
   BuildSequenceInput,
   GoldStandardExample,
@@ -176,6 +176,7 @@ type AiStrategy = z.infer<typeof aiStrategySchema>;
 export type AiMessageStrategyProviderRequest = {
   input: BuildSequenceInput;
   intelligence: ProspectIntelligence;
+  prospectBrief?: MessageStrategy["prospectBrief"];
   approvedCapabilities: typeof approvedCapabilities;
   approvedProductGaps: typeof approvedProductGaps;
   proofRecords: Array<{ id: string; text: string }>;
@@ -316,11 +317,13 @@ function validateAiStrategy({
   input,
   intelligence,
   records,
+  prospectBrief,
 }: {
   strategy: AiStrategy;
   input: BuildSequenceInput;
   intelligence: ProspectIntelligence;
   records: SequenceKnowledgeRecord[];
+  prospectBrief?: MessageStrategy["prospectBrief"];
 }) {
   const issues: string[] = [];
   const allowedText = sourceText({ input, intelligence, records });
@@ -364,6 +367,12 @@ function validateAiStrategy({
   if (strategy.openingStyle === "PROSPECT_FACT" && intelligence.selectedInsights.length === 0) {
     issues.push("Opening style uses prospect fact without selected commercial prospect insights.");
   }
+  if (
+    prospectBrief?.factsToAvoid.some((fact) => normalize(strategy.prospectInsight).includes(normalize(fact))) ||
+    (strategy.openingStyle === "PROSPECT_FACT" && !prospectBrief?.strongestUsableProspectInsight)
+  ) {
+    issues.push("Strategy tries to personalize from a rejected or weak prospect fact.");
+  }
   if (strategy.confidence === "HIGH" && intelligence.relevantFacts.length === 0 && intelligence.confidence.serp !== "HIGH") {
     issues.push("High confidence is unsupported by weak prospect and SERP context.");
   }
@@ -383,14 +392,17 @@ function toMessageStrategy({
   capability,
   proof,
   goldStandards,
+  prospectBrief,
 }: {
   ai: AiStrategy;
   productGap: { text: string };
   capability: { text: string };
   proof?: { text: string };
   goldStandards: GoldStandardExample[];
+  prospectBrief?: MessageStrategy["prospectBrief"];
 }): MessageStrategy {
   return {
+    prospectBrief,
     prospectInsight: ai.prospectInsight,
     whyNow: ai.whyNow,
     businessQuestion: ai.businessQuestion,
@@ -480,6 +492,7 @@ async function callOpenAiStrategyPlanner(
                   instruction:
                     "Choose the strongest prospect-specific WHY. Return valid JSON matching the contract. Use ids for productGapId, relevantCapabilityId, proofPointId, and selectedGoldStandardExampleIds.",
                   prospectContext: {
+                    cleanProspectBrief: request.prospectBrief,
                     raw: request.input.rawProspectContext,
                     companyName: request.input.companyName,
                     contactFirstName: request.input.contactFirstName,
@@ -521,8 +534,12 @@ async function callOpenAiStrategyPlanner(
                   },
                   strictRules: [
                     "Use selectedCommercialInsights as the primary basis for why this prospect is relevant. Do not use a weaker supportingProspectFact when a stronger selectedCommercialInsight exists.",
+                    "Prefer cleanProspectBrief. If cleanProspectBrief.strongestUsableProspectInsight is empty, do not force personalization; use cleanProspectBrief.roleCompanyFallback.",
+                    "Never use cleanProspectBrief.factsToAvoid as personalization.",
                     "Build the core WHY from CURRENT context when available: current company, current role, current responsibilities, current tools/channels, and current priorities.",
                     "Historical context can support credibility, but never treat a historical employer, historical agency/account context, past expansion, past budget ownership, or past tool use as the target account's current operating environment.",
+                    "If source text is written in first person, treat it as the prospect's self-description. Never copy it as sender first person; paraphrase it into second-person or neutral prospect context.",
+                    "Do not quote long prospect phrases verbatim. Convert them into concise commercial interpretation grounded in the same meaning.",
                     "Do not use raw LinkedIn headlines, bare titles, bare company names, section labels, or decorative personal history as prospectInsight.",
                     "Avoid default openings like 'I saw that', 'I noticed that', 'I came across', or 'I saw your profile'. Connect the selected responsibility to the business question instead.",
                     "emailStepPlans must be an array of 4 objects with exactly: stepNumber, objective, newInformation, angle, evidenceToUse, CTAIntent, avoidRepeating, optional proofToUseId.",
@@ -598,9 +615,11 @@ export async function planAiMessageStrategy({
 }): Promise<MessageStrategy> {
   const goldStandards = selectGoldStandardExamples({ intelligence, primaryAngle: intelligence.primaryAngle });
   const proofOptions = proofRecords(records);
+  const prospectBrief = buildProspectBrief({ input, intelligence, records });
   const baseRequest: AiMessageStrategyProviderRequest = {
     input,
     intelligence,
+    prospectBrief,
     approvedCapabilities,
     approvedProductGaps,
     proofRecords: proofOptions,
@@ -633,7 +652,7 @@ export async function planAiMessageStrategy({
       };
     }
     const ai = parsed.data;
-    const validation = validateAiStrategy({ strategy: ai, input, intelligence, records });
+    const validation = validateAiStrategy({ strategy: ai, input, intelligence, records, prospectBrief });
     if (!validation.ok || !validation.capability || !validation.productGap) {
       return { ai, validation, durationMs };
     }
@@ -656,6 +675,7 @@ export async function planAiMessageStrategy({
         productGap: first.validation.productGap,
         proof: first.validation.proof,
         goldStandards,
+        prospectBrief,
       });
       return { ...strategy, diagnostics };
     }
@@ -670,6 +690,7 @@ export async function planAiMessageStrategy({
         productGap: second.validation.productGap,
         proof: second.validation.proof,
         goldStandards,
+        prospectBrief,
       });
       return { ...strategy, diagnostics };
     }

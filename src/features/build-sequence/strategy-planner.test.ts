@@ -63,6 +63,25 @@ describe("Build Sequence strategy planner", () => {
     expect(strategy.confidence).not.toBe("HIGH");
   });
 
+  it("builds a clean prospect brief and rejects weak personalization fragments", () => {
+    const { strategy } = strategyFor({
+      companyName: "SearchPilot",
+      contactFirstName: "Ari",
+      contactRole: "Paid Media Lead",
+      prospectContext: [
+        "Ari Cohen",
+        "Current: Paid Media Lead at SearchPilot",
+        "In-depth knowledge of the paid digital media channels covering programmatic, paid,",
+        "Skills: programmatic, paid,",
+      ].join("\n"),
+    });
+
+    expect(strategy.prospectBrief?.strongestUsableProspectInsight).toBeUndefined();
+    expect(strategy.prospectBrief?.roleCompanyFallback).toContain("Paid Media Lead role at SearchPilot");
+    expect(strategy.prospectBrief?.factsToAvoid.join(" ")).toMatch(/In-depth knowledge|Skills:/i);
+    expect(strategy.prospectBrief?.copyGuidance.join(" ")).toContain("Do not force personalization");
+  });
+
   it("selects the Chris Remofirst gold standard for a paid-search AI automation context", () => {
     const { strategy, examples } = strategyFor({
       prospectContext:
@@ -110,7 +129,7 @@ describe("Build Sequence strategy planner", () => {
     const { strategy, intelligence } = strategyFor({ keywords: undefined, serpEvidence: undefined });
 
     expect(intelligence.serpScenario).toBe("UNKNOWN");
-    expect(strategy.sequenceNarrative[2].newInformation).toContain("No unsupported SERP observation");
+    expect(strategy.sequenceNarrative[2].newInformation).toContain("paid-brand decision question");
     expect(strategy.businessQuestion).toContain("when branded-search competition changes");
   });
 

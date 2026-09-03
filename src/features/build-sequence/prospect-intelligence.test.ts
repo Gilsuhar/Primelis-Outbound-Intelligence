@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BuildSequenceInput, SequenceKnowledgeRecord } from "./types";
-import { buildProspectIntelligence, interpretProspectContext, rankProspectInsights } from "./prospect-intelligence";
+import { buildProspectIntelligence, interpretProspectContext, isCompleteProspectInsight, rankProspectInsights } from "./prospect-intelligence";
 
 const input: BuildSequenceInput = {
   companyName: "Cursor",
@@ -345,8 +345,8 @@ describe("Prospect Intelligence extraction", () => {
         expect(item.top3, item.label).toEqual([]);
         continue;
       }
-      expect(item.top3[0], item.label).toMatch(item.expectedTop);
-      expect(item.top3[0], item.label).not.toMatch(/\|.*\||wanted to be|forensic|chemistry|^hush$/i);
+      expect(item.top3[0] ?? "", item.label).toMatch(item.expectedTop);
+      expect(item.top3[0] ?? "", item.label).not.toMatch(/\|.*\||wanted to be|forensic|chemistry|^hush$/i);
     }
   });
 
@@ -406,6 +406,33 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.contextInterpretation.personalBackground.map((item) => item.text).join(" ")).toMatch(
       /doctor|chemistry|forensic|London/i,
     );
+  });
+
+  it("rejects truncated and low-value LinkedIn fragments as personalization insights", () => {
+    const badFragments = [
+      "In-depth knowledge of the paid digital media channels covering programmatic, paid,",
+      "Expertise in Google Ads, Microsoft Ads,",
+      "Paid digital media channels covering programmatic, paid",
+      "Skills: programmatic, paid,",
+      "View verification",
+      "Company logo svg",
+    ];
+
+    for (const fragment of badFragments) {
+      expect(isCompleteProspectInsight(fragment), fragment).toBe(false);
+    }
+
+    const ranked = rankProspectInsights(
+      [
+        ...badFragments,
+        "My focus is on aligning media investment with real business outcomes.",
+        "I manage paid search performance reporting across Google Ads and Microsoft Ads.",
+      ],
+      input,
+    ).map((insight) => insight.text);
+
+    expect(ranked).not.toEqual(expect.arrayContaining(badFragments));
+    expect(ranked.join(" ")).toMatch(/business outcomes|paid search performance reporting/i);
   });
 
   it("handles varied current and historical contexts without unsupported historical-to-current projection", () => {

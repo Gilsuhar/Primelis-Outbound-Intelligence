@@ -919,6 +919,27 @@ function containsVagueLanguage(text: string) {
   );
 }
 
+function containsInternalFacingLanguage(text: string) {
+  return /\b(?:without account-specific|based on (?:the )?available evidence|we cannot confirm|we can'?t confirm|cannot confirm|unsupported (?:claim|serp|evidence)|no unsupported serp observation|understand minute-by-minute branded-search competition before changing coverage)\b/i.test(
+    text,
+  );
+}
+
+function containsStandaloneSentenceFragment(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .some((line) => {
+      if (/^hi\b/i.test(line) || /^(?:congrats|congratulations)\b/i.test(line) || /[?]$/.test(line) || /^re:/i.test(line)) return false;
+      if (/^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(line)) {
+        return true;
+      }
+      const dangling = /(?:,\s*|(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(line);
+      return dangling;
+    });
+}
+
 function containsUnsupportedOrganicClaim(
   input: BuildSequenceInput,
   text: string,
@@ -972,7 +993,7 @@ function validateStepThreeReference(step: SequenceStep) {
   return (
     /existing Google Ads setup/i.test(text) &&
     /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|without account-specific (?:SERP|auction) evidence|at the time of the check/i.test(text) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|decision rule|brand auction changes|auction pressure/i.test(text) &&
     /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );
@@ -1152,6 +1173,8 @@ const recoverableSequenceFailureReasons = new Set([
   "word-count",
   "anonymous",
   "vague",
+  "internal-language",
+  "sentence-fragment",
   "step1-reference",
   "step2-reference",
   "step3-reference",
@@ -1391,6 +1414,16 @@ function sequenceValidationIssueDetails(
   );
   if (vagueStep.length > 0) {
     return fail(issue("vague", vagueStep));
+  }
+  const internalLanguageStep = firstStepIndex(steps, (step) =>
+    containsInternalFacingLanguage(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`),
+  );
+  if (internalLanguageStep.length > 0) {
+    return fail(issue("internal-language", internalLanguageStep));
+  }
+  const sentenceFragmentStep = firstStepIndex(steps, (step) => containsStandaloneSentenceFragment(step.messageBody));
+  if (sentenceFragmentStep.length > 0) {
+    return fail(issue("sentence-fragment", sentenceFragmentStep));
   }
   if (steps[0] && containsUnsupportedStepOneClaim(input, steps[0])) {
     return fail(issue("step1-claim", [0], false));

@@ -248,6 +248,7 @@ export type GoldStandardExample = {
 };
 
 export type MessageStrategy = {
+  prospectBrief?: ProspectBrief;
   prospectInsight: string;
   whyNow?: string;
   businessQuestion: string;
@@ -295,6 +296,22 @@ export type MessageStrategy = {
     firstIssues: string[];
     retryIssues: string[];
   };
+};
+
+export type ProspectBrief = {
+  prospectName?: string;
+  companyName: string;
+  role?: string;
+  persona: ProspectIntelligence["persona"];
+  strongestUsableProspectInsight?: string;
+  roleCompanyFallback: string;
+  whyNow: string;
+  businessQuestion: string;
+  signalAngle: string;
+  relevantCapability: string;
+  proofPoint?: string;
+  factsToAvoid: string[];
+  copyGuidance: string[];
 };
 
 export type SequenceGeneration = {

@@ -81,6 +81,20 @@ function responseStep(subjectLine: string, messageBody: string) {
   } as Response;
 }
 
+function renderedStepWordCount(step: { subjectLine?: string; connectionRequest?: string; imagePlaceholder?: string; messageBody: string; cta: string }) {
+  return [
+    step.subjectLine,
+    step.connectionRequest,
+    step.imagePlaceholder,
+    step.messageBody,
+    step.cta,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
 describe("Build Sequence OpenAI provider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -221,6 +235,129 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).toMatch(/Buildots|CMO|B2B SaaS|performance-driven growth/i);
   });
 
+  it("rewrites first-person prospect profile text and strips UI artifacts from prospect-facing copy", async () => {
+    const firstPersonInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Iterable logo",
+      companyWebsite: "iterable.com",
+      contactFirstName: "Luis",
+      contactRole: "Senior Paid Search Manager",
+      prospectContext: [
+        "Luis Rivera",
+        "Current:",
+        "Senior Paid Search Manager at Iterable logo",
+        "I specialise in managing and optimising high-budget Google Ads campaigns.",
+        "I manage paid search across Google Ads and Microsoft Ads.",
+        "My focus is on aligning media investment with real business outcomes - not just platform metrics.",
+        "I've worked with enterprise media budgets and profitability reporting.",
+        "Historical:",
+        "Previously worked at an agency managing client accounts.",
+        "View verification",
+        "svg",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: firstPersonInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(firstPersonInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("Iterable branded search visibility");
+    expect(rendered).not.toMatch(/\b(?:Iterable logo|logo|svg|View verification)\b/i);
+    expect(rendered).not.toMatch(/\bGiven I specialise\b|\bI specialise\b|\bI manage\b|\bMy focus\b|\bI've worked\b/i);
+    expect(rendered).toMatch(/you specialise|you manage|your focus on profitability and business outcomes|you've worked/i);
+    expect(rendered).toMatch(/Google Ads|Microsoft Ads|profitability|business outcomes/i);
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+    expect(rendered).not.toMatch(/Without account-specific auction evidence|Without account-specific SERP evidence/i);
+    expect(result.overallStrategy).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
+  });
+
+  it("falls back to a clean role and company opener when prospect insights are malformed fragments", async () => {
+    const fragmentInput: BuildSequenceInput = {
+      ...input,
+      companyName: "SearchPilot logo",
+      companyWebsite: "searchpilot.com",
+      contactFirstName: "Ari",
+      contactRole: "Paid Media Lead",
+      prospectContext: [
+        "Ari Cohen",
+        "Current:",
+        "Paid Media Lead at SearchPilot logo",
+        "In-depth knowledge of the paid digital media channels covering programmatic, paid,",
+        "Expertise in Google Ads, Microsoft Ads,",
+        "Skills: programmatic, paid,",
+        "Historical:",
+        "Previously worked at an agency managing client accounts.",
+        "svg",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: fragmentInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(fragmentInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
+    expect(result.steps[0].messageBody).toContain("For your Paid Media Lead role at SearchPilot");
+    expect(rendered).not.toMatch(/Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i);
+    expect(rendered).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
+    expect(rendered).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+  });
+
+  it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(input),
+    });
+    const stepTwo = result.steps[1].messageBody;
+    const stepThree = result.steps[2].messageBody;
+
+    expect(stepTwo).toMatch(/workflow|live Google and Bing search-page conditions/i);
+    expect(stepThree).toMatch(/business value|decision rule|existing Google Ads setup/i);
+    expect(stepThree).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
+    expect(stepThree).not.toBe(stepTwo);
+  });
+
+  it("keeps deterministic fallback steps under the final sequence word limit", async () => {
+    const managedAccountInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Americaneagle",
+      companyWebsite: "americaneagle.com",
+      contactFirstName: "Mia",
+      contactRole: "PPC Team Lead",
+      prospectContext: [
+        "Mia was promoted to PPC Team Lead.",
+        "Current: PPC Team Lead at Americaneagle.",
+        "Manages multiple client accounts across Google Ads and Microsoft Ads.",
+        "Focused on branded-search efficiency, campaign optimisation, and performance reporting.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: managedAccountInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(managedAccountInput),
+    });
+
+    expect(result.steps.map(renderedStepWordCount)).toEqual(result.steps.map(() => expect.any(Number)));
+    expect(result.steps.every((step) => renderedStepWordCount(step) <= 110)).toBe(true);
+  });
+
   it("accepts OpenAI schema without letting model text replace rendered steps", async () => {
     const provider = createBuildSequenceAiProvider({
       AI_PROVIDER: "openai",
@@ -322,6 +459,64 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
     expect(result.steps[0].messageBody).toContain("Congrats on your promotion");
     expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+  });
+
+  it("rejects weak AI rewrites with malformed personalization, internal caveats, and sentence fragments", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const attempts = new Map<string, number>();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const payload = JSON.parse(String((init as RequestInit).body));
+      const requestText = JSON.parse(payload.input[0].content[0].text);
+      const currentDraft = JSON.parse(requestText.currentDraft);
+      const key = currentDraft.subject ?? currentDraft.body.slice(0, 24);
+      const attempt = attempts.get(key) ?? 0;
+      attempts.set(key, attempt + 1);
+      if (/Nike branded search visibility/i.test(key)) {
+        return attempt === 0
+          ? responseStep(
+              "brand visibility",
+              "Hi there,\n\nGiven In-depth knowledge of the paid digital media channels covering programmatic, paid,\n\nI wanted to ask one narrow branded-search question.",
+            )
+          : responseStep(
+              "brand visibility",
+              "Hi there,\n\nFor your VP Performance Marketing role at Nike, I would keep this to one narrow branded-search question.\n\nHow do you decide when branded bids should change?",
+            );
+      }
+      if (/Signal and branded CPC/i.test(key)) {
+        return responseStep(
+          "re: fragment",
+          "Hi there,\n\nUnderstand minute-by-minute branded-search competition before changing coverage.",
+        );
+      }
+      if (/practical paid-brand example/i.test(key)) {
+        return responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        );
+      }
+      return responseStep(
+        "re: mechanism",
+        "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+      );
+    });
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("For your VP Performance Marketing role at Nike");
+    expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific/i);
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
   });
 
   it("falls back only the step whose hybrid rewrite uses an unrecognized entity", async () => {

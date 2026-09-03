@@ -1,17 +1,22 @@
 import type {
   BuildSequenceInput,
   MessageStrategy,
+  ProspectBrief,
   ProspectIntelligence,
   SequenceKnowledgeRecord,
 } from "./types";
 import { selectGoldStandardExamples } from "./gold-standard-examples";
+import { isCompleteProspectInsight } from "./prospect-intelligence";
 
 function compact(value?: string) {
   return value?.replace(/\s+/g, " ").trim();
 }
 
 function firstProspectFact(intelligence: ProspectIntelligence) {
-  return intelligence.selectedInsights[0]?.text ?? intelligence.relevantFacts.find(Boolean);
+  return intelligence.selectedInsights[0]?.text ??
+    intelligence.contextInterpretation.commercialSignals
+      .map((item) => item.text)
+      .find((fact) => isCompleteProspectInsight(fact));
 }
 
 function hasSelectedInsight(intelligence: ProspectIntelligence) {
@@ -20,6 +25,15 @@ function hasSelectedInsight(intelligence: ProspectIntelligence) {
 
 function firstCaseStudy(records: SequenceKnowledgeRecord[]) {
   return records.find((record) => record.type === "CASE_STUDY")?.approvedText;
+}
+
+function roleCompanyLabel(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const role = intelligence.jobTitle ?? intelligence.contextInterpretation.currentRole ?? compact(input.contactRole);
+  const company = intelligence.companyName ??
+    intelligence.contextInterpretation.currentCompany ??
+    compact(input.companyName) ??
+    "the account";
+  return { role, company };
 }
 
 function capabilityFor(intelligence: ProspectIntelligence) {
@@ -86,19 +100,17 @@ function openingStyleFor(intelligence: ProspectIntelligence): MessageStrategy["o
 function prospectInsightFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
   const fact = firstProspectFact(intelligence);
   if (fact) return fact;
-  if (intelligence.contextInterpretation.currentRole) {
-    return `${intelligence.contextInterpretation.currentRole} at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
+  const { role, company } = roleCompanyLabel(input, intelligence);
+  if (role) {
+    return `${role} at ${company}`;
   }
-  if (intelligence.jobTitle) {
-    return `${intelligence.jobTitle} at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
-  }
-  return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${intelligence.contextInterpretation.currentCompany ?? compact(input.companyName) ?? "the account"}`;
+  return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${company}`;
 }
 
 function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boolean): MessageStrategy["sequenceNarrative"] {
   const evidencePhrase =
     intelligence.serpScenario === "UNKNOWN"
-      ? "No unsupported SERP observation; keep this as a visibility question."
+      ? "Keep this as a paid-brand decision question without claiming account-specific SERP findings."
       : `Use the ${intelligence.serpScenario.toLowerCase()} branded-search evidence without overclaiming.`;
   return [
     {
@@ -117,7 +129,7 @@ function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boole
     },
     {
       step: 3,
-      objective: "Introduce the most relevant Signal capability only once.",
+      objective: "Show the business impact of changing bid pressure by auction condition.",
       newInformation: evidencePhrase,
       ctaIntent: "Ask if a narrow look would be useful.",
     },
@@ -148,6 +160,63 @@ function stepPlansFromNarrative(
   }));
 }
 
+export function buildProspectBrief({
+  input,
+  intelligence,
+  records,
+}: {
+  input: BuildSequenceInput;
+  intelligence: ProspectIntelligence;
+  records: SequenceKnowledgeRecord[];
+}): ProspectBrief {
+  const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
+  const strongestUsableProspectInsight = firstProspectFact(intelligence);
+  const { role, company } = roleCompanyLabel(input, intelligence);
+  const roleCompanyFallback = role
+    ? `For your ${role} role at ${company}, keep this to one narrow branded-search question.`
+    : `Quick question on ${company} branded search.`;
+  const businessQuestion = businessQuestionFor(input, intelligence);
+  const relevantCapability = capabilityFor(intelligence);
+  const factsToAvoid = Array.from(
+    new Set(
+      [
+        ...intelligence.relevantFacts,
+        ...intelligence.contextInterpretation.commercialSignals.map((item) => item.text),
+        ...intelligence.contextInterpretation.historicalExperience.map((item) => item.text),
+        ...intelligence.contextInterpretation.rejectedHistoricalProjections,
+      ]
+        .filter(Boolean)
+        .filter((fact) => fact !== strongestUsableProspectInsight)
+        .filter((fact) => !isCompleteProspectInsight(fact) || /\b(previously|former|historical|past role|agency)\b/i.test(fact)),
+    ),
+  ).slice(0, 10);
+  return {
+    prospectName: intelligence.prospectName ?? compact(input.contactFirstName),
+    companyName: company,
+    role,
+    persona: intelligence.persona,
+    strongestUsableProspectInsight,
+    roleCompanyFallback,
+    whyNow: strongestUsableProspectInsight
+      ? "Use the strongest current prospect fact as the reason to ask one sharp paid-brand question."
+      : "Do not force personalization; use a clean role/company opener.",
+    businessQuestion,
+    signalAngle: intelligence.primaryAngle,
+    relevantCapability,
+    proofPoint,
+    factsToAvoid,
+    copyGuidance: [
+      "Email 1 should open on the prospect, role, or company and ask the pain/question.",
+      "Email 2 should explain how Signal makes the live SERP decision differently.",
+      "Email 3 should add business or incrementality value without repeating the mechanism.",
+      "Email 4 should use one proof point and close softly.",
+      "Do not force personalization when the strongest usable prospect insight is empty.",
+      "Never use factsToAvoid as personalization.",
+      "Never expose internal uncertainty, validation, or evidence-language.",
+    ],
+  };
+}
+
 export function planMessageStrategy({
   input,
   intelligence,
@@ -157,6 +226,7 @@ export function planMessageStrategy({
   intelligence: ProspectIntelligence;
   records: SequenceKnowledgeRecord[];
 }): MessageStrategy {
+  const prospectBrief = buildProspectBrief({ input, intelligence, records });
   const prospectInsight = prospectInsightFor(input, intelligence);
   const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
   const primaryAngle = intelligence.primaryAngle;
@@ -171,6 +241,7 @@ export function planMessageStrategy({
         : "LOW";
 
   return {
+    prospectBrief,
     prospectInsight,
     whyNow: hasProspectFact
       ? "The supplied prospect context gives a real reason to connect their work to branded-search decision quality."

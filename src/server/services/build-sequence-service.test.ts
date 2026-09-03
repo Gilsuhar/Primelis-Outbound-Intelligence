@@ -393,7 +393,6 @@ describe("Build Sequence service", () => {
       },
       { persistence: adapter },
     );
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
@@ -632,7 +631,7 @@ describe("Build Sequence service", () => {
       },
       {
         scenario: "UNKNOWN",
-        expectedCopy: /Without account-specific auction evidence|visibility question/i,
+        expectedCopy: /business value|decision rule|visibility question/i,
         forbiddenCopy: /only advertiser|competitors appearing/i,
       },
     ];
@@ -1340,7 +1339,7 @@ describe("Build Sequence service", () => {
           "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("Without account-specific auction evidence");
+      expect(JSON.stringify(result.data.steps)).toContain("The business value");
     }
   });
 
@@ -1668,7 +1667,7 @@ describe("Build Sequence service", () => {
       expect(bodies[0]).toMatch(/Google Ads reports performance/i);
       expect(bodies[1]).toMatch(/Google and Bing/i);
       expect(bodies[1]).not.toMatch(/Google Ads reports performance/i);
-      expect(bodies[2]).toMatch(/Without account-specific auction evidence/i);
+      expect(bodies[2]).toMatch(/business value|decision rule/i);
       expect(rendered).not.toMatch(/organic is already enough|organic would have captured|organic cannot do/i);
       expect(rendered).toContain("ZoomInfo used Signal to reduce branded CPC by 40%");
     }

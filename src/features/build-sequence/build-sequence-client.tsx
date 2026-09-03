@@ -411,13 +411,23 @@ function formString(formData: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function prospectContextFromForm(formData: FormData) {
+  return [
+    formString(formData, "linkedinProfileUrl")
+      ? `LinkedIn URL: ${formString(formData, "linkedinProfileUrl")}`
+      : "",
+    formString(formData, "rawProspectContext"),
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 function missingQuickBriefFields(formData: FormData) {
-  if (formString(formData, "rawProspectContext") || formString(formData, "companyName")) {
+  if (prospectContextFromForm(formData) || formString(formData, "companyName")) {
     return [];
   }
-  return [["rawProspectContext", "Prospect Context"]]
-    .filter(([name]) => !formString(formData, name))
-    .map(([, label]) => label);
+  return ["Prospect Context or LinkedIn URL"];
 }
 
 export function buildFullStepText(step: SequenceStep) {
@@ -685,6 +695,7 @@ export function BuildSequenceClient() {
   function onSubmit(formData: FormData) {
     setError(null);
     setResult(null);
+    const combinedProspectContext = prospectContextFromForm(formData);
     const missingFields = missingQuickBriefFields(formData);
     if (missingFields.length > 0) {
       setResult(null);
@@ -714,8 +725,8 @@ export function BuildSequenceClient() {
             formString(formData, "desiredOverallDuration") || "12 business days",
           outputLanguage,
           accountStatusOverride: false,
-          rawProspectContext: formString(formData, "rawProspectContext") || undefined,
-          prospectContext: formString(formData, "rawProspectContext") || undefined,
+          rawProspectContext: combinedProspectContext || undefined,
+          prospectContext: combinedProspectContext || undefined,
           serpEvidence: formString(formData, "serpEvidence") || undefined,
           keywords: cleanedKeywordEvidence(),
           internalNotes: formString(formData, "internalNotes") || undefined,
@@ -804,6 +815,18 @@ export function BuildSequenceClient() {
             icon={<Layers3 aria-hidden="true" className="h-5 w-5" />}
             title="Prospect Intelligence"
           />
+
+          <label className="block space-y-1 text-sm font-medium text-stone-700">
+            LinkedIn profile URL
+            <input
+              className="w-full rounded-md border border-line px-3 py-2 text-sm"
+              name="linkedinProfileUrl"
+              placeholder="https://www.linkedin.com/in/..."
+            />
+            <span className="block text-xs leading-5 text-stone-500">
+              Optional. Used for prospect identity and source tracking; paste profile text below for stronger personalization.
+            </span>
+          </label>
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">
             Prospect Context

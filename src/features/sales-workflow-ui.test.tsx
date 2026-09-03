@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/ask-signal-brain/actions", () => ({
   askSignalBrainAction: vi.fn(),
@@ -56,6 +56,10 @@ import { AccountResearchClient } from "@/features/account-research/account-resea
 import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 function buildSequenceResult(overrides: Partial<BuildSequenceResult> = {}): BuildSequenceResult {
   return {
@@ -166,6 +170,7 @@ describe("Sales workflow UI", () => {
     render(<BuildSequenceClient />);
 
     expect(screen.getByRole("heading", { name: "Prospect Intelligence" })).toBeTruthy();
+    expect(screen.getByText("LinkedIn profile URL")).toBeTruthy();
     expect(screen.getByText("Prospect Context")).toBeTruthy();
     expect(screen.getByText("SERP Evidence")).toBeTruthy();
     expect(screen.getByText("Company")).toBeTruthy();
@@ -228,6 +233,31 @@ describe("Sales workflow UI", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText("Test-visible generation failure.")).toBeTruthy());
+  });
+
+  it("passes an optional LinkedIn profile URL into Build Sequence prospect context", async () => {
+    const action = vi.mocked(generateBuildSequenceAction);
+    action.mockResolvedValueOnce({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    });
+    render(<BuildSequenceClient />);
+
+    const linkedinUrl = document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]');
+    expect(linkedinUrl).toBeTruthy();
+    fireEvent.change(linkedinUrl!, {
+      target: { value: "https://www.linkedin.com/in/chris-example/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(action.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        rawProspectContext: "LinkedIn URL: https://www.linkedin.com/in/chris-example/",
+        prospectContext: "LinkedIn URL: https://www.linkedin.com/in/chris-example/",
+      }),
+    );
   });
 
   it("renders existing-activity warnings after successful Build Sequence generation", async () => {
