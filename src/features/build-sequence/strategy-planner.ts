@@ -12,6 +12,22 @@ function compact(value?: string) {
   return value?.replace(/\s+/g, " ").trim();
 }
 
+function roleAlreadyIncludesCompany(role: string, company: string) {
+  const normalizedRole = role.toLowerCase();
+  const normalizedCompany = company.toLowerCase();
+  return (
+    normalizedRole.includes(` at ${normalizedCompany}`) ||
+    normalizedRole.includes(` @ ${normalizedCompany}`) ||
+    normalizedRole.endsWith(normalizedCompany)
+  );
+}
+
+function roleCompanyOpening(role: string | undefined, company: string) {
+  if (!role) return `Quick question on ${company} branded search.`;
+  const roleLabel = roleAlreadyIncludesCompany(role, company) ? role : `${role} at ${company}`;
+  return `Quick question for your ${roleLabel} remit.`;
+}
+
 function firstProspectFact(intelligence: ProspectIntelligence) {
   return intelligence.selectedInsights[0]?.text ??
     intelligence.contextInterpretation.commercialSignals
@@ -172,9 +188,7 @@ export function buildProspectBrief({
   const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
   const strongestUsableProspectInsight = firstProspectFact(intelligence);
   const { role, company } = roleCompanyLabel(input, intelligence);
-  const roleCompanyFallback = role
-    ? `For your ${role} role at ${company}, keep this to one narrow branded-search question.`
-    : `Quick question on ${company} branded search.`;
+  const roleCompanyFallback = roleCompanyOpening(role, company);
   const businessQuestion = businessQuestionFor(input, intelligence);
   const relevantCapability = capabilityFor(intelligence);
   const factsToAvoid = Array.from(

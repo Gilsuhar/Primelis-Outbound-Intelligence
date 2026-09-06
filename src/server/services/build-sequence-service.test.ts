@@ -658,7 +658,7 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "SOCIAL_PROOF",
       ]);
-      expect(result.data.steps[0].messageBody).toMatch(/narrow branded-search question|visibility question/i);
+      expect(result.data.steps[0].messageBody).toMatch(/branded-search competition changes|visibility question/i);
       expect(result.data.steps[1].messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
       expect(result.data.steps[2].messageBody).toMatch(/existing Google Ads setup|Google and Bing SERPs/i);
       expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
@@ -1173,10 +1173,8 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).toContain("VP Performance Marketing");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
-      expect(result.data.steps[0].messageBody).toMatch(/narrow branded-search question/i);
-      expect(
-        result.data.steps[0].messageBody.match(/narrow branded-search question/gi)?.length,
-      ).toBe(1);
+      expect(result.data.steps[0].messageBody).toMatch(/branded-search competition changes/i);
+      expect(result.data.steps[0].messageBody).not.toMatch(/keep this to one narrow/i);
       expect(result.data.steps[1].messageBody).toMatch(/Signal monitors Google and Bing SERPs minute by minute|visibility/i);
       expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);

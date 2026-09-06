@@ -151,8 +151,8 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
-    expect(result.steps[0].messageBody).toContain("branded-search question");
+    expect(result.steps[0].messageBody).toContain("Quick question for your VP Performance Marketing at Nike remit.");
+    expect(result.steps[0].messageBody).not.toContain("keep this to one narrow");
     expect(result.steps[1].imagePlaceholder).toBeUndefined();
     expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");
@@ -306,11 +306,35 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
-    expect(result.steps[0].messageBody).toContain("For your Paid Media Lead role at SearchPilot");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Paid Media Lead at SearchPilot remit.");
     expect(rendered).not.toMatch(/Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i);
     expect(rendered).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
     expect(rendered).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
     expect(rendered).not.toMatch(/accounts your team manages/i);
+  });
+
+  it("does not repeat the company when the role already includes it", async () => {
+    const ibmInput: BuildSequenceInput = {
+      ...input,
+      companyName: "IBM",
+      companyWebsite: "ibm.com",
+      contactFirstName: "Kevin",
+      contactRole: "Global Paid Search Lead at IBM",
+      prospectContext: "Kevin\nGlobal Paid Search Lead at IBM\nIBM",
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: ibmInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(ibmInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("Quick question for your Global Paid Search Lead at IBM remit.");
+    expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
+    expect(result.steps[0].messageBody).not.toContain("The practical question is:");
   });
 
   it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
@@ -403,7 +427,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your VP Performance Marketing at Nike remit.");
     expect(result.steps[1].messageBody).toContain("Google and Bing SERPs in real time");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
@@ -484,7 +508,7 @@ describe("Build Sequence OpenAI provider", () => {
             )
           : responseStep(
               "brand visibility",
-              "Hi there,\n\nFor your VP Performance Marketing role at Nike, I would keep this to one narrow branded-search question.\n\nHow do you decide when branded bids should change?",
+              "Hi there,\n\nQuick question for your VP Performance Marketing at Nike remit.\n\nHow do you decide when branded bids should change?",
             );
       }
       if (/Signal and branded CPC/i.test(key)) {
@@ -513,7 +537,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("For your VP Performance Marketing role at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your VP Performance Marketing at Nike remit.");
     expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific/i);
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
@@ -540,7 +564,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your VP Performance Marketing at Nike remit.");
     expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
     expect(JSON.stringify(result.steps)).not.toContain("Gong");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
@@ -756,7 +780,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("VP Performance Marketing role at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your VP Performance Marketing at Nike remit.");
     expect(result.steps[1].messageBody).toContain("Google and Bing SERPs in real time");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("existing Google Ads setup");

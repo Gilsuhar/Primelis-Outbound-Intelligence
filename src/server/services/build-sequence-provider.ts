@@ -307,7 +307,7 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
 }
 
 function isKnownRewriteStopword(noun: string) {
-  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Standard|Adjust|Separating|Want|How|Branded|Brand|Paid)$/i.test(noun);
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Standard|Adjust|Separating|Want|How|Quick|Branded|Brand|Paid)$/i.test(noun);
 }
 
 function entityAllowed(noun: string, allowed: AllowedEntities) {
@@ -463,6 +463,7 @@ function looksLikeStandaloneFragment(line: string) {
   const trimmed = line.trim();
   if (!trimmed || /^hi\b/i.test(trimmed) || /^(?:congrats|congratulations)\b/i.test(trimmed) || /[?]$/.test(trimmed)) return false;
   if (/^(?:Subject|Re):/i.test(trimmed)) return false;
+  if (/^quick question\b/i.test(trimmed)) return false;
   if (/^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(trimmed)) {
     return true;
   }
@@ -716,6 +717,24 @@ function buyerRole(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
   return intelligence?.jobTitle || input.contactRole;
 }
 
+function roleAlreadyIncludesCompany(role: string, company: string) {
+  const normalizedRole = role.toLowerCase();
+  const normalizedCompany = company.toLowerCase();
+  return (
+    normalizedRole.includes(` at ${normalizedCompany}`) ||
+    normalizedRole.includes(` @ ${normalizedCompany}`) ||
+    normalizedRole.endsWith(normalizedCompany)
+  );
+}
+
+function roleCompanyPhrase(role: string, company: string) {
+  return roleAlreadyIncludesCompany(role, company) ? role : `${role} at ${company}`;
+}
+
+function roleCompanyOpening(role: string, company: string) {
+  return `Quick question for your ${roleCompanyPhrase(role, company)} remit.`;
+}
+
 function hasPromotionSignal(input: BuildSequenceInput) {
   return /\b(promoted|promotion|new role|stepped into|recently became|congrats|congratulations)\b/i.test(
     [
@@ -896,16 +915,16 @@ function accountOpening(
   if (fact && intelligence.confidence.prospect !== "LOW") {
     return (
       responsibilityOpening({ input, intelligence, insight: fact }) ??
-      `For your ${buyerRole(input, intelligence)} role at ${company}, I would keep this to one narrow branded-search question.`
+      roleCompanyOpening(buyerRole(input, intelligence), company)
     );
   }
   if (brief?.roleCompanyFallback) {
     return brief.roleCompanyFallback;
   }
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
-    return `For your ${intelligence.jobTitle} role at ${company}, I would keep this to one narrow branded-search question.`;
+    return roleCompanyOpening(intelligence.jobTitle, company);
   }
-  return `I had ${company} on my list for one narrow branded-search visibility check.`;
+  return `Quick question on ${company} branded search.`;
 }
 
 function prospectLedInsight(
@@ -941,7 +960,7 @@ function strategyFirstTouch(
   return [
     prospectInsight,
     strategy.productGap,
-    `The practical question is: ${strategy.businessQuestion.replace(/\?$/, "")}?`,
+    strategy.businessQuestion.replace(/^the practical question is:\s*/i, "").replace(/\?*$/, "?"),
   ].join("\n\n");
 }
 
