@@ -235,7 +235,26 @@ describe("Sales workflow UI", () => {
     await waitFor(() => expect(screen.getByText("Test-visible generation failure.")).toBeTruthy());
   });
 
-  it("passes an optional LinkedIn profile URL into Build Sequence prospect context", async () => {
+  it("does not submit Build Sequence from a LinkedIn URL alone", async () => {
+    const action = vi.mocked(generateBuildSequenceAction);
+    render(<BuildSequenceClient />);
+
+    const linkedinUrl = document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]');
+    expect(linkedinUrl).toBeTruthy();
+    fireEvent.change(linkedinUrl!, {
+      target: { value: "https://www.linkedin.com/in/chris-example/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    expect(action).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "Complete these fields first: Prospect Context text; a LinkedIn URL alone cannot be read automatically yet.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("passes an optional LinkedIn profile URL with pasted context into Build Sequence prospect context", async () => {
     const action = vi.mocked(generateBuildSequenceAction);
     action.mockResolvedValueOnce({
       ok: false,
@@ -249,13 +268,22 @@ describe("Sales workflow UI", () => {
     fireEvent.change(linkedinUrl!, {
       target: { value: "https://www.linkedin.com/in/chris-example/" },
     });
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: { value: "Chris from Remofirst manages paid search and AI automation." },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
     await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
     expect(action.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        rawProspectContext: "LinkedIn URL: https://www.linkedin.com/in/chris-example/",
-        prospectContext: "LinkedIn URL: https://www.linkedin.com/in/chris-example/",
+        rawProspectContext:
+          "LinkedIn URL: https://www.linkedin.com/in/chris-example/\n\nChris from Remofirst manages paid search and AI automation.",
+        prospectContext:
+          "LinkedIn URL: https://www.linkedin.com/in/chris-example/\n\nChris from Remofirst manages paid search and AI automation.",
       }),
     );
   });

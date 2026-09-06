@@ -411,12 +411,20 @@ function formString(formData: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function linkedinProfileUrlFromForm(formData: FormData) {
+  return formString(formData, "linkedinProfileUrl");
+}
+
+function rawProspectContextFromForm(formData: FormData) {
+  return formString(formData, "rawProspectContext");
+}
+
 function prospectContextFromForm(formData: FormData) {
+  const linkedinProfileUrl = linkedinProfileUrlFromForm(formData);
+  const rawProspectContext = rawProspectContextFromForm(formData);
   return [
-    formString(formData, "linkedinProfileUrl")
-      ? `LinkedIn URL: ${formString(formData, "linkedinProfileUrl")}`
-      : "",
-    formString(formData, "rawProspectContext"),
+    linkedinProfileUrl ? `LinkedIn URL: ${linkedinProfileUrl}` : "",
+    rawProspectContext,
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -424,10 +432,13 @@ function prospectContextFromForm(formData: FormData) {
 }
 
 function missingQuickBriefFields(formData: FormData) {
-  if (prospectContextFromForm(formData) || formString(formData, "companyName")) {
+  if (rawProspectContextFromForm(formData) || formString(formData, "companyName")) {
     return [];
   }
-  return ["Prospect Context or LinkedIn URL"];
+  if (linkedinProfileUrlFromForm(formData)) {
+    return ["Prospect Context text; a LinkedIn URL alone cannot be read automatically yet"];
+  }
+  return ["Prospect Context"];
 }
 
 export function buildFullStepText(step: SequenceStep) {
@@ -824,7 +835,7 @@ export function BuildSequenceClient() {
               placeholder="https://www.linkedin.com/in/..."
             />
             <span className="block text-xs leading-5 text-stone-500">
-              Optional. Used for prospect identity and source tracking; paste profile text below for stronger personalization.
+              Optional. Used for prospect identity and source tracking. Paste profile text below; a URL alone does not include the profile content.
             </span>
           </label>
 
