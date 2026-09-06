@@ -524,8 +524,12 @@ function accountStatusPersistence(persistence: BuildSequencePersistence) {
 }
 
 function accountStatusDraftWarning(status?: AccountStatusResult) {
-  if (!status || status.severity !== "WARNING") return undefined;
+  if (!status) return undefined;
   const company = status.companyName ?? "this account";
+  if (status.state === "EXISTING_CLIENT") {
+    return `Existing Primelis client status found for ${company}. Review before sending or pushing to CRM.`;
+  }
+  if (status.severity !== "WARNING") return undefined;
   return `Existing ownership or recent outreach activity found for ${company}. Review this before sending or pushing to CRM.`;
 }
 
@@ -2060,7 +2064,9 @@ export async function generateBuildSequence(
   if (!accountStatus.ok) {
     return accountStatus;
   }
-  if (accountStatus.data.severity === "BLOCKED") {
+  const clientDraftOverride =
+    accountStatus.data.state === "EXISTING_CLIENT" && input.accountStatusOverride;
+  if (accountStatus.data.severity === "BLOCKED" && !clientDraftOverride) {
     return err("ACCOUNT_STATUS_BLOCKED", accountStatus.data.message);
   }
   const accountStatusWarning = accountStatusDraftWarning(accountStatus.data);

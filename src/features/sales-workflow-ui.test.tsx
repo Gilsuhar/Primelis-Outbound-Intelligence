@@ -317,6 +317,56 @@ describe("Sales workflow UI", () => {
     );
   });
 
+  it("lets Build Sequence generation continue after a client-status confirmation", async () => {
+    const action = vi.mocked(generateBuildSequenceAction);
+    action
+      .mockResolvedValueOnce({
+        ok: false,
+        code: "ACCOUNT_STATUS_BLOCKED",
+        message:
+          "This company is already marked as a Primelis client. Normal prospecting should not continue.",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: buildSequenceResult({
+          safetyNotes: [
+            "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
+          ],
+        }),
+      });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("I checked this, generate draft anyway")).toBeTruthy(),
+    );
+    expect(action.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ accountStatusOverride: false }),
+    );
+
+    fireEvent.click(screen.getByText("I checked this, generate draft anyway"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    expect(action.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ accountStatusOverride: true }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
+        ),
+      ).toBeTruthy(),
+    );
+  });
+
   it("gives Build Sequence Generate buttons materially different local variants", () => {
     const step: SequenceStep = {
       stepNumber: 1,

@@ -224,7 +224,7 @@ function existingProspect(overrides: Partial<ProspectRecord>): ProspectRecord {
 }
 
 describe("Build Sequence service", () => {
-  it("blocks sequence generation when the account is in suppression", async () => {
+  it("requires confirmation before generating when the account is marked as a client", async () => {
     const suppression: DoNotContactRecord = {
       id: "apollo-customer",
       companyName: "Zenleads Inc. DBA Apollo.io",
@@ -249,6 +249,68 @@ describe("Build Sequence service", () => {
     if (!result.ok) {
       expect(result.code).toBe("ACCOUNT_STATUS_BLOCKED");
       expect(result.message).toContain("already marked as a Primelis client");
+    }
+    expect(persisted).toEqual([]);
+  });
+
+  it("allows draft generation for a client-marked account after explicit confirmation", async () => {
+    const suppression: DoNotContactRecord = {
+      id: "apollo-customer",
+      companyName: "Zenleads Inc. DBA Apollo.io",
+      domain: "apollo.io",
+      status: "EXISTING_CUSTOMER",
+      reason: "Existing Signal customer.",
+    };
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })], "SALES_USER", [
+      suppression,
+    ]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Apollo",
+        companyWebsite: undefined,
+        accountStatusOverride: true,
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps).toHaveLength(4);
+      expect(result.data.safetyNotes).toContain(
+        "Existing Primelis client status found for Zenleads Inc. DBA Apollo.io. Review before sending or pushing to CRM.",
+      );
+    }
+    expect(persisted).toHaveLength(1);
+  });
+
+  it("keeps Do Not Contact records blocked even when confirmation is requested", async () => {
+    const suppression: DoNotContactRecord = {
+      id: "blocked-account",
+      companyName: "Blocked Co",
+      domain: "blocked.example",
+      status: "DO_NOT_CONTACT",
+      reason: "Explicit DNC request.",
+    };
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })], "SALES_USER", [
+      suppression,
+    ]);
+
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "Blocked Co",
+        companyWebsite: "blocked.example",
+        accountStatusOverride: true,
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ACCOUNT_STATUS_BLOCKED");
+      expect(result.message).toContain("suppression list");
     }
     expect(persisted).toEqual([]);
   });

@@ -592,6 +592,7 @@ export function BuildSequenceClient() {
     state: "idle" | "sending" | "success" | "error";
     message?: string;
   }>({ state: "idle" });
+  const [accountStatusOverride, setAccountStatusOverride] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const generationInProgress = isPending || isGenerating;
@@ -606,8 +607,12 @@ export function BuildSequenceClient() {
   const quality = result ? sequenceQuality(displayedSteps, result.safetyNotes) : null;
   const draftWarnings =
     result?.safetyNotes.filter((note) =>
-      note.startsWith("Existing ownership or recent outreach activity found"),
+      note.startsWith("Existing ownership or recent outreach activity found") ||
+      note.startsWith("Existing Primelis client status found"),
     ) ?? [];
+  const canApproveAccountStatusOverride =
+    error?.includes("already marked as a Primelis client") ||
+    error?.includes("active sales process");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -735,7 +740,7 @@ export function BuildSequenceClient() {
           desiredOverallDuration:
             formString(formData, "desiredOverallDuration") || "12 business days",
           outputLanguage,
-          accountStatusOverride: false,
+          accountStatusOverride,
           rawProspectContext: combinedProspectContext || undefined,
           prospectContext: combinedProspectContext || undefined,
           serpEvidence: formString(formData, "serpEvidence") || undefined,
@@ -1110,9 +1115,23 @@ export function BuildSequenceClient() {
           </details>
 
           {error ? (
-            <p className="rounded-md border border-[#f1c6b7] bg-[#fff4ef] px-3 py-2 text-sm text-[#9a3f24]">
-              {error}
-            </p>
+            <div className="space-y-2 rounded-md border border-[#f1c6b7] bg-[#fff4ef] px-3 py-2 text-sm text-[#9a3f24]">
+              <p>{error}</p>
+              {canApproveAccountStatusOverride ? (
+                <button
+                  className="rounded-md border border-[#d7957f] bg-white px-3 py-2 text-sm font-semibold text-[#7a321c] transition hover:bg-[#fff8f4]"
+                  onClick={() => {
+                    setAccountStatusOverride(true);
+                    setError(
+                      "Override enabled for draft generation. Click Generate again to continue; review account status before sending or pushing to CRM.",
+                    );
+                  }}
+                  type="button"
+                >
+                  I checked this, generate draft anyway
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {generationInProgress ? (
