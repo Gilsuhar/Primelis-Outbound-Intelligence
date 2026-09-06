@@ -77,7 +77,7 @@ describe("Build Sequence strategy planner", () => {
     });
 
     expect(strategy.prospectBrief?.strongestUsableProspectInsight).toBeUndefined();
-    expect(strategy.prospectBrief?.roleCompanyFallback).toContain("Paid Media Lead at SearchPilot");
+    expect(strategy.prospectBrief?.roleCompanyFallback).toContain("Paid Media Lead scope at SearchPilot");
     expect(strategy.prospectBrief?.roleCompanyFallback).not.toContain("role at SearchPilot");
     expect(strategy.prospectBrief?.factsToAvoid.join(" ")).toMatch(/In-depth knowledge|Skills:/i);
     expect(strategy.prospectBrief?.copyGuidance.join(" ")).toContain("Do not force personalization");

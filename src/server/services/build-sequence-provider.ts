@@ -307,7 +307,7 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
 }
 
 function isKnownRewriteStopword(noun: string) {
-  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Standard|Adjust|Separating|Want|How|Quick|Branded|Brand|Paid)$/i.test(noun);
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Given|Standard|Adjust|Separating|Want|How|Quick|Branded|Brand|Paid)$/i.test(noun);
 }
 
 function entityAllowed(noun: string, allowed: AllowedEntities) {
@@ -470,7 +470,7 @@ function looksLikeStandaloneFragment(line: string) {
   if (/(?:,\s*|(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(trimmed)) {
     return true;
   }
-  const hasVerb = /\b(?:is|are|was|were|be|being|been|has|have|had|can|could|would|should|do|does|did|may|might|need|needs|manage|manages|managed|lead|leads|led|focus|focuses|focused|work|works|worked|reduce|reduces|reduced|lower|lowers|lowered|monitor|monitors|detect|detects|connect|connects|compare|compares|decide|decides|change|changes|protect|protects|keep|keeps|hold|holds|restore|restores)\b/i.test(
+  const hasVerb = /\b(?:is|are|was|were|be|being|been|has|have|had|can|could|would|should|do|does|did|may|might|need|needs|want|wants|wanted|ask|asks|asked|manage|manages|managed|lead|leads|led|focus|focuses|focused|work|works|worked|reduce|reduces|reduced|lower|lowers|lowered|monitor|monitors|detect|detects|connect|connects|compare|compares|decide|decides|change|changes|protect|protects|keep|keeps|hold|holds|restore|restores)\b/i.test(
     trimmed,
   );
   return trimmed.split(/\s+/).length >= 5 && !hasVerb;
@@ -717,22 +717,18 @@ function buyerRole(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
   return intelligence?.jobTitle || input.contactRole;
 }
 
-function roleAlreadyIncludesCompany(role: string, company: string) {
-  const normalizedRole = role.toLowerCase();
-  const normalizedCompany = company.toLowerCase();
-  return (
-    normalizedRole.includes(` at ${normalizedCompany}`) ||
-    normalizedRole.includes(` @ ${normalizedCompany}`) ||
-    normalizedRole.endsWith(normalizedCompany)
-  );
-}
-
-function roleCompanyPhrase(role: string, company: string) {
-  return roleAlreadyIncludesCompany(role, company) ? role : `${role} at ${company}`;
+function cleanRoleForCompany(role: string, company: string) {
+  return role
+    .replace(new RegExp(`\\s+(?:at|@)\\s+${escapeRegExp(company)}\\.?$`, "i"), "")
+    .replace(new RegExp(`\\s+${escapeRegExp(company)}\\.?$`, "i"), "")
+    .trim();
 }
 
 function roleCompanyOpening(role: string, company: string) {
-  return `Quick question for your ${roleCompanyPhrase(role, company)} remit.`;
+  const roleLabel = cleanRoleForCompany(role, company);
+  return roleLabel
+    ? `Given your ${roleLabel} scope at ${company}, I wanted to ask one branded-search question.`
+    : `Quick question on ${company} branded search.`;
 }
 
 function hasPromotionSignal(input: BuildSequenceInput) {
@@ -957,10 +953,19 @@ function strategyFirstTouch(
   strategy: MessageStrategy,
 ) {
   const prospectInsight = prospectLedInsight(input, intelligence, strategy) ?? accountOpening(input, intelligence, strategy);
+  const company = displayCompanyFor(input, intelligence);
+  const productGap =
+    intelligence.serpScenario === "UNKNOWN"
+      ? `Google Ads reports branded performance, but it does not show the live auction clearly: when ${company} is defending against another advertiser versus when paid coverage may be broader than needed.`
+      : strategy.productGap;
+  const businessQuestion =
+    intelligence.serpScenario === "UNKNOWN"
+      ? "How are you currently deciding when branded bids should change?"
+      : strategy.businessQuestion.replace(/^the practical question is:\s*/i, "").replace(/\?*$/, "?");
   return [
     prospectInsight,
-    strategy.productGap,
-    strategy.businessQuestion.replace(/^the practical question is:\s*/i, "").replace(/\?*$/, "?"),
+    productGap,
+    businessQuestion,
   ].join("\n\n");
 }
 
@@ -971,9 +976,8 @@ function strategyMethodLine(
 ) {
   if (intelligence.serpScenario === "UNKNOWN") {
     return [
-      strategy.primaryAngle,
-      strategy.relevantCapability,
-      "That changes the workflow from reading lagging campaign reports to deciding coverage from live Google and Bing search-page conditions.",
+      "Signal checks Google and Bing SERPs continuously and separates contested brand auctions from quieter moments.",
+      "That gives the team a cleaner rule: defend when competitors show up, and reduce pressure only where coverage still looks protected.",
     ].join("\n\n");
   }
   return [
@@ -999,7 +1003,7 @@ function strategyEvidenceLine(intelligence: ProspectIntelligence) {
       ? `In the keyword data, the useful sample is ${examples}: one shows quieter coverage and one shows competition. That is why one static branded-bid rule can miss the decision.`
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
   }
-  return "The business value is knowing when to hold branded coverage, and when bids can potentially come down because the auction is quieter.\n\nSignal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.";
+  return "The operational value is fewer manual SERP checks, faster reaction when competitors appear, and more confidence that branded CPC reflects live market pressure instead of one static rule.\n\nSignal can sit alongside the current Google Ads setup, without requiring the team to rebuild campaigns or change the bidding strategy.";
 }
 
 function tailorBody(
@@ -1176,7 +1180,9 @@ function bodyForPurpose({
         ? ""
         : intelligence.persona === "GROWTH"
           ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
-          : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
+          : intelligence.serpScenario === "UNKNOWN"
+            ? ""
+            : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input, intelligence),

@@ -995,9 +995,9 @@ function validateStepTwoReference(step: SequenceStep) {
 function validateStepThreeReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /existing Google Ads setup/i.test(text) &&
-    /without requiring.*rebuild campaigns|without requiring.*change your current bidding strategy/i.test(text) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|decision rule|brand auction changes|auction pressure/i.test(text) &&
+    /(?:existing|current) Google Ads setup/i.test(text) &&
+    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy/i.test(text) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|decision rule|brand auction changes|auction pressure|live market pressure/i.test(text) &&
     /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );

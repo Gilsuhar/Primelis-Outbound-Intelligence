@@ -12,20 +12,19 @@ function compact(value?: string) {
   return value?.replace(/\s+/g, " ").trim();
 }
 
-function roleAlreadyIncludesCompany(role: string, company: string) {
-  const normalizedRole = role.toLowerCase();
-  const normalizedCompany = company.toLowerCase();
-  return (
-    normalizedRole.includes(` at ${normalizedCompany}`) ||
-    normalizedRole.includes(` @ ${normalizedCompany}`) ||
-    normalizedRole.endsWith(normalizedCompany)
-  );
+function cleanRoleForCompany(role: string, company: string) {
+  return role
+    .replace(new RegExp(`\\s+(?:at|@)\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?$`, "i"), "")
+    .replace(new RegExp(`\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?$`, "i"), "")
+    .trim();
 }
 
 function roleCompanyOpening(role: string | undefined, company: string) {
   if (!role) return `Quick question on ${company} branded search.`;
-  const roleLabel = roleAlreadyIncludesCompany(role, company) ? role : `${role} at ${company}`;
-  return `Quick question for your ${roleLabel} remit.`;
+  const roleLabel = cleanRoleForCompany(role, company);
+  return roleLabel
+    ? `Given your ${roleLabel} scope at ${company}, I wanted to ask one branded-search question.`
+    : `Quick question on ${company} branded search.`;
 }
 
 function firstProspectFact(intelligence: ProspectIntelligence) {
