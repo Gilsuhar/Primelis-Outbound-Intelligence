@@ -21,10 +21,12 @@ function cleanRoleForCompany(role: string, company: string) {
 
 function naturalRoleOpening(role: string, company: string) {
   const roleLabel = cleanRoleForCompany(role, company);
-  if (!roleLabel) return `Quick question on ${company} branded search.`;
+  const hasSpecificCompany = !/^(?:the|this) account$/i.test(company);
+  const companySuffix = hasSpecificCompany ? ` at ${company}` : "";
+  if (!roleLabel) return hasSpecificCompany ? `Quick question on ${company} branded search.` : "Quick question on branded search.";
   const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
   if (globalLead) {
-    return `For someone leading ${globalLead[1].toLowerCase()} globally at ${company}, the hard part is not seeing campaign performance.`;
+    return `For someone leading ${globalLead[1].toLowerCase()} globally${companySuffix}, the hard part is not seeing campaign performance.`;
   }
   const normalizedRole = roleLabel
     .replace(/^head\s+of\s+/i, "leading ")
@@ -36,9 +38,9 @@ function naturalRoleOpening(role: string, company: string) {
     .replace(/\s+/g, " ")
     .trim();
   if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
-    return `For someone ${normalizedRole} at ${company}, the hard part is not seeing campaign performance.`;
+    return `For someone ${normalizedRole}${companySuffix}, the hard part is not seeing campaign performance.`;
   }
-  return `For someone responsible for ${roleLabel} at ${company}, the hard part is not seeing campaign performance.`;
+  return `For someone responsible for ${roleLabel}${companySuffix}, the hard part is not seeing campaign performance.`;
 }
 
 function roleCompanyOpening(role: string | undefined, company: string) {

@@ -424,6 +424,22 @@ describe("Prospect Intelligence extraction", () => {
     expect(intelligence.jobTitle).toBe("Director Performance Marketing & Acquisition");
   });
 
+  it("does not treat a LinkedIn location as the current company", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "",
+      contactFirstName: "Ruby",
+      contactRole: "",
+      prospectContext:
+        "Ruby\nPaid Search Analyst | Analytics-Driven PPC & Growth Optimization at Atlanta Metropolitan Area",
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBeUndefined();
+    expect(intelligence.contextInterpretation.currentRole).toBe("Paid Search Analyst");
+    expect(intelligence.companyName).toBeUndefined();
+    expect(intelligence.jobTitle).toBe("Paid Search Analyst");
+  });
+
   it("rejects truncated and low-value LinkedIn fragments as personalization insights", () => {
     const badFragments = [
       "In-depth knowledge of the paid digital media channels covering programmatic, paid,",

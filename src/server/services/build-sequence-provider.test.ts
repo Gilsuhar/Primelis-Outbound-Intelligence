@@ -365,6 +365,31 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
   });
 
+  it("does not use a LinkedIn location as the account name", async () => {
+    const locationInput: BuildSequenceInput = {
+      ...input,
+      companyName: "",
+      companyWebsite: "",
+      contactFirstName: "Ruby",
+      contactRole: "",
+      prospectContext:
+        "Ruby\nPaid Search Analyst | Analytics-Driven PPC & Growth Optimization at Atlanta Metropolitan Area",
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: locationInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(locationInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("branded search visibility");
+    expect(result.steps[0].messageBody).toContain("For someone responsible for Paid Search Analyst");
+    expect(rendered).not.toMatch(/Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i);
+  });
+
   it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
     const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
 

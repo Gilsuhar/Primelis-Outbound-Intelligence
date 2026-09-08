@@ -96,6 +96,27 @@ function isLikelyRoleLine(value: string) {
     /\b(?:lead|manager|director|head|vp|vice president|specialist|strategist|analyst|team lead|consultant)\b/i.test(text);
 }
 
+function isLikelyLocationText(value?: string) {
+  const normalized = normalize(value);
+  if (!normalized) return false;
+  return (
+    /\b(?:metropolitan area|greater [a-z ]+ area|united states|united kingdom|israel|canada|germany|france|spain|italy|netherlands|australia)\b/i.test(
+      value ?? "",
+    ) ||
+    /^(?:atlanta|new york|los angeles|san francisco|london|paris|berlin|tel aviv|toronto|chicago|boston|miami|austin|seattle)\s+(?:metropolitan\s+area|area)$/i.test(
+      value ?? "",
+    )
+  );
+}
+
+function cleanCompanyCandidate(value?: string) {
+  const cleaned = cleanUiArtifactText(value);
+  if (!cleaned) return undefined;
+  if (isLikelyLocationText(cleaned)) return undefined;
+  if (isLikelyRoleLine(cleaned)) return undefined;
+  return cleaned;
+}
+
 function isLikelyPersonNameLine(value: string) {
   const text = value.trim();
   if (!text || text.length > 80) return false;
@@ -214,11 +235,11 @@ function historicalSectionText(input: BuildSequenceInput) {
 
 function companyFromRoleLine(value?: string) {
   const joinedCompany = compact(value)?.match(/\brecently\s+joined\s+([A-Z][A-Za-z0-9&' -]{1,80})\s+as\b/i)?.[1];
-  if (joinedCompany) return compact(joinedCompany);
+  if (joinedCompany) return cleanCompanyCandidate(joinedCompany);
   const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? compact(value);
   if (!text) return undefined;
   const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:\s*\||$|[.,;])/);
-  return compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
+  return cleanCompanyCandidate(match?.[1]?.replace(/\s*\|.*$/g, ""));
 }
 
 function roleFromRoleLine(value?: string) {
@@ -229,6 +250,10 @@ function roleFromRoleLine(value?: string) {
   if (joinedAs) return compact(joinedAs);
   const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? raw;
   if (!text) return undefined;
+  const beforePipe = text.includes("|") ? compact(text.split("|")[0]) : undefined;
+  if (beforePipe && !/(?:@|\bat\b)/i.test(beforePipe) && isLikelyRoleLine(beforePipe)) {
+    return beforePipe;
+  }
   const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:\s*\||$|[.,;])/);
   return compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
 }
@@ -297,9 +322,9 @@ function contextItem(
 function currentCompanyFor(input: BuildSequenceInput) {
   const currentText = currentSectionText(input);
   return (
-    cleanUiArtifactText(companyFromRoleLine(currentText)) ??
-    cleanUiArtifactText(companyFromRoleLine(input.prospectContext)) ??
-    cleanUiArtifactText(input.companyName)
+    cleanCompanyCandidate(companyFromRoleLine(currentText)) ??
+    cleanCompanyCandidate(companyFromRoleLine(input.prospectContext)) ??
+    cleanCompanyCandidate(input.companyName)
   );
 }
 
@@ -872,7 +897,7 @@ export function buildProspectIntelligence(
 
   return {
     prospectName: inferProspectName(input),
-    companyName: contextInterpretation.currentCompany ?? cleanUiArtifactText(input.companyName),
+    companyName: contextInterpretation.currentCompany ?? cleanCompanyCandidate(input.companyName),
     jobTitle: contextInterpretation.currentRole ?? inferJobTitle(input),
     seniority: inferSeniority(input),
     persona,
