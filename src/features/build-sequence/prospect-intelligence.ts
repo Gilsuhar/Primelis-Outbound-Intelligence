@@ -213,21 +213,24 @@ function historicalSectionText(input: BuildSequenceInput) {
 }
 
 function companyFromRoleLine(value?: string) {
-  const text = lines(value)[0] ?? compact(value);
+  const joinedCompany = compact(value)?.match(/\brecently\s+joined\s+([A-Z][A-Za-z0-9&' -]{1,80})\s+as\b/i)?.[1];
+  if (joinedCompany) return compact(joinedCompany);
+  const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? compact(value);
   if (!text) return undefined;
-  const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,80})\s+(?:@|at)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:$|[.,;])/);
-  return compact(match?.[1]);
+  const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:\s*\||$|[.,;])/);
+  return compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
 }
 
 function roleFromRoleLine(value?: string) {
-  const text = lines(value)[0] ?? compact(value);
-  if (!text) return undefined;
-  const promoted = text.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  const raw = compact(value);
+  const promoted = raw?.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
   if (promoted) return compact(promoted);
-  const joinedAs = text.match(/\brecently\s+joined\s+[A-Z][A-Za-z0-9&' -]{1,80}\s+as\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  const joinedAs = raw?.match(/\brecently\s+joined\s+[A-Z][A-Za-z0-9&' -]{1,80}\s+as\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
   if (joinedAs) return compact(joinedAs);
-  const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,80})\s+(?:@|at)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:$|[.,;])/);
-  return compact(match?.[1]);
+  const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? raw;
+  if (!text) return undefined;
+  const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:\s*\||$|[.,;])/);
+  return compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
 }
 
 function companyMentions(value: string) {

@@ -545,7 +545,7 @@ function ctaForPurpose(
   purpose: SequenceStep["purpose"],
 ) {
   const ctas: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: "Do you have anything in place for that today?",
+    FIRST_TOUCH_RELEVANCE: "How are you currently deciding when branded bids should change?",
     PROBLEM_FRAMING: "Is your team able to detect these moments automatically?",
     METHODOLOGY_DIFFERENTIATION: "Worth a quick look?",
     ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
@@ -724,11 +724,30 @@ function cleanRoleForCompany(role: string, company: string) {
     .trim();
 }
 
-function roleCompanyOpening(role: string, company: string) {
+function naturalRoleOpening(role: string, company: string) {
   const roleLabel = cleanRoleForCompany(role, company);
-  return roleLabel
-    ? `Given your ${roleLabel} scope at ${company}, I wanted to ask one branded-search question.`
-    : `Quick question on ${company} branded search.`;
+  if (!roleLabel) return `Quick question on ${company} branded search.`;
+  const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
+  if (globalLead) {
+    return `For someone leading ${globalLead[1].toLowerCase()} globally at ${company}, the hard part is not seeing campaign performance.`;
+  }
+  const normalizedRole = roleLabel
+    .replace(/^head\s+of\s+/i, "leading ")
+    .replace(/^director\s+of\s+/i, "leading ")
+    .replace(/^vp\s+of\s+/i, "owning ")
+    .replace(/\bhead\b/gi, "leading")
+    .replace(/\bdirector\b/gi, "leading")
+    .replace(/\bvp\b/gi, "owning")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
+    return `For someone ${normalizedRole} at ${company}, the hard part is not seeing campaign performance.`;
+  }
+  return `For someone responsible for ${roleLabel} at ${company}, the hard part is not seeing campaign performance.`;
+}
+
+function roleCompanyOpening(role: string, company: string) {
+  return naturalRoleOpening(role, company);
 }
 
 function hasPromotionSignal(input: BuildSequenceInput) {
@@ -772,7 +791,7 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
     return "The practical takeaway is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
-    return "For paid search, the practical decision is when to stay covered, and when bids can potentially be reduced while maintaining coverage.";
+    return "For paid search, the decision is when to defend, and when bids can come down safely.";
   }
   if (/cmo|chief|vp|head|director/.test(role)) {
     return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
@@ -956,16 +975,11 @@ function strategyFirstTouch(
   const company = displayCompanyFor(input, intelligence);
   const productGap =
     intelligence.serpScenario === "UNKNOWN"
-      ? `Google Ads reports branded performance, but it does not show the live auction clearly: when ${company} is defending against another advertiser versus when paid coverage may be broader than needed.`
+      ? `The harder branded-search question is whether ${company} is defending against another advertiser, or keeping the same pressure when the auction is quieter.`
       : strategy.productGap;
-  const businessQuestion =
-    intelligence.serpScenario === "UNKNOWN"
-      ? "How are you currently deciding when branded bids should change?"
-      : strategy.businessQuestion.replace(/^the practical question is:\s*/i, "").replace(/\?*$/, "?");
   return [
     prospectInsight,
     productGap,
-    businessQuestion,
   ].join("\n\n");
 }
 
@@ -976,8 +990,8 @@ function strategyMethodLine(
 ) {
   if (intelligence.serpScenario === "UNKNOWN") {
     return [
-      "Signal checks Google and Bing SERPs continuously and separates contested brand auctions from quieter moments.",
-      "That gives the team a cleaner rule: defend when competitors show up, and reduce pressure only where coverage still looks protected.",
+      "Signal watches Google and Bing results directly, then flags when competitors appear or disappear.",
+      "That gives the team a clearer moment to defend, lower pressure, or hold steady.",
     ].join("\n\n");
   }
   return [
@@ -1003,7 +1017,7 @@ function strategyEvidenceLine(intelligence: ProspectIntelligence) {
       ? `In the keyword data, the useful sample is ${examples}: one shows quieter coverage and one shows competition. That is why one static branded-bid rule can miss the decision.`
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
   }
-  return "The operational value is fewer manual SERP checks, faster reaction when competitors appear, and more confidence that branded CPC reflects live market pressure instead of one static rule.\n\nSignal can sit alongside the current Google Ads setup, without requiring the team to rebuild campaigns or change the bidding strategy.";
+  return "Instead of checking SERPs manually or waiting for campaign reports, the team gets a practical read on when branded CPC should change.\n\nSignal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.";
 }
 
 function tailorBody(
@@ -1032,7 +1046,7 @@ function tailorBody(
     const middle =
       input.desiredTone === "EXECUTIVE"
         ? "If paid-brand efficiency becomes relevant later, the useful starting point is budget visibility: where paid coverage protects demand, and where it is only adding cost."
-        : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where paid coverage may be broader than needed.";
+        : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where bid pressure can come down safely.";
     return stripCommercialTerms(
       [hello, "I will close the loop here.", middle, "If this is not relevant right now, no problem."]
         .filter(Boolean)
@@ -1136,7 +1150,7 @@ function bodyForPurpose({
     ? [
         `The useful sample to show is "${solo.term}". In the keyword data you supplied, it was a solo brand auction.`,
         "That does not prove wasted spend, but it is the kind of moment worth checking before keeping one flat branded bid rule.",
-        "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+        "Signal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
       ].join("\n\n")
     : [
         "For a PPC team, the value is not another dashboard.",
@@ -1144,7 +1158,7 @@ function bodyForPurpose({
         hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
           ? screenshotObservation(input, intelligence)
           : "I would keep this as a visibility check: where does the auction change, and how quickly can bids react?",
-        "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+        "Signal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
       ].join("\n\n");
   const managedPpcProofAngle = "The simplest way to evaluate this is one account with meaningful branded-search spend: compare auction conditions, CPC, and paid coverage needs before discussing anything broader.";
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
@@ -1194,7 +1208,7 @@ function bodyForPurpose({
         ? ""
         : intelligence.serpScenario === "UNKNOWN"
           ? ""
-          : "Signal works alongside your existing Google Ads setup, without requiring the team to rebuild campaigns or change your current bidding strategy.",
+          : "Signal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
     ],
     ACCOUNT_SPECIFIC_OBSERVATION: [
       greeting(input, intelligence),

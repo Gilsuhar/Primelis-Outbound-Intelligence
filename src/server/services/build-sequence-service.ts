@@ -331,7 +331,7 @@ function normalizedInputFromExtraction(
   const extractedSerp = serpEvidenceText(extraction);
   return {
     ...input,
-    companyName: input.companyName || extraction.companyName || "the account",
+    companyName: input.companyName || extraction.companyName || "",
     companyWebsite: input.companyWebsite || extraction.companyDomain,
     contactFirstName: input.contactFirstName || extraction.firstName,
     contactRole:
@@ -984,8 +984,8 @@ function validateStepTwoReference(step: SequenceStep) {
   const hasImageReference = /screenshot|visual|SERP/i.test(step.imageContextNote ?? "");
   return (
     (hasImageReference || !step.imageContextNote) &&
-    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction/i.test(text) &&
-    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page/i.test(text) &&
+    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction|competitors appear|competitors disappear|hold steady/i.test(text) &&
+    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page|Google and Bing results|defend|lower pressure/i.test(text) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
     !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(text) &&
     !containsVagueAnonymousCustomerStory(text)
@@ -996,8 +996,8 @@ function validateStepThreeReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
     /(?:existing|current) Google Ads setup/i.test(text) &&
-    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy/i.test(text) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|decision rule|brand auction changes|auction pressure|live market pressure/i.test(text) &&
+    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy|not rebuilding campaigns|decision quality/i.test(text) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|practical read|decision rule|brand auction changes|auction pressure|live market pressure/i.test(text) &&
     /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );

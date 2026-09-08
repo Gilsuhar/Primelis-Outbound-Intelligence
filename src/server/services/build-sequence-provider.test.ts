@@ -151,11 +151,12 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Given your VP Performance Marketing scope at Nike");
+    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
     expect(result.steps[0].messageBody).not.toContain("keep this to one narrow");
     expect(result.steps[1].imagePlaceholder).toBeUndefined();
     expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
+    expect(JSON.stringify(result.steps)).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     expect(JSON.stringify(result.steps)).not.toContain("Our tech");
     expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
     expect(result.steps[2].messageBody).not.toContain("40-60%");
@@ -306,7 +307,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
-    expect(result.steps[0].messageBody).toContain("Given your Paid Media Lead scope at SearchPilot");
+    expect(result.steps[0].messageBody).toContain("For someone responsible for Paid Media Lead at SearchPilot");
     expect(rendered).not.toMatch(/Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i);
     expect(rendered).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
     expect(rendered).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
@@ -332,9 +333,36 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("Given your Global Paid Search Lead scope at IBM");
+    expect(result.steps[0].messageBody).toContain("For someone leading paid search globally at IBM");
+    expect(result.steps[0].messageBody.match(/\?/g) ?? []).toHaveLength(0);
     expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
+    expect(rendered).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     expect(result.steps[0].messageBody).not.toContain("The practical question is:");
+  });
+
+  it("uses the actual company from a noisy LinkedIn headline instead of The Account", async () => {
+    const headlineInput: BuildSequenceInput = {
+      ...input,
+      companyName: "",
+      companyWebsite: "",
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      prospectContext:
+        "Director Performance Marketing & Acquisition @ Shine | SaaS & Fintech Growth Leader",
+    };
+    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: headlineInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(headlineInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("Shine branded search visibility");
+    expect(result.steps[0].messageBody).toContain("For someone leading Performance Marketing & Acquisition at Shine");
+    expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
   });
 
   it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
@@ -349,8 +377,9 @@ describe("Build Sequence OpenAI provider", () => {
     const stepTwo = result.steps[1].messageBody;
     const stepThree = result.steps[2].messageBody;
 
-    expect(stepTwo).toMatch(/separates contested brand auctions|cleaner bidding rule/i);
-    expect(stepThree).toMatch(/operational value|static rule|current Google Ads setup/i);
+    expect(stepTwo).toMatch(/competitors appear or disappear|hold steady/i);
+    expect(stepThree).toMatch(/practical read|decision quality|current Google Ads setup/i);
+    expect(`${stepTwo} ${stepThree}`).not.toMatch(/cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     expect(stepThree).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
     expect(stepThree).not.toBe(stepTwo);
   });
@@ -427,8 +456,8 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Given your VP Performance Marketing scope at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing SERPs continuously");
+    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
+    expect(result.steps[1].messageBody).toContain("Google and Bing results directly");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
@@ -508,7 +537,7 @@ describe("Build Sequence OpenAI provider", () => {
             )
           : responseStep(
               "brand visibility",
-              "Hi there,\n\nGiven your VP Performance Marketing scope at Nike, I wanted to ask one branded-search question.\n\nHow do you decide when branded bids should change?",
+              "Hi there,\n\nFor someone owning Performance Marketing at Nike, the hard part is not seeing campaign performance.\n\nHow do you decide when branded bids should change?",
             );
       }
       if (/Signal and branded CPC/i.test(key)) {
@@ -537,7 +566,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("Given your VP Performance Marketing scope at Nike");
+    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
     expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific/i);
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
@@ -564,7 +593,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Given your VP Performance Marketing scope at Nike");
+    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
     expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
     expect(JSON.stringify(result.steps)).not.toContain("Gong");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
@@ -780,8 +809,8 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Given your VP Performance Marketing scope at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing SERPs continuously");
+    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
+    expect(result.steps[1].messageBody).toContain("Google and Bing results directly");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");

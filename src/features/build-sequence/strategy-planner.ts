@@ -19,12 +19,31 @@ function cleanRoleForCompany(role: string, company: string) {
     .trim();
 }
 
+function naturalRoleOpening(role: string, company: string) {
+  const roleLabel = cleanRoleForCompany(role, company);
+  if (!roleLabel) return `Quick question on ${company} branded search.`;
+  const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
+  if (globalLead) {
+    return `For someone leading ${globalLead[1].toLowerCase()} globally at ${company}, the hard part is not seeing campaign performance.`;
+  }
+  const normalizedRole = roleLabel
+    .replace(/^head\s+of\s+/i, "leading ")
+    .replace(/^director\s+of\s+/i, "leading ")
+    .replace(/^vp\s+of\s+/i, "owning ")
+    .replace(/\bhead\b/gi, "leading")
+    .replace(/\bdirector\b/gi, "leading")
+    .replace(/\bvp\b/gi, "owning")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
+    return `For someone ${normalizedRole} at ${company}, the hard part is not seeing campaign performance.`;
+  }
+  return `For someone responsible for ${roleLabel} at ${company}, the hard part is not seeing campaign performance.`;
+}
+
 function roleCompanyOpening(role: string | undefined, company: string) {
   if (!role) return `Quick question on ${company} branded search.`;
-  const roleLabel = cleanRoleForCompany(role, company);
-  return roleLabel
-    ? `Given your ${roleLabel} scope at ${company}, I wanted to ask one branded-search question.`
-    : `Quick question on ${company} branded search.`;
+  return naturalRoleOpening(role, company);
 }
 
 function firstProspectFact(intelligence: ProspectIntelligence) {
@@ -74,7 +93,7 @@ function productGapFor(intelligence: ProspectIntelligence) {
   if (intelligence.serpScenario === "MIXED") {
     return "A single branded-bid rule treats different auctions alike even when the SERP conditions are changing.";
   }
-  return "Google Ads reports performance, but it does not clearly distinguish moments when the brand is defending against another advertiser from moments when it is paying alone.";
+  return "Google Ads reports branded performance, but it does not show the live auction clearly enough to know when branded bid pressure should change.";
 }
 
 function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {

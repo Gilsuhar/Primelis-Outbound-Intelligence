@@ -408,6 +408,22 @@ describe("Prospect Intelligence extraction", () => {
     );
   });
 
+  it("extracts company and role from a noisy LinkedIn headline with a pipe suffix", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "",
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      prospectContext:
+        "Director Performance Marketing & Acquisition @ Shine | SaaS & Fintech Growth Leader",
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBe("Shine");
+    expect(intelligence.contextInterpretation.currentRole).toBe("Director Performance Marketing & Acquisition");
+    expect(intelligence.companyName).toBe("Shine");
+    expect(intelligence.jobTitle).toBe("Director Performance Marketing & Acquisition");
+  });
+
   it("rejects truncated and low-value LinkedIn fragments as personalization insights", () => {
     const badFragments = [
       "In-depth knowledge of the paid digital media channels covering programmatic, paid,",
