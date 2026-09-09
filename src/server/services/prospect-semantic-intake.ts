@@ -278,7 +278,7 @@ async function callOpenAiSemanticExtraction(rawText: string, env: NodeJS.Process
     throw new Error("SEMANTIC_AI_NOT_CONFIGURED");
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",

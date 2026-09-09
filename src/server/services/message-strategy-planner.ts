@@ -469,7 +469,7 @@ async function callOpenAiStrategyPlanner(
     throw new Error("STRATEGY_AI_NOT_CONFIGURED");
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 55_000);
+  const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",

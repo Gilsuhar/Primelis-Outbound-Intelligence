@@ -80,7 +80,7 @@ async function defaultGetLeadsProvider(
   if (!apiKey) return null;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 4000);
   try {
     const response = await fetch(getleadsEndpoint, {
       method: "POST",
@@ -135,7 +135,7 @@ function decodeHtmlEntities(value: string) {
 
 async function defaultPublicPreviewProvider(linkedinUrl: string): Promise<PublicPreview | null> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), 3000);
   try {
     const response = await fetch(linkedinUrl, {
       method: "GET",

@@ -442,7 +442,7 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), request.workflow === "BUILD_SEQUENCE" ? 30_000 : 20_000);
+    const timeout = setTimeout(() => controller.abort(), request.workflow === "BUILD_SEQUENCE" ? 12_000 : 15_000);
     try {
       let response = await this.fetchResponse(request, controller.signal, true);
       if (response.status === 400) {
