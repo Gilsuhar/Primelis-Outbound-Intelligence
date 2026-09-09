@@ -21,6 +21,15 @@ vi.mock("@/app/account-status/actions", () => ({
 }));
 
 vi.mock("@/app/build-sequence/actions", () => ({
+  getBuildSequenceProviderDiagnosticsAction: vi.fn(async () => ({
+    ok: true,
+    data: {
+      aiProvider: "openai",
+      openAiApiKey: "available",
+      openAiModel: "gpt-5-mini",
+      openAiEnabled: true,
+    },
+  })),
   generateBuildSequenceAction: vi.fn(),
   pushSequenceToHubSpotAction: vi.fn(),
 }));
