@@ -9,7 +9,7 @@ import type {
   ProspectIntelligence,
   SequenceKnowledgeRecord,
 } from "@/features/build-sequence/types";
-import { mapAiProviderError, shouldUseOpenAiProvider } from "./ai-provider";
+import { mapAiProviderError, normalizeOpenAiModel, shouldUseOpenAiProvider } from "./ai-provider";
 
 const approvedCapabilities = [
   {
@@ -479,7 +479,7 @@ async function callOpenAiStrategyPlanner(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: env.OPENAI_MODEL || "gpt-5-mini",
+        model: normalizeOpenAiModel(env.OPENAI_MODEL),
         instructions:
           "Plan the outbound message strategy only. Use only grounded prospect/account inputs and approved capability/product gap/proof ids. Do not write email copy. Do not invent product behavior, customers, competitors, initiatives, budgets, markets, or SERP evidence. Gold standards are reasoning examples only; do not copy their wording or structure. Return JSON only.",
         input: [

@@ -145,7 +145,7 @@ To enable live OpenAI generation in the application server, set:
 ```bash
 AI_PROVIDER="openai"
 OPENAI_API_KEY="sk-proj-..."
-OPENAI_MODEL="gpt-5.4-mini"
+OPENAI_MODEL="gpt-5-mini"
 ```
 
 These values must be configured in the server runtime that hosts the Next.js

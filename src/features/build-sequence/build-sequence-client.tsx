@@ -314,7 +314,7 @@ function normalizedLine(text: string) {
 
 function usedDeterministicFallback(notes: string[]) {
   return notes.some((note) =>
-    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found/i.test(
+    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse/i.test(
       note,
     ),
   );
@@ -329,17 +329,21 @@ function fallbackReason(notes: string[]) {
 }
 
 function providerLabel(result: BuildSequenceResult) {
-  if (usedDeterministicFallback(result.safetyNotes)) {
+  const hybridAccepted = result.safetyNotes.filter((note) =>
+    /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
+  ).length;
+  const hybridFellBack = result.safetyNotes.filter((note) =>
+    /^Hybrid rewrite fell back for step \d+:/i.test(note),
+  ).length;
+
+  if (hybridAccepted > 0) {
+    return `Hybrid OpenAI sequence - ${hybridAccepted}/${result.steps.length} steps rewritten`;
+  }
+  if (usedDeterministicFallback(result.safetyNotes) || hybridFellBack >= result.steps.length) {
     const reason = fallbackReason(result.safetyNotes);
     return reason
       ? `Fallback sequence - OpenAI did not write this. Reason: ${reason}`
       : "Fallback sequence - OpenAI did not write this";
-  }
-  const hybridAccepted = result.safetyNotes.filter((note) =>
-    /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
-  ).length;
-  if (hybridAccepted > 0) {
-    return `Hybrid OpenAI sequence - ${hybridAccepted}/${result.steps.length} steps rewritten`;
   }
   if (result.provider.providerName === "openai") {
     return `OpenAI sequence - ${result.provider.modelName}`;
@@ -357,9 +361,17 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
     .join("\n")
     .toLowerCase();
   const uniquePurposes = new Set(steps.map((step) => step.purpose));
+  const hybridAccepted = safetyNotes.filter((note) =>
+    /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
+  ).length;
+  const hybridFellBack = safetyNotes.filter((note) =>
+    /^Hybrid rewrite fell back for step \d+:/i.test(note),
+  ).length;
 
-  if (usedDeterministicFallback(safetyNotes)) {
+  if (usedDeterministicFallback(safetyNotes) || (hybridAccepted === 0 && hybridFellBack >= steps.length)) {
     issues.push("OpenAI did not write this sequence. The deterministic fallback was used.");
+  } else if (hybridFellBack > 0) {
+    issues.push("One or more steps used fallback copy after OpenAI rewrite validation failed.");
   }
 
   if (new Set(subjects).size < subjects.length) {

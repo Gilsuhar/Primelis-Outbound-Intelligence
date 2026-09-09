@@ -18,7 +18,12 @@ import type {
 import type { ReplyProviderMetadata } from "@/features/reply-to-prospect/types";
 import { outputLanguageInstruction } from "@/lib/output-language";
 
-import { createAiProvider, mapAiProviderError, shouldUseOpenAiProvider } from "./ai-provider";
+import {
+  createAiProvider,
+  mapAiProviderError,
+  normalizeOpenAiModel,
+  shouldUseOpenAiProvider,
+} from "./ai-provider";
 import {
   displayCompanyName,
   winningPatternForPurpose,
@@ -1567,7 +1572,7 @@ export function createBuildSequenceAiProvider(
   return {
     metadata: {
       providerName: "openai",
-      modelName: env.OPENAI_MODEL ?? "gpt-5-mini",
+      modelName: normalizeOpenAiModel(env.OPENAI_MODEL),
       deterministic: false,
     },
     async generate(request) {

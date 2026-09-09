@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createAiProvider, OpenAiProvider, shouldUseOpenAiProvider, type AiDraftRequest } from "./ai-provider";
+import {
+  createAiProvider,
+  normalizeOpenAiModel,
+  OpenAiProvider,
+  shouldUseOpenAiProvider,
+  type AiDraftRequest,
+} from "./ai-provider";
 
 function request(overrides: Partial<AiDraftRequest> = {}): AiDraftRequest {
   return {
@@ -49,6 +55,53 @@ describe("OpenAI provider output boundaries", () => {
     const env = { AI_PROVIDER: "deterministic", OPENAI_API_KEY: "redacted" } as unknown as NodeJS.ProcessEnv;
 
     expect(shouldUseOpenAiProvider(env)).toBe(false);
+  });
+
+  it("normalizes the legacy mini model alias used in environment configuration", () => {
+    expect(normalizeOpenAiModel("gpt-5.4-mini")).toBe("gpt-5-mini");
+    expect(normalizeOpenAiModel("gpt-test")).toBe("gpt-test");
+  });
+
+  it("retries without reasoning parameters when OpenAI rejects the request shape", async () => {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init) {
+          calls.push(init);
+        }
+        if (calls.length === 1) {
+          return { ok: false, status: 400, json: async () => ({}) } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            output_text: JSON.stringify({
+              primaryContent: "Safe generated draft from approved Signal context.",
+              sourceReferences: ["source-1"],
+              factualClaimsUsed: ["Signal monitors live search results."],
+              uncertaintyNotes: [],
+              safetyFlags: [],
+            }),
+          }),
+        } as Response;
+      }),
+    );
+
+    const result = await new OpenAiProvider({
+      ...process.env,
+      OPENAI_API_KEY: "redacted",
+      OPENAI_MODEL: "gpt-5.4-mini",
+    }).generateDraft(request());
+
+    expect(result.primaryContent).toBe("Safe generated draft from approved Signal context.");
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(String(calls[0].body))).toMatchObject({
+      model: "gpt-5-mini",
+      reasoning: { effort: "minimal" },
+    });
+    expect(JSON.parse(String(calls[1].body))).not.toHaveProperty("reasoning");
   });
 
   it("rejects empty primary content instead of treating it as a valid draft", async () => {

@@ -6,7 +6,7 @@ import {
   normalizeLinkedInUrl,
 } from "@/features/build-sequence/prospect-memory";
 import type { ProspectExtraction } from "@/features/build-sequence/types";
-import { mapAiProviderError, shouldUseOpenAiProvider } from "./ai-provider";
+import { mapAiProviderError, normalizeOpenAiModel, shouldUseOpenAiProvider } from "./ai-provider";
 
 const confidenceSchema = z.preprocess((value) => {
   if (typeof value === "number") {
@@ -288,7 +288,7 @@ async function callOpenAiSemanticExtraction(rawText: string, env: NodeJS.Process
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: env.OPENAI_MODEL || "gpt-5-mini",
+        model: normalizeOpenAiModel(env.OPENAI_MODEL),
         instructions:
           "Extract only facts explicitly present in the raw prospect context. Return JSON only. Every fact, note, and SERP observation must include exact sourceEvidence copied from the input. Do not infer achievements, competitors, SERP scenarios, spend, roles, or companies that are not in the input.",
         input: [
