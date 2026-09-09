@@ -455,7 +455,13 @@ function missingQuickBriefFields(formData: FormData) {
 }
 
 export function buildFullStepText(step: SequenceStep) {
-  return [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.messageBody, step.cta]
+  return [
+    step.subjectLine ? `Subject: ${step.subjectLine}` : "",
+    step.connectionRequest,
+    step.imagePlaceholder,
+    step.messageBody,
+    step.cta,
+  ]
     .filter(Boolean)
     .join("\n\n");
 }
@@ -1250,15 +1256,29 @@ export function BuildSequenceClient() {
             </div>
             {result ? (
               <div className="space-y-3">
-                <p
-                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
-                    usedDeterministicFallback(result.safetyNotes)
-                      ? "bg-[#fff7e8] text-[#8a5a2b]"
-                      : "bg-[#eef8ed] text-[#2f6f3a]"
-                  }`}
-                >
-                  {providerLabel(result)}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p
+                    className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                      usedDeterministicFallback(result.safetyNotes)
+                        ? "bg-[#fff7e8] text-[#8a5a2b]"
+                        : "bg-[#eef8ed] text-[#2f6f3a]"
+                    }`}
+                  >
+                    {providerLabel(result)}
+                  </p>
+                  <button
+                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-md border border-line bg-white px-3 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                    onClick={() => copyText("sequence-all", fullSequenceText())}
+                    type="button"
+                  >
+                    {copiedKey === "sequence-all" ? (
+                      <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                    )}
+                    {copiedKey === "sequence-all" ? "Copied" : "Copy full sequence"}
+                  </button>
+                </div>
                 {draftWarnings.length > 0 ? (
                   <div className="space-y-2" aria-label="Warnings">
                     {draftWarnings.map((warning) => (

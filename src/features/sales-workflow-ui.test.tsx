@@ -421,6 +421,7 @@ describe("Sales workflow UI", () => {
     expect(copied.match(/Step 2 - Day 6/g)).toHaveLength(1);
     expect(copied.match(/Step 3 - Day 9/g)).toHaveLength(1);
     expect(copied.match(/Step 4 - Final touch/g)).toHaveLength(1);
+    expect(copied).toContain("Subject: Subject 1");
     expect(copied).not.toMatch(/claimsUsed|sourceIds|channelRationale|overallStrategy/i);
   });
 
