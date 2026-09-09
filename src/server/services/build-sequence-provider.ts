@@ -727,13 +727,17 @@ function cleanRoleForCompany(role: string, company: string) {
 
 function naturalRoleOpening(role: string, company: string) {
   const roleLabel = cleanRoleForCompany(role, company);
-  const hasSpecificCompany = !/^(?:the|this) account$/i.test(company);
+  const hasSpecificCompany = Boolean(company.trim()) && !/^(?:the|this) account$/i.test(company);
   const companySuffix = hasSpecificCompany ? ` at ${company}` : "";
   if (!roleLabel) return hasSpecificCompany ? `Quick question on ${company} branded search.` : "Quick question on branded search.";
   const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
   if (globalLead) {
-    return `For someone leading ${globalLead[1].toLowerCase()} globally${companySuffix}, the hard part is not seeing campaign performance.`;
+    return `Quick question for your global ${globalLead[1].toLowerCase()} work${companySuffix}.`;
   }
+  const rolePhrase = roleLabel
+    .replace(/^(?:vp|vice president|director|head)\s+(?!of\b)/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const normalizedRole = roleLabel
     .replace(/^head\s+of\s+/i, "leading ")
     .replace(/^director\s+of\s+/i, "leading ")
@@ -744,9 +748,9 @@ function naturalRoleOpening(role: string, company: string) {
     .replace(/\s+/g, " ")
     .trim();
   if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
-    return `For someone ${normalizedRole}${companySuffix}, the hard part is not seeing campaign performance.`;
+    return `Quick question for your ${rolePhrase || roleLabel} remit${companySuffix}.`;
   }
-  return `For someone responsible for ${roleLabel}${companySuffix}, the hard part is not seeing campaign performance.`;
+  return `Quick question for your ${rolePhrase || roleLabel} focus${companySuffix}.`;
 }
 
 function roleCompanyOpening(role: string, company: string) {
@@ -794,18 +798,18 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
     return "The practical takeaway is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
-    return "For paid search, the decision is when to defend, and when bids can come down safely.";
+    return "For paid search, the decision is where coverage needs defending and where bid pressure can safely ease.";
   }
   if (/cmo|chief|vp|head|director/.test(role)) {
     return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
   }
   if (/growth|acquisition|demand/.test(role)) {
-    return "For growth, the sharper question is whether paid brand improves acquisition efficiency or just re-buys existing demand.";
+    return "For growth, the sharper question is where paid brand still changes conversion outcomes.";
   }
   if (/ecommerce|e-commerce|digital/.test(role)) {
     return "For digital commerce, the useful angle is protecting high-intent brand demand when competitive pressure is real, without keeping the same pressure in quieter auctions.";
   }
-  return "The practical question is where paid brand is still changing the outcome.";
+  return "That is the practical benchmark.";
 }
 
 function contestedKeyword(intelligence: ProspectIntelligence) {
@@ -900,9 +904,9 @@ function responsibilityOpening({
   const normalizedInsight = directProspectFact(input, insight, intelligence.prospectName).replace(/\.$/, "");
   if (!normalizedInsight || !isProspectInsightReadyForPersonalization(normalizedInsight)) return undefined;
   if (/^you(?:'ve| are|'re| have|\s)/i.test(normalizedInsight)) {
-    return `${normalizedInsight}, so I wanted to ask one narrow branded-search question.`;
+    return `${normalizedInsight}. One branded-search question seemed worth asking.`;
   }
-  return `Given ${normalizedInsight}, I wanted to ask one narrow branded-search question.`;
+  return `Given ${normalizedInsight}, one branded-search question seemed worth asking.`;
 }
 
 function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
@@ -979,8 +983,8 @@ function strategyFirstTouch(
   const productGap =
     intelligence.serpScenario === "UNKNOWN"
       ? /^(?:the|this) account$/i.test(company)
-        ? "The harder branded-search question is whether the brand is defending against another advertiser, or keeping the same pressure when the auction is quieter."
-        : `The harder branded-search question is whether ${company} is defending against another advertiser, or keeping the same pressure when the auction is quieter.`
+        ? "Google Ads shows branded performance, but not the live search-page context behind each branded bid decision."
+        : `Google Ads shows branded performance for ${company}, but not the live search-page context behind each branded bid decision.`
       : strategy.productGap;
   return [
     prospectInsight,
@@ -995,8 +999,8 @@ function strategyMethodLine(
 ) {
   if (intelligence.serpScenario === "UNKNOWN") {
     return [
-      "Signal watches Google and Bing results directly, then flags when competitors appear or disappear.",
-      "That gives the team a clearer moment to defend, lower pressure, or hold steady.",
+      "Signal checks Google and Bing search results continuously and separates competitor-present moments from quieter brand auctions.",
+      "That gives the team a live input for whether to defend, ease pressure, or hold steady.",
     ].join("\n\n");
   }
   return [
@@ -1022,7 +1026,7 @@ function strategyEvidenceLine(intelligence: ProspectIntelligence) {
       ? `In the keyword data, the useful sample is ${examples}: one shows quieter coverage and one shows competition. That is why one static branded-bid rule can miss the decision.`
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
   }
-  return "Instead of checking SERPs manually or waiting for campaign reports, the team gets a practical read on when branded CPC should change.\n\nSignal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.";
+  return "For a visibility check, the value is simple: fewer manual SERP checks, faster reaction when competitors appear, and a practical way to test branded CPC decision quality inside the current Google Ads setup instead of rebuilding campaigns.";
 }
 
 function tailorBody(

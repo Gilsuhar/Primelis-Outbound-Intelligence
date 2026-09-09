@@ -21,13 +21,17 @@ function cleanRoleForCompany(role: string, company: string) {
 
 function naturalRoleOpening(role: string, company: string) {
   const roleLabel = cleanRoleForCompany(role, company);
-  const hasSpecificCompany = !/^(?:the|this) account$/i.test(company);
+  const hasSpecificCompany = Boolean(company.trim()) && !/^(?:the|this) account$/i.test(company);
   const companySuffix = hasSpecificCompany ? ` at ${company}` : "";
   if (!roleLabel) return hasSpecificCompany ? `Quick question on ${company} branded search.` : "Quick question on branded search.";
   const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
   if (globalLead) {
-    return `For someone leading ${globalLead[1].toLowerCase()} globally${companySuffix}, the hard part is not seeing campaign performance.`;
+    return `Quick question for your global ${globalLead[1].toLowerCase()} work${companySuffix}.`;
   }
+  const rolePhrase = roleLabel
+    .replace(/^(?:vp|vice president|director|head)\s+(?!of\b)/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const normalizedRole = roleLabel
     .replace(/^head\s+of\s+/i, "leading ")
     .replace(/^director\s+of\s+/i, "leading ")
@@ -38,9 +42,9 @@ function naturalRoleOpening(role: string, company: string) {
     .replace(/\s+/g, " ")
     .trim();
   if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
-    return `For someone ${normalizedRole}${companySuffix}, the hard part is not seeing campaign performance.`;
+    return `Quick question for your ${rolePhrase || roleLabel} remit${companySuffix}.`;
   }
-  return `For someone responsible for ${roleLabel}${companySuffix}, the hard part is not seeing campaign performance.`;
+  return `Quick question for your ${rolePhrase || roleLabel} focus${companySuffix}.`;
 }
 
 function roleCompanyOpening(role: string | undefined, company: string) {
@@ -95,7 +99,7 @@ function productGapFor(intelligence: ProspectIntelligence) {
   if (intelligence.serpScenario === "MIXED") {
     return "A single branded-bid rule treats different auctions alike even when the SERP conditions are changing.";
   }
-  return "Google Ads reports branded performance, but it does not show the live auction clearly enough to know when branded bid pressure should change.";
+  return "Google Ads shows branded performance, but not the live search-page context behind each branded bid decision.";
 }
 
 function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {

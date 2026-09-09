@@ -939,7 +939,7 @@ function containsStandaloneSentenceFragment(text: string) {
       if (/^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(line)) {
         return true;
       }
-      const dangling = /(?:,\s*|(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(line);
+      const dangling = /(?:,\s*|\b(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(line);
       return dangling;
     });
 }

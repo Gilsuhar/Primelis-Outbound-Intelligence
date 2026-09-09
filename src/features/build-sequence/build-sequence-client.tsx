@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import {
+  enrichLinkedInProspectAction,
   generateBuildSequenceAction,
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
@@ -595,6 +596,10 @@ export function BuildSequenceClient() {
   const [accountStatusOverride, setAccountStatusOverride] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [linkedinProfileUrl, setLinkedinProfileUrl] = useState("");
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichStatus, setEnrichStatus] = useState<string | null>(null);
   const generationInProgress = isPending || isGenerating;
 
   const displayedSteps =
@@ -781,6 +786,59 @@ export function BuildSequenceClient() {
     });
   }
 
+  function fetchFromLinkedIn() {
+    if (!linkedinProfileUrl.trim()) {
+      setEnrichError("Paste a LinkedIn profile URL first.");
+      return;
+    }
+    setIsEnriching(true);
+    setEnrichError(null);
+    setEnrichStatus(null);
+    startTransition(async () => {
+      try {
+        const response = await enrichLinkedInProspectAction({
+          linkedinUrl: linkedinProfileUrl,
+        });
+
+        if (!response.ok) {
+          setEnrichError(safeClientErrorMessage(response.message));
+          return;
+        }
+
+        const { record, rawProspectContext } = response.data;
+        setProspectContext((current) =>
+          current.trim() ? `${rawProspectContext}\n\n${current}` : rawProspectContext,
+        );
+        if (record?.company_name) setCompanyName(record.company_name);
+        if (record?.company_website || record?.company_domain) {
+          setCompanyWebsite(record.company_website || record.company_domain || "");
+        }
+        if (record?.job_title || record?.headline) {
+          setContactRole(record.job_title || record.headline || "");
+        }
+        const statusByProvider: Record<string, string> = {
+          GETLEADS_AND_PREVIEW:
+            "Pulled in GetLeads data + LinkedIn preview - review below, then Generate.",
+          GETLEADS: "Pulled in GetLeads data - review below, then Generate.",
+          PUBLIC_PREVIEW:
+            "Pulled in LinkedIn's public preview (headline/snippet only) - review below, then Generate.",
+          NONE: "No enrichment match found. Add context manually below.",
+        };
+        setEnrichStatus(
+          statusByProvider[response.data.provider] ?? "Review the context below, then Generate.",
+        );
+      } catch (caught) {
+        setEnrichError(
+          safeClientErrorMessage(
+            caught instanceof Error ? caught.message : "LinkedIn lookup failed.",
+          ),
+        );
+      } finally {
+        setIsEnriching(false);
+      }
+    });
+  }
+
   function pushToHubSpot() {
     if (!result) return;
     setHubSpotStatus({ state: "sending", message: "Sending to HubSpot..." });
@@ -834,14 +892,34 @@ export function BuildSequenceClient() {
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">
             LinkedIn profile URL
-            <input
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              name="linkedinProfileUrl"
-              placeholder="https://www.linkedin.com/in/..."
-            />
+            <div className="flex gap-2">
+              <input
+                className="w-full rounded-md border border-line px-3 py-2 text-sm"
+                name="linkedinProfileUrl"
+                onChange={(event) => setLinkedinProfileUrl(event.target.value)}
+                placeholder="https://www.linkedin.com/in/..."
+                value={linkedinProfileUrl}
+              />
+              <button
+                className="shrink-0 rounded-md border border-line bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                disabled={isEnriching}
+                onClick={fetchFromLinkedIn}
+                type="button"
+              >
+                {isEnriching ? "Fetching..." : "Fetch profile"}
+              </button>
+            </div>
             <span className="block text-xs leading-5 text-stone-500">
-              Optional. Used for prospect identity and source tracking. Paste profile text below; a URL alone does not include the profile content.
+              Fetch pulls what is available via GetLeads (structured data) and LinkedIn public
+              link-preview metadata (headline/snippet, not the full profile) into
+              Prospect Context below for you to review before generating.
             </span>
+            {enrichError ? (
+              <span className="block text-xs font-medium text-rose-600">{enrichError}</span>
+            ) : null}
+            {enrichStatus ? (
+              <span className="block text-xs font-medium text-[#32795d]">{enrichStatus}</span>
+            ) : null}
           </label>
 
           <label className="block space-y-1 text-sm font-medium text-stone-700">

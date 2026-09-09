@@ -151,12 +151,12 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
     expect(result.steps[0].messageBody).not.toContain("keep this to one narrow");
     expect(result.steps[1].imagePlaceholder).toBeUndefined();
     expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
-    expect(JSON.stringify(result.steps)).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
+    expect(JSON.stringify(result.steps)).not.toMatch(/hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     expect(JSON.stringify(result.steps)).not.toContain("Our tech");
     expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
     expect(result.steps[2].messageBody).not.toContain("40-60%");
@@ -307,7 +307,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
-    expect(result.steps[0].messageBody).toContain("For someone responsible for Paid Media Lead at SearchPilot");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Paid Media Lead focus at SearchPilot");
     expect(rendered).not.toMatch(/Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i);
     expect(rendered).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
     expect(rendered).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
@@ -333,7 +333,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("For someone leading paid search globally at IBM");
+    expect(result.steps[0].messageBody).toContain("Quick question for your global paid search work at IBM");
     expect(result.steps[0].messageBody.match(/\?/g) ?? []).toHaveLength(0);
     expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
     expect(rendered).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
@@ -361,7 +361,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("Shine branded search visibility");
-    expect(result.steps[0].messageBody).toContain("For someone leading Performance Marketing & Acquisition at Shine");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing & Acquisition remit at Shine");
     expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
   });
 
@@ -386,7 +386,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("branded search visibility");
-    expect(result.steps[0].messageBody).toContain("For someone responsible for Paid Search Analyst");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Paid Search Analyst focus");
     expect(rendered).not.toMatch(/Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i);
   });
 
@@ -403,7 +403,7 @@ describe("Build Sequence OpenAI provider", () => {
     const stepThree = result.steps[2].messageBody;
 
     expect(stepTwo).toMatch(/competitors appear or disappear|hold steady/i);
-    expect(stepThree).toMatch(/practical read|decision quality|current Google Ads setup/i);
+    expect(stepThree).toMatch(/visibility check|decision quality|current Google Ads setup/i);
     expect(`${stepTwo} ${stepThree}`).not.toMatch(/cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     expect(stepThree).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
     expect(stepThree).not.toBe(stepTwo);
@@ -481,8 +481,8 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing results directly");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
+    expect(result.steps[1].messageBody).toContain("Google and Bing search results continuously");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
@@ -562,7 +562,7 @@ describe("Build Sequence OpenAI provider", () => {
             )
           : responseStep(
               "brand visibility",
-              "Hi there,\n\nFor someone owning Performance Marketing at Nike, the hard part is not seeing campaign performance.\n\nHow do you decide when branded bids should change?",
+              "Hi there,\n\nQuick question for your Performance Marketing remit at Nike, I wanted to ask one branded-search question.\n\nHow do you decide when branded bids should change?",
             );
       }
       if (/Signal and branded CPC/i.test(key)) {
@@ -591,8 +591,8 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
-    expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific/i);
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
+    expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific|hard part is not seeing|harder branded-search question/i);
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
   });
@@ -618,7 +618,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
     expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
     expect(JSON.stringify(result.steps)).not.toContain("Gong");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
@@ -834,8 +834,8 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("For someone owning Performance Marketing at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing results directly");
+    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
+    expect(result.steps[1].messageBody).toContain("Google and Bing search results continuously");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
     expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");

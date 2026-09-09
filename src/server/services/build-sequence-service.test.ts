@@ -520,7 +520,7 @@ describe("Build Sequence service", () => {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.imagePlaceholder).toBeUndefined();
       expect(stepTwo.imageContextNote).toContain("outside the email body");
-      expect(stepTwo.messageBody).toMatch(/Signal watches Google and Bing results directly|visibility/i);
+      expect(stepTwo.messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
       expect(stepTwo.messageBody).not.toContain("{{! Insert screenshot }}");
       expect(stepTwo.messageBody).not.toMatch(/\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b/i);
       expect(stepTwo.messageBody).not.toMatch(/customer example|one customer|one client/i);
@@ -658,13 +658,13 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "SOCIAL_PROOF",
       ]);
-      expect(result.data.steps[0].messageBody).toMatch(/branded bids should change|live auction|harder branded-search question/i);
+      expect(result.data.steps[0].messageBody).toMatch(/branded bids should change|live search-page context/i);
       expect(`${result.data.steps[0].messageBody} ${result.data.steps[0].cta}`.match(/\?/g) ?? []).toHaveLength(1);
-      expect(result.data.steps[1].messageBody).toMatch(/Signal watches Google and Bing results directly|visibility/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
       expect(result.data.steps[2].messageBody).toMatch(/current Google Ads setup|Google and Bing SERPs/i);
       expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
       expect(result.data.steps[3].cta).toBe("Open to a quick overview?");
-      expect(JSON.stringify(result.data.steps)).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
+      expect(JSON.stringify(result.data.steps)).not.toMatch(/hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
     }
   });
 
@@ -1172,12 +1172,12 @@ describe("Build Sequence service", () => {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.steps[0].subjectLine).toContain("Nike");
       expect(result.data.steps[0].messageBody).toContain("Nike");
-      expect(result.data.steps[0].messageBody).toContain("owning Performance Marketing");
+      expect(result.data.steps[0].messageBody).toContain("Performance Marketing remit");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
-      expect(result.data.steps[0].messageBody).toMatch(/harder question|defending against another advertiser/i);
+      expect(result.data.steps[0].messageBody).toMatch(/live search-page context|branded bids should change/i);
       expect(result.data.steps[0].messageBody).not.toMatch(/keep this to one narrow/i);
-      expect(result.data.steps[1].messageBody).toMatch(/Signal watches Google and Bing results directly|visibility/i);
+      expect(result.data.steps[1].messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
       expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("SOCIAL_PROOF");
@@ -1321,8 +1321,8 @@ describe("Build Sequence service", () => {
     if (directOperator.ok && executiveGrowth.ok) {
       const directBody = directOperator.data.steps[0].messageBody;
       const executiveBody = executiveGrowth.data.steps[0].messageBody;
-      expect(directBody).toMatch(/harder question|defending against another advertiser/i);
-      expect(executiveBody).toMatch(/harder question|defending against another advertiser/i);
+      expect(directBody).toMatch(/live search-page context|branded bids should change/i);
+      expect(executiveBody).toMatch(/live search-page context|branded bids should change/i);
       expect(directOperator.data.personaEmphasis.emphasis).toBe("operational control");
       expect(executiveGrowth.data.personaEmphasis.emphasis).toBe("governance");
     }
@@ -1401,7 +1401,7 @@ describe("Build Sequence service", () => {
           "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("the team gets a practical read");
+      expect(JSON.stringify(result.data.steps)).toContain("a practical way to test branded CPC decision quality");
     }
   });
 
@@ -1681,8 +1681,7 @@ describe("Build Sequence service", () => {
       expect(rendered).toContain("$50M");
       expect(rendered).toMatch(/AI and automation/i);
       expect(rendered).toMatch(/harder question|branded bids should change/i);
-      expect(rendered).toMatch(/defending against another advertiser/i);
-      expect(rendered).toMatch(/auction is quieter/i);
+      expect(rendered).toMatch(/live search-page context/i);
       expect(rendered).toContain("ZoomInfo used Signal to reduce branded CPC by 40%");
       expect(rendered).not.toContain("I noticed this about Remofirst");
     }
@@ -1726,7 +1725,7 @@ describe("Build Sequence service", () => {
       expect(rendered).not.toContain("I noticed this about Remofirst");
       expect(rendered).not.toContain("over $50M+");
       expect(rendered).toMatch(/AI and automation/i);
-      expect(bodies[0]).toMatch(/harder branded-search question|branded bids should change/i);
+      expect(bodies[0]).toMatch(/branded bids should change|live search-page context/i);
       expect(bodies[1]).toMatch(/Google and Bing/i);
       expect(bodies[1]).not.toMatch(/harder question/i);
       expect(bodies[2]).toMatch(/practical read|decision quality/i);
