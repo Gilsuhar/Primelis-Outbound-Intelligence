@@ -15,7 +15,6 @@ import {
 import {
   enrichLinkedInProspectAction,
   generateBuildSequenceAction,
-  getBuildSequenceProviderDiagnosticsAction,
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
@@ -619,12 +618,6 @@ export function BuildSequenceClient() {
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
   const [enrichStatus, setEnrichStatus] = useState<string | null>(null);
-  const [providerDiagnostics, setProviderDiagnostics] = useState<{
-    aiProvider: string;
-    openAiApiKey: "available" | "missing";
-    openAiModel: string;
-    openAiEnabled: boolean;
-  } | null>(null);
   const generationInProgress = isPending || isGenerating;
 
   const displayedSteps =
@@ -667,17 +660,6 @@ export function BuildSequenceClient() {
       setProspectContext(researchNotes);
       setInternalNotes(researchNotes);
     }
-  }, []);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const response = await getBuildSequenceProviderDiagnosticsAction();
-        if (response.ok) setProviderDiagnostics(response.data);
-      } catch {
-        setProviderDiagnostics(null);
-      }
-    })();
   }, []);
 
   async function copyText(key: string, text: string) {
@@ -1297,13 +1279,6 @@ export function BuildSequenceClient() {
                     {copiedKey === "sequence-all" ? "Copied" : "Copy full sequence"}
                   </button>
                 </div>
-                {providerDiagnostics ? (
-                  <p className="rounded-md border border-line bg-[#f8f5ef] px-3 py-2 text-xs leading-5 text-stone-600">
-                    OpenAI config: provider {providerDiagnostics.aiProvider}; key{" "}
-                    {providerDiagnostics.openAiApiKey}; model {providerDiagnostics.openAiModel};
-                    enabled {providerDiagnostics.openAiEnabled ? "yes" : "no"}.
-                  </p>
-                ) : null}
                 {draftWarnings.length > 0 ? (
                   <div className="space-y-2" aria-label="Warnings">
                     {draftWarnings.map((warning) => (
