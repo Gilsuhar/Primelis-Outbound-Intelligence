@@ -1540,6 +1540,22 @@ function sequenceValidationIssues(
   return sequenceValidationIssueDetails(input, generation, records).map((detail) => detail.reason);
 }
 
+function stripDuplicatedTrailingCta(messageBody: string, cta: string) {
+  const cleanCta = cta.trim();
+  if (!cleanCta) return messageBody.trim();
+
+  const normalizedBody = normalizedText(messageBody);
+  const normalizedCtaText = normalizedText(cleanCta);
+  if (!normalizedCtaText || !normalizedBody.endsWith(normalizedCtaText)) {
+    return messageBody.trim();
+  }
+
+  return messageBody
+    .trim()
+    .replace(new RegExp(`\\s*${escapeRegExp(cleanCta)}\\s*$`, "i"), "")
+    .trim();
+}
+
 function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {
   const safeKeywords = protectedKeywordPhrases(generation);
   return {
@@ -1567,16 +1583,20 @@ function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGen
       })),
     },
     claimsUsed: generation.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
-    steps: generation.steps.map((step) => ({
-      ...step,
-      subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine, safeKeywords) : undefined,
-      connectionRequest: step.connectionRequest
-        ? sanitizeGeneratedText(step.connectionRequest, safeKeywords)
-        : undefined,
-      messageBody: sanitizeGeneratedText(step.messageBody, safeKeywords),
-      cta: sanitizeGeneratedText(step.cta, safeKeywords),
-      claimsUsed: step.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
-    })),
+    steps: generation.steps.map((step) => {
+      const cta = sanitizeGeneratedText(step.cta, safeKeywords);
+      const messageBody = sanitizeGeneratedText(step.messageBody, safeKeywords);
+      return {
+        ...step,
+        subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine, safeKeywords) : undefined,
+        connectionRequest: step.connectionRequest
+          ? sanitizeGeneratedText(step.connectionRequest, safeKeywords)
+          : undefined,
+        messageBody: stripDuplicatedTrailingCta(messageBody, cta),
+        cta,
+        claimsUsed: step.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
+      };
+    }),
   };
 }
 

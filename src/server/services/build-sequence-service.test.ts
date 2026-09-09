@@ -1530,6 +1530,52 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("removes a duplicated trailing CTA from OpenAI message bodies before validation", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            steps: generated.steps.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    messageBody:
+                      "Hi Sam,\n\nGoogle Ads reports branded performance, but not the live search-page competition behind each bid decision.\n\nHow are you currently deciding when branded bids should change?",
+                    cta: "How are you currently deciding when branded bids should change?",
+                  }
+                : step,
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps[0].messageBody).not.toContain(
+        "How are you currently deciding when branded bids should change?",
+      );
+      expect(result.data.steps[0].cta).toBe(
+        "How are you currently deciding when branded bids should change?",
+      );
+    }
+  });
+
   it("preserves valid AI steps while replacing only a locally invalid step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {
