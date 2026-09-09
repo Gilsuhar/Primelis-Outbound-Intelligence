@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/ask-signal-brain/actions", () => ({
   askSignalBrainAction: vi.fn(),
@@ -21,7 +21,6 @@ vi.mock("@/app/account-status/actions", () => ({
 }));
 
 vi.mock("@/app/build-sequence/actions", () => ({
-  generateBuildSequenceAction: vi.fn(),
   pushSequenceToHubSpotAction: vi.fn(),
 }));
 
@@ -53,13 +52,41 @@ import type { BuildSequenceResult, SequenceStep } from "@/features/build-sequenc
 import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
 import { ReplyToProspectClient } from "@/features/reply-to-prospect/reply-to-prospect-client";
 import { AccountResearchClient } from "@/features/account-research/account-research-client";
-import { generateBuildSequenceAction } from "@/app/build-sequence/actions";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
+let fetchMock: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  fetchMock = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    }),
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+});
+
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
+
+function latestBuildSequencePayload() {
+  const init = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+  return JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+}
+
+function mockBuildSequenceApiResponse(response: unknown) {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => response,
+  });
+}
 
 function buildSequenceResult(overrides: Partial<BuildSequenceResult> = {}): BuildSequenceResult {
   return {
@@ -202,8 +229,7 @@ describe("Sales workflow UI", () => {
   });
 
   it("submits Build Sequence from Prospect Context only and renders action errors", async () => {
-    const action = vi.mocked(generateBuildSequenceAction);
-    action.mockResolvedValueOnce({
+    mockBuildSequenceApiResponse({
       ok: false,
       code: "VALIDATION_ERROR",
       message: "Test-visible generation failure.",
@@ -223,12 +249,11 @@ describe("Sales workflow UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
     expect(screen.getByText("Understanding prospect... Building strategy... Generating sequence...")).toBeTruthy();
-    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
-    expect(action.mock.calls[0][0]).toEqual(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/build-sequence/generate");
+    expect(latestBuildSequencePayload()).toEqual(
       expect.objectContaining({
         companyName: "",
-        contactFirstName: undefined,
-        industry: undefined,
         accountStatusOverride: false,
       }),
     );
@@ -236,7 +261,6 @@ describe("Sales workflow UI", () => {
   });
 
   it("does not submit Build Sequence from a LinkedIn URL alone", async () => {
-    const action = vi.mocked(generateBuildSequenceAction);
     render(<BuildSequenceClient />);
 
     const linkedinUrl = document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]');
@@ -246,7 +270,7 @@ describe("Sales workflow UI", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
-    expect(action).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(
       screen.getByText(
         "Complete these fields first: Prospect Context text; a LinkedIn URL alone cannot be read automatically yet.",
@@ -255,8 +279,7 @@ describe("Sales workflow UI", () => {
   });
 
   it("passes an optional LinkedIn profile URL with pasted context into Build Sequence prospect context", async () => {
-    const action = vi.mocked(generateBuildSequenceAction);
-    action.mockResolvedValueOnce({
+    mockBuildSequenceApiResponse({
       ok: false,
       code: "VALIDATION_ERROR",
       message: "Test-visible generation failure.",
@@ -277,8 +300,8 @@ describe("Sales workflow UI", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
-    expect(action.mock.calls[0][0]).toEqual(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(latestBuildSequencePayload()).toEqual(
       expect.objectContaining({
         rawProspectContext:
           "LinkedIn URL: https://www.linkedin.com/in/chris-example/\n\nChris from Remofirst manages paid search and AI automation.",
@@ -289,8 +312,7 @@ describe("Sales workflow UI", () => {
   });
 
   it("renders existing-activity warnings after successful Build Sequence generation", async () => {
-    const action = vi.mocked(generateBuildSequenceAction);
-    action.mockResolvedValueOnce({
+    mockBuildSequenceApiResponse({
       ok: true,
       data: buildSequenceResult({
         safetyNotes: [
@@ -318,20 +340,27 @@ describe("Sales workflow UI", () => {
   });
 
   it("lets Build Sequence generation continue after a client-status confirmation", async () => {
-    const action = vi.mocked(generateBuildSequenceAction);
-    action
+    fetchMock
       .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
         ok: false,
         code: "ACCOUNT_STATUS_BLOCKED",
         message:
           "This company is already marked as a Primelis client. Normal prospecting should not continue.",
+        }),
       })
       .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
         ok: true,
         data: buildSequenceResult({
           safetyNotes: [
             "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
           ],
+        }),
         }),
       });
     render(<BuildSequenceClient />);
@@ -347,15 +376,15 @@ describe("Sales workflow UI", () => {
     await waitFor(() =>
       expect(screen.getByText("I checked this, generate draft anyway")).toBeTruthy(),
     );
-    expect(action.mock.calls[0][0]).toEqual(
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual(
       expect.objectContaining({ accountStatusOverride: false }),
     );
 
     fireEvent.click(screen.getByText("I checked this, generate draft anyway"));
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
-    expect(action.mock.calls[1][0]).toEqual(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual(
       expect.objectContaining({ accountStatusOverride: true }),
     );
     await waitFor(() =>

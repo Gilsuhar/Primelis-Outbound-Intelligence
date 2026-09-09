@@ -14,7 +14,6 @@ import {
 
 import {
   enrichLinkedInProspectAction,
-  generateBuildSequenceAction,
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
@@ -36,6 +35,10 @@ import type {
   SequenceStep,
   SequenceTone,
 } from "@/features/build-sequence/types";
+
+type BuildSequenceActionResult =
+  | { ok: true; data: BuildSequenceResult }
+  | { ok: false; code: string; message: string };
 
 const tones: { label: string; value: SequenceTone }[] = [
   { label: "Direct", value: "DIRECT" },
@@ -744,7 +747,7 @@ export function BuildSequenceClient() {
     setIsGenerating(true);
     startTransition(async () => {
       try {
-        const response = await generateBuildSequenceAction({
+        const payload = {
           companyName: formString(formData, "companyName"),
           companyWebsite: formString(formData, "companyWebsite") || undefined,
           contactFirstName: formString(formData, "contactFirstName") || undefined,
@@ -776,7 +779,17 @@ export function BuildSequenceClient() {
           device: formString(formData, "device") || undefined,
           observationDate: formString(formData, "observationDate") || undefined,
           screenshotShows: formString(formData, "screenshotShows") || undefined,
+        };
+        const apiResponse = await fetch("/api/build-sequence/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+        const response = (await apiResponse.json().catch(() => ({
+          ok: false,
+          code: "INVALID_RESPONSE",
+          message: "Build Sequence returned an unexpected response. Please try again.",
+        }))) as BuildSequenceActionResult;
 
         if (!response.ok) {
           setResult(null);
