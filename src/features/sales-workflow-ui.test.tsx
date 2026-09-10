@@ -446,11 +446,14 @@ describe("Sales workflow UI", () => {
 
     const copied = __buildSequenceVariantTest.buildFullSequenceText(steps);
 
-    expect(copied.match(/Step 1 - Day 0/g)).toHaveLength(1);
-    expect(copied.match(/Step 2 - Day 6/g)).toHaveLength(1);
-    expect(copied.match(/Step 3 - Day 9/g)).toHaveLength(1);
-    expect(copied.match(/Step 4 - Final touch/g)).toHaveLength(1);
+    expect(copied.match(/Email 1 - Day 0/g)).toHaveLength(1);
+    expect(copied.match(/Email 2 - Day 6/g)).toHaveLength(1);
+    expect(copied.match(/Email 3 - Day 9/g)).toHaveLength(1);
+    expect(copied.match(/Email 4 - Final touch/g)).toHaveLength(1);
     expect(copied).toContain("Subject: Subject 1");
+    expect(copied).not.toContain("Subject: Subject 2");
+    expect(copied).not.toContain("Subject: Subject 3");
+    expect(copied).not.toContain("Subject: Subject 4");
     expect(copied).not.toMatch(/claimsUsed|sourceIds|channelRationale|overallStrategy/i);
   });
 

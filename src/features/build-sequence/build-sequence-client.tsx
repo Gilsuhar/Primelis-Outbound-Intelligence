@@ -18,7 +18,6 @@ import {
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
 import { purposeLabels } from "@/features/build-sequence/sequence-policy";
-import { DraftRefinementPanel } from "@/features/draft-refinement/draft-refinement-panel";
 import { industries, personas } from "@/features/playbook/playbook-content";
 import {
   WorkflowBadge,
@@ -470,9 +469,22 @@ export function buildFullStepText(step: SequenceStep) {
 }
 
 export function buildFullSequenceText(steps: SequenceStep[]) {
-  return steps
-    .map((step) => `Step ${step.stepNumber} - ${step.delay}\n${buildFullStepText(step)}`)
-    .join("\n\n---\n\n");
+  const [firstStep] = steps;
+  const threadSubject = firstStep?.subjectLine ? `Subject: ${firstStep.subjectLine}\n\n` : "";
+
+  return `${threadSubject}${steps
+    .map((step) =>
+      [
+        `Email ${step.stepNumber} - ${step.delay}`,
+        step.connectionRequest,
+        step.imagePlaceholder,
+        step.messageBody,
+        step.cta,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    )
+    .join("\n\n---\n\n")}`;
 }
 
 export const __buildSequenceVariantTest = {
@@ -1680,7 +1692,6 @@ export function BuildSequenceClient() {
                 </div>
               </article>
 
-              <DraftRefinementPanel draftId={result.draftId} workflow="BUILD_SEQUENCE" />
             </>
           ) : null}
         </section>
