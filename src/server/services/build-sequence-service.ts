@@ -1581,9 +1581,100 @@ function stripDanglingTrailingFragment(text: string) {
     .trim();
 }
 
-function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {
-  const safeKeywords = protectedKeywordPhrases(generation);
+function inferredGreetingName(steps: SequenceStep[]) {
+  for (const step of steps) {
+    const match = step.messageBody.match(/\bHi\s+([A-Z][A-Za-z'-]{1,40})(?:[,.!]|[\r\n])/);
+    if (match?.[1]) return match[1];
+  }
+  return "there";
+}
+
+function normalizeEmailGreeting(messageBody: string, greetingName: string) {
+  const trimmed = messageBody.trim();
+  if (!trimmed) return `Hi ${greetingName},`;
+
+  const greetingMatch = trimmed.match(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i);
+  if (greetingMatch) {
+    return trimmed.replace(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i, (match) =>
+      `${match.replace(/[.!]\s*$/, "").trim()},\n\n`,
+    );
+  }
+  if (/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there),/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `Hi ${greetingName},\n\n${trimmed}`;
+}
+
+function hasMarketSequenceContext(generation: SequenceGeneration) {
+  return /markets?|query sets?|geograph|global|regional|international|multi-market/i.test(
+    [
+      generation.overallStrategy,
+      generation.angleRationale,
+      generation.messageStrategy.primaryAngle,
+      generation.messageStrategy.secondaryAngle ?? "",
+      generation.messageStrategy.whyThisShouldResonate,
+      ...generation.messageStrategy.sequenceNarrative.flatMap((item) => [
+        item.objective,
+        item.newInformation,
+      ]),
+      ...generation.steps.flatMap((step) => [step.messageBody, step.subjectLine ?? ""]),
+    ].join(" "),
+  );
+}
+
+function replaceWeakProofBridge(messageBody: string, generation: SequenceGeneration) {
+  const bridge = hasMarketSequenceContext(generation)
+    ? "For a multi-market paid media team, the practical question is where branded coverage still needs defending and where bid pressure can safely ease."
+    : "For paid search, the practical question is where branded coverage still needs defending and where bid pressure can safely ease.";
+
+  return messageBody
+    .replace(/\n*\s*That is the practical benchmark\.\s*/gi, `\n\n${bridge}\n\n`)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function repairGenericMarketMethodologyStep(step: SequenceStep, generation: SequenceGeneration) {
+  if (step.purpose !== "METHODOLOGY_DIFFERENTIATION" || !hasMarketSequenceContext(generation)) {
+    return step.messageBody;
+  }
+  if (!/For a visibility check,\s+the value is simple/i.test(step.messageBody)) {
+    return step.messageBody;
+  }
+  return [
+    "The operational value is consistency.",
+    "Instead of checking markets manually or relying on delayed campaign reporting, the team can see where branded CPC pressure is tied to live competition and where the auction is quieter.",
+    "That makes bid changes easier to review inside the current Google Ads setup, without requiring the team to rebuild campaigns.",
+  ].join("\n\n");
+}
+
+function repairSequenceCopy(generation: SequenceGeneration): SequenceGeneration {
+  const greetingName = inferredGreetingName(generation.steps);
+  const steps = generation.steps.map((step) => {
+    let messageBody = step.messageBody;
+    messageBody = repairGenericMarketMethodologyStep({ ...step, messageBody }, generation);
+    if (step.purpose === "SOCIAL_PROOF") {
+      messageBody = replaceWeakProofBridge(messageBody, generation);
+    }
+    if (step.channel === "EMAIL") {
+      messageBody = normalizeEmailGreeting(messageBody, greetingName);
+    }
+    return {
+      ...step,
+      messageBody,
+    };
+  });
   return {
+    ...generation,
+    steps,
+  };
+}
+
+function sanitizeSequenceGeneration(
+  generation: SequenceGeneration,
+  options: { repairCopy?: boolean } = {},
+): SequenceGeneration {
+  const safeKeywords = protectedKeywordPhrases(generation);
+  const sanitized = {
     ...generation,
     overallStrategy: sanitizeGeneratedText(generation.overallStrategy, safeKeywords),
     messageStrategy: {
@@ -1625,6 +1716,7 @@ function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGen
       };
     }),
   };
+  return options.repairCopy ? repairSequenceCopy(sanitized) : sanitized;
 }
 
 function recoverSequenceSteps(
@@ -2179,6 +2271,7 @@ export async function generateBuildSequence(
       sourceReferences: sources,
       generation: baseGeneration,
     }),
+    { repairCopy: provider.metadata.providerName === "openai" },
   );
   const sequenceGenerationDurationMs = nowMs() - sequenceStarted;
   let providerMetadata = provider.metadata;
@@ -2211,6 +2304,7 @@ export async function generateBuildSequence(
             ],
           },
         }),
+        { repairCopy: false },
       );
       const recoveryValidationStarted = nowMs();
       let recovered: SequenceGeneration | undefined;

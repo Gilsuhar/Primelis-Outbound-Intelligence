@@ -1666,6 +1666,72 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("repairs common AI copy quality issues before final sequence validation", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            overallStrategy:
+              "Use the paid-search angle across markets and query sets without inventing account-specific SERP evidence.",
+            angleRationale:
+              "The account context mentions multiple markets, so the sequence should emphasize consistent visibility across markets.",
+            steps: generated.steps.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    messageBody:
+                      "Hi Sam. Quick question for your Paid Media focus at Acme.\n\nGoogle Ads shows branded performance, but not the live search-page context behind each branded bid decision.",
+                  }
+                : index === 1
+                  ? {
+                      ...step,
+                      messageBody:
+                        "Across markets and query sets, standard reports or one static bid rule often miss short windows when competitors appear in branded searches and when they do not.\n\nSignal checks Google and Bing results continuously and separates competitor-present moments from quieter brand auctions.",
+                      cta: "Is your team able to detect these moments automatically?",
+                    }
+                  : index === 2
+                    ? {
+                        ...step,
+                        messageBody:
+                          "Hi Sam,\n\nFor a visibility check, the value is simple: fewer manual SERP checks, faster reaction when competitors appear, and a practical way to test branded CPC decision quality inside the current Google Ads setup instead of rebuilding campaigns.",
+                      }
+                    : {
+                        ...step,
+                        messageBody:
+                          "Hi Sam,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is the practical benchmark.",
+                      },
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps[0].messageBody).toMatch(/^Hi Sam,\n\n/);
+      expect(result.data.steps[1].messageBody).toMatch(/^Hi Sam,\n\n/);
+      expect(result.data.steps[2].messageBody).toContain("The operational value is consistency.");
+      expect(result.data.steps[2].messageBody).not.toContain("For a visibility check");
+      expect(result.data.steps[3].messageBody).not.toContain("That is the practical benchmark");
+      expect(result.data.steps[3].messageBody).toContain("multi-market paid media team");
+    }
+  });
+
   it("preserves valid AI steps while replacing only a locally invalid step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {
