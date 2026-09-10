@@ -135,6 +135,33 @@ describe("Build Sequence strategy planner", () => {
     expect(strategy.businessQuestion).toContain("when branded-search competition changes");
   });
 
+  it("varies deterministic fallback strategy by ranked prospect fact even with the same persona and unknown SERP", () => {
+    const aiAutomation = strategyFor({
+      keywords: undefined,
+      serpEvidence: undefined,
+      prospectContext:
+        "Chris is exploring AI and automation for paid-search decisions across Google Ads.",
+    }).strategy;
+    const expansion = strategyFor({
+      keywords: undefined,
+      serpEvidence: undefined,
+      prospectContext:
+        "Chris expanded paid search into five international markets this year.",
+    }).strategy;
+    const efficiency = strategyFor({
+      keywords: undefined,
+      serpEvidence: undefined,
+      prospectContext:
+        "Chris is under budget pressure to improve paid-search efficiency without losing coverage.",
+    }).strategy;
+
+    expect(aiAutomation.relevantCapability).toContain("automation");
+    expect(expansion.relevantCapability).toContain("market-level");
+    expect(efficiency.productGap).toContain("necessary defensive spend");
+    expect(new Set([aiAutomation.businessQuestion, expansion.businessQuestion, efficiency.businessQuestion]).size).toBe(3);
+    expect(new Set([aiAutomation.productGap, expansion.productGap, efficiency.productGap]).size).toBe(3);
+  });
+
   it("uses exactly one approved proof point where appropriate", () => {
     const { strategy } = strategyFor();
 

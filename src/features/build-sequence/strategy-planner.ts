@@ -76,7 +76,71 @@ function roleCompanyLabel(input: BuildSequenceInput, intelligence: ProspectIntel
   return { role, company };
 }
 
-function capabilityFor(intelligence: ProspectIntelligence) {
+type StrategyDriver =
+  | "AI_AUTOMATION"
+  | "EXPANSION_MARKET"
+  | "EFFICIENCY_PRESSURE"
+  | "SCALE_GOVERNANCE"
+  | "OPERATOR_VISIBILITY"
+  | "DEFAULT";
+
+function strategySignalText(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  return [
+    input.companyContext,
+    input.geographyOrMarkets,
+    input.paidSearchContext,
+    input.internalNotes,
+    input.prospectContext,
+    intelligence.jobTitle,
+    ...intelligence.selectedInsights.map((insight) => insight.text),
+    ...intelligence.contextInterpretation.currentResponsibilities.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentPrioritiesOrInterests.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentToolsOrChannels.map((item) => item.text),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function strategyDriverFor(input: BuildSequenceInput, intelligence: ProspectIntelligence): StrategyDriver {
+  const text = strategySignalText(input, intelligence);
+  if (/\b(?:ai|automation|automated|machine learning|workflow automation)\b/i.test(text)) {
+    return "AI_AUTOMATION";
+  }
+  if (/\b(?:international|global|markets?|countries|regions?|expansion|multi-market|localization|localisation)\b/i.test(text)) {
+    return "EXPANSION_MARKET";
+  }
+  if (/\b(?:budget|efficien|cost|cpc|lower spend|reduce spend|profitability|margin|pressure|waste|saving)\b/i.test(text)) {
+    return "EFFICIENCY_PRESSURE";
+  }
+  if (/\b(?:global|enterprise|governance|scale|cross-team|multiple teams|portfolio)\b/i.test(text)) {
+    return "SCALE_GOVERNANCE";
+  }
+  if (
+    intelligence.persona === "PAID_SEARCH" &&
+    /\b(?:analyst|specialist|coordinator|hands-on|reporting|manual|checks?|optimis|optimiz)\b/i.test(text)
+  ) {
+    return "OPERATOR_VISIBILITY";
+  }
+  return "DEFAULT";
+}
+
+function capabilityFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const driver = strategyDriverFor(input, intelligence);
+  if (driver === "AI_AUTOMATION") {
+    return "Signal turns live Google and Bing SERP changes into decision inputs for branded-search automation.";
+  }
+  if (driver === "EXPANSION_MARKET") {
+    return "Signal gives teams market-level branded-search visibility across Google and Bing before they change coverage or bids.";
+  }
+  if (driver === "EFFICIENCY_PRESSURE") {
+    return "Signal separates defensive coverage from quieter branded auctions so teams can test where bid pressure can ease.";
+  }
+  if (driver === "SCALE_GOVERNANCE") {
+    return "Signal gives search teams a consistent live SERP signal across brands, markets, and bidding decisions.";
+  }
+  if (driver === "OPERATOR_VISIBILITY") {
+    return "Signal reduces manual SERP checks by flagging when competitors appear or disappear on Google and Bing.";
+  }
   if (intelligence.serpScenario === "CONTESTED") {
     return "Signal monitors live SERP competition so teams can defend branded terms without defaulting to one high CPC rule.";
   }
@@ -89,7 +153,23 @@ function capabilityFor(intelligence: ProspectIntelligence) {
   return "Signal monitors Google and Bing SERPs in real time and connects that visibility to paid-search decisions.";
 }
 
-function productGapFor(intelligence: ProspectIntelligence) {
+function productGapFor(intelligence: ProspectIntelligence, input?: BuildSequenceInput) {
+  const driver = strategyDriverFor(input ?? ({} as BuildSequenceInput), intelligence);
+  if (driver === "AI_AUTOMATION") {
+    return "Google Ads reports performance, but it does not turn live SERP competition into automated branded-bid decisions.";
+  }
+  if (driver === "EXPANSION_MARKET") {
+    return "As markets and query sets change, Google Ads does not clearly show where branded coverage needs defending versus where pressure can ease.";
+  }
+  if (driver === "EFFICIENCY_PRESSURE") {
+    return "Google Ads can show branded performance, but it does not clearly separate necessary defensive spend from pressure that may be broader than needed.";
+  }
+  if (driver === "SCALE_GOVERNANCE") {
+    return "At scale, standard reporting does not give teams one consistent live view of when branded-search competition should change coverage.";
+  }
+  if (driver === "OPERATOR_VISIBILITY") {
+    return "Manual SERP checks and delayed campaign reports make it hard to catch the moment when branded bid pressure should change.";
+  }
   if (intelligence.serpScenario === "CONTESTED") {
     return "Google Ads can show performance, but it does not clearly answer the minimum defensive CPC needed when another advertiser appears.";
   }
@@ -115,6 +195,7 @@ function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIn
   )
     ? " across the accounts your team manages"
     : "";
+  const driver = strategyDriverFor(input, intelligence);
   if (intelligence.serpScenario === "CONTESTED") {
     return `When competitors appear${scope}, how do you know the minimum CPC needed to defend the brand?`;
   }
@@ -123,6 +204,21 @@ function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIn
   }
   if (intelligence.serpScenario === "MIXED") {
     return `How do you decide when branded coverage is defensive and when the auction is quiet enough to lower pressure${scope}?`;
+  }
+  if (driver === "AI_AUTOMATION") {
+    return `Where does live SERP competition still need to feed paid-search automation before branded bids change${scope}?`;
+  }
+  if (driver === "EXPANSION_MARKET") {
+    return `Across markets and query sets, how do you decide where branded coverage should defend demand versus ease pressure${scope}?`;
+  }
+  if (driver === "EFFICIENCY_PRESSURE") {
+    return `When efficiency is under pressure, how do you know which branded bids still need defending${scope}?`;
+  }
+  if (driver === "SCALE_GOVERNANCE") {
+    return `Across a scaled paid-search remit, how do you keep branded-bid decisions tied to live search competition${scope}?`;
+  }
+  if (driver === "OPERATOR_VISIBILITY") {
+    return `How much of the branded-bid decision still depends on manual SERP checks or delayed reporting${scope}?`;
   }
   return `How do you see when branded-search competition changes${scope} before deciding whether bids should change?`;
 }
@@ -214,7 +310,7 @@ export function buildProspectBrief({
   const { role, company } = roleCompanyLabel(input, intelligence);
   const roleCompanyFallback = roleCompanyOpening(role, company);
   const businessQuestion = businessQuestionFor(input, intelligence);
-  const relevantCapability = capabilityFor(intelligence);
+  const relevantCapability = capabilityFor(input, intelligence);
   const factsToAvoid = Array.from(
     new Set(
       [
@@ -285,17 +381,17 @@ export function planMessageStrategy({
       ? "The supplied prospect context gives a real reason to connect their work to branded-search decision quality."
       : "The supplied context is light, so the safest reason to reach out is a narrow paid-brand visibility question.",
     businessQuestion: businessQuestionFor(input, intelligence),
-    productGap: productGapFor(intelligence),
+    productGap: productGapFor(intelligence, input),
     primaryAngle,
     secondaryAngle: intelligence.secondaryAngle,
-    relevantCapability: capabilityFor(intelligence),
+    relevantCapability: capabilityFor(input, intelligence),
     proofPoint,
     whyThisShouldResonate: hasProspectFact
       ? "The sequence can start from a real supplied prospect fact, then connect it to a specific branded-search decision."
       : "The supplied prospect context is light, so the sequence should stay role- and account-level instead of inventing achievements.",
     openingStyle: openingStyleFor(intelligence),
     sequenceNarrative,
-    emailStepPlans: stepPlansFromNarrative(sequenceNarrative, { primaryAngle, relevantCapability: capabilityFor(intelligence), proofPoint }),
+    emailStepPlans: stepPlansFromNarrative(sequenceNarrative, { primaryAngle, relevantCapability: capabilityFor(input, intelligence), proofPoint }),
     confidence,
     selectedGoldStandardExampleIds: selectedGoldStandards.map((example) => example.id),
     groundingReferences: [
