@@ -1633,6 +1633,26 @@ function replaceWeakProofBridge(messageBody: string, generation: SequenceGenerat
     .trim();
 }
 
+function normalizeApprovedProofParagraph(messageBody: string, generation: SequenceGeneration) {
+  const bridge = hasMarketSequenceContext(generation)
+    ? "For a multi-market paid media team, the practical question is where branded coverage still needs defending and where bid pressure can safely ease."
+    : "For paid search, the practical question is where branded coverage still needs defending and where bid pressure can safely ease.";
+
+  if (
+    /when they used|used live SERP|guide brand bids|guided brand bids/i.test(messageBody) &&
+    /AppsFlyer/i.test(messageBody) &&
+    /branded spend\s+29%/i.test(messageBody) &&
+    /qualified lead volume\s+(?:rose|up)\s+25%/i.test(messageBody)
+  ) {
+    return [
+      "AppsFlyer cut branded spend 29% while qualified lead volume rose 25% in the first 30 days.",
+      bridge,
+    ].join("\n\n");
+  }
+
+  return messageBody;
+}
+
 function repairGenericMarketMethodologyStep(step: SequenceStep, generation: SequenceGeneration) {
   if (step.purpose !== "METHODOLOGY_DIFFERENTIATION" || !hasMarketSequenceContext(generation)) {
     return step.messageBody;
@@ -1647,6 +1667,16 @@ function repairGenericMarketMethodologyStep(step: SequenceStep, generation: Sequ
   ].join("\n\n");
 }
 
+function normalizeSubjectLine(subjectLine: string | undefined, generation: SequenceGeneration) {
+  if (!subjectLine) return undefined;
+  const companyName = generation.prospectIntelligence.companyName?.trim();
+  let normalized = subjectLine.trim();
+  if (companyName) {
+    normalized = normalized.replace(new RegExp(`\\b${escapeRegExp(companyName)}\\b`, "i"), companyName);
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function repairSequenceCopy(generation: SequenceGeneration): SequenceGeneration {
   const greetingName = inferredGreetingName(generation.steps);
   const steps = generation.steps.map((step) => {
@@ -1654,12 +1684,14 @@ function repairSequenceCopy(generation: SequenceGeneration): SequenceGeneration 
     messageBody = repairGenericMarketMethodologyStep({ ...step, messageBody }, generation);
     if (step.purpose === "SOCIAL_PROOF") {
       messageBody = replaceWeakProofBridge(messageBody, generation);
+      messageBody = normalizeApprovedProofParagraph(messageBody, generation);
     }
     if (step.channel === "EMAIL") {
       messageBody = normalizeEmailGreeting(messageBody, greetingName);
     }
     return {
       ...step,
+      subjectLine: normalizeSubjectLine(step.subjectLine, generation),
       messageBody,
     };
   });

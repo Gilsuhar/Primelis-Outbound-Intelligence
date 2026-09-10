@@ -1694,6 +1694,7 @@ describe("Build Sequence service", () => {
               index === 0
                 ? {
                     ...step,
+                    subjectLine: "acme branded search visibility",
                     messageBody:
                       "Hi Sam. Quick question for your Paid Media focus at Acme.\n\nGoogle Ads shows branded performance, but not the live search-page context behind each branded bid decision.",
                   }
@@ -1713,7 +1714,7 @@ describe("Build Sequence service", () => {
                     : {
                         ...step,
                         messageBody:
-                          "Hi Sam,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is the practical benchmark.",
+                          "Hi Sam,\n\nAcross markets, live branded-search competition decides whether you should defend demand or ease bid pressure. AppsFlyer cut branded spend 29% while qualified lead volume rose 25% in the first 30 days when they used live SERP visibility to guide brand bids.",
                       },
             ),
           };
@@ -1723,11 +1724,13 @@ describe("Build Sequence service", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.data.steps[0].subjectLine).toBe("Acme branded search visibility");
       expect(result.data.steps[0].messageBody).toMatch(/^Hi Sam,\n\n/);
       expect(result.data.steps[1].messageBody).toMatch(/^Hi Sam,\n\n/);
       expect(result.data.steps[2].messageBody).toContain("The operational value is consistency.");
       expect(result.data.steps[2].messageBody).not.toContain("For a visibility check");
       expect(result.data.steps[3].messageBody).not.toContain("That is the practical benchmark");
+      expect(result.data.steps[3].messageBody).not.toContain("when they used");
       expect(result.data.steps[3].messageBody).toContain("multi-market paid media team");
     }
   });
