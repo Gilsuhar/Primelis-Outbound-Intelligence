@@ -1622,6 +1622,50 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("removes dangling trailing sentence fragments from OpenAI message bodies", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            steps: generated.steps.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    messageBody:
+                      "Hi Sam,\n\nGoogle Ads reports branded performance, but it does not show the live search-page context behind each branded bid decision. Across markets and query sets,",
+                    cta: "How are you currently deciding when branded bids should change?",
+                  }
+                : step,
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps[0].messageBody).toContain(
+        "Google Ads reports branded performance, but it does not show the live search-page context behind each branded bid decision.",
+      );
+      expect(result.data.steps[0].messageBody).not.toContain("Across markets and query sets,");
+    }
+  });
+
   it("preserves valid AI steps while replacing only a locally invalid step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {

@@ -1565,6 +1565,22 @@ function stripDuplicatedTrailingCta(messageBody: string, cta: string) {
   return trimmedBody;
 }
 
+function stripDanglingTrailingFragment(text: string) {
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => {
+      const trimmed = paragraph.trim();
+      if (!trimmed) return "";
+      const dangling = trimmed.match(
+        /^(?<prefix>[\s\S]*?[.!?])\s+(?<fragment>(?:Across|across|For|for|With|with|Including|including|Covering|covering|When|when|If|if|Because|because|Since|since|As|as)\s+[^.!?\n]{8,160}[,:;-])$/,
+      );
+      return dangling?.groups?.prefix?.trim() ?? trimmed;
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {
   const safeKeywords = protectedKeywordPhrases(generation);
   return {
@@ -1594,7 +1610,9 @@ function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGen
     claimsUsed: generation.claimsUsed.map((claim) => sanitizeGeneratedText(claim, safeKeywords)),
     steps: generation.steps.map((step) => {
       const cta = sanitizeGeneratedText(step.cta, safeKeywords);
-      const messageBody = sanitizeGeneratedText(step.messageBody, safeKeywords);
+      const messageBody = stripDanglingTrailingFragment(
+        sanitizeGeneratedText(step.messageBody, safeKeywords),
+      );
       return {
         ...step,
         subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine, safeKeywords) : undefined,
