@@ -44,6 +44,7 @@ vi.mock("@/features/draft-refinement/draft-refinement-panel", () => ({
 }));
 
 import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-brain-client";
+import { pushSequenceToHubSpotAction } from "@/app/build-sequence/actions";
 import {
   __buildSequenceVariantTest,
   BuildSequenceClient,
@@ -336,6 +337,45 @@ describe("Sales workflow UI", () => {
           "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
         ),
       ).toBeTruthy(),
+    );
+  });
+
+  it("pushes Build Sequence to HubSpot with the extracted company when manual company is empty", async () => {
+    mockBuildSequenceApiResponse({
+      ok: true,
+      data: buildSequenceResult(),
+    });
+    vi.mocked(pushSequenceToHubSpotAction).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        companyId: "company-1",
+        noteId: "note-1",
+        taskId: "task-1",
+        companyUrl: "https://app.hubspot.com/contacts/0/company/company-1",
+      },
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Send to HubSpot" }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send to HubSpot" }));
+
+    await waitFor(() => expect(pushSequenceToHubSpotAction).toHaveBeenCalledTimes(1));
+    expect(pushSequenceToHubSpotAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyName: "Cisco",
+      }),
     );
   });
 

@@ -722,8 +722,27 @@ export function BuildSequenceClient() {
       .filter((keyword) => keyword.term);
   }
 
+  function resolvedCompanyName() {
+    return (
+      companyName.trim() ||
+      result?.prospectMemory?.prospect.companyName?.trim() ||
+      result?.prospectMemory?.extraction.companyName?.trim() ||
+      result?.prospectIntelligence.companyName?.trim() ||
+      ""
+    );
+  }
+
+  function resolvedCompanyWebsite() {
+    return (
+      companyWebsite.trim() ||
+      result?.prospectMemory?.prospect.companyDomain?.trim() ||
+      result?.prospectMemory?.extraction.companyDomain?.trim() ||
+      ""
+    );
+  }
+
   function regenerateSubject(step: SequenceStep) {
-    const variants = subjectVariants(step, companyName || "this account");
+    const variants = subjectVariants(step, resolvedCompanyName() || "this account");
     const nextIndex = variantIndex(
       stepSubjectVariantIndexes[step.stepNumber] ?? -1,
       variants.length,
@@ -733,7 +752,7 @@ export function BuildSequenceClient() {
   }
 
   function regenerateBody(step: SequenceStep) {
-    const variants = bodyVariants(step, companyName || "this account");
+    const variants = bodyVariants(step, resolvedCompanyName() || "this account");
     const nextIndex = variantIndex(stepBodyVariantIndexes[step.stepNumber] ?? -1, variants.length);
     setStepBodyVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepBodyDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
@@ -884,11 +903,19 @@ export function BuildSequenceClient() {
 
   function pushToHubSpot() {
     if (!result) return;
+    const hubSpotCompanyName = resolvedCompanyName();
+    if (!hubSpotCompanyName) {
+      setHubSpotStatus({
+        state: "error",
+        message: "Add or confirm a company before sending this sequence to HubSpot.",
+      });
+      return;
+    }
     setHubSpotStatus({ state: "sending", message: "Sending to HubSpot..." });
     startTransition(async () => {
       const response = await pushSequenceToHubSpotAction({
-        companyName,
-        companyWebsite,
+        companyName: hubSpotCompanyName,
+        companyWebsite: resolvedCompanyWebsite() || undefined,
         overallStrategy: result.overallStrategy,
         selectedAngle: result.selectedAngle,
         persona: result.personaEmphasis.persona,
