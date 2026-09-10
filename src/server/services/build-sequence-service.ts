@@ -1544,16 +1544,25 @@ function stripDuplicatedTrailingCta(messageBody: string, cta: string) {
   const cleanCta = cta.trim();
   if (!cleanCta) return messageBody.trim();
 
+  const trimmedBody = messageBody.trim();
   const normalizedBody = normalizedText(messageBody);
   const normalizedCtaText = normalizedText(cleanCta);
-  if (!normalizedCtaText || !normalizedBody.endsWith(normalizedCtaText)) {
-    return messageBody.trim();
+  if (!normalizedCtaText) return trimmedBody;
+
+  if (normalizedBody.endsWith(normalizedCtaText)) {
+    return trimmedBody.replace(new RegExp(`\\s*${escapeRegExp(cleanCta)}\\s*$`, "i"), "").trim();
   }
 
-  return messageBody
-    .trim()
-    .replace(new RegExp(`\\s*${escapeRegExp(cleanCta)}\\s*$`, "i"), "")
-    .trim();
+  const trailingQuestion = trimmedBody.match(/(^|[.!?\n]\s*)([^.!?\n][^?\n]{10,220}\?)\s*$/)?.[2];
+  if (
+    trailingQuestion &&
+    normalizedCtaText.endsWith("?") &&
+    similarity(normalizedText(trailingQuestion), normalizedCtaText) >= 0.82
+  ) {
+    return trimmedBody.slice(0, trimmedBody.lastIndexOf(trailingQuestion)).trim();
+  }
+
+  return trimmedBody;
 }
 
 function sanitizeSequenceGeneration(generation: SequenceGeneration): SequenceGeneration {

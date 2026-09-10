@@ -1576,6 +1576,52 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("removes a near-duplicate trailing CTA question from OpenAI message bodies", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(baseInput, {
+      persistence: adapter,
+      provider: {
+        metadata: {
+          providerName: "openai",
+          modelName: "gpt-test",
+          deterministic: false,
+        },
+        generate: async ({ input, records, generation }) => {
+          const fallback = new DeterministicBuildSequenceProvider();
+          const generated = await fallback.generate({
+            input,
+            records,
+            sourceReferences: [],
+            generation,
+          });
+          return {
+            ...generated,
+            steps: generated.steps.map((step, index) =>
+              index === 1
+                ? {
+                    ...step,
+                    messageBody:
+                      "Hi Sam,\n\nSignal checks Google and Bing search results continuously and separates competitor-present moments from quieter brand auctions.\n\nIs your team able to detect those moments automatically?",
+                    cta: "Is your team able to detect these moments automatically?",
+                  }
+                : step,
+            ),
+          };
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps[1].messageBody).not.toContain(
+        "Is your team able to detect those moments automatically?",
+      );
+      expect(result.data.steps[1].cta).toBe(
+        "Is your team able to detect these moments automatically?",
+      );
+    }
+  });
+
   it("preserves valid AI steps while replacing only a locally invalid step", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {
