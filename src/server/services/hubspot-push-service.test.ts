@@ -26,6 +26,15 @@ const baseInput = {
       messageBody: "Hi there,\n\nQuick question on Nike brand search.",
       cta: "Do you already have a way to do that?",
     },
+    {
+      stepNumber: 2,
+      channel: "EMAIL" as const,
+      delay: "Day 3",
+      purpose: "PROBLEM_FRAMING" as const,
+      subjectLine: "Re: Nike paid brand",
+      messageBody: "Hi there,\n\nSignal checks live SERPs before branded bids change.",
+      cta: "Is your team able to detect this automatically?",
+    },
   ],
 };
 
@@ -77,7 +86,11 @@ describe("HubSpot sequence push", () => {
     }
     expect(calls[0]).toBe("searchCompany");
     expect(calls[1]).toBe("createCompany");
-    expect(calls.some((call) => call.includes("Nike paid brand question"))).toBe(true);
+    const noteCall = calls.find((call) => call.startsWith("createNote:")) ?? "";
+    expect(noteCall).toContain("Thread subject:</strong> Nike paid brand question");
+    expect(noteCall).toContain("Email 1 - Day 0");
+    expect(noteCall).toContain("Email 2 - Day 3");
+    expect(noteCall).not.toContain("Subject:</strong> Re: Nike paid brand");
     expect(calls.some((call) => call.includes("Review Signal sequence - Nike"))).toBe(true);
   });
 

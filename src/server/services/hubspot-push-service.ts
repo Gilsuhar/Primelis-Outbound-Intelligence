@@ -84,11 +84,14 @@ function escapeHtml(value: string) {
 }
 
 function noteBody(input: PushSequenceToHubSpotInput) {
+  const [firstStep] = input.steps;
+  const threadSubject = firstStep?.subjectLine
+    ? `<p><strong>Thread subject:</strong> ${escapeHtml(firstStep.subjectLine)}</p>`
+    : "";
   const steps = input.steps
     .map((step) => {
       const parts = [
-        `<strong>Step ${step.stepNumber} - ${escapeHtml(step.channel)} - ${escapeHtml(step.delay)}</strong>`,
-        step.subjectLine ? `<strong>Subject:</strong> ${escapeHtml(step.subjectLine)}` : "",
+        `<strong>Email ${step.stepNumber} - ${escapeHtml(step.delay)}</strong>`,
         step.connectionRequest
           ? `<strong>Connection request:</strong><br>${escapeHtml(step.connectionRequest)}`
           : "",
@@ -110,6 +113,7 @@ function noteBody(input: PushSequenceToHubSpotInput) {
     `<p><strong>Signal generated sequence for ${escapeHtml(input.companyName)}</strong></p>`,
     `<p><strong>Strategy:</strong><br>${escapeHtml(input.overallStrategy).replaceAll("\n", "<br>")}</p>`,
     `<p><strong>Angle:</strong> ${escapeHtml(input.selectedAngle)}<br><strong>Persona:</strong> ${escapeHtml(input.persona)}</p>`,
+    threadSubject,
     "<hr>",
     steps,
     safety,
