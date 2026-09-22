@@ -74,10 +74,7 @@ function isFixtureEligible(record: SequenceKnowledgeRecord, input: BuildSequence
       ? record.channels.includes("EMAIL") || record.channels.includes("LINKEDIN")
       : record.channels.includes(input.primaryChannel));
   if (record.type === "CASE_STUDY") {
-    return (
-      record.approvedText.length > 0 &&
-      record.sourceIds.length > 0
-    );
+    return record.approvedText.length > 0 && record.sourceIds.length > 0;
   }
   return (
     channelOk &&
@@ -520,7 +517,9 @@ describe("Build Sequence service", () => {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.imagePlaceholder).toBeUndefined();
       expect(stepTwo.imageContextNote).toContain("outside the email body");
-      expect(stepTwo.messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
+      expect(stepTwo.messageBody).toMatch(
+        /continuously monitors Google and Bing search results|visibility/i,
+      );
       expect(stepTwo.messageBody).not.toContain("{{! Insert screenshot }}");
       expect(stepTwo.messageBody).not.toMatch(/\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b/i);
       expect(stepTwo.messageBody).not.toMatch(/customer example|one customer|one client/i);
@@ -639,7 +638,9 @@ describe("Build Sequence service", () => {
     if (accepted.ok) {
       const finalStep = accepted.data.steps.at(-1)!;
       const averageEarlierLength =
-        accepted.data.steps.slice(0, -1).reduce((total, step) => total + step.messageBody.length, 0) /
+        accepted.data.steps
+          .slice(0, -1)
+          .reduce((total, step) => total + step.messageBody.length, 0) /
         (accepted.data.steps.length - 1);
       expect(finalStep.messageBody.length).toBeLessThan(averageEarlierLength);
     }
@@ -658,13 +659,23 @@ describe("Build Sequence service", () => {
         "METHODOLOGY_DIFFERENTIATION",
         "SOCIAL_PROOF",
       ]);
-      expect(result.data.steps[0].messageBody).toMatch(/branded bids should change|live search-page context/i);
-      expect(`${result.data.steps[0].messageBody} ${result.data.steps[0].cta}`.match(/\?/g) ?? []).toHaveLength(1);
-      expect(result.data.steps[1].messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
-      expect(result.data.steps[2].messageBody).toMatch(/current Google Ads setup|Google and Bing SERPs/i);
-      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
-      expect(result.data.steps[3].cta).toBe("Open to a quick overview?");
-      expect(JSON.stringify(result.data.steps)).not.toMatch(/hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
+      expect(result.data.steps[0].messageBody).toMatch(
+        /branded bids should change|live search-page context/i,
+      );
+      expect(
+        `${result.data.steps[0].messageBody} ${result.data.steps[0].cta}`.match(/\?/g) ?? [],
+      ).toHaveLength(1);
+      expect(result.data.steps[1].messageBody).toMatch(
+        /continuously monitors Google and Bing search results|visibility/i,
+      );
+      expect(result.data.steps[2].messageBody).toMatch(
+        /current Google Ads setup|Google and Bing SERPs/i,
+      );
+      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+      expect(result.data.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+      expect(JSON.stringify(result.data.steps)).not.toMatch(
+        /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+      );
     }
   });
 
@@ -734,7 +745,9 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       expect(result.data.prospectIntelligence.persona).toBe("GROWTH");
       expect(result.data.steps[0].messageBody).toContain("experimentation and growth efficiency");
-      expect(JSON.stringify(result.data.steps)).not.toMatch(/budget owner|managed a .* budget|led paid search/i);
+      expect(JSON.stringify(result.data.steps)).not.toMatch(
+        /budget owner|managed a .* budget|led paid search/i,
+      );
     }
   });
 
@@ -750,7 +763,8 @@ describe("Build Sequence service", () => {
         contactRole: "Head of Performance Marketing",
         companyContext: "Digital agency managing multiple client accounts",
         observedTrigger: "Promotion to PPC Team Lead",
-        prospectContext: "About\nMia Johnson\nPPC Team Lead\nAmericaneagle.com.\nOct 2025 - Present · 11 mos.",
+        prospectContext:
+          "About\nMia Johnson\nPPC Team Lead\nAmericaneagle.com.\nOct 2025 - Present · 11 mos.",
         keywords: [
           { term: "Americaneagle web design", status: "contested", competitor: "WebFX" },
           { term: "Americaneagle ecommerce", status: "solo" },
@@ -765,9 +779,13 @@ describe("Build Sequence service", () => {
       const rendered = JSON.stringify(result.data.steps);
       expect(result.data.steps[0].subjectLine).toBe("branded search across managed accounts");
       expect(result.data.steps[0].messageBody).toContain("Hi Mia");
-      expect(result.data.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
-      expect(result.data.steps[1].messageBody).toContain("\"Americaneagle web design\" was a contested brand auction with WebFX visible");
-      expect(result.data.steps[2].messageBody).toContain("\"Americaneagle ecommerce\"");
+      expect(result.data.steps[0].messageBody).toContain(
+        "Congrats on your promotion to PPC Team Lead",
+      );
+      expect(result.data.steps[1].messageBody).toContain(
+        '"Americaneagle web design" was a contested brand auction with WebFX visible',
+      );
+      expect(result.data.steps[2].messageBody).toContain('"Americaneagle ecommerce"');
       expect(result.data.steps[2].messageBody).toContain("solo brand auction");
       expect(rendered).toContain("across multiple accounts");
       expect(rendered).not.toContain("Hi About");
@@ -787,9 +805,7 @@ describe("Build Sequence service", () => {
         companyWebsite: "americaneagle.com",
         contactRole: "PPC Team Lead",
         companyContext: "Digital agency managing multiple client accounts",
-        keywords: [
-          { term: "Nike running shoes", status: "contested", competitor: "Adidas" },
-        ],
+        keywords: [{ term: "Nike running shoes", status: "contested", competitor: "Adidas" }],
       },
       { persistence: adapter },
     );
@@ -798,7 +814,9 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       const rendered = JSON.stringify(result.data);
       expect(rendered).not.toContain("Nike running shoes");
-      expect(result.data.safetyNotes).toContain("Mismatched keyword evidence was filtered before generation.");
+      expect(result.data.safetyNotes).toContain(
+        "Mismatched keyword evidence was filtered before generation.",
+      );
     }
   });
 
@@ -893,7 +911,9 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.provider.providerName).toBe("openai");
-      expect(result.data.steps[0].messageBody).toContain("Acme's branded search is worth one narrow look");
+      expect(result.data.steps[0].messageBody).toContain(
+        "Acme's branded search is worth one narrow look",
+      );
       expect(result.data.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
     }
   });
@@ -967,7 +987,10 @@ describe("Build Sequence service", () => {
           index === 0
             ? { ...step, messageBody: step.messageBody.replace("Hi Sam,", "Hi Rex,") }
             : index === result.steps.length - 1
-              ? { ...step, messageBody: `${step.messageBody}\n\nIf Uber reviews this later, happy to help.` }
+              ? {
+                  ...step,
+                  messageBody: `${step.messageBody}\n\nIf Uber reviews this later, happy to help.`,
+                }
               : step,
         ),
       };
@@ -1172,13 +1195,17 @@ describe("Build Sequence service", () => {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.steps[0].subjectLine).toContain("Nike");
       expect(result.data.steps[0].messageBody).toContain("Nike");
-      expect(result.data.steps[0].messageBody).toContain("Performance Marketing remit");
+      expect(result.data.steps[0].messageBody).toContain("Acme's branded search");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
-      expect(result.data.steps[0].messageBody).toMatch(/live search-page context|branded bids should change/i);
+      expect(result.data.steps[0].messageBody).toMatch(
+        /live search-page context|branded bids should change/i,
+      );
       expect(result.data.steps[0].messageBody).not.toMatch(/keep this to one narrow/i);
-      expect(result.data.steps[1].messageBody).toMatch(/Signal checks Google and Bing search results continuously|visibility/i);
-      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer cut branded spend 29%/i);
+      expect(result.data.steps[1].messageBody).toMatch(
+        /continuously monitors Google and Bing search results|visibility/i,
+      );
+      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
       expect(result.data.steps.at(-1)?.purpose).toBe("SOCIAL_PROOF");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
@@ -1190,10 +1217,7 @@ describe("Build Sequence service", () => {
   });
 
   it("builds a draft with conservative defaults and a warning when recent outreach exists", async () => {
-    const { adapter, persisted } = persistence(
-      [knowledge({ id: "product-truth" })],
-      "SALES_USER",
-    );
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })], "SALES_USER");
     const recentAwareAdapter = {
       ...adapter,
       getRecentDrafts: async () => [
@@ -1341,7 +1365,7 @@ describe("Build Sequence service", () => {
         cta: "Open to a quick overview?",
       });
       expect(`${result.data.steps.at(-1)?.messageBody} ${result.data.steps.at(-1)?.cta}`).toMatch(
-        /AppsFlyer cut branded spend 29%|quick overview/i,
+        /AppsFlyer reduced branded spend by 29%|bid decisions/i,
       );
     }
   });
@@ -1361,7 +1385,9 @@ describe("Build Sequence service", () => {
                 subjectLine: "Quick follow-up",
                 messageBody: "Hi Sam,\n\nNot sure if this is a priority right now.",
                 cta: "Happy to share more if useful.",
-                claimsUsed: ["Signal evaluates paid and organic brand search together to support efficient decisions."],
+                claimsUsed: [
+                  "Signal evaluates paid and organic brand search together to support efficient decisions.",
+                ],
               }
             : step,
         ),
@@ -1377,7 +1403,9 @@ describe("Build Sequence service", () => {
         purpose: "BREAKUP_CLOSE_LOOP",
         cta: "Happy to share more if useful.",
       });
-      expect(result.data.steps.at(-1)?.messageBody).toContain("Not sure if this is a priority right now");
+      expect(result.data.steps.at(-1)?.messageBody).toContain(
+        "Not sure if this is a priority right now",
+      );
     }
   });
 
@@ -1401,7 +1429,9 @@ describe("Build Sequence service", () => {
           "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("a practical way to test branded CPC decision quality");
+      expect(JSON.stringify(result.data.steps)).toContain(
+        "a practical way to test branded CPC decision quality",
+      );
     }
   });
 
@@ -1923,7 +1953,9 @@ describe("Build Sequence service", () => {
     if (result.ok) {
       const bodies = result.data.steps.map((step) => step.messageBody);
       const rendered = bodies.join("\n\n");
-      expect(rendered).not.toMatch(/\b(?:Prospect|Company|Role|Context|Notes|SERP|Keywords|Important):/);
+      expect(rendered).not.toMatch(
+        /\b(?:Prospect|Company|Role|Context|Notes|SERP|Keywords|Important):/,
+      );
       expect(rendered).not.toContain("I saw that Prospect: Chris.");
       expect(bodies[0]).toContain("you've managed over $50M in paid media");
       expect(rendered).not.toMatch(/\bChris has\b|\bChris is\b/);
@@ -1934,7 +1966,9 @@ describe("Build Sequence service", () => {
       expect(bodies[1]).toMatch(/Google and Bing/i);
       expect(bodies[1]).not.toMatch(/harder question/i);
       expect(bodies[2]).toMatch(/practical read|decision quality/i);
-      expect(rendered).not.toMatch(/organic is already enough|organic would have captured|organic cannot do/i);
+      expect(rendered).not.toMatch(
+        /organic is already enough|organic would have captured|organic cannot do/i,
+      );
       expect(rendered).toContain("ZoomInfo used Signal to reduce branded CPC by 40%");
     }
   });
@@ -2010,7 +2044,9 @@ describe("Build Sequence service", () => {
       expect(sources).toHaveLength(1);
       expect(result.data.prospectId).toBe(prospects[0].id);
       expect(result.data.prospectMemory?.sourceCount).toBe(1);
-      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).toMatch(/\$50M|AI and automation/i);
+      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).toMatch(
+        /\$50M|AI and automation/i,
+      );
       expect(persisted[0].prospectId).toBe(prospects[0].id);
     }
   });
@@ -2092,14 +2128,14 @@ describe("Build Sequence service", () => {
       expect(prospects).toHaveLength(1);
       expect(sources).toHaveLength(1);
       expect(persisted[0].prospectId).toBe(prospects[0].id);
-      expect(facts.map((fact) => fact.value).join("\n")).toContain("managed over $50M in paid media");
+      expect(facts.map((fact) => fact.value).join("\n")).toContain(
+        "managed over $50M in paid media",
+      );
       expect(facts.map((fact) => fact.value).join("\n")).not.toContain("global AI transformation");
       expect(facts.every((fact) => fact.sourceId === sources[0].id)).toBe(true);
       expect(result.data.prospectIntelligence.serpScenario).toBe("SOLO");
       expect(result.data.safetyNotes).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("unsupported semantic intake extraction"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("unsupported semantic intake extraction")]),
       );
     }
   });
@@ -2241,7 +2277,9 @@ describe("Build Sequence service", () => {
 
   it("reuses an existing prospect by exact email and appends a new source", async () => {
     const { adapter, prospects, sources } = prospectPersistence({
-      initialProspects: [existingProspect({ email: "chris@example.com", fullName: "Chris Example" })],
+      initialProspects: [
+        existingProspect({ email: "chris@example.com", fullName: "Chris Example" }),
+      ],
     });
 
     const result = await generateBuildSequence(
@@ -2331,15 +2369,26 @@ describe("Build Sequence service", () => {
 
   it("appends a new source without destroying previous sources", async () => {
     const { adapter, prospects, sources } = prospectPersistence({
-      initialProspects: [existingProspect({ email: "chris@example.com", fullName: "Chris Example" })],
+      initialProspects: [
+        existingProspect({ email: "chris@example.com", fullName: "Chris Example" }),
+      ],
     });
 
     await generateBuildSequence(
-      { ...baseInput, companyName: "", rawProspectContext: "Chris Example\nEmail: chris@example.com\nCompany: Remofirst" },
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext: "Chris Example\nEmail: chris@example.com\nCompany: Remofirst",
+      },
       { persistence: adapter },
     );
     await generateBuildSequence(
-      { ...baseInput, companyName: "", rawProspectContext: "Chris Example\nEmail: chris@example.com\nNew LinkedIn post about AI automation.\nCompany: Remofirst" },
+      {
+        ...baseInput,
+        companyName: "",
+        rawProspectContext:
+          "Chris Example\nEmail: chris@example.com\nNew LinkedIn post about AI automation.\nCompany: Remofirst",
+      },
       { persistence: adapter },
     );
 
@@ -2370,7 +2419,9 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     expect(prospects[0].jobTitle).toBe("Head of Growth");
     if (result.ok) {
-      expect(result.data.prospectMemory?.conflicts.some((conflict) => conflict.field === "jobTitle")).toBe(true);
+      expect(
+        result.data.prospectMemory?.conflicts.some((conflict) => conflict.field === "jobTitle"),
+      ).toBe(true);
     }
   });
 
@@ -2408,7 +2459,8 @@ describe("Build Sequence service", () => {
       {
         ...baseInput,
         companyName: "",
-        rawProspectContext: "Mia Chen\nPPC Team Lead\nCompany: Americaneagle\nWebsite: americaneagle.com",
+        rawProspectContext:
+          "Mia Chen\nPPC Team Lead\nCompany: Americaneagle\nWebsite: americaneagle.com",
       },
       { persistence: adapter },
     );
@@ -2416,7 +2468,9 @@ describe("Build Sequence service", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.prospectId).toBeTruthy();
-      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).not.toMatch(/\$50M|managed over|AI and automation/i);
+      expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).not.toMatch(
+        /\$50M|managed over|AI and automation/i,
+      );
       expect(result.data.prospectMemory?.extraction.serpEvidence).toEqual([]);
       expect(result.data.prospectIntelligence.serpScenario).toBe("UNKNOWN");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\$50M|managed over/i);
@@ -2471,6 +2525,142 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[2].messageBody).not.toContain("Dior");
       expect(result.data.steps[3].messageBody).toContain("Dior example");
       expect(result.data.steps[3].messageBody).toContain("54%");
+    }
+  });
+
+  it("recovers the SoSafe raw-profile leak, unsupported impact claims, and double CTA", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "SoSafe",
+        companyWebsite: "sosafe-awareness.com",
+        contactFirstName: "Darren",
+        contactRole: "Senior Growth Marketing Manager",
+        prospectContext: "Darren Goldstein\nSenior Growth Marketing Manager\nCompany: SoSafe",
+      },
+      {
+        persistence: adapter,
+        provider: {
+          metadata: { providerName: "openai", modelName: "regression", deterministic: false },
+          generate: async ({ input, records, generation }) => {
+            const fallback = await new DeterministicBuildSequenceProvider().generate({
+              input,
+              records,
+              sourceReferences: [],
+              generation,
+            });
+            return {
+              ...fallback,
+              steps: fallback.steps.map((step, index) =>
+                index === 0
+                  ? {
+                      ...step,
+                      messageBody:
+                        "Hi Darren,\n\nQuick question for your LinkedIn URL: Darren Goldstein Darren Goldstein Senior Growth Marketing Manager focus at SoSafe.",
+                    }
+                  : index === 2
+                    ? {
+                        ...step,
+                        messageBody:
+                          "Hi Darren,\n\nlower CPC but possible demand leakage or higher CAC from unexpected rivals. Would a narrow look be useful?",
+                        cta: "Worth a quick look?",
+                      }
+                    : step,
+              ),
+            };
+          },
+        },
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(rendered).not.toMatch(
+        /LinkedIn URL|focus at|Darren Goldstein Darren Goldstein|higher CAC|demand leakage|unexpected rivals/i,
+      );
+      expect(result.data.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
+      expect(
+        result.data.steps.every(
+          (step) =>
+            (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <=
+            1,
+        ),
+      ).toBe(true);
+      expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([1, 3]);
+    }
+  });
+
+  it("runs the common final validator after a StoneX hybrid rewrite and recovers every unsafe step", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "StoneX",
+        companyWebsite: "stonex.com",
+        contactFirstName: "Amit",
+        contactRole: "Global Head Of Paid Search",
+        geographyOrMarkets: "Global markets",
+        prospectContext: "Amit Arora\nGlobal Head Of Paid Search\nCompany: StoneX",
+      },
+      {
+        persistence: adapter,
+        provider: {
+          metadata: { providerName: "openai", modelName: "regression", deterministic: false },
+          generate: async ({ input, records, generation }) => {
+            const fallback = await new DeterministicBuildSequenceProvider().generate({
+              input,
+              records,
+              sourceReferences: [],
+              generation,
+            });
+            return {
+              ...fallback,
+              safetyNotes: [...fallback.safetyNotes, "Hybrid rewrite accepted for step 1."],
+              steps: fallback.steps.map((step, index) =>
+                index === 0
+                  ? {
+                      ...step,
+                      messageBody:
+                        "Hi Amit,\n\nQuick question for your Global Head Of Paid Search remit at StoneX.",
+                    }
+                  : index === 1
+                    ? {
+                        ...step,
+                        messageBody:
+                          "Hi Amit,\n\nAmit, when branded auctions flip from lone-bidder to competitor-present, Signal flags competitor-present moments.",
+                      }
+                    : index === 2
+                      ? {
+                          ...step,
+                          messageBody:
+                            "Hi Amit,\n\nAcross markets and query sets, where do you draw the line between defending branded demand and easing bid pressure? Signal can stop avoidable CPC increases and missed conversions.",
+                        }
+                      : {
+                          ...step,
+                          messageBody:
+                            "Hi Amit,\n\nWhen you change branded coverage, do you have live visibility into who is appearing in the SERP first?",
+                          cta: "Open to a quick overview?",
+                        },
+              ),
+            };
+          },
+        },
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(rendered).not.toMatch(
+        /remit at StoneX|Amit,\s*when|lone-bidder|competitor-present|query sets|missed conversions|avoidable CPC increases/i,
+      );
+      expect(result.data.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
+      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+      expect(result.data.steps[3].messageBody).not.toContain("?");
+      expect(result.data.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+      expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([1, 2, 3, 4]);
     }
   });
 });

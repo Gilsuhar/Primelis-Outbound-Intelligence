@@ -39,11 +39,7 @@ export type SequenceKeywordEvidence = {
 };
 
 export type ProspectStatus =
-  | "NEW"
-  | "CONTEXT_READY"
-  | "INTELLIGENCE_READY"
-  | "SEQUENCE_DRAFT"
-  | "SEQUENCE_APPROVED";
+  "NEW" | "CONTEXT_READY" | "INTELLIGENCE_READY" | "SEQUENCE_DRAFT" | "SEQUENCE_APPROVED";
 
 export type ProspectSourceType =
   | "MANUAL_PASTE"
@@ -123,7 +119,14 @@ export type IdentityResolution = {
 export type ProspectConflict = {
   field: keyof Pick<
     ProspectRecord,
-    "firstName" | "lastName" | "fullName" | "email" | "jobTitle" | "companyName" | "companyDomain" | "linkedinUrl"
+    | "firstName"
+    | "lastName"
+    | "fullName"
+    | "email"
+    | "jobTitle"
+    | "companyName"
+    | "companyDomain"
+    | "linkedinUrl"
   >;
   existingValue?: string;
   incomingValue?: string;
@@ -310,6 +313,9 @@ export type ProspectBrief = {
   signalAngle: string;
   relevantCapability: string;
   proofPoint?: string;
+  verifiedFacts: Array<{ field: string; value: string; confidence: "HIGH" | "MEDIUM" | "LOW" }>;
+  unknownFacts: string[];
+  stepObjectives: Array<{ step: 1 | 2 | 3 | 4; objective: string }>;
   factsToAvoid: string[];
   copyGuidance: string[];
 };
@@ -365,7 +371,8 @@ export type SelectedProspectInsight = {
   groundingReference: string;
   text: string;
   temporalStatus?: "CURRENT" | "HISTORICAL" | "UNKNOWN";
-  relevanceScope?: "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
+  relevanceScope?:
+    "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
   relevanceToSignal: number;
   specificity: number;
   commercialUsefulness: number;
@@ -380,7 +387,8 @@ export type ProspectContextItem = {
   groundingReference: string;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   temporalStatus: "CURRENT" | "HISTORICAL" | "UNKNOWN";
-  relevanceScope: "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
+  relevanceScope:
+    "CURRENT_ROLE" | "CURRENT_COMPANY" | "HISTORICAL_BACKGROUND" | "PERSONAL" | "GENERAL";
 };
 
 export type ProspectContextInterpretation = {
@@ -404,12 +412,7 @@ export type ProspectIntelligence = {
   jobTitle?: string;
   seniority?: string;
   persona:
-    | "PAID_SEARCH"
-    | "PERFORMANCE"
-    | "GROWTH"
-    | "ECOMMERCE"
-    | "MARKETING_LEADERSHIP"
-    | "OTHER";
+    "PAID_SEARCH" | "PERFORMANCE" | "GROWTH" | "ECOMMERCE" | "MARKETING_LEADERSHIP" | "OTHER";
   relevantFacts: string[];
   selectedInsights: SelectedProspectInsight[];
   contextInterpretation: ProspectContextInterpretation;

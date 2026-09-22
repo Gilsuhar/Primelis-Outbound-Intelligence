@@ -14,37 +14,19 @@ function compact(value?: string) {
 
 function cleanRoleForCompany(role: string, company: string) {
   return role
-    .replace(new RegExp(`\\s+(?:at|@)\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?$`, "i"), "")
+    .replace(
+      new RegExp(`\\s+(?:at|@)\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?$`, "i"),
+      "",
+    )
     .replace(new RegExp(`\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?$`, "i"), "")
     .trim();
 }
 
 function naturalRoleOpening(role: string, company: string) {
-  const roleLabel = cleanRoleForCompany(role, company);
   const hasSpecificCompany = Boolean(company.trim()) && !/^(?:the|this) account$/i.test(company);
-  const companySuffix = hasSpecificCompany ? ` at ${company}` : "";
-  if (!roleLabel) return hasSpecificCompany ? `Quick question on ${company} branded search.` : "Quick question on branded search.";
-  const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
-  if (globalLead) {
-    return `Quick question for your global ${globalLead[1].toLowerCase()} work${companySuffix}.`;
-  }
-  const rolePhrase = roleLabel
-    .replace(/^(?:vp|vice president|director|head)\s+(?!of\b)/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const normalizedRole = roleLabel
-    .replace(/^head\s+of\s+/i, "leading ")
-    .replace(/^director\s+of\s+/i, "leading ")
-    .replace(/^vp\s+of\s+/i, "owning ")
-    .replace(/\bhead\b/gi, "leading")
-    .replace(/\bdirector\b/gi, "leading")
-    .replace(/\bvp\b/gi, "owning")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
-    return `Quick question for your ${rolePhrase || roleLabel} remit${companySuffix}.`;
-  }
-  return `Quick question for your ${rolePhrase || roleLabel} focus${companySuffix}.`;
+  return hasSpecificCompany
+    ? `Company: ${company}; Role: ${cleanRoleForCompany(role, company) || "unknown"}.`
+    : `Role: ${cleanRoleForCompany(role, company) || "unknown"}.`;
 }
 
 function roleCompanyOpening(role: string | undefined, company: string) {
@@ -53,10 +35,12 @@ function roleCompanyOpening(role: string | undefined, company: string) {
 }
 
 function firstProspectFact(intelligence: ProspectIntelligence) {
-  return intelligence.selectedInsights[0]?.text ??
+  return (
+    intelligence.selectedInsights[0]?.text ??
     intelligence.contextInterpretation.commercialSignals
       .map((item) => item.text)
-      .find((fact) => isCompleteProspectInsight(fact));
+      .find((fact) => isCompleteProspectInsight(fact))
+  );
 }
 
 function hasSelectedInsight(intelligence: ProspectIntelligence) {
@@ -68,8 +52,12 @@ function firstCaseStudy(records: SequenceKnowledgeRecord[]) {
 }
 
 function roleCompanyLabel(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const role = intelligence.jobTitle ?? intelligence.contextInterpretation.currentRole ?? compact(input.contactRole);
-  const company = intelligence.companyName ??
+  const role =
+    intelligence.jobTitle ??
+    intelligence.contextInterpretation.currentRole ??
+    compact(input.contactRole);
+  const company =
+    intelligence.companyName ??
     intelligence.contextInterpretation.currentCompany ??
     compact(input.companyName) ??
     "the account";
@@ -101,23 +89,38 @@ function strategySignalText(input: BuildSequenceInput, intelligence: ProspectInt
     .join(" ");
 }
 
-function strategyDriverFor(input: BuildSequenceInput, intelligence: ProspectIntelligence): StrategyDriver {
+function strategyDriverFor(
+  input: BuildSequenceInput,
+  intelligence: ProspectIntelligence,
+): StrategyDriver {
   const text = strategySignalText(input, intelligence);
   if (/\b(?:ai|automation|automated|machine learning|workflow automation)\b/i.test(text)) {
     return "AI_AUTOMATION";
   }
-  if (/\b(?:international|global|markets?|countries|regions?|expansion|multi-market|localization|localisation)\b/i.test(text)) {
+  if (
+    /\b(?:international|global|markets?|countries|regions?|expansion|multi-market|localization|localisation)\b/i.test(
+      text,
+    )
+  ) {
     return "EXPANSION_MARKET";
   }
-  if (/\b(?:budget|efficien|cost|cpc|lower spend|reduce spend|profitability|margin|pressure|waste|saving)\b/i.test(text)) {
+  if (
+    /\b(?:budget|efficien|cost|cpc|lower spend|reduce spend|profitability|margin|pressure|waste|saving)\b/i.test(
+      text,
+    )
+  ) {
     return "EFFICIENCY_PRESSURE";
   }
-  if (/\b(?:global|enterprise|governance|scale|cross-team|multiple teams|portfolio)\b/i.test(text)) {
+  if (
+    /\b(?:global|enterprise|governance|scale|cross-team|multiple teams|portfolio)\b/i.test(text)
+  ) {
     return "SCALE_GOVERNANCE";
   }
   if (
     intelligence.persona === "PAID_SEARCH" &&
-    /\b(?:analyst|specialist|coordinator|hands-on|reporting|manual|checks?|optimis|optimiz)\b/i.test(text)
+    /\b(?:analyst|specialist|coordinator|hands-on|reporting|manual|checks?|optimis|optimiz)\b/i.test(
+      text,
+    )
   ) {
     return "OPERATOR_VISIBILITY";
   }
@@ -190,11 +193,12 @@ function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIn
     ...intelligence.contextInterpretation.currentPrioritiesOrInterests.map((item) => item.text),
     ...intelligence.contextInterpretation.currentToolsOrChannels.map((item) => item.text),
   ].join(" ");
-  const scope = /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?)\b/i.test(
-    currentScopeText,
-  )
-    ? " across the accounts your team manages"
-    : "";
+  const scope =
+    /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?)\b/i.test(
+      currentScopeText,
+    )
+      ? " across the accounts your team manages"
+      : "";
   const driver = strategyDriverFor(input, intelligence);
   if (intelligence.serpScenario === "CONTESTED") {
     return `When competitors appear${scope}, how do you know the minimum CPC needed to defend the brand?`;
@@ -243,7 +247,10 @@ function prospectInsightFor(input: BuildSequenceInput, intelligence: ProspectInt
   return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${company}`;
 }
 
-function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boolean): MessageStrategy["sequenceNarrative"] {
+function narrativeFor(
+  intelligence: ProspectIntelligence,
+  hasProspectFact: boolean,
+): MessageStrategy["sequenceNarrative"] {
   const evidencePhrase =
     intelligence.serpScenario === "UNKNOWN"
       ? "Keep this as a paid-brand decision question without claiming account-specific SERP findings."
@@ -265,8 +272,8 @@ function narrativeFor(intelligence: ProspectIntelligence, hasProspectFact: boole
     },
     {
       step: 3,
-      objective: "Show the business impact of changing bid pressure by auction condition.",
-      newInformation: evidencePhrase,
+      objective: "Explain Signal's bid mechanics without inventing account impact.",
+      newInformation: `${evidencePhrase} Explain that Signal can reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns; this is not simply on/off.`,
       ctaIntent: "Ask if a narrow look would be useful.",
     },
     {
@@ -290,9 +297,10 @@ function stepPlansFromNarrative(
     evidenceToUse: item.newInformation,
     proofToUse: item.step === 4 ? strategy.proofPoint : undefined,
     CTAIntent: item.ctaIntent,
-    avoidRepeating: item.step === 1
-      ? "Do not explain the full methodology yet."
-      : "Do not restate the prior step's opening or business question.",
+    avoidRepeating:
+      item.step === 1
+        ? "Do not explain the full methodology yet."
+        : "Do not restate the prior step's opening or business question.",
   }));
 }
 
@@ -308,7 +316,7 @@ export function buildProspectBrief({
   const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
   const strongestUsableProspectInsight = firstProspectFact(intelligence);
   const { role, company } = roleCompanyLabel(input, intelligence);
-  const roleCompanyFallback = roleCompanyOpening(role, company);
+  const roleCompanyFallback = roleCompanyOpening(role ?? "", company);
   const businessQuestion = businessQuestionFor(input, intelligence);
   const relevantCapability = capabilityFor(input, intelligence);
   const factsToAvoid = Array.from(
@@ -321,7 +329,11 @@ export function buildProspectBrief({
       ]
         .filter(Boolean)
         .filter((fact) => fact !== strongestUsableProspectInsight)
-        .filter((fact) => !isCompleteProspectInsight(fact) || /\b(previously|former|historical|past role|agency)\b/i.test(fact)),
+        .filter(
+          (fact) =>
+            !isCompleteProspectInsight(fact) ||
+            /\b(previously|former|historical|past role|agency)\b/i.test(fact),
+        ),
     ),
   ).slice(0, 10);
   return {
@@ -338,15 +350,46 @@ export function buildProspectBrief({
     signalAngle: intelligence.primaryAngle,
     relevantCapability,
     proofPoint,
+    verifiedFacts: [
+      intelligence.prospectName
+        ? {
+            field: "firstName",
+            value: intelligence.prospectName,
+            confidence: intelligence.confidence.prospect,
+          }
+        : undefined,
+      company && !/^(?:the|this) account$/i.test(company)
+        ? { field: "company", value: company, confidence: intelligence.confidence.prospect }
+        : undefined,
+      role
+        ? { field: "role", value: role, confidence: intelligence.confidence.prospect }
+        : undefined,
+    ].filter(
+      (fact): fact is { field: string; value: string; confidence: "HIGH" | "MEDIUM" | "LOW" } =>
+        Boolean(fact),
+    ),
+    unknownFacts: [
+      ...(intelligence.serpScenario === "UNKNOWN" ? ["competitor presence"] : []),
+      "conversion impact",
+      "CAC impact",
+      "demand leakage",
+      "paid-search ownership",
+      "branded-search spend",
+    ],
+    stepObjectives: narrativeFor(intelligence, Boolean(strongestUsableProspectInsight)).map(
+      ({ step, objective }) => ({ step, objective }),
+    ),
     factsToAvoid,
     copyGuidance: [
       "Email 1 should open on the prospect, role, or company and ask the pain/question.",
       "Email 2 should explain how Signal makes the live SERP decision differently.",
-      "Email 3 should add business or incrementality value without repeating the mechanism.",
+      "Email 3 should explain Signal mechanics: reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns.",
       "Email 4 should use one proof point and close softly.",
       "Do not force personalization when the strongest usable prospect insight is empty.",
       "Never use factsToAvoid as personalization.",
       "Never expose internal uncertainty, validation, or evidence-language.",
+      "Role and title select the angle only; never turn them into an As a or For your role opener.",
+      "Unknown facts must remain questions or be omitted.",
     ],
   };
 }
@@ -391,7 +434,11 @@ export function planMessageStrategy({
       : "The supplied prospect context is light, so the sequence should stay role- and account-level instead of inventing achievements.",
     openingStyle: openingStyleFor(intelligence),
     sequenceNarrative,
-    emailStepPlans: stepPlansFromNarrative(sequenceNarrative, { primaryAngle, relevantCapability: capabilityFor(input, intelligence), proofPoint }),
+    emailStepPlans: stepPlansFromNarrative(sequenceNarrative, {
+      primaryAngle,
+      relevantCapability: capabilityFor(input, intelligence),
+      proofPoint,
+    }),
     confidence,
     selectedGoldStandardExampleIds: selectedGoldStandards.map((example) => example.id),
     groundingReferences: [
@@ -399,7 +446,9 @@ export function planMessageStrategy({
       ...intelligence.selectedInsights.map((insight) => insight.groundingReference),
       ...intelligence.relevantFacts,
       ...intelligence.serpEvidence.observations,
-    ].filter(Boolean).slice(0, 8),
+    ]
+      .filter(Boolean)
+      .slice(0, 8),
     plannerMode: "DETERMINISTIC_FALLBACK",
   };
 }

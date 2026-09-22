@@ -24,10 +24,7 @@ import {
   normalizeOpenAiModel,
   shouldUseOpenAiProvider,
 } from "./ai-provider";
-import {
-  displayCompanyName,
-  winningPatternForPurpose,
-} from "./winning-message-engine";
+import { displayCompanyName, winningPatternForPurpose } from "./winning-message-engine";
 
 export type BuildSequenceProviderRequest = {
   input: BuildSequenceInput;
@@ -102,7 +99,10 @@ function stripFallbackPhrases(text: string) {
     .replace(/^For context,\s*/gim, "")
     .replace(/A useful way to look at this is/gi, "The practical read is")
     .replace(/I will close the loop here\.\s*/gi, "")
-    .replace(/If this is not relevant, I can close the loop here\./gi, "If timing is wrong, no need to reply.");
+    .replace(
+      /If this is not relevant, I can close the loop here\./gi,
+      "If timing is wrong, no need to reply.",
+    );
 }
 
 function stripSingleStepHeader(text: string) {
@@ -121,7 +121,7 @@ function stripSingleStepHeader(text: string) {
 }
 
 const approvedProofPoints = [
-  "AppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.",
+  "AppsFlyer reduced branded spend by 29% while qualified lead volume increased 25% in the first 30 days.",
   "Crocs reduced total branded-search spend by 71.2% while monitoring paid and organic performance.",
   "Dior reduced ad cost by 54% at equal performance.",
 ] as const;
@@ -135,6 +135,14 @@ const bannedRewritePhrases = [
   "seamless",
   "let me know if interested",
   "book a meeting",
+  "competitor-present",
+  "lone-bidder",
+  "query sets",
+  "defend demand and ease pressure",
+  "missed conversions",
+  "avoidable CPC increases",
+  "higher CAC",
+  "demand leakage",
 ];
 
 type StepFactSheet = {
@@ -171,15 +179,18 @@ type AllowedEntities = {
 function hasScreenshotContext(input: BuildSequenceInput) {
   return Boolean(
     input.screenshotAvailable &&
-      [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
+    [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
   );
 }
 
 function screenshotObservation(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const keyword = intelligence.serpEvidence.structuredKeywords.find((item) => item.status === "solo")?.term ??
+  const keyword =
+    intelligence.serpEvidence.structuredKeywords.find((item) => item.status === "solo")?.term ??
     intelligence.serpEvidence.keywords[0] ??
     input.brandKeyword;
-  const observedAt = input.observationDate ? ` at the time of the ${input.observationDate} check` : "";
+  const observedAt = input.observationDate
+    ? ` at the time of the ${input.observationDate} check`
+    : "";
   const market = input.marketCountry ? ` in ${input.marketCountry}` : "";
   const shows = input.screenshotShows?.trim();
   if (shows) {
@@ -206,7 +217,9 @@ function caseStudyCompany(record: SequenceKnowledgeRecord) {
   if (approvedTextLead?.[1]) {
     return approvedTextLead[1].trim();
   }
-  const titleLead = record.title.split(/\s+(?:cuts|cut|reduces|reduced|lowers|lowered|improves|improved|leads|saved)\s+/i)[0];
+  const titleLead = record.title.split(
+    /\s+(?:cuts|cut|reduces|reduced|lowers|lowered|improves|improved|leads|saved)\s+/i,
+  )[0];
   return titleLead.trim();
 }
 
@@ -231,10 +244,24 @@ function customerProofLine(records: SequenceKnowledgeRecord[]) {
   if (!summary) {
     return approvedProofPoints[0];
   }
+  if (
+    /^AppsFlyer\b/i.test(company) &&
+    /branded spend\s+(?:by\s+)?29%/i.test(summary) &&
+    /qualified lead volume\s+(?:increased|rose|up)\s+25%/i.test(summary)
+  ) {
+    return approvedProofPoints[0];
+  }
+  if (new RegExp(`^${escapeRegExp(company)}\\b`, "i").test(summary)) {
+    return summary;
+  }
   return `${company} example: ${summary}`;
 }
 
-function proofPointForStep(records: SequenceKnowledgeRecord[], purpose: SequencePurpose, ctaIndex: number) {
+function proofPointForStep(
+  records: SequenceKnowledgeRecord[],
+  purpose: SequencePurpose,
+  ctaIndex: number,
+) {
   const proof = selectedCaseStudy(records);
   if (proof && purpose === "SOCIAL_PROOF") {
     return {
@@ -255,14 +282,13 @@ function proofPointForStep(records: SequenceKnowledgeRecord[], purpose: Sequence
 }
 
 function extractNumbers(text: string) {
-  return Array.from(text.matchAll(/\$?\b\d+(?:\.\d+)?%?|\b\d+(?:\.\d+)?\s*(?:days?|months?|years?)\b/gi))
-    .map((match) => match[0].trim());
+  return Array.from(
+    text.matchAll(/\$?\b\d+(?:\.\d+)?%?|\b\d+(?:\.\d+)?\s*(?:days?|months?|years?)\b/gi),
+  ).map((match) => match[0].trim());
 }
 
 function extractCapitalizedPhrases(text: string) {
-  return Array.from(
-    text.matchAll(/\b[A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3}\b/g),
-  )
+  return Array.from(text.matchAll(/\b[A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3}\b/g))
     .flatMap((match) => match[0].split(/\.\s+/))
     .map((match) => match.trim())
     .filter(Boolean);
@@ -312,7 +338,9 @@ function buildAllowedEntities(sheet: StepFactSheet): AllowedEntities {
 }
 
 function isKnownRewriteStopword(noun: string) {
-  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Given|Standard|Adjust|Separating|Want|How|Quick|Branded|Brand|Paid)$/i.test(noun);
+  return /^(Hi|I|A|An|One|Some|When|That|This|The|For|If|It|Do|Would|Could|Is|Open|Worth|Without|With|Re|Day|Step|Final|Congrats|Congratulations|Your|You|Across|At|Before|Seeing|Which|What|Since|Given|Standard|Adjust|Separating|Want|How|Quick|Branded|Brand|Paid)$/i.test(
+    noun,
+  );
 }
 
 function entityAllowed(noun: string, allowed: AllowedEntities) {
@@ -330,7 +358,12 @@ function wordCount(text: string) {
 function truncateWords(text: string, limit: number) {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= limit) return text.trim();
-  return words.slice(0, Math.max(0, limit)).join(" ").replace(/[,:;]+$/g, "") + ".";
+  return (
+    words
+      .slice(0, Math.max(0, limit))
+      .join(" ")
+      .replace(/[,:;]+$/g, "") + "."
+  );
 }
 
 function compactBodyToWordBudget(body: string, budget: number) {
@@ -351,7 +384,10 @@ function compactBodyToWordBudget(body: string, budget: number) {
       selected.push(paragraph);
       continue;
     }
-    for (const sentence of paragraph.split(/(?<=[.!?])\s+/).map((item) => item.trim()).filter(Boolean)) {
+    for (const sentence of paragraph
+      .split(/(?<=[.!?])\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean)) {
       const sentenceCandidate = [...selected, sentence].join("\n\n");
       if (wordCount(sentenceCandidate) <= cleanBudget) {
         selected.push(sentence);
@@ -373,13 +409,7 @@ function compactBodyToWordBudget(body: string, budget: number) {
 
 function renderedStepWordCount(step: SequenceStep) {
   return wordCount(
-    [
-      step.subjectLine,
-      step.connectionRequest,
-      step.imagePlaceholder,
-      step.messageBody,
-      step.cta,
-    ]
+    [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.messageBody, step.cta]
       .filter(Boolean)
       .join(" "),
   );
@@ -387,12 +417,7 @@ function renderedStepWordCount(step: SequenceStep) {
 
 function enforceStepWordBudget(step: SequenceStep) {
   const nonBodyWords = wordCount(
-    [
-      step.subjectLine,
-      step.connectionRequest,
-      step.imagePlaceholder,
-      step.cta,
-    ]
+    [step.subjectLine, step.connectionRequest, step.imagePlaceholder, step.cta]
       .filter(Boolean)
       .join(" "),
   );
@@ -437,7 +462,9 @@ function validateHybridStepRewrite(
     failures.push("Opens on product, not prospect");
   }
   if (sheet.proofPoint) {
-    const mentions = body.match(new RegExp(`\\b${caseInsensitiveEscape(sheet.proofPoint.company)}\\b`, "gi")) ?? [];
+    const mentions =
+      body.match(new RegExp(`\\b${caseInsensitiveEscape(sheet.proofPoint.company)}\\b`, "gi")) ??
+      [];
     if (mentions.length > 1) failures.push("Proof company mentioned more than once");
   }
   failures.push(...judgeProspectFacingStep({ subject, body }, sheet));
@@ -466,18 +493,29 @@ function looksLikeMalformedPersonalization(line: string) {
 
 function looksLikeStandaloneFragment(line: string) {
   const trimmed = line.trim();
-  if (!trimmed || /^hi\b/i.test(trimmed) || /^(?:congrats|congratulations)\b/i.test(trimmed) || /[?]$/.test(trimmed)) return false;
+  if (
+    !trimmed ||
+    /^hi\b/i.test(trimmed) ||
+    /^(?:congrats|congratulations)\b/i.test(trimmed) ||
+    /[?]$/.test(trimmed)
+  )
+    return false;
   if (/^(?:Subject|Re):/i.test(trimmed)) return false;
   if (/^quick question\b/i.test(trimmed)) return false;
-  if (/^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(trimmed)) {
+  if (
+    /^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(
+      trimmed,
+    )
+  ) {
     return true;
   }
   if (/(?:,\s*|(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(trimmed)) {
     return true;
   }
-  const hasVerb = /\b(?:is|are|was|were|be|being|been|has|have|had|can|could|would|should|do|does|did|may|might|need|needs|want|wants|wanted|ask|asks|asked|manage|manages|managed|lead|leads|led|focus|focuses|focused|work|works|worked|reduce|reduces|reduced|lower|lowers|lowered|monitor|monitors|detect|detects|connect|connects|compare|compares|decide|decides|change|changes|protect|protects|keep|keeps|hold|holds|restore|restores)\b/i.test(
-    trimmed,
-  );
+  const hasVerb =
+    /\b(?:is|are|was|were|be|being|been|has|have|had|can|could|would|should|do|does|did|may|might|need|needs|want|wants|wanted|ask|asks|asked|manage|manages|managed|lead|leads|led|focus|focuses|focused|work|works|worked|reduce|reduces|reduced|lower|lowers|lowered|monitor|monitors|detect|detects|connect|connects|compare|compares|decide|decides|change|changes|protect|protects|keep|keeps|hold|holds|restore|restores)\b/i.test(
+      trimmed,
+    );
   return trimmed.split(/\s+/).length >= 5 && !hasVerb;
 }
 
@@ -487,23 +525,61 @@ function judgeProspectFacingStep(output: { subject?: string; body: string }, she
   if (containsInternalEvidenceLanguage(rendered)) {
     failures.push("Internal safety/evidence language leaked into prospect-facing copy");
   }
-  if (/understand minute-by-minute branded-search competition before changing coverage/i.test(rendered)) {
+  if (
+    /\b(?:competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage)\b/i.test(
+      rendered,
+    )
+  ) {
+    failures.push("Unsafe internal wording or unsupported business outcome used");
+  }
+  if (
+    /\b(?:for your .{2,100} remit|in your role as|as a [^,.]{2,100}|given your role as)\b/i.test(
+      rendered,
+    )
+  ) {
+    failures.push("Job title mechanically inserted into prospect-facing copy");
+  }
+  const greetingName = output.body.match(/^Hi\s+([A-Za-z][A-Za-z'’-]{1,60}),/i)?.[1];
+  const firstSentenceAfterGreeting = output.body
+    .replace(/^Hi\s+[A-Za-z][A-Za-z'’-]{1,60},\s*/i, "")
+    .trim();
+  if (
+    greetingName &&
+    new RegExp(`^${caseInsensitiveEscape(greetingName)}\\b[,;:]?`, "i").test(
+      firstSentenceAfterGreeting,
+    )
+  ) {
+    failures.push("Prospect name repeated immediately after greeting");
+  }
+  if (
+    /understand minute-by-minute branded-search competition before changing coverage/i.test(
+      rendered,
+    )
+  ) {
     failures.push("Standalone technical fragment used as customer-facing copy");
   }
-  const opener = output.body
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line && !/^hi\b/i.test(line)) ?? "";
+  const opener =
+    output.body
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line && !/^hi\b/i.test(line)) ?? "";
   if (looksLikeMalformedPersonalization(opener)) {
     failures.push("Malformed prospect insight used as personalization");
   }
-  for (const line of output.body.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+  for (const line of output.body
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)) {
     if (looksLikeStandaloneFragment(line)) {
       failures.push(`Incomplete standalone sentence: ${line.slice(0, 80)}`);
       break;
     }
   }
-  if (sheet.prospectBrief?.factsToAvoid.some((fact) => fact && rendered.toLowerCase().includes(fact.toLowerCase()))) {
+  if (
+    sheet.prospectBrief?.factsToAvoid.some(
+      (fact) => fact && rendered.toLowerCase().includes(fact.toLowerCase()),
+    )
+  ) {
     failures.push("Rejected prospect fact used in customer-facing copy");
   }
   return failures;
@@ -514,7 +590,9 @@ function caseInsensitiveEscape(text: string) {
 }
 
 function normalizeHybridSubject(subject: string | undefined, fallback: string | undefined) {
-  const clean = stripSingleStepHeader(subject ?? "").replace(/!+/g, "").trim();
+  const clean = stripSingleStepHeader(subject ?? "")
+    .replace(/!+/g, "")
+    .trim();
   if (!clean) {
     return fallback;
   }
@@ -535,7 +613,7 @@ function approvedProofPointExcluding(customerName: string, ctaIndex: number) {
 
 function greeting(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
   const firstName = input.contactFirstName || intelligence?.prospectName;
-  return firstName ? `Hi ${firstName},` : "Hi there,";
+  return firstName ? `Hi ${firstName},` : "";
 }
 
 function displayCompany(input: BuildSequenceInput) {
@@ -543,18 +621,23 @@ function displayCompany(input: BuildSequenceInput) {
 }
 
 function displayCompanyFor(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
-  return displayCompanyName(cleanUiArtifactText(intelligence?.contextInterpretation.currentCompany ?? intelligence?.companyName ?? input.companyName));
+  return displayCompanyName(
+    cleanUiArtifactText(
+      intelligence?.contextInterpretation.currentCompany ??
+        intelligence?.companyName ??
+        input.companyName,
+    ),
+  );
 }
 
-function ctaForPurpose(
-  purpose: SequenceStep["purpose"],
-) {
+function ctaForPurpose(purpose: SequenceStep["purpose"]) {
   const ctas: Record<SequenceStep["purpose"], string> = {
     FIRST_TOUCH_RELEVANCE: "How are you currently deciding when branded bids should change?",
     PROBLEM_FRAMING: "Is your team able to detect these moments automatically?",
     METHODOLOGY_DIFFERENTIATION: "Worth a quick look?",
-    ACCOUNT_SPECIFIC_OBSERVATION: "Would it be useful to check whether this is relevant at your scale?",
-    SOCIAL_PROOF: "Open to a quick overview?",
+    ACCOUNT_SPECIFIC_OBSERVATION:
+      "Would it be useful to check whether this is relevant at your scale?",
+    SOCIAL_PROOF: "Worth seeing how Signal makes those bid decisions?",
     TECHNICAL_CLARIFICATION: "Would a brief walkthrough help?",
     LOW_PRESSURE_FOLLOW_UP: "Should I park this for later?",
     BREAKUP_CLOSE_LOOP: "Happy to share more if useful.",
@@ -584,27 +667,40 @@ function subjectFor(
   }
   const hasSpecificCompany = !/^(?:the|this) account$/i.test(company);
   const subjects: Record<SequenceStep["purpose"], string> = {
-    FIRST_TOUCH_RELEVANCE: hasSpecificCompany ? `${company} branded search visibility` : "branded search visibility",
-    PROBLEM_FRAMING: hasSpecificCompany ? `Re: ${company} SERP visibility` : "Re: branded SERP visibility",
+    FIRST_TOUCH_RELEVANCE: hasSpecificCompany
+      ? `${company} branded search visibility`
+      : "branded search visibility",
+    PROBLEM_FRAMING: hasSpecificCompany
+      ? `Re: ${company} SERP visibility`
+      : "Re: branded SERP visibility",
     METHODOLOGY_DIFFERENTIATION: `Re: Signal and branded CPC`,
-    ACCOUNT_SPECIFIC_OBSERVATION: hasSpecificCompany ? `${company}: one brand-search check` : "one brand-search check",
+    ACCOUNT_SPECIFIC_OBSERVATION: hasSpecificCompany
+      ? `${company}: one brand-search check`
+      : "one brand-search check",
     SOCIAL_PROOF: `A practical paid-brand example`,
     TECHNICAL_CLARIFICATION: `Paid brand methodology`,
-    LOW_PRESSURE_FOLLOW_UP: hasSpecificCompany ? `Quick follow-up on ${company}` : "Quick follow-up",
+    LOW_PRESSURE_FOLLOW_UP: hasSpecificCompany
+      ? `Quick follow-up on ${company}`
+      : "Quick follow-up",
     BREAKUP_CLOSE_LOOP: `Quick follow-up`,
   };
   return subjects[purpose] ?? `Thought for ${company} ${stepNumber}`;
 }
 
 function connectionRequestFor(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
-  return `Hi ${input.contactFirstName || "there"} - had a quick paid-brand question for ${displayCompanyFor(input, intelligence)}. Open to connecting?`;
+  const opener = input.contactFirstName ? `Hi ${input.contactFirstName} - ` : "";
+  return `${opener}had a quick paid-brand question for ${displayCompanyFor(input, intelligence)}. Open to connecting?`;
 }
 
 function humanizeFact(fact: string) {
   if (/solo|competitive|ghost|pause|reduce bids|brand.*only advertiser/i.test(fact)) {
     return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
-  if (/paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(fact)) {
+  if (
+    /paid.*organic|organic.*paid|serp|google ads|search console|conversion-source|conversion performance|competitive/i.test(
+      fact,
+    )
+  ) {
     return "Signal helps teams spot those moments, lower or pause branded ads, and bring coverage back when the search page changes.";
   }
   return fact;
@@ -612,7 +708,10 @@ function humanizeFact(fact: string) {
 
 function cleanUiArtifactText(value?: string) {
   return (value ?? "")
-    .replace(/\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/gi, "")
+    .replace(
+      /\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/gi,
+      "",
+    )
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:])/g, "$1")
     .trim();
@@ -620,19 +719,13 @@ function cleanUiArtifactText(value?: string) {
 
 function stripStructuredLeadLabel(value: string) {
   return value
-    .replace(
-      /^\s*(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/i,
-      "",
-    )
+    .replace(/^\s*(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/i, "")
     .trim();
 }
 
 function sanitizeProspectFacingFact(value: string) {
   return cleanUiArtifactText(stripStructuredLeadLabel(value))
-    .replace(
-      /\b(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/gi,
-      "",
-    )
+    .replace(/\b(?:prospect|company|role|context|notes?|serp|keywords?|important)\s*:\s*/gi, "")
     .replace(/\bover\s+(\$\d+(?:\.\d+)?[KMB])\+/gi, "over $1")
     .replace(/\s+/g, " ")
     .trim();
@@ -651,12 +744,24 @@ function directProspectFact(input: BuildSequenceInput, fact: string, prospectNam
     return perspectiveNormalized;
   }
   return perspectiveNormalized
-    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+has\\b`, "i"), "you have")
-    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+is\\b`, "i"), "you're")
+    .replace(
+      new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+has\\b`, "i"),
+      "you have",
+    )
+    .replace(
+      new RegExp(`^${escapeRegExp(firstName)}\\s+at\\s+${escapeRegExp(company)}\\s+is\\b`, "i"),
+      "you're",
+    )
     .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+has\\b`, "i"), "you've")
     .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+is\\b`, "i"), "you're")
-    .replace(new RegExp(`^${escapeRegExp(firstName)}\\s+recently\\s+joined\\b`, "i"), "you recently joined")
-    .replace(new RegExp(`^(?:now\\s+)?works\\s+at\\s+${escapeRegExp(company)}\\s+managing\\b`, "i"), "you're managing")
+    .replace(
+      new RegExp(`^${escapeRegExp(firstName)}\\s+recently\\s+joined\\b`, "i"),
+      "you recently joined",
+    )
+    .replace(
+      new RegExp(`^(?:now\\s+)?works\\s+at\\s+${escapeRegExp(company)}\\s+managing\\b`, "i"),
+      "you're managing",
+    )
     .replace(/^manages\b/i, "you manage")
     .replace(/^owns\b/i, "you own")
     .replace(/^leads\b/i, "you lead")
@@ -680,11 +785,17 @@ function normalizeProspectPerspective(value: string) {
     .replace(/^(given|since|as)\s+i\s+run\s+/i, "$1 you run ")
     .replace(/^(given|since|as)\s+i\s+focus\s+on\s+/i, "$1 you focus on ")
     .replace(/^(given|since|as)\s+i'm\s+focused\s+on\s+/i, "$1 you're focused on ")
-    .replace(/^(given|since|as)\s+my\s+focus\s+is\s+on\s+aligning\s+media\s+investment\s+with\s+real\s+business\s+outcomes\b.*$/i, "$1 your focus on profitability and business outcomes")
+    .replace(
+      /^(given|since|as)\s+my\s+focus\s+is\s+on\s+aligning\s+media\s+investment\s+with\s+real\s+business\s+outcomes\b.*$/i,
+      "$1 your focus on profitability and business outcomes",
+    )
     .replace(/^(given|since|as)\s+my\s+focus\s+is\s+on\s+/i, "$1 your focus on ")
     .replace(/^(given|since|as)\s+i\s+have\s+worked\s+(on|with)\s+/i, "$1 you've worked $2 ")
     .replace(/^(given|since|as)\s+i've\s+worked\s+(on|with)\s+/i, "$1 you've worked $2 ")
-    .replace(/^my\s+focus\s+is\s+on\s+aligning\s+media\s+investment\s+with\s+real\s+business\s+outcomes\b.*$/i, "your focus on profitability and business outcomes")
+    .replace(
+      /^my\s+focus\s+is\s+on\s+aligning\s+media\s+investment\s+with\s+real\s+business\s+outcomes\b.*$/i,
+      "your focus on profitability and business outcomes",
+    )
     .replace(/^my\s+focus\s+is\s+on\s+/i, "your focus on ")
     .replace(/^i\s+speciali([sz])e\s+in\s+/i, "you specialise in ")
     .replace(/^i\s+manage\s+/i, "you manage ")
@@ -705,10 +816,18 @@ function normalizeProspectPerspective(value: string) {
 function sanitizeProspectFacingBody(body: string) {
   return body
     .split(/\n/)
-    .filter((line) => !/\b(?:without account-specific|based on the available evidence|we cannot confirm|cannot confirm|we can'?t confirm)\b/i.test(line))
+    .filter(
+      (line) =>
+        !/\b(?:without account-specific|based on the available evidence|we cannot confirm|cannot confirm|we can'?t confirm)\b/i.test(
+          line,
+        ),
+    )
     .map((line) => normalizeProspectPerspective(sanitizeProspectFacingFact(line)))
     .join("\n")
-    .replace(/\bGiven your focus on profitability and business outcomes\b/gi, "Given your focus on profitability and business outcomes")
+    .replace(
+      /\bGiven your focus on profitability and business outcomes\b/gi,
+      "Given your focus on profitability and business outcomes",
+    )
     .trim();
 }
 
@@ -723,39 +842,12 @@ function buyerRole(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
   return intelligence?.jobTitle || input.contactRole;
 }
 
-function cleanRoleForCompany(role: string, company: string) {
-  return role
-    .replace(new RegExp(`\\s+(?:at|@)\\s+${escapeRegExp(company)}\\.?$`, "i"), "")
-    .replace(new RegExp(`\\s+${escapeRegExp(company)}\\.?$`, "i"), "")
-    .trim();
-}
-
 function naturalRoleOpening(role: string, company: string) {
-  const roleLabel = cleanRoleForCompany(role, company);
+  void role;
   const hasSpecificCompany = Boolean(company.trim()) && !/^(?:the|this) account$/i.test(company);
-  const companySuffix = hasSpecificCompany ? ` at ${company}` : "";
-  if (!roleLabel) return hasSpecificCompany ? `Quick question on ${company} branded search.` : "Quick question on branded search.";
-  const globalLead = roleLabel.match(/^global\s+(.+?)\s+lead$/i);
-  if (globalLead) {
-    return `Quick question for your global ${globalLead[1].toLowerCase()} work${companySuffix}.`;
-  }
-  const rolePhrase = roleLabel
-    .replace(/^(?:vp|vice president|director|head)\s+(?!of\b)/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const normalizedRole = roleLabel
-    .replace(/^head\s+of\s+/i, "leading ")
-    .replace(/^director\s+of\s+/i, "leading ")
-    .replace(/^vp\s+of\s+/i, "owning ")
-    .replace(/\bhead\b/gi, "leading")
-    .replace(/\bdirector\b/gi, "leading")
-    .replace(/\bvp\b/gi, "owning")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (/\b(?:leading|heading|directing|owning|managing)\b/i.test(normalizedRole)) {
-    return `Quick question for your ${rolePhrase || roleLabel} remit${companySuffix}.`;
-  }
-  return `Quick question for your ${rolePhrase || roleLabel} focus${companySuffix}.`;
+  return hasSpecificCompany
+    ? `Quick question on ${company}'s branded search.`
+    : "Quick question on branded search.";
 }
 
 function roleCompanyOpening(role: string, company: string) {
@@ -764,13 +856,7 @@ function roleCompanyOpening(role: string, company: string) {
 
 function hasPromotionSignal(input: BuildSequenceInput) {
   return /\b(promoted|promotion|new role|stepped into|recently became|congrats|congratulations)\b/i.test(
-    [
-      input.prospectContext,
-      input.observedTrigger,
-      input.internalNotes,
-    ]
-      .filter(Boolean)
-      .join(" "),
+    [input.prospectContext, input.observedTrigger, input.internalNotes].filter(Boolean).join(" "),
   );
 }
 
@@ -799,7 +885,10 @@ function managesMultipleAccounts(input: BuildSequenceInput, intelligence?: Prosp
 
 function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligence) {
   const role = buyerRole(input, intelligence).toLowerCase();
-  if (managesMultipleAccounts(input, intelligence) && /paid search|sem|ppc|performance/.test(role)) {
+  if (
+    managesMultipleAccounts(input, intelligence) &&
+    /paid search|sem|ppc|performance/.test(role)
+  ) {
     return "The practical takeaway is deciding when paid coverage is defensive, and when the auction is quiet enough to lower pressure.";
   }
   if (/paid search|sem|ppc|performance/.test(role)) {
@@ -809,16 +898,18 @@ function roleAngle(input: BuildSequenceInput, intelligence?: ProspectIntelligenc
     return "For a marketing leader, I would frame this as budget control and visibility, not a bid tweak.";
   }
   if (/growth|acquisition|demand/.test(role)) {
-    return "For growth, the sharper question is where paid brand still changes conversion outcomes.";
+    return "For growth teams, the useful angle is knowing when live search-page conditions actually justify a different branded bid.";
   }
   if (/ecommerce|e-commerce|digital/.test(role)) {
     return "For digital commerce, the useful angle is protecting high-intent brand demand when competitive pressure is real, without keeping the same pressure in quieter auctions.";
   }
-  return "That is the practical benchmark.";
+  return "That is a practical way to evaluate paid-brand efficiency without assuming the answer in advance.";
 }
 
 function contestedKeyword(intelligence: ProspectIntelligence) {
-  return intelligence.serpEvidence.structuredKeywords.find((keyword) => keyword.status === "contested");
+  return intelligence.serpEvidence.structuredKeywords.find(
+    (keyword) => keyword.status === "contested",
+  );
 }
 
 function soloKeyword(intelligence: ProspectIntelligence) {
@@ -854,9 +945,7 @@ function buildStepFactSheet({
     personalHook: firstPersonalFact(intelligence) ?? null,
     proofPoint: proofPointForStep(records, step.purpose, ctaIndex),
     keywordEvidence: {
-      contested: contested
-        ? { term: contested.term, competitor: contested.competitor }
-        : undefined,
+      contested: contested ? { term: contested.term, competitor: contested.competitor } : undefined,
       solo: solo ? { term: solo.term } : undefined,
     },
     cta: step.cta,
@@ -875,26 +964,44 @@ function firstPersonalFact(intelligence: ProspectIntelligence) {
       : intelligence.contextInterpretation.commercialSignals.map((item) => item.text);
   return rankedFacts
     .map((fact) => sanitizeProspectFacingFact(fact))
-    .find((fact) =>
-      fact &&
-      isProspectInsightReadyForPersonalization(fact) &&
-      fact.toLowerCase() !== intelligence.companyName?.toLowerCase() &&
-      fact.toLowerCase() !== intelligence.prospectName?.toLowerCase() &&
-      fact.toLowerCase() !== intelligence.jobTitle?.toLowerCase() &&
-      !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()) &&
-      !(/^[A-Z][A-Za-z' -]{1,50}\.?$/.test(fact) && !/[0-9$]|\b(has|managed|exploring|built|led|owns|runs|responsible)\b/i.test(fact)),
+    .find(
+      (fact) =>
+        fact &&
+        isProspectInsightReadyForPersonalization(fact) &&
+        fact.toLowerCase() !== intelligence.companyName?.toLowerCase() &&
+        fact.toLowerCase() !== intelligence.prospectName?.toLowerCase() &&
+        fact.toLowerCase() !== intelligence.jobTitle?.toLowerCase() &&
+        !/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(fact.trim()) &&
+        !(
+          /^[A-Z][A-Za-z' -]{1,50}\.?$/.test(fact) &&
+          !/[0-9$]|\b(has|managed|exploring|built|led|owns|runs|responsible)\b/i.test(fact)
+        ),
     );
 }
 
 function isProspectInsightReadyForPersonalization(value: string) {
-  const normalized = normalizeProspectPerspective(sanitizeProspectFacingFact(value)).replace(/\.$/, "");
+  const normalized = normalizeProspectPerspective(sanitizeProspectFacingFact(value)).replace(
+    /\.$/,
+    "",
+  );
   if (!isCompleteProspectInsight(normalized)) return false;
   if (/[,:;/-]\s*$/.test(normalized)) return false;
-  if (/\b(?:and|or|with|covering|including|across|for|of|in|paid)\s*$/i.test(normalized)) return false;
-  if (/^(?:in[- ]depth knowledge|deep knowledge|expertise|skilled|proficient|experienced|knowledge|experience|skills?)\b/i.test(normalized)) {
+  if (/\b(?:and|or|with|covering|including|across|for|of|in|paid)\s*$/i.test(normalized))
+    return false;
+  if (
+    /^(?:in[- ]depth knowledge|deep knowledge|expertise|skilled|proficient|experienced|knowledge|experience|skills?)\b/i.test(
+      normalized,
+    )
+  ) {
     return false;
   }
-  return !/\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/i.test(normalized);
+  if (/^(?:works across|company|role|title|linkedin|prospect context)\b/i.test(normalized))
+    return false;
+  if (normalized.includes(";")) return false;
+  if (/\b([A-Z][a-z'’-]+(?:\s+[A-Z][a-z'’-]+){1,2})\s+\1\b/.test(normalized)) return false;
+  return !/\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/i.test(
+    normalized,
+  );
 }
 
 function responsibilityOpening({
@@ -906,8 +1013,12 @@ function responsibilityOpening({
   intelligence: ProspectIntelligence;
   insight: string;
 }) {
-  const normalizedInsight = directProspectFact(input, insight, intelligence.prospectName).replace(/\.$/, "");
-  if (!normalizedInsight || !isProspectInsightReadyForPersonalization(normalizedInsight)) return undefined;
+  const normalizedInsight = directProspectFact(input, insight, intelligence.prospectName).replace(
+    /\.$/,
+    "",
+  );
+  if (!normalizedInsight || !isProspectInsightReadyForPersonalization(normalizedInsight))
+    return undefined;
   if (/^you(?:'ve| are|'re| have|\s)/i.test(normalizedInsight)) {
     return `${normalizedInsight}. One branded-search question seemed worth asking.`;
   }
@@ -915,7 +1026,9 @@ function responsibilityOpening({
 }
 
 function scenarioMethod(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
-  const accountScope = managesMultipleAccounts(input, intelligence) ? " across the accounts your team manages" : "";
+  const accountScope = managesMultipleAccounts(input, intelligence)
+    ? " across the accounts your team manages"
+    : "";
   if (intelligence.serpScenario === "SOLO") {
     return `The useful method is to identify solo periods${accountScope}, reduce CPC only where coverage is still protected, and restore defense when competitors return.`;
   }
@@ -945,9 +1058,7 @@ function accountOpening(
       roleCompanyOpening(buyerRole(input, intelligence), company)
     );
   }
-  if (brief?.roleCompanyFallback) {
-    return brief.roleCompanyFallback;
-  }
+  void brief;
   if (intelligence.jobTitle && intelligence.persona !== "OTHER") {
     return roleCompanyOpening(intelligence.jobTitle, company);
   }
@@ -983,18 +1094,38 @@ function strategyFirstTouch(
   intelligence: ProspectIntelligence,
   strategy: MessageStrategy,
 ) {
-  const prospectInsight = prospectLedInsight(input, intelligence, strategy) ?? accountOpening(input, intelligence, strategy);
+  const prospectInsight =
+    prospectLedInsight(input, intelligence, strategy) ??
+    accountOpening(input, intelligence, strategy);
   const company = displayCompanyFor(input, intelligence);
+  const hasMarketScope =
+    /\b(?:multiple|several|global|international|across)\s+(?:markets?|countries|regions?)\b/i.test(
+      [input.geographyOrMarkets, input.prospectContext, input.companyContext]
+        .filter(Boolean)
+        .join(" "),
+    );
+  const hasGrowthRole =
+    intelligence.persona === "GROWTH" ||
+    /\b(?:growth|acquisition|demand)\b/i.test(buyerRole(input, intelligence));
+  if (!prospectLedInsight(input, intelligence, strategy) && hasMarketScope) {
+    return [
+      `Quick question on how ${company} handles branded search across markets.`,
+      "The same branded bid may not make sense in every market when competition changes. Google Ads shows performance, but not who was on the search page at that moment.",
+    ].join("\n\n");
+  }
+  if (!prospectLedInsight(input, intelligence, strategy) && hasGrowthRole) {
+    return [
+      `Quick question on how ${company} handles branded search when competition changes.`,
+      "Google Ads shows campaign performance, but not when another advertiser appears or when the brand may be effectively bidding alone.",
+    ].join("\n\n");
+  }
   const productGap =
     intelligence.serpScenario === "UNKNOWN"
       ? /^(?:the|this) account$/i.test(company)
         ? "Google Ads shows branded performance, but not the live search-page context behind each branded bid decision."
         : `Google Ads shows branded performance for ${company}, but not the live search-page context behind each branded bid decision.`
       : strategy.productGap;
-  return [
-    prospectInsight,
-    productGap,
-  ].join("\n\n");
+  return [prospectInsight, productGap].join("\n\n");
 }
 
 function strategyMethodLine(
@@ -1003,35 +1134,63 @@ function strategyMethodLine(
   strategy: MessageStrategy,
 ) {
   if (intelligence.serpScenario === "UNKNOWN") {
+    const company = displayCompanyFor(input, intelligence);
+    const hasMarketScope =
+      /\b(?:multiple|several|global|international|across)\s+(?:markets?|countries|regions?)\b/i.test(
+        [input.geographyOrMarkets, input.prospectContext, input.companyContext]
+          .filter(Boolean)
+          .join(" "),
+      );
+    const hasGrowthRole =
+      intelligence.persona === "GROWTH" ||
+      /\b(?:growth|acquisition|demand)\b/i.test(buyerRole(input, intelligence));
+    if (hasMarketScope) {
+      return [
+        `Across markets, the same branded bid may make sense when another advertiser appears and less sense when ${company} is effectively bidding alone.`,
+        "Signal continuously monitors Google and Bing search results so the team can see those changes before deciding what to do with bids.",
+      ].join("\n\n");
+    }
+    if (hasGrowthRole) {
+      return [
+        "The same branded bid may no longer make sense when competition changes.",
+        "Signal continuously monitors Google and Bing search results so the team can see when another advertiser appears and when the brand may be effectively bidding alone.",
+      ].join("\n\n");
+    }
     return [
-      "Signal checks Google and Bing search results continuously and separates competitor-present moments from quieter brand auctions.",
-      "That gives the team a live input for whether to defend, ease pressure, or hold steady.",
+      "Signal continuously monitors Google and Bing search results to see when another advertiser appears and when the brand may be effectively bidding alone.",
+      "That lets the team see when conditions change before deciding whether bids should change.",
     ].join("\n\n");
   }
-  return [
-    strategy.primaryAngle,
-    scenarioMethod(input, intelligence),
-  ].join("\n\n");
+  return [strategy.primaryAngle, scenarioMethod(input, intelligence)].join("\n\n");
 }
 
 function strategyEvidenceLine(intelligence: ProspectIntelligence) {
+  const mechanics =
+    "This is not simply an on/off decision. Signal can reduce bids when competition drops, find the lowest CPC or position needed to maintain visibility, and react when competition returns, all inside the current Google Ads setup.";
   const solo = soloKeyword(intelligence);
   const contested = contestedKeyword(intelligence);
   const soloTerm = solo?.term ?? intelligence.serpEvidence.soloKeywords[0];
   const contestedTerm = contested?.term ?? intelligence.serpEvidence.contestedKeywords[0];
   if (intelligence.serpScenario === "SOLO" && soloTerm) {
-    return `The concrete query to review is "${soloTerm}". At the time of the check, the brand appeared alone, which does not prove wasted spend but does create a measurement question for coverage and bid pressure.`;
+    return [
+      `The concrete query to review is "${soloTerm}". At the time of the check, the brand appeared alone, which does not prove wasted spend but does create a measurement question for coverage and bid pressure.`,
+      mechanics,
+    ].join("\n\n");
   }
   if (intelligence.serpScenario === "CONTESTED" && contestedTerm) {
-    return `The concrete query to review is "${contestedTerm}". At the time of the check, it was a contested brand auction${contested?.competitor ? ` with ${contested.competitor} visible` : ""}, which is where coverage and bid pressure should be measured.`;
+    return [
+      `The concrete query to review is "${contestedTerm}". At the time of the check, it was a contested brand auction${contested?.competitor ? ` with ${contested.competitor} visible` : ""}, which is where coverage and bid pressure should be measured.`,
+      mechanics,
+    ].join("\n\n");
   }
   if (intelligence.serpScenario === "MIXED") {
     const examples = [soloTerm, contestedTerm].filter(Boolean).join(" and ");
-    return examples
+    const evidence = examples
       ? `In the keyword data, the useful sample is ${examples}: one shows quieter coverage and one shows competition. That is why one static branded-bid rule can miss the decision.`
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
+    return [evidence, mechanics].join("\n\n");
   }
-  return "For a visibility check, the value is simple: fewer manual SERP checks, faster reaction when competitors appear, and a practical way to test branded CPC decision quality inside the current Google Ads setup instead of rebuilding campaigns.";
+  return mechanics;
 }
 
 function tailorBody(
@@ -1051,7 +1210,10 @@ function tailorBody(
     return stripCommercialTerms(body, protectedPhrases);
   }
 
-  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const blocks = body
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
   const hello = blocks[0]?.startsWith("Hi ") ? blocks[0] : greeting(input);
   const content = blocks[0]?.startsWith("Hi ") ? blocks.slice(1) : blocks;
   const roleSpecific = roleAngle(input);
@@ -1062,7 +1224,12 @@ function tailorBody(
         ? "If paid-brand efficiency becomes relevant later, the useful starting point is budget visibility: where paid coverage protects demand, and where it is only adding cost."
         : "If paid-brand efficiency becomes relevant later, the useful starting point is simple: where coverage protects demand, and where bid pressure can come down safely.";
     return stripCommercialTerms(
-      [hello, "I will close the loop here.", middle, "If this is not relevant right now, no problem."]
+      [
+        hello,
+        "I will close the loop here.",
+        middle,
+        "If this is not relevant right now, no problem.",
+      ]
         .filter(Boolean)
         .join("\n\n"),
       protectedPhrases,
@@ -1075,7 +1242,11 @@ function tailorBody(
         hello,
         ...(content.length <= 2
           ? content
-          : [content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]),
+          : [
+              content[0],
+              purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1],
+              content.at(-1),
+            ]),
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -1089,7 +1260,11 @@ function tailorBody(
         hello,
         ...(content.length <= 2
           ? content
-          : [content[0], purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1], content.at(-1)]),
+          : [
+              content[0],
+              purpose === "FIRST_TOUCH_RELEVANCE" ? roleSpecific : content[1],
+              content.at(-1),
+            ]),
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -1142,14 +1317,14 @@ function bodyForPurpose({
   const selectedProofLine = proof ? customerProofLine(records) : undefined;
   const proofLine =
     proof && purpose === "SOCIAL_PROOF"
-      ? selectedProofLine ?? approvedProofPointForStep(ctaIndex)
+      ? (selectedProofLine ?? approvedProofPointForStep(ctaIndex))
       : proof
         ? approvedProofPointExcluding(caseStudyCompany(proof), ctaIndex)
         : approvedProofPointForStep(ctaIndex);
-  const isManagedPpcSequence = managesMultipleAccounts(input, intelligence) &&
+  const isManagedPpcSequence =
+    managesMultipleAccounts(input, intelligence) &&
     /paid search|sem|ppc|performance/.test(buyerRole(input, intelligence).toLowerCase());
   const contested = contestedKeyword(intelligence);
-  const solo = soloKeyword(intelligence);
   const managedPpcStepOne = hasPromotionSignal(input)
     ? "One challenge that often becomes harder across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet."
     : "One challenge across multiple accounts is branded-search efficiency. A campaign can look strong while still paying the same CPC when the brand auction is quiet.";
@@ -1160,31 +1335,19 @@ function bodyForPurpose({
         "The point is not to cut every branded bid. It is to tell contested and solo moments apart across the accounts your team manages.",
       ].join("\n\n")
     : "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThat is the useful method: identify solo periods across the accounts your team manages, lower pressure only where coverage is still protected, and restore defense when competitors return.";
-  const managedPpcStepThree = solo
-    ? [
-        `The useful sample to show is "${solo.term}". In the keyword data you supplied, it was a solo brand auction.`,
-        "That does not prove wasted spend, but it is the kind of moment worth checking before keeping one flat branded bid rule.",
-        "Signal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
-      ].join("\n\n")
-    : [
-        "For a PPC team, the value is not another dashboard.",
-        "It is being able to identify solo and contested periods across multiple accounts, then act without manually checking every SERP.",
-        hasScreenshotContext(input) || intelligence.serpScenario !== "UNKNOWN"
-          ? screenshotObservation(input, intelligence)
-          : "I would keep this as a visibility check: where does the auction change, and how quickly can bids react?",
-        "Signal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
-      ].join("\n\n");
-  const managedPpcProofAngle = "The simplest way to evaluate this is one account with meaningful branded-search spend: compare auction conditions, CPC, and paid coverage needs before discussing anything broader.";
+  const managedPpcStepThree = strategyEvidenceLine(intelligence);
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
-      return sanitizeProspectFacingBody(stripCommercialTerms(
-        tailorBody(input, purpose, patternBody, safeKeywordPhrases)
-          .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
-          .replace(/\n\n/g, " ")
-          .replace(/\n/g, " ")
-          .trim(),
-        safeKeywordPhrases,
-      ));
+      return sanitizeProspectFacingBody(
+        stripCommercialTerms(
+          tailorBody(input, purpose, patternBody, safeKeywordPhrases)
+            .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
+            .replace(/\n\n/g, " ")
+            .replace(/\n/g, " ")
+            .trim(),
+          safeKeywordPhrases,
+        ),
+      );
     }
     return sanitizeProspectFacingBody(tailorBody(input, purpose, patternBody, safeKeywordPhrases));
   }
@@ -1201,23 +1364,15 @@ function bodyForPurpose({
     PROBLEM_FRAMING: [
       greeting(input, intelligence),
       "",
-      isManagedPpcSequence
-        ? managedPpcStepTwo
-        : strategyMethodLine(input, intelligence, strategy),
-      isManagedPpcSequence
+      isManagedPpcSequence ? managedPpcStepTwo : strategyMethodLine(input, intelligence, strategy),
+      isManagedPpcSequence || intelligence.serpScenario === "UNKNOWN"
         ? ""
-        : intelligence.persona === "GROWTH"
-          ? "For growth teams, the goal is not just lower spend; it is knowing whether paid brand is changing conversion outcomes."
-          : intelligence.serpScenario === "UNKNOWN"
-            ? ""
-            : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
+        : "That lets the team adjust coverage with evidence, without assuming every quiet auction means inefficient spend.",
     ],
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input, intelligence),
       "",
-      isManagedPpcSequence
-        ? managedPpcStepThree
-        : strategyEvidenceLine(intelligence),
+      isManagedPpcSequence ? managedPpcStepThree : strategyEvidenceLine(intelligence),
       isManagedPpcSequence
         ? ""
         : intelligence.serpScenario === "UNKNOWN"
@@ -1230,12 +1385,7 @@ function bodyForPurpose({
       `The only assumption I would make about ${company} is a light one: branded-search process may be worth checking.`,
       "I would not pitch that as proof. I would use it as a reason to check whether paid coverage still matches the actual auction pressure.",
     ],
-    SOCIAL_PROOF: [
-      greeting(input, intelligence),
-      "",
-      proofLine,
-      isManagedPpcSequence ? managedPpcProofAngle : roleAngle(input, intelligence),
-    ],
+    SOCIAL_PROOF: [greeting(input, intelligence), "", proofLine],
     TECHNICAL_CLARIFICATION: [
       greeting(input, intelligence),
       "",
@@ -1255,20 +1405,29 @@ function bodyForPurpose({
     ],
   };
 
-  const body = tailorBody(input, purpose, linesByPurpose[purpose].join("\n\n"), safeKeywordPhrases);
+  const body = tailorBody(
+    input,
+    purpose,
+    linesByPurpose[purpose].filter(Boolean).join("\n\n"),
+    safeKeywordPhrases,
+  );
   if (channel === "LINKEDIN") {
-    return sanitizeProspectFacingBody(stripFallbackPhrases(
-      stripCommercialTerms(
-        body
-        .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
-        .replace(/\n\n/g, " ")
-        .replace(/\n/g, " ")
-        .trim(),
-        safeKeywordPhrases,
+    return sanitizeProspectFacingBody(
+      stripFallbackPhrases(
+        stripCommercialTerms(
+          body
+            .replace(greeting(input), input.contactFirstName ? `${input.contactFirstName},` : "")
+            .replace(/\n\n/g, " ")
+            .replace(/\n/g, " ")
+            .trim(),
+          safeKeywordPhrases,
+        ),
       ),
-    ));
+    );
   }
-  return sanitizeProspectFacingBody(stripFallbackPhrases(stripCommercialTerms(body, safeKeywordPhrases)));
+  return sanitizeProspectFacingBody(
+    stripFallbackPhrases(stripCommercialTerms(body, safeKeywordPhrases)),
+  );
 }
 
 function delayFor(stepNumber: number, length: number, desiredOverallDuration: string) {
@@ -1328,9 +1487,14 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
               : "LinkedIn keeps the touch lighter and different from the email copy."
             : `${channel === "EMAIL" ? "Email" : "LinkedIn"} is the selected primary channel.`) +
           " Account context is user-provided until verified.",
-        subjectLine: channel === "EMAIL" ? subjectFor(input, purpose, stepNumber, generation.prospectIntelligence) : undefined,
+        subjectLine:
+          channel === "EMAIL"
+            ? subjectFor(input, purpose, stepNumber, generation.prospectIntelligence)
+            : undefined,
         connectionRequest:
-          channel === "LINKEDIN" && stepNumber === 1 ? connectionRequestFor(input, generation.prospectIntelligence) : undefined,
+          channel === "LINKEDIN" && stepNumber === 1
+            ? connectionRequestFor(input, generation.prospectIntelligence)
+            : undefined,
         messageBody: bodyForPurpose({
           input,
           purpose,
@@ -1362,15 +1526,16 @@ export class DeterministicBuildSequenceProvider implements BuildSequenceAiProvid
     return {
       ...generation,
       steps,
-      claimsUsed: Array.from(new Set([...deterministicClaims, ...steps.flatMap((step) => step.claimsUsed)])),
+      claimsUsed: Array.from(
+        new Set([...deterministicClaims, ...steps.flatMap((step) => step.claimsUsed)]),
+      ),
       overallStrategy: stripCommercialTerms(
         [
-          `Strategy planner: ${generation.messageStrategy.prospectInsight}`,
-          generation.messageStrategy.businessQuestion,
-          `Gap: ${generation.messageStrategy.productGap}`,
-          `Capability: ${generation.messageStrategy.relevantCapability}`,
-          `Narrative objectives: ${generation.messageStrategy.sequenceNarrative.map((item) => item.objective).join(" ")}`,
-          `Keep the sequence concise and anchored to ${emailAngle}.`,
+          `Strategy planner (${generation.messageStrategy.plannerMode ?? "DETERMINISTIC_FALLBACK"}).`,
+          `Verified facts: ${(generation.messageStrategy.prospectBrief?.verifiedFacts ?? []).map((fact) => `${fact.field}=${fact.value} (${fact.confidence})`).join("; ") || "none"}.`,
+          `Unknown facts: ${(generation.messageStrategy.prospectBrief?.unknownFacts ?? []).join("; ") || "none"}.`,
+          `Selected angle: ${emailAngle}.`,
+          `Objectives: ${(generation.messageStrategy.prospectBrief?.stepObjectives ?? []).map((item) => `E${item.step}=${item.objective}`).join("; ")}.`,
         ].join(" "),
         protectedKeywordPhrases(generation.prospectIntelligence),
       ),
@@ -1412,14 +1577,16 @@ async function rewriteStepWithHybrid({
         prospectBrief: request.generation.messageStrategy.prospectBrief,
         stepPlan: sheet.stepPlan,
         messageStrategy: request.generation.messageStrategy,
-        selectedGoldStandardExamples: request.generation.selectedGoldStandardExamples.map((example) => ({
-          id: example.id,
-          outcome: example.outcome,
-          reasoningTags: example.reasoningTags,
-          whyItWorked: example.whyItWorked,
-          subject: example.subject,
-          body: example.body,
-        })),
+        selectedGoldStandardExamples: request.generation.selectedGoldStandardExamples.map(
+          (example) => ({
+            id: example.id,
+            outcome: example.outcome,
+            reasoningTags: example.reasoningTags,
+            whyItWorked: example.whyItWorked,
+            subject: example.subject,
+            body: example.body,
+          }),
+        ),
       },
       writingInstructions: [
         "Rewrite only this one outbound step.",
@@ -1438,7 +1605,9 @@ async function rewriteStepWithHybrid({
       ],
       approvedFacts: [
         `Prospect: ${sheet.prospect.name}, ${sheet.prospect.title} at ${sheet.prospect.company}`,
-        sheet.personalHook ? `Personal detail: ${sheet.personalHook}` : "No personal detail provided.",
+        sheet.personalHook
+          ? `Personal detail: ${sheet.personalHook}`
+          : "No personal detail provided.",
         sheet.proofPoint
           ? `Proof point: ${sheet.proofPoint.company}: ${sheet.proofPoint.claim}`
           : "No proof point for this step.",
@@ -1453,7 +1622,9 @@ async function rewriteStepWithHybrid({
       userProvidedContext: [],
       sourceReferences: request.sourceReferences,
       safetyPolicy: request.generation.safetyNotes,
-      outputLanguageInstruction: outputLanguageInstruction(request.input.outputLanguage ?? "ENGLISH"),
+      outputLanguageInstruction: outputLanguageInstruction(
+        request.input.outputLanguage ?? "ENGLISH",
+      ),
     },
   });
   const suggestion = aiResult.sequenceSteps?.[0];
@@ -1462,8 +1633,13 @@ async function rewriteStepWithHybrid({
   }
   const candidate = enforceStepWordBudget({
     ...step,
-    subjectLine: step.channel === "EMAIL" ? normalizeHybridSubject(suggestion.subjectLine, step.subjectLine) : undefined,
-    messageBody: sanitizeProspectFacingBody(stripFallbackPhrases(stripCommercialTerms(suggestion.messageBody))),
+    subjectLine:
+      step.channel === "EMAIL"
+        ? normalizeHybridSubject(suggestion.subjectLine, step.subjectLine)
+        : undefined,
+    messageBody: sanitizeProspectFacingBody(
+      stripFallbackPhrases(stripCommercialTerms(suggestion.messageBody)),
+    ),
     cta: step.cta,
   });
   const validation = validateHybridStepRewrite(
@@ -1486,71 +1662,73 @@ async function hybridRewriteSequence({
   request: BuildSequenceProviderRequest;
   result: SequenceGeneration;
 }) {
-  const rewritten = await Promise.all(result.steps.map(async (step, index) => {
-    const sheet = buildStepFactSheet({
-      input: request.input,
-      records: request.records,
-      step,
-      intelligence: request.generation.prospectIntelligence,
-      strategy: request.generation.messageStrategy,
-      ctaIndex: index,
-    });
-    const allowed = buildAllowedEntities(sheet);
-    const diagnostics: NonNullable<BuildSequenceDiagnostics["stepRewriteDiagnostics"]>[number] = {
-      stepNumber: step.stepNumber,
-      retryUsed: false,
-      fallbackUsed: false,
-      firstFailures: [],
-      retryFailures: [],
-    };
-    try {
-      const firstStarted = nowMs();
-      const first = await rewriteStepWithHybrid({ provider, request, step, sheet, allowed });
-      diagnostics.firstCallDurationMs = nowMs() - firstStarted;
-      if (first.accepted) {
-        return {
-          step: first.step,
-          note: `Hybrid rewrite accepted for step ${step.stepNumber}.`,
-          diagnostics,
-        };
-      }
-      diagnostics.firstFailures = first.failures;
-      diagnostics.retryUsed = true;
-      const retryStarted = nowMs();
-      const retry = await rewriteStepWithHybrid({
-        provider,
-        request,
+  const rewritten = await Promise.all(
+    result.steps.map(async (step, index) => {
+      const sheet = buildStepFactSheet({
+        input: request.input,
+        records: request.records,
         step,
-        sheet,
-        allowed,
-        priorFailures: first.failures,
+        intelligence: request.generation.prospectIntelligence,
+        strategy: request.generation.messageStrategy,
+        ctaIndex: index,
       });
-      diagnostics.retryDurationMs = nowMs() - retryStarted;
-      if (retry.accepted) {
+      const allowed = buildAllowedEntities(sheet);
+      const diagnostics: NonNullable<BuildSequenceDiagnostics["stepRewriteDiagnostics"]>[number] = {
+        stepNumber: step.stepNumber,
+        retryUsed: false,
+        fallbackUsed: false,
+        firstFailures: [],
+        retryFailures: [],
+      };
+      try {
+        const firstStarted = nowMs();
+        const first = await rewriteStepWithHybrid({ provider, request, step, sheet, allowed });
+        diagnostics.firstCallDurationMs = nowMs() - firstStarted;
+        if (first.accepted) {
+          return {
+            step: first.step,
+            note: `Hybrid rewrite accepted for step ${step.stepNumber}.`,
+            diagnostics,
+          };
+        }
+        diagnostics.firstFailures = first.failures;
+        diagnostics.retryUsed = true;
+        const retryStarted = nowMs();
+        const retry = await rewriteStepWithHybrid({
+          provider,
+          request,
+          step,
+          sheet,
+          allowed,
+          priorFailures: first.failures,
+        });
+        diagnostics.retryDurationMs = nowMs() - retryStarted;
+        if (retry.accepted) {
+          return {
+            step: retry.step,
+            note: `Hybrid rewrite accepted on retry for step ${step.stepNumber}.`,
+            diagnostics,
+          };
+        }
+        diagnostics.retryFailures = retry.failures;
+        diagnostics.fallbackUsed = true;
         return {
-          step: retry.step,
-          note: `Hybrid rewrite accepted on retry for step ${step.stepNumber}.`,
+          step,
+          note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${retry.failures.join("; ") || first.failures.join("; ")}.`,
+          diagnostics,
+        };
+      } catch (error) {
+        const failure = mapAiProviderError(error);
+        diagnostics.fallbackUsed = true;
+        diagnostics.retryFailures = [failure.message];
+        return {
+          step,
+          note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${failure.message}`,
           diagnostics,
         };
       }
-      diagnostics.retryFailures = retry.failures;
-      diagnostics.fallbackUsed = true;
-      return {
-        step,
-        note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${retry.failures.join("; ") || first.failures.join("; ")}.`,
-        diagnostics,
-      };
-    } catch (error) {
-      const failure = mapAiProviderError(error);
-      diagnostics.fallbackUsed = true;
-      diagnostics.retryFailures = [failure.message];
-      return {
-        step,
-        note: `Hybrid rewrite fell back for step ${step.stepNumber}: ${failure.message}`,
-        diagnostics,
-      };
-    }
-  }));
+    }),
+  );
   return {
     ...result,
     steps: rewritten.map((item) => item.step),

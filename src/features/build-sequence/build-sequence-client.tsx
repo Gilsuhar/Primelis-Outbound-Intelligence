@@ -36,8 +36,7 @@ import type {
 } from "@/features/build-sequence/types";
 
 type BuildSequenceActionResult =
-  | { ok: true; data: BuildSequenceResult }
-  | { ok: false; code: string; message: string };
+  { ok: true; data: BuildSequenceResult } | { ok: false; code: string; message: string };
 
 const tones: { label: string; value: SequenceTone }[] = [
   { label: "Direct", value: "DIRECT" },
@@ -46,9 +45,7 @@ const tones: { label: string; value: SequenceTone }[] = [
   { label: "Executive", value: "EXECUTIVE" },
 ];
 
-const lengths: { label: string; value: SequenceLength }[] = [
-  { label: "4 steps", value: 4 },
-];
+const lengths: { label: string; value: SequenceLength }[] = [{ label: "4 steps", value: 4 }];
 
 const emptyKeywordEvidence: SequenceKeywordEvidence[] = [
   { term: "", status: "solo" },
@@ -306,6 +303,35 @@ function ctaVariants(step: SequenceStep) {
   return byPurpose[step.purpose].filter(Boolean);
 }
 
+function safeManualBodyVariant(step: SequenceStep, candidate: string) {
+  if (
+    /\b(?:Hi there|LinkedIn URL|Prospect Context|focus at|The Account|this account|competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage|organic would have captured|captured organically|brand already owns)\b/i.test(
+      candidate,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /\b(?:for your .{2,100} remit|in your role as|as a [^,.]{2,100}|given your role as)\b/i.test(
+      candidate,
+    )
+  ) {
+    return false;
+  }
+  if ((candidate.match(/\?/g) ?? []).length > 0 && step.cta.trim()) return false;
+  if (step.purpose === "METHODOLOGY_DIFFERENTIATION") {
+    return (
+      /not (?:simply|always) an? [“\"]?on[/-]off/i.test(candidate) &&
+      /competition (?:drops|returns)/i.test(candidate) &&
+      /lowest CPC|position needed/i.test(candidate)
+    );
+  }
+  if (step.purpose === "SOCIAL_PROOF") {
+    return /\b\d+(?:\.\d+)?%\b/.test(candidate);
+  }
+  return true;
+}
+
 function normalizedLine(text: string) {
   return text
     .toLowerCase()
@@ -370,7 +396,10 @@ function sequenceQuality(steps: SequenceStep[], safetyNotes: string[] = []) {
     /^Hybrid rewrite fell back for step \d+:/i.test(note),
   ).length;
 
-  if (usedDeterministicFallback(safetyNotes) || (hybridAccepted === 0 && hybridFellBack >= steps.length)) {
+  if (
+    usedDeterministicFallback(safetyNotes) ||
+    (hybridAccepted === 0 && hybridFellBack >= steps.length)
+  ) {
     issues.push("OpenAI did not write this sequence. The deterministic fallback was used.");
   } else if (hybridFellBack > 0) {
     issues.push("One or more steps used fallback copy after OpenAI rewrite validation failed.");
@@ -435,15 +464,7 @@ function rawProspectContextFromForm(formData: FormData) {
 }
 
 function prospectContextFromForm(formData: FormData) {
-  const linkedinProfileUrl = linkedinProfileUrlFromForm(formData);
-  const rawProspectContext = rawProspectContextFromForm(formData);
-  return [
-    linkedinProfileUrl ? `LinkedIn URL: ${linkedinProfileUrl}` : "",
-    rawProspectContext,
-  ]
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
+  return rawProspectContextFromForm(formData);
 }
 
 function missingQuickBriefFields(formData: FormData) {
@@ -599,7 +620,8 @@ export function BuildSequenceClient() {
   const [observedTrigger, setObservedTrigger] = useState("");
   const [prospectContext, setProspectContext] = useState("");
   const [serpEvidence, setSerpEvidence] = useState("");
-  const [keywordEvidence, setKeywordEvidence] = useState<SequenceKeywordEvidence[]>(emptyKeywordEvidence);
+  const [keywordEvidence, setKeywordEvidence] =
+    useState<SequenceKeywordEvidence[]>(emptyKeywordEvidence);
   const [internalNotes, setInternalNotes] = useState("");
   const [screenshotAvailable, setScreenshotAvailable] = useState(false);
   const [screenshotContext, setScreenshotContext] = useState("");
@@ -644,9 +666,10 @@ export function BuildSequenceClient() {
     })) ?? [];
   const quality = result ? sequenceQuality(displayedSteps, result.safetyNotes) : null;
   const draftWarnings =
-    result?.safetyNotes.filter((note) =>
-      note.startsWith("Existing ownership or recent outreach activity found") ||
-      note.startsWith("Existing Primelis client status found"),
+    result?.safetyNotes.filter(
+      (note) =>
+        note.startsWith("Existing ownership or recent outreach activity found") ||
+        note.startsWith("Existing Primelis client status found"),
     ) ?? [];
   const canApproveAccountStatusOverride =
     error?.includes("already marked as a Primelis client") ||
@@ -752,7 +775,10 @@ export function BuildSequenceClient() {
   }
 
   function regenerateBody(step: SequenceStep) {
-    const variants = bodyVariants(step, resolvedCompanyName() || "this account");
+    const safeVariants = bodyVariants(step, resolvedCompanyName() || "this account").filter(
+      (candidate) => safeManualBodyVariant(step, candidate),
+    );
+    const variants = safeVariants.length > 0 ? safeVariants : [step.messageBody];
     const nextIndex = variantIndex(stepBodyVariantIndexes[step.stepNumber] ?? -1, variants.length);
     setStepBodyVariantIndexes((current) => ({ ...current, [step.stepNumber]: nextIndex }));
     setStepBodyDrafts((current) => ({ ...current, [step.stepNumber]: variants[nextIndex] }));
@@ -981,8 +1007,8 @@ export function BuildSequenceClient() {
             </div>
             <span className="block text-xs leading-5 text-stone-500">
               Fetch pulls what is available via GetLeads (structured data) and LinkedIn public
-              link-preview metadata (headline/snippet, not the full profile) into
-              Prospect Context below for you to review before generating.
+              link-preview metadata (headline/snippet, not the full profile) into Prospect Context
+              below for you to review before generating.
             </span>
             {enrichError ? (
               <span className="block text-xs font-medium text-rose-600">{enrichError}</span>
@@ -1002,7 +1028,8 @@ export function BuildSequenceClient() {
               value={prospectContext}
             />
             <span className="block text-xs leading-5 text-stone-500">
-              Paste context first. The system will extract the prospect, company, role, keywords and useful facts before generating the sequence.
+              Paste context first. The system will extract the prospect, company, role, keywords and
+              useful facts before generating the sequence.
             </span>
           </label>
 
@@ -1015,7 +1042,9 @@ export function BuildSequenceClient() {
                 setSerpEvidence(event.target.value);
                 setScreenshotAvailable(Boolean(event.target.value.trim()) || screenshotAvailable);
               }}
-              placeholder={"cursor — brand bidding alone\ncursor pricing — brand alone\ncursor build — competitor visible\n\nor: Checked 6 branded keywords. Brand was alone on all 6."}
+              placeholder={
+                "cursor — brand bidding alone\ncursor pricing — brand alone\ncursor build — competitor visible\n\nor: Checked 6 branded keywords. Brand was alone on all 6."
+              }
               value={serpEvidence}
             />
             <span className="block text-xs leading-5 text-stone-500">
@@ -1179,7 +1208,7 @@ export function BuildSequenceClient() {
                   ? "Visual example"
                   : "Approved case study when available, otherwise diagnostic insight"}
               </div>
-              <div className="sm:col-span-2 rounded-lg border border-line bg-white p-3">
+              <div className="rounded-lg border border-line bg-white p-3 sm:col-span-2">
                 <label className="flex items-start gap-2 text-sm font-semibold text-ink">
                   <input
                     checked={screenshotAvailable}
@@ -1432,7 +1461,9 @@ export function BuildSequenceClient() {
                     <p>
                       <span className="font-semibold text-ink">Gold standards:</span>{" "}
                       {result.selectedGoldStandardExamples.length > 0
-                        ? result.selectedGoldStandardExamples.map((example) => example.id).join(", ")
+                        ? result.selectedGoldStandardExamples
+                            .map((example) => example.id)
+                            .join(", ")
                         : "none selected"}
                     </p>
                     <ol className="grid gap-2">
@@ -1693,13 +1724,13 @@ export function BuildSequenceClient() {
                   {result.safetyNotes
                     .filter((note) => !draftWarnings.includes(note))
                     .map((note) => (
-                    <p
-                      className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]"
-                      key={note}
-                    >
-                      {note}
-                    </p>
-                  ))}
+                      <p
+                        className="rounded-md bg-[#fff7e8] px-3 py-2 text-sm text-[#8a5a2b]"
+                        key={note}
+                      >
+                        {note}
+                      </p>
+                    ))}
                   {result.knowledgeLimitations.map((limitation) => (
                     <p
                       className="rounded-md bg-[#f8f5ef] px-3 py-2 text-sm text-stone-700"
@@ -1718,7 +1749,6 @@ export function BuildSequenceClient() {
                   </div>
                 </div>
               </article>
-
             </>
           ) : null}
         </section>

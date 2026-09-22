@@ -37,7 +37,11 @@ const records = [
 
 function generation(generationInput = input) {
   const prospectIntelligence = buildProspectIntelligence(generationInput, records);
-  const messageStrategy = planMessageStrategy({ input: generationInput, intelligence: prospectIntelligence, records });
+  const messageStrategy = planMessageStrategy({
+    input: generationInput,
+    intelligence: prospectIntelligence,
+    records,
+  });
   return {
     overallStrategy: "Fallback strategy.",
     selectedAngle: "BRANDED_SEARCH_EFFICIENCY" as const,
@@ -81,7 +85,13 @@ function responseStep(subjectLine: string, messageBody: string) {
   } as Response;
 }
 
-function renderedStepWordCount(step: { subjectLine?: string; connectionRequest?: string; imagePlaceholder?: string; messageBody: string; cta: string }) {
+function renderedStepWordCount(step: {
+  subjectLine?: string;
+  connectionRequest?: string;
+  imagePlaceholder?: string;
+  messageBody: string;
+  cta: string;
+}) {
   return [
     step.subjectLine,
     step.connectionRequest,
@@ -98,6 +108,167 @@ function renderedStepWordCount(step: { subjectLine?: string; connectionRequest?:
 describe("Build Sequence OpenAI provider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  const forbiddenDemoCopy =
+    /Hi there|LinkedIn URL|Prospect Context|focus at|The Account|this account|As a Senior Manager|defend demand and ease pressure|That is the practical benchmark|higher CAC|demand leakage|unexpected rivals/i;
+
+  async function deterministicSequenceFor(demoInput: BuildSequenceInput) {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+    return provider.generate({
+      input: demoInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(demoInput),
+    });
+  }
+
+  it("keeps the KAYAK regression structured, progressive, and free of recycled planner copy", async () => {
+    const kayakInput: BuildSequenceInput = {
+      ...input,
+      companyName: "KAYAK",
+      companyWebsite: "kayak.com",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      geographyOrMarkets: "Multiple markets",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager\nWorks across channels and markets.",
+    };
+    const result = await deterministicSequenceFor(kayakInput);
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(forbiddenDemoCopy);
+    expect(result.messageStrategy.prospectBrief?.verifiedFacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "company", value: "KAYAK" }),
+        expect.objectContaining({ field: "role", value: "Senior Manager" }),
+      ]),
+    );
+    expect(result.steps[0].messageBody).toContain("KAYAK");
+    expect(result.steps[1].messageBody).toMatch(
+      /continuously monitors Google and Bing search results/i,
+    );
+    expect(result.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
+    expect(result.steps[2].messageBody).toMatch(/lowest CPC or position needed/i);
+    expect(result.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+    expect(result.steps[3].messageBody).not.toMatch(
+      /kind of paid-brand efficiency|practical benchmark/i,
+    );
+    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+    expect(
+      result.steps.every(
+        (step) =>
+          (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <= 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks the SoSafe raw-profile leak, unsupported impact, and double asks", async () => {
+    const soSafeInput: BuildSequenceInput = {
+      ...input,
+      companyName: "SoSafe",
+      companyWebsite: "sosafe-awareness.com",
+      contactFirstName: "Darren",
+      contactRole: "Senior Growth Marketing Manager",
+      prospectContext:
+        "LinkedIn URL: Darren Goldstein Darren Goldstein Senior Growth Marketing Manager focus at SoSafe.",
+    };
+    const result = await deterministicSequenceFor(soSafeInput);
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(forbiddenDemoCopy);
+    expect(rendered).not.toMatch(/Darren Goldstein Darren Goldstein/i);
+    expect(
+      result.steps.every(
+        (step) =>
+          (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <= 1,
+      ),
+    ).toBe(true);
+    expect(result.steps[2].messageBody).toMatch(/competition drops/i);
+    expect(result.steps[2].messageBody).toMatch(/react when competition returns/i);
+  });
+
+  it("keeps the Amit StoneX sequence on the shared safe progression", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "StoneX",
+      companyWebsite: "stonex.com",
+      contactFirstName: "Amit",
+      contactRole: "Global Head Of Paid Search",
+      geographyOrMarkets: "Global markets",
+      prospectContext: "Amit Arora\nGlobal Head Of Paid Search\nCompany: StoneX",
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(
+      /for your Global Head Of Paid Search remit|Hi Amit,\s*\n\nAmit,|competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage/i,
+    );
+    expect(result.steps[0].messageBody).toMatch(/StoneX.*across markets/i);
+    expect(result.steps[1].messageBody).toMatch(/another advertiser appears/i);
+    expect(result.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
+    expect(result.steps[2].messageBody).toMatch(/lowest CPC or position needed/i);
+    expect(result.steps[3].messageBody).toBe(
+      "Hi Amit,\n\nAppsFlyer reduced branded spend by 29% while qualified lead volume increased 25% in the first 30 days.",
+    );
+    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+  });
+
+  it("omits the greeting naturally when first name cannot be resolved", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "KAYAK",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager",
+    });
+
+    expect(result.steps.every((step) => !/^Hi\b/i.test(step.messageBody))).toBe(true);
+    expect(JSON.stringify(result.steps)).not.toContain("Hi there");
+  });
+
+  it("does not collapse distinct usable role and company context into near-identical first halves", async () => {
+    const kayak = await deterministicSequenceFor({
+      ...input,
+      companyName: "KAYAK",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      geographyOrMarkets: "Multiple markets",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager\nWorks across channels and markets.",
+    });
+    const soSafe = await deterministicSequenceFor({
+      ...input,
+      companyName: "SoSafe",
+      contactFirstName: "Darren",
+      contactRole: "Senior Growth Marketing Manager",
+      prospectContext: "Darren Goldstein\nSenior Growth Marketing Manager\nCompany: SoSafe",
+    });
+    const normalize = (value: string) =>
+      new Set(
+        value
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]/g, " ")
+          .split(/\s+/)
+          .filter((word) => word.length > 3),
+      );
+    const kayakWords = normalize(
+      kayak.steps
+        .slice(0, 2)
+        .map((step) => step.messageBody)
+        .join(" "),
+    );
+    const soSafeWords = normalize(
+      soSafe.steps
+        .slice(0, 2)
+        .map((step) => step.messageBody)
+        .join(" "),
+    );
+    const overlap = [...kayakWords].filter((word) => soSafeWords.has(word)).length;
+    const similarity = overlap / Math.min(kayakWords.size, soSafeWords.size);
+
+    expect(similarity).toBeLessThan(0.9);
+    expect(kayak.steps[0].messageBody).toMatch(/across markets/i);
+    expect(soSafe.steps[0].messageBody).toMatch(/when competition changes/i);
   });
 
   it("keeps the deterministic rendered sequence even when OpenAI returns full steps", async () => {
@@ -151,17 +322,19 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
     expect(result.steps[0].messageBody).not.toContain("keep this to one narrow");
     expect(result.steps[1].imagePlaceholder).toBeUndefined();
     expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
-    expect(JSON.stringify(result.steps)).not.toMatch(/hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
+    expect(JSON.stringify(result.steps)).not.toMatch(
+      /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+    );
     expect(JSON.stringify(result.steps)).not.toContain("Our tech");
     expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
     expect(result.steps[2].messageBody).not.toContain("40-60%");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
-    expect(result.steps[3].cta).toBe("Open to a quick overview?");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
+    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
     expect(JSON.stringify(result.steps)).not.toContain("AI step one");
     expect(result.overallStrategy).toContain("Strategy planner");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
@@ -187,7 +360,9 @@ describe("Build Sequence OpenAI provider", () => {
         "Chemistry degree.",
       ].join("\n"),
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: tanviInput,
@@ -196,7 +371,9 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(tanviInput),
     });
 
-    expect(result.steps[0].messageBody).toMatch(/Google Ads|Microsoft Ads|SA360|optimisation|performance reporting/i);
+    expect(result.steps[0].messageBody).toMatch(
+      /Google Ads|Microsoft Ads|SA360|optimisation|performance reporting/i,
+    );
     expect(result.steps[0].messageBody).not.toMatch(/^Hi Tanvi,\s+I saw that/i);
     expect(result.steps[0].messageBody).not.toMatch(/Performance Marketer \|/i);
     expect(result.steps[0].messageBody).not.toMatch(/wanted to be a doctor|chemistry/i);
@@ -220,7 +397,9 @@ describe("Build Sequence OpenAI provider", () => {
         "During tenure as CMO at myThings led performance marketing.",
       ].join("\n"),
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: shacharInput,
@@ -257,7 +436,9 @@ describe("Build Sequence OpenAI provider", () => {
         "svg",
       ].join("\n"),
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: firstPersonInput,
@@ -269,12 +450,20 @@ describe("Build Sequence OpenAI provider", () => {
 
     expect(result.steps[0].subjectLine).toBe("Iterable branded search visibility");
     expect(rendered).not.toMatch(/\b(?:Iterable logo|logo|svg|View verification)\b/i);
-    expect(rendered).not.toMatch(/\bGiven I specialise\b|\bI specialise\b|\bI manage\b|\bMy focus\b|\bI've worked\b/i);
-    expect(rendered).toMatch(/you specialise|you manage|your focus on profitability and business outcomes|you've worked/i);
+    expect(rendered).not.toMatch(
+      /\bGiven I specialise\b|\bI specialise\b|\bI manage\b|\bMy focus\b|\bI've worked\b/i,
+    );
+    expect(rendered).toMatch(
+      /you specialise|you manage|your focus on profitability and business outcomes|you've worked/i,
+    );
     expect(rendered).toMatch(/Google Ads|Microsoft Ads|profitability|business outcomes/i);
     expect(rendered).not.toMatch(/accounts your team manages/i);
-    expect(rendered).not.toMatch(/Without account-specific auction evidence|Without account-specific SERP evidence/i);
-    expect(result.overallStrategy).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
+    expect(rendered).not.toMatch(
+      /Without account-specific auction evidence|Without account-specific SERP evidence/i,
+    );
+    expect(result.overallStrategy).not.toContain(
+      "Understand minute-by-minute branded-search competition before changing coverage.",
+    );
   });
 
   it("falls back to a clean role and company opener when prospect insights are malformed fragments", async () => {
@@ -296,7 +485,9 @@ describe("Build Sequence OpenAI provider", () => {
         "svg",
       ].join("\n"),
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: fragmentInput,
@@ -307,10 +498,16 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
-    expect(result.steps[0].messageBody).toContain("Quick question for your Paid Media Lead focus at SearchPilot");
-    expect(rendered).not.toMatch(/Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i);
-    expect(rendered).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
-    expect(rendered).not.toContain("Understand minute-by-minute branded-search competition before changing coverage.");
+    expect(result.steps[0].messageBody).toContain("Quick question on SearchPilot's branded search");
+    expect(rendered).not.toMatch(
+      /Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i,
+    );
+    expect(rendered).not.toMatch(
+      /Without account-specific|Based on the available evidence|cannot confirm/i,
+    );
+    expect(rendered).not.toContain(
+      "Understand minute-by-minute branded-search competition before changing coverage.",
+    );
     expect(rendered).not.toMatch(/accounts your team manages/i);
   });
 
@@ -323,7 +520,9 @@ describe("Build Sequence OpenAI provider", () => {
       contactRole: "Global Paid Search Lead at IBM",
       prospectContext: "Kevin\nGlobal Paid Search Lead at IBM\nIBM",
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: ibmInput,
@@ -333,10 +532,14 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your global paid search work at IBM");
+    expect(result.steps[0].messageBody).toContain(
+      "Quick question for your global paid search work at IBM",
+    );
     expect(result.steps[0].messageBody.match(/\?/g) ?? []).toHaveLength(0);
     expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
-    expect(rendered).not.toMatch(/scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
+    expect(rendered).not.toMatch(
+      /scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+    );
     expect(result.steps[0].messageBody).not.toContain("The practical question is:");
   });
 
@@ -350,7 +553,9 @@ describe("Build Sequence OpenAI provider", () => {
       prospectContext:
         "Director Performance Marketing & Acquisition @ Shine | SaaS & Fintech Growth Leader",
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: headlineInput,
@@ -361,7 +566,9 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("Shine branded search visibility");
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing & Acquisition remit at Shine");
+    expect(result.steps[0].messageBody).toContain(
+      "Quick question for your Performance Marketing & Acquisition remit at Shine",
+    );
     expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
   });
 
@@ -375,7 +582,9 @@ describe("Build Sequence OpenAI provider", () => {
       prospectContext:
         "Ruby\nPaid Search Analyst | Analytics-Driven PPC & Growth Optimization at Atlanta Metropolitan Area",
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: locationInput,
@@ -386,12 +595,18 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("branded search visibility");
-    expect(result.steps[0].messageBody).toContain("Quick question for your Paid Search Analyst focus");
-    expect(rendered).not.toMatch(/Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i);
+    expect(result.steps[0].messageBody).toContain(
+      "Quick question for your Paid Search Analyst focus",
+    );
+    expect(rendered).not.toMatch(
+      /Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i,
+    );
   });
 
   it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input,
@@ -404,8 +619,12 @@ describe("Build Sequence OpenAI provider", () => {
 
     expect(stepTwo).toMatch(/competitors appear or disappear|hold steady/i);
     expect(stepThree).toMatch(/visibility check|decision quality|current Google Ads setup/i);
-    expect(`${stepTwo} ${stepThree}`).not.toMatch(/cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i);
-    expect(stepThree).not.toMatch(/Without account-specific|Based on the available evidence|cannot confirm/i);
+    expect(`${stepTwo} ${stepThree}`).not.toMatch(
+      /cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+    );
+    expect(stepThree).not.toMatch(
+      /Without account-specific|Based on the available evidence|cannot confirm/i,
+    );
     expect(stepThree).not.toBe(stepTwo);
   });
 
@@ -423,7 +642,9 @@ describe("Build Sequence OpenAI provider", () => {
         "Focused on branded-search efficiency, campaign optimisation, and performance reporting.",
       ].join("\n"),
     };
-    const provider = createBuildSequenceAiProvider({ AI_PROVIDER: "deterministic" } as unknown as NodeJS.ProcessEnv);
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
 
     const result = await provider.generate({
       input: managedAccountInput,
@@ -432,7 +653,9 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(managedAccountInput),
     });
 
-    expect(result.steps.map(renderedStepWordCount)).toEqual(result.steps.map(() => expect.any(Number)));
+    expect(result.steps.map(renderedStepWordCount)).toEqual(
+      result.steps.map(() => expect.any(Number)),
+    );
     expect(result.steps.every((step) => renderedStepWordCount(step) <= 110)).toBe(true);
   });
 
@@ -481,8 +704,10 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing search results continuously");
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].messageBody).toContain(
+      "continuously monitors Google and Bing search results",
+    );
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
@@ -496,10 +721,30 @@ describe("Build Sequence OpenAI provider", () => {
     } as unknown as NodeJS.ProcessEnv);
 
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(responseStep("nike brand coverage", "Hi there,\n\nNike's branded search may be worth one narrow look.\n\nA campaign can look healthy while the brand auction is quiet."))
-      .mockResolvedValueOnce(responseStep("re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
-      .mockResolvedValueOnce(responseStep("re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
-      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+      .mockResolvedValueOnce(
+        responseStep(
+          "nike brand coverage",
+          "Hi there,\n\nNike's branded search may be worth one narrow look.\n\nA campaign can look healthy while the brand auction is quiet.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      );
 
     const result = await provider.generate({
       input,
@@ -510,7 +755,7 @@ describe("Build Sequence OpenAI provider", () => {
 
     expect(result.steps[0].messageBody).toContain("Nike's branded search may be worth");
     expect(result.steps[2].messageBody).toContain("For Nike, the useful part");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
     expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
   });
 
@@ -522,10 +767,30 @@ describe("Build Sequence OpenAI provider", () => {
     } as unknown as NodeJS.ProcessEnv);
 
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(responseStep("Branded search across managed accounts!", "Hi there,\n\nCongrats on your promotion to VP Performance Marketing.\n\nNike's branded search may be worth one narrow look."))
-      .mockResolvedValueOnce(responseStep("Re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
-      .mockResolvedValueOnce(responseStep("Re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
-      .mockResolvedValueOnce(responseStep("Paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."));
+      .mockResolvedValueOnce(
+        responseStep(
+          "Branded search across managed accounts!",
+          "Hi there,\n\nCongrats on your promotion to VP Performance Marketing.\n\nNike's branded search may be worth one narrow look.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      );
 
     const result = await provider.generate({
       input,
@@ -591,8 +856,10 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
-    expect(rendered).not.toMatch(/Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific|hard part is not seeing|harder branded-search question/i);
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(rendered).not.toMatch(
+      /Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific|hard part is not seeing|harder branded-search question/i,
+    );
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
   });
@@ -605,11 +872,36 @@ describe("Build Sequence OpenAI provider", () => {
     } as unknown as NodeJS.ProcessEnv);
 
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."))
-      .mockResolvedValueOnce(responseStep("re: brand auctions", "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure."))
-      .mockResolvedValueOnce(responseStep("re: paid brand control", "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns."))
-      .mockResolvedValueOnce(responseStep("paid-brand example", "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions."))
-      .mockResolvedValueOnce(responseStep("gong brand coverage", "Hi there,\n\nGong has a paid-brand issue worth checking."));
+      .mockResolvedValueOnce(
+        responseStep(
+          "gong brand coverage",
+          "Hi there,\n\nGong has a paid-brand issue worth checking.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "gong brand coverage",
+          "Hi there,\n\nGong has a paid-brand issue worth checking.",
+        ),
+      );
 
     const result = await provider.generate({
       input,
@@ -618,7 +910,7 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
     expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
     expect(JSON.stringify(result.steps)).not.toContain("Gong");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
@@ -690,7 +982,8 @@ describe("Build Sequence OpenAI provider", () => {
           title: "Dior approved proof",
           type: "CASE_STUDY",
           approvalStatus: "APPROVED",
-          approvedText: "Case study: Dior. Ad cost decreased by 54% while performance stayed stable.",
+          approvedText:
+            "Case study: Dior. Ad cost decreased by 54% while performance stayed stable.",
           channels: ["EMAIL", "LINKEDIN"],
           sourceIds: ["source-2"],
           sourceTitles: ["Dior source"],
@@ -746,12 +1039,18 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
     expect(result.steps[0].messageBody).toContain("Hi Mia");
     expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
-    expect(result.steps[1].messageBody).toContain("The same branded query can move between two different auctions");
-    expect(result.steps[2].messageBody).toContain("For a PPC team, the value is not another dashboard.");
+    expect(result.steps[1].messageBody).toContain(
+      "The same branded query can move between two different auctions",
+    );
+    expect(result.steps[2].messageBody).toContain(
+      "For a PPC team, the value is not another dashboard.",
+    );
     expect(rendered).not.toContain("{{! Insert screenshot }}");
     expect(result.steps[0].messageBody).toContain("across multiple accounts");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
-    expect(result.steps[3].messageBody).toContain("one account with meaningful branded-search spend");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
+    expect(result.steps[3].messageBody).toContain(
+      "one account with meaningful branded-search spend",
+    );
   });
 
   it("turns raw promotion posts into a concise congratulations opener", async () => {
@@ -764,7 +1063,8 @@ describe("Build Sequence OpenAI provider", () => {
       contactRole: "PPC Team Lead",
       companyContext: "Digital agency managing multiple client accounts",
       observedTrigger: "Promotion to PPC Team Lead",
-      prospectContext: "Mia Johnson\nI’m excited to share that I’ve been promoted to PPC Team Lead at Americaneagle.com!",
+      prospectContext:
+        "Mia Johnson\nI’m excited to share that I’ve been promoted to PPC Team Lead at Americaneagle.com!",
       serpEvidence: "solo brand moments",
       brandKeyword: "American Eagle baggy",
     };
@@ -834,12 +1134,14 @@ describe("Build Sequence OpenAI provider", () => {
       generation: generation(),
     });
 
-    expect(result.steps[0].messageBody).toContain("Quick question for your Performance Marketing remit at Nike");
-    expect(result.steps[1].messageBody).toContain("Google and Bing search results continuously");
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].messageBody).toContain(
+      "continuously monitors Google and Bing search results",
+    );
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer cut branded spend 29%");
-    expect(result.steps[3].cta).toBe("Open to a quick overview?");
+    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
+    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
     expect(JSON.stringify(result.steps)).not.toContain("duplicated model heading");
   });
 

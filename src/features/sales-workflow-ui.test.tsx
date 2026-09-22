@@ -144,9 +144,24 @@ function buildSequenceResult(overrides: Partial<BuildSequenceResult> = {}): Buil
       whyThisShouldResonate: "It maps to paid-search operations.",
       openingStyle: "BUSINESS_QUESTION",
       sequenceNarrative: [
-        { step: 1, objective: "Open relevance", newInformation: "Prospect context", ctaIntent: "Discovery" },
-        { step: 2, objective: "Frame problem", newInformation: "Auction changes", ctaIntent: "Assess process" },
-        { step: 3, objective: "Explain method", newInformation: "Signal capability", ctaIntent: "Invite review" },
+        {
+          step: 1,
+          objective: "Open relevance",
+          newInformation: "Prospect context",
+          ctaIntent: "Discovery",
+        },
+        {
+          step: 2,
+          objective: "Frame problem",
+          newInformation: "Auction changes",
+          ctaIntent: "Assess process",
+        },
+        {
+          step: 3,
+          objective: "Explain method",
+          newInformation: "Signal capability",
+          ctaIntent: "Invite review",
+        },
         { step: 4, objective: "Proof", newInformation: "Approved proof", ctaIntent: "Soft CTA" },
       ],
       confidence: "MEDIUM",
@@ -211,7 +226,9 @@ describe("Sales workflow UI", () => {
     expect(screen.getByText("Duration")).toBeTruthy();
     expect(screen.getByText("Edit extracted details").closest("details")?.open).toBe(false);
     expect(document.querySelector("form")?.noValidate).toBe(true);
-    expect(document.querySelector<HTMLInputElement>('input[name="companyName"]')?.required).toBe(false);
+    expect(document.querySelector<HTMLInputElement>('input[name="companyName"]')?.required).toBe(
+      false,
+    );
   });
 
   it("keeps Build Sequence screenshot context optional and tucked into advanced details", () => {
@@ -249,7 +266,9 @@ describe("Sales workflow UI", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
 
-    expect(screen.getByText("Understanding prospect... Building strategy... Generating sequence...")).toBeTruthy();
+    expect(
+      screen.getByText("Understanding prospect... Building strategy... Generating sequence..."),
+    ).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock.mock.calls[0][0]).toBe("/api/build-sequence/generate");
     expect(latestBuildSequencePayload()).toEqual(
@@ -264,7 +283,9 @@ describe("Sales workflow UI", () => {
   it("does not submit Build Sequence from a LinkedIn URL alone", async () => {
     render(<BuildSequenceClient />);
 
-    const linkedinUrl = document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]');
+    const linkedinUrl = document.querySelector<HTMLInputElement>(
+      'input[name="linkedinProfileUrl"]',
+    );
     expect(linkedinUrl).toBeTruthy();
     fireEvent.change(linkedinUrl!, {
       target: { value: "https://www.linkedin.com/in/chris-example/" },
@@ -279,7 +300,7 @@ describe("Sales workflow UI", () => {
     ).toBeTruthy();
   });
 
-  it("passes an optional LinkedIn profile URL with pasted context into Build Sequence prospect context", async () => {
+  it("keeps the LinkedIn URL out of pasted prospect context sent to copy generation", async () => {
     mockBuildSequenceApiResponse({
       ok: false,
       code: "VALIDATION_ERROR",
@@ -287,7 +308,9 @@ describe("Sales workflow UI", () => {
     });
     render(<BuildSequenceClient />);
 
-    const linkedinUrl = document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]');
+    const linkedinUrl = document.querySelector<HTMLInputElement>(
+      'input[name="linkedinProfileUrl"]',
+    );
     expect(linkedinUrl).toBeTruthy();
     fireEvent.change(linkedinUrl!, {
       target: { value: "https://www.linkedin.com/in/chris-example/" },
@@ -304,10 +327,8 @@ describe("Sales workflow UI", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(latestBuildSequencePayload()).toEqual(
       expect.objectContaining({
-        rawProspectContext:
-          "LinkedIn URL: https://www.linkedin.com/in/chris-example/\n\nChris from Remofirst manages paid search and AI automation.",
-        prospectContext:
-          "LinkedIn URL: https://www.linkedin.com/in/chris-example/\n\nChris from Remofirst manages paid search and AI automation.",
+        rawProspectContext: "Chris from Remofirst manages paid search and AI automation.",
+        prospectContext: "Chris from Remofirst manages paid search and AI automation.",
       }),
     );
   });
@@ -385,22 +406,22 @@ describe("Sales workflow UI", () => {
         ok: true,
         status: 200,
         json: async () => ({
-        ok: false,
-        code: "ACCOUNT_STATUS_BLOCKED",
-        message:
-          "This company is already marked as a Primelis client. Normal prospecting should not continue.",
+          ok: false,
+          code: "ACCOUNT_STATUS_BLOCKED",
+          message:
+            "This company is already marked as a Primelis client. Normal prospecting should not continue.",
         }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
-        ok: true,
-        data: buildSequenceResult({
-          safetyNotes: [
-            "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
-          ],
-        }),
+          ok: true,
+          data: buildSequenceResult({
+            safetyNotes: [
+              "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
+            ],
+          }),
         }),
       });
     render(<BuildSequenceClient />);
@@ -467,7 +488,8 @@ describe("Sales workflow UI", () => {
     const steps: SequenceStep[] = [1, 2, 3, 4].map((stepNumber) => ({
       stepNumber,
       channel: "EMAIL",
-      delay: stepNumber === 1 ? "Day 0" : stepNumber === 4 ? "Final touch" : `Day ${stepNumber * 3}`,
+      delay:
+        stepNumber === 1 ? "Day 0" : stepNumber === 4 ? "Final touch" : `Day ${stepNumber * 3}`,
       purpose:
         stepNumber === 1
           ? "FIRST_TOUCH_RELEVANCE"

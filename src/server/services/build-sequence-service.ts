@@ -58,10 +58,7 @@ import {
   extractProspectSemantic,
   type SemanticExtractionProvider,
 } from "./prospect-semantic-intake";
-import {
-  planAiMessageStrategy,
-  type AiMessageStrategyProvider,
-} from "./message-strategy-planner";
+import { planAiMessageStrategy, type AiMessageStrategyProvider } from "./message-strategy-planner";
 import { err, ok } from "./result";
 
 const buildSequenceSchema = z
@@ -94,10 +91,7 @@ const buildSequenceSchema = z
       .optional()
       .transform((value) => value || "Light discovery before pitching Signal"),
     primaryChannel: z.enum(sequenceChannels),
-    sequenceLength: z.union([
-      z.literal(4),
-      z.coerce.number().pipe(z.literal(4)),
-    ]),
+    sequenceLength: z.union([z.literal(4), z.coerce.number().pipe(z.literal(4))]),
     desiredTone: z.enum(sequenceTones),
     desiredOverallDuration: z
       .string()
@@ -303,7 +297,7 @@ function keywordEvidenceFromExtraction(extraction: ProspectExtraction) {
     .filter((item) => item.status === "SOLO" || item.status === "CONTESTED")
     .map((item) => ({
       term: item.keyword,
-      status: item.status === "SOLO" ? "solo" as const : "contested" as const,
+      status: item.status === "SOLO" ? ("solo" as const) : ("contested" as const),
       competitor: item.competitors?.[0],
       note: item.observation,
     }))
@@ -363,7 +357,10 @@ async function persistProspectMemory({
 }) {
   const rawText = input.rawProspectContext?.trim();
   if (!rawText) {
-    return { input: normalizedInputFromExtraction(input), memory: undefined as ProspectMemory | undefined };
+    return {
+      input: normalizedInputFromExtraction(input),
+      memory: undefined as ProspectMemory | undefined,
+    };
   }
   const semanticStarted = nowMs();
   const semanticResult = await extractProspectSemantic(rawText, {
@@ -452,12 +449,14 @@ function stripLeadingStepHeader(text: string) {
 function protectedKeywordPhrases(generation: SequenceGeneration) {
   const evidence = generation.prospectIntelligence.serpEvidence;
   return Array.from(
-    new Set([
-      ...evidence.keywords,
-      ...evidence.soloKeywords,
-      ...evidence.contestedKeywords,
-      ...evidence.structuredKeywords.map((keyword) => keyword.term),
-    ].filter(Boolean)),
+    new Set(
+      [
+        ...evidence.keywords,
+        ...evidence.soloKeywords,
+        ...evidence.contestedKeywords,
+        ...evidence.structuredKeywords.map((keyword) => keyword.term),
+      ].filter(Boolean),
+    ),
   );
 }
 
@@ -590,10 +589,16 @@ function knowledgeRank(record: SequenceKnowledgeRecord, input: BuildSequenceInpu
   if (/fashion|luxury/.test(industry ?? "") && /fashion|luxury|retail/.test(haystack)) {
     rank -= 6;
   }
-  if (/saas|software|b2b|data|lead/.test(industry ?? "") && /saas|data|lead|martech/.test(haystack)) {
+  if (
+    /saas|software|b2b|data|lead/.test(industry ?? "") &&
+    /saas|data|lead|martech/.test(haystack)
+  ) {
     rank -= 6;
   }
-  if (/retail|e-?commerce|footwear/.test(industry ?? "") && /retail|e-?commerce|footwear/.test(haystack)) {
+  if (
+    /retail|e-?commerce|footwear/.test(industry ?? "") &&
+    /retail|e-?commerce|footwear/.test(haystack)
+  ) {
     rank -= 6;
   }
   return rank;
@@ -649,7 +654,9 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
     );
   }
   if (!input.paidSearchContext) {
-    limitations.add("No structured paid-search context was provided; raw context was used conservatively.");
+    limitations.add(
+      "No structured paid-search context was provided; raw context was used conservatively.",
+    );
   }
   if (input.currentVendor) {
     limitations.add(
@@ -663,10 +670,14 @@ function knowledgeLimitations(input: BuildSequenceInput, records: SequenceKnowle
     limitations.add("No approved eligible Signal knowledge was available for this channel.");
   }
   if (!input.serpEvidence && !hasVisualContext(input) && !input.keywords?.length) {
-    limitations.add("No SERP evidence was provided, so account-specific search conditions were not claimed.");
+    limitations.add(
+      "No SERP evidence was provided, so account-specific search conditions were not claimed.",
+    );
   }
   if (mismatchedKeywordEvidence(input).length > 0) {
-    limitations.add("Some keyword evidence did not appear to match the prospect company and was not used for specific SERP claims.");
+    limitations.add(
+      "Some keyword evidence did not appear to match the prospect company and was not used for specific SERP claims.",
+    );
   }
   return Array.from(limitations);
 }
@@ -731,7 +742,7 @@ function escapeRegExp(text: string) {
 function hasVisualContext(input: BuildSequenceInput) {
   return Boolean(
     input.screenshotAvailable &&
-      [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
+    [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
   );
 }
 
@@ -747,29 +758,86 @@ function questionCount(text: string) {
   return (text.match(/\?/g) ?? []).length;
 }
 
+function containsForbiddenProspectCopy(text: string) {
+  return /\b(?:Hi there|LinkedIn URL|Prospect Context|focus at|The Account|this account|As a Senior Manager|defend demand and ease pressure|That is the practical benchmark|higher CAC|demand leakage|unexpected rivals|competitor-present|lone-bidder|query sets|missed conversions|avoidable CPC increases)\b/i.test(
+    text,
+  );
+}
+
+function containsMechanicalTitleInsertion(text: string) {
+  return /\b(?:for your .{2,100} remit|in your role as|as a [^,.]{2,100}|given your role as)\b/i.test(
+    text,
+  );
+}
+
+function repeatsNameAfterGreeting(input: BuildSequenceInput, body: string) {
+  const firstName = input.contactFirstName?.trim();
+  if (!firstName) return false;
+  const afterGreeting = body
+    .replace(new RegExp(`^Hi\\s+${escapeRegExp(firstName)},\\s*`, "i"), "")
+    .trim();
+  return new RegExp(`^${escapeRegExp(firstName)}\\b[,;:]?`, "i").test(afterGreeting);
+}
+
+function containsSemanticAsk(text: string) {
+  return (
+    questionCount(text) > 0 ||
+    /\b(?:would|could|can|do|does|is|are)\s+(?:you|your team)\b|\bhow do you\b|\bworth (?:a|seeing|checking|exploring)\b|\bopen to\b|\blet me know\b|\bhappy to (?:share|send|show)\b/i.test(
+      text,
+    )
+  );
+}
+
+function hasRequiredSignalMechanics(step: SequenceStep) {
+  const text = `${step.messageBody} ${step.cta}`;
+  return (
+    /not simply an on\/off decision|isn['’]t simply an on\/off decision/i.test(text) &&
+    /competition drops/i.test(text) &&
+    /reduce bids/i.test(text) &&
+    /lowest CPC|lowest .*position needed/i.test(text) &&
+    /competition returns|another advertiser returns/i.test(text)
+  );
+}
+
+function containsDuplicatedProspectName(input: BuildSequenceInput, text: string) {
+  const name = input.contactFirstName?.trim();
+  const repeatedFirstName = name
+    ? new RegExp(`\\b${escapeRegExp(name)}\\b(?:\\s+\\b${escapeRegExp(name)}\\b)+`, "i").test(text)
+    : false;
+  const repeatedFullName = /\b([A-Z][a-z'’-]+(?:\s+[A-Z][a-z'’-]+){1,2})\s+\1\b/.test(text);
+  return repeatedFirstName || repeatedFullName;
+}
+
 function wordCount(text: string) {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
 function containsVagueAnonymousCustomerStory(text: string) {
-  return /\b(a customer example|one customer found|a client we worked with|we(?:'|’)ve seen with customers|another customer|one customer|a client|one client|a brand we worked with|a team we worked with)\b/i.test(text) ||
+  return (
+    /\b(a customer example|one customer found|a client we worked with|we(?:'|’)ve seen with customers|another customer|one customer|a client|one client|a brand we worked with|a team we worked with)\b/i.test(
+      text,
+    ) ||
     /\b(one|a|another)\s+(customer|client|brand|company|team)\s+(example|found|showed|saw|proved|reduced|cut|saved)\b/i.test(
       text,
-    );
+    )
+  );
 }
 
 function containsUnsupportedVisualClaim(text: string) {
-  return /\b(screenshot|serp|image|visual|example)\b/i.test(text) &&
+  return (
+    /\b(screenshot|serp|image|visual|example)\b/i.test(text) &&
     /\bshows|visible|appears|above|below|only advertiser|no other advertiser|solo bidder\b/i.test(
       text,
-    );
+    )
+  );
 }
 
 function containsProspectWasteClaim(input: BuildSequenceInput, text: string) {
   const company = escapeRegExp(input.companyName);
-  return new RegExp(`\\b${company}\\b.{0,80}\\b(wasting|wasteful|overpaying|unnecessary spend)\\b`, "i").test(
-    text,
-  );
+  return new RegExp(
+    `\\b${company}\\b.{0,80}\\b(wasting|wasteful|overpaying|unnecessary spend)\\b`,
+    "i",
+  ).test(text);
 }
 
 function containsUnsupportedStepOneClaim(input: BuildSequenceInput, step: SequenceStep) {
@@ -785,9 +853,10 @@ function containsUnsupportedStepOneClaim(input: BuildSequenceInput, step: Sequen
   ]
     .filter(Boolean)
     .join(" ");
-  const hasSupport = /crowded|competitor|competition|auction|solo|alone|only advertiser|no other advertiser|waste|unnecessary spend|spend is high|high spend|weak control|incremental|incrementality/i.test(
-    verified,
-  );
+  const hasSupport =
+    /crowded|competitor|competition|auction|solo|alone|only advertiser|no other advertiser|waste|unnecessary spend|spend is high|high spend|weak control|incremental|incrementality/i.test(
+      verified,
+    );
   if (hasSupport) {
     return false;
   }
@@ -828,7 +897,10 @@ function containsStepContamination(step: SequenceStep, expectedLength: number) {
   if (containsRepeatedStepOrder(body, expectedLength)) {
     return true;
   }
-  if (expectedLength >= 4 && /step\s+1\b[\s\S]*step\s+2\b[\s\S]*step\s+3\b[\s\S]*step\s+4\b/i.test(body)) {
+  if (
+    expectedLength >= 4 &&
+    /step\s+1\b[\s\S]*step\s+2\b[\s\S]*step\s+3\b[\s\S]*step\s+4\b/i.test(body)
+  ) {
     return true;
   }
   if ((body.match(/\n\s*---+\s*\n/g) ?? []).length > 1) {
@@ -898,8 +970,8 @@ function hasRepeatedCtaIntent(steps: SequenceStep[]) {
   const nonCloseIntents = intents.filter((intent) => intent !== "close");
   return (
     nonCloseIntents.length >= 3 &&
-      nonCloseIntents.filter((intent) => intent === "show_or_send").length >=
-        nonCloseIntents.length - 1
+    nonCloseIntents.filter((intent) => intent === "show_or_send").length >=
+      nonCloseIntents.length - 1
   );
 }
 
@@ -935,11 +1007,22 @@ function containsStandaloneSentenceFragment(text: string) {
     .map((line) => line.trim())
     .filter(Boolean)
     .some((line) => {
-      if (/^hi\b/i.test(line) || /^(?:congrats|congratulations)\b/i.test(line) || /[?]$/.test(line) || /^re:/i.test(line)) return false;
-      if (/^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(line)) {
+      if (
+        /^hi\b/i.test(line) ||
+        /^(?:congrats|congratulations)\b/i.test(line) ||
+        /[?]$/.test(line) ||
+        /^re:/i.test(line)
+      )
+        return false;
+      if (
+        /^(?:Understand|Identify|Measure|Compare|Separate|Review|Use|Build|Create|Determine)\b/i.test(
+          line,
+        )
+      ) {
         return true;
       }
-      const dangling = /(?:,\s*|\b(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(line);
+      const dangling =
+        /(?:,\s*|\b(?:and|or|with|covering|including|across|for|of|in|paid)\.?)$/i.test(line);
       return dangling;
     });
 }
@@ -972,10 +1055,16 @@ function containsUnsupportedOrganicClaim(
 function validateStepOneReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /branded-search|brand(ed)? search|SERP|auction|CPC|bid|coverage|competitive landscape/i.test(text) &&
-    /question|snapshot|competitors?|solo|contested|visibility|bids should change|CPC may be|same CPC|quiet brand auctions|branded-search efficiency/i.test(text) &&
+    /branded-search|brand(ed)? search|SERP|auction|CPC|bid|coverage|competitive landscape/i.test(
+      text,
+    ) &&
+    /question|snapshot|competitors?|solo|contested|visibility|bids should change|CPC may be|same CPC|quiet brand auctions|branded-search efficiency/i.test(
+      text,
+    ) &&
     questionCount(text) <= 2 &&
-    !/case study|screenshot|\{\{! Insert screenshot \}\}|use the screenshot|what it shows/i.test(text)
+    !/case study|screenshot|\{\{! Insert screenshot \}\}|use the screenshot|what it shows/i.test(
+      text,
+    )
   );
 }
 
@@ -984,10 +1073,16 @@ function validateStepTwoReference(step: SequenceStep) {
   const hasImageReference = /screenshot|visual|SERP/i.test(step.imageContextNote ?? "");
   return (
     (hasImageReference || !step.imageContextNote) &&
-    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction|competitors appear|competitors disappear|hold steady/i.test(text) &&
-    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page|Google and Bing results|defend|lower pressure/i.test(text) &&
+    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction|competitors appear|competitors disappear|another advertiser|competition changes|same branded bid|hold steady/i.test(
+      text,
+    ) &&
+    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page|Google and Bing (?:search )?results|defend|lower pressure/i.test(
+      text,
+    ) &&
     !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
-    !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(text) &&
+    !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(
+      text,
+    ) &&
     !containsVagueAnonymousCustomerStory(text)
   );
 }
@@ -996,9 +1091,13 @@ function validateStepThreeReference(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
   return (
     /(?:existing|current) Google Ads setup/i.test(text) &&
-    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy|not rebuilding campaigns|decision quality/i.test(text) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|practical read|decision rule|brand auction changes|auction pressure|live market pressure/i.test(text) &&
-    /measure|visibility|bid|CPC|coverage|auction changes/i.test(text) &&
+    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy|not rebuilding campaigns|decision quality|not simply an on\/off decision/i.test(
+      text,
+    ) &&
+    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|practical read|decision rule|brand auction changes|auction pressure|live market pressure|competition drops/i.test(
+      text,
+    ) &&
+    /measure|visibility|bid|CPC|coverage|auction changes|position needed/i.test(text) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );
 }
@@ -1009,7 +1108,9 @@ function validateStepFourReference(step: SequenceStep) {
     return (
       /priority right now|timing/i.test(text) &&
       /happy to share more|happy to send a short overview/i.test(text) &&
-      !/close the loop|close this out|final email|case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b|monitors?|Google Ads|Search Console|Bing|competitors?|pause|reduce bids|restore coverage|walkthrough|demo/i.test(text)
+      !/close the loop|close this out|final email|case study|\b\d+(?:\.\d+)?\s*%|\bMQL\b|\bSQL\b|\brevenue\b|\bclicks?\b|\bCPC\b|monitors?|Google Ads|Search Console|Bing|competitors?|pause|reduce bids|restore coverage|walkthrough|demo/i.test(
+        text,
+      )
     );
   }
   return (
@@ -1105,8 +1206,16 @@ function copiesGoldStandardExample(generation: SequenceGeneration, steps: Sequen
   const generatedText = normalizedText(renderedSequenceText(steps));
   return generation.selectedGoldStandardExamples.some((example) => {
     const exampleText = normalizedText(`${example.subject ?? ""} ${example.body}`);
-    return similarity(generatedText, exampleText) > 0.85 ||
-      steps.some((step) => similarity(normalizedText(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`), exampleText) > 0.9);
+    return (
+      similarity(generatedText, exampleText) > 0.85 ||
+      steps.some(
+        (step) =>
+          similarity(
+            normalizedText(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`),
+            exampleText,
+          ) > 0.9,
+      )
+    );
   });
 }
 
@@ -1131,13 +1240,15 @@ function caseStudyCompanies(records: SequenceKnowledgeRecord[]) {
         match?.[1] ??
         approvedTextCompany?.[1] ??
         record.title.split(/\s+(?:cuts|reduces|lowers|improves|leads)\s+/i)[0]
-      )
-        .trim();
+      ).trim();
     })
     .filter((company) => company.length > 1);
 }
 
-function hasMultipleProofCompanies(generation: SequenceGeneration, records: SequenceKnowledgeRecord[]) {
+function hasMultipleProofCompanies(
+  generation: SequenceGeneration,
+  records: SequenceKnowledgeRecord[],
+) {
   const rendered = JSON.stringify({
     overallStrategy: generation.overallStrategy,
     claimsUsed: generation.claimsUsed,
@@ -1174,6 +1285,12 @@ const recoverableSequenceFailureReasons = new Set([
   "cta-intent",
   "questions",
   "cta-questions",
+  "forbidden-copy",
+  "duplicate-name",
+  "mechanical-title",
+  "greeting-name-repeat",
+  "multiple-asks",
+  "step3-mechanics",
   "word-count",
   "anonymous",
   "vague",
@@ -1201,7 +1318,10 @@ function issue(
   };
 }
 
-function firstStepIndex(steps: SequenceStep[], predicate: (step: SequenceStep, index: number) => boolean) {
+function firstStepIndex(
+  steps: SequenceStep[],
+  predicate: (step: SequenceStep, index: number) => boolean,
+) {
   const index = steps.findIndex(predicate);
   return index >= 0 ? [index] : [];
 }
@@ -1278,8 +1398,13 @@ function ctaIntentRecoveryStepIndexes(steps: SequenceStep[]) {
   return [];
 }
 
-function duplicateCompleteSequenceStepIndexes(steps: SequenceStep[], generation: SequenceGeneration) {
-  const contaminated = firstStepIndex(steps, (step) => containsStepContamination(step, steps.length));
+function duplicateCompleteSequenceStepIndexes(
+  steps: SequenceStep[],
+  generation: SequenceGeneration,
+) {
+  const contaminated = firstStepIndex(steps, (step) =>
+    containsStepContamination(step, steps.length),
+  );
   if (contaminated.length > 0) {
     return contaminated;
   }
@@ -1289,7 +1414,9 @@ function duplicateCompleteSequenceStepIndexes(steps: SequenceStep[], generation:
   }
   const rendered = renderedSequenceText(steps);
   if (containsRepeatedStepOrder(rendered, steps.length)) {
-    return firstStepIndex(steps, (step) => containsRepeatedStepOrder(step.messageBody, steps.length));
+    return firstStepIndex(steps, (step) =>
+      containsRepeatedStepOrder(step.messageBody, steps.length),
+    );
   }
   const allText = [
     generation.overallStrategy,
@@ -1298,12 +1425,14 @@ function duplicateCompleteSequenceStepIndexes(steps: SequenceStep[], generation:
     rendered,
   ].join("\n");
   if (containsRepeatedStepOrder(allText, steps.length)) {
-    return firstStepIndex(steps, (step) => containsRepeatedStepOrder(step.messageBody, steps.length));
+    return firstStepIndex(steps, (step) =>
+      containsRepeatedStepOrder(step.messageBody, steps.length),
+    );
   }
   return [];
 }
 
-function sequenceValidationIssueDetails(
+export function sequenceValidationIssueDetails(
   input: BuildSequenceInput,
   generation: SequenceGeneration,
   records: SequenceKnowledgeRecord[] = [],
@@ -1335,7 +1464,9 @@ function sequenceValidationIssueDetails(
     return fail(issue("channel", [], false));
   }
   if (hasDuplicateCompleteSequence(steps, generation)) {
-    return fail(issue("duplicate-sequence", duplicateCompleteSequenceStepIndexes(steps, generation)));
+    return fail(
+      issue("duplicate-sequence", duplicateCompleteSequenceStepIndexes(steps, generation)),
+    );
   }
   if (hasTemplateLikeStructure(steps)) {
     return fail(issue("template-like", templateLikeStepIndexes(steps)));
@@ -1346,7 +1477,9 @@ function sequenceValidationIssueDetails(
   if (copiesGoldStandardExample(generation, steps)) {
     return fail(issue("gold-standard-copy", [], false));
   }
-  const contaminatedStep = firstStepIndex(steps, (step) => containsStepContamination(step, input.sequenceLength));
+  const contaminatedStep = firstStepIndex(steps, (step) =>
+    containsStepContamination(step, input.sequenceLength),
+  );
   if (contaminatedStep.length > 0) {
     return fail(issue("contamination", contaminatedStep));
   }
@@ -1373,13 +1506,50 @@ function sequenceValidationIssueDetails(
   if (hasRepeatedCtaIntent(steps)) {
     return fail(issue("cta-intent", ctaIntentRecoveryStepIndexes(steps)));
   }
-  const questionStep = firstStepIndex(steps, (step) => questionCount(`${step.messageBody} ${step.cta}`) > 2);
+  const questionStep = firstStepIndex(
+    steps,
+    (step) => questionCount(`${step.messageBody} ${step.cta}`) > 2,
+  );
   if (questionStep.length > 0) {
     return fail(issue("questions", questionStep));
   }
   const ctaQuestionStep = firstStepIndex(steps, (step) => questionCount(step.cta) > 1);
   if (ctaQuestionStep.length > 0) {
     return fail(issue("cta-questions", ctaQuestionStep));
+  }
+  const forbiddenCopyStep = firstStepIndex(steps, (step) =>
+    containsForbiddenProspectCopy(`${step.subjectLine ?? ""} ${step.messageBody} ${step.cta}`),
+  );
+  if (forbiddenCopyStep.length > 0) {
+    return fail(issue("forbidden-copy", forbiddenCopyStep));
+  }
+  const duplicatedNameStep = firstStepIndex(steps, (step) =>
+    containsDuplicatedProspectName(input, `${step.messageBody} ${step.cta}`),
+  );
+  if (duplicatedNameStep.length > 0) {
+    return fail(issue("duplicate-name", duplicatedNameStep));
+  }
+  const mechanicalTitleStep = firstStepIndex(steps, (step) =>
+    containsMechanicalTitleInsertion(`${step.messageBody} ${step.cta}`),
+  );
+  if (mechanicalTitleStep.length > 0) {
+    return fail(issue("mechanical-title", mechanicalTitleStep));
+  }
+  const greetingNameRepeatStep = firstStepIndex(steps, (step) =>
+    repeatsNameAfterGreeting(input, step.messageBody),
+  );
+  if (greetingNameRepeatStep.length > 0) {
+    return fail(issue("greeting-name-repeat", greetingNameRepeatStep));
+  }
+  const multipleAskStep = firstStepIndex(
+    steps,
+    (step) => Boolean(step.cta.trim()) && containsSemanticAsk(step.messageBody),
+  );
+  if (multipleAskStep.length > 0) {
+    return fail(issue("multiple-asks", multipleAskStep));
+  }
+  if (steps[2] && !hasRequiredSignalMechanics(steps[2])) {
+    return fail(issue("step3-mechanics", [2]));
   }
   const wordyStep = firstStepIndex(
     steps,
@@ -1399,7 +1569,9 @@ function sequenceValidationIssueDetails(
   if (wordyStep.length > 0) {
     return fail(issue("word-count", wordyStep));
   }
-  const anonymousStep = firstStepIndex(steps, (step) => containsVagueAnonymousCustomerStory(step.messageBody));
+  const anonymousStep = firstStepIndex(steps, (step) =>
+    containsVagueAnonymousCustomerStory(step.messageBody),
+  );
   if (anonymousStep.length > 0) {
     return fail(issue("anonymous", anonymousStep));
   }
@@ -1425,7 +1597,9 @@ function sequenceValidationIssueDetails(
   if (internalLanguageStep.length > 0) {
     return fail(issue("internal-language", internalLanguageStep));
   }
-  const sentenceFragmentStep = firstStepIndex(steps, (step) => containsStandaloneSentenceFragment(step.messageBody));
+  const sentenceFragmentStep = firstStepIndex(steps, (step) =>
+    containsStandaloneSentenceFragment(step.messageBody),
+  );
   if (sentenceFragmentStep.length > 0) {
     return fail(issue("sentence-fragment", sentenceFragmentStep));
   }
@@ -1471,7 +1645,9 @@ function sequenceValidationIssueDetails(
       return fail(issue("image-note", [1], false));
     }
   }
-  const wasteStep = firstStepIndex(steps, (step) => containsProspectWasteClaim(input, step.messageBody));
+  const wasteStep = firstStepIndex(steps, (step) =>
+    containsProspectWasteClaim(input, step.messageBody),
+  );
   if (wasteStep.length > 0) {
     return fail(issue("waste", wasteStep, false));
   }
@@ -1481,8 +1657,7 @@ function sequenceValidationIssueDetails(
       steps[0].purpose === "FIRST_TOUCH_RELEVANCE" &&
       steps[1].purpose === "PROBLEM_FRAMING" &&
       steps[2].purpose === "METHODOLOGY_DIFFERENTIATION" &&
-      (steps.at(-1)?.purpose === "SOCIAL_PROOF" ||
-        steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP")
+      (steps.at(-1)?.purpose === "SOCIAL_PROOF" || steps.at(-1)?.purpose === "BREAKUP_CLOSE_LOOP")
     )
   ) {
     return fail(issue("progression", [], false));
@@ -1595,8 +1770,9 @@ function normalizeEmailGreeting(messageBody: string, greetingName: string) {
 
   const greetingMatch = trimmed.match(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i);
   if (greetingMatch) {
-    return trimmed.replace(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i, (match) =>
-      `${match.replace(/[.!]\s*$/, "").trim()},\n\n`,
+    return trimmed.replace(
+      /^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i,
+      (match) => `${match.replace(/[.!]\s*$/, "").trim()},\n\n`,
     );
   }
   if (/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there),/i.test(trimmed)) {
@@ -1634,9 +1810,7 @@ function replaceWeakProofBridge(messageBody: string, generation: SequenceGenerat
 }
 
 function normalizeApprovedProofParagraph(messageBody: string, generation: SequenceGeneration) {
-  const bridge = hasMarketSequenceContext(generation)
-    ? "For a multi-market paid media team, the practical question is where branded coverage still needs defending and where bid pressure can safely ease."
-    : "For paid search, the practical question is where branded coverage still needs defending and where bid pressure can safely ease.";
+  void generation;
 
   if (
     /when they used|used live SERP|guide brand bids|guided brand bids/i.test(messageBody) &&
@@ -1645,8 +1819,7 @@ function normalizeApprovedProofParagraph(messageBody: string, generation: Sequen
     /qualified lead volume\s+(?:rose|up)\s+25%/i.test(messageBody)
   ) {
     return [
-      "AppsFlyer cut branded spend 29% while qualified lead volume rose 25% in the first 30 days.",
-      bridge,
+      "AppsFlyer reduced branded spend by 29% while qualified lead volume increased 25% in the first 30 days.",
     ].join("\n\n");
   }
 
@@ -1672,7 +1845,10 @@ function normalizeSubjectLine(subjectLine: string | undefined, generation: Seque
   const companyName = generation.prospectIntelligence.companyName?.trim();
   let normalized = subjectLine.trim();
   if (companyName) {
-    normalized = normalized.replace(new RegExp(`\\b${escapeRegExp(companyName)}\\b`, "i"), companyName);
+    normalized = normalized.replace(
+      new RegExp(`\\b${escapeRegExp(companyName)}\\b`, "i"),
+      companyName,
+    );
   }
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
@@ -1711,18 +1887,30 @@ function sanitizeSequenceGeneration(
     overallStrategy: sanitizeGeneratedText(generation.overallStrategy, safeKeywords),
     messageStrategy: {
       ...generation.messageStrategy,
-      prospectInsight: sanitizeGeneratedText(generation.messageStrategy.prospectInsight, safeKeywords),
-      businessQuestion: sanitizeGeneratedText(generation.messageStrategy.businessQuestion, safeKeywords),
+      prospectInsight: sanitizeGeneratedText(
+        generation.messageStrategy.prospectInsight,
+        safeKeywords,
+      ),
+      businessQuestion: sanitizeGeneratedText(
+        generation.messageStrategy.businessQuestion,
+        safeKeywords,
+      ),
       productGap: sanitizeGeneratedText(generation.messageStrategy.productGap, safeKeywords),
       primaryAngle: sanitizeGeneratedText(generation.messageStrategy.primaryAngle, safeKeywords),
       secondaryAngle: generation.messageStrategy.secondaryAngle
         ? sanitizeGeneratedText(generation.messageStrategy.secondaryAngle, safeKeywords)
         : undefined,
-      relevantCapability: sanitizeGeneratedText(generation.messageStrategy.relevantCapability, safeKeywords),
+      relevantCapability: sanitizeGeneratedText(
+        generation.messageStrategy.relevantCapability,
+        safeKeywords,
+      ),
       proofPoint: generation.messageStrategy.proofPoint
         ? sanitizeGeneratedText(generation.messageStrategy.proofPoint, safeKeywords)
         : undefined,
-      whyThisShouldResonate: sanitizeGeneratedText(generation.messageStrategy.whyThisShouldResonate, safeKeywords),
+      whyThisShouldResonate: sanitizeGeneratedText(
+        generation.messageStrategy.whyThisShouldResonate,
+        safeKeywords,
+      ),
       sequenceNarrative: generation.messageStrategy.sequenceNarrative.map((item) => ({
         ...item,
         objective: sanitizeGeneratedText(item.objective, safeKeywords),
@@ -1738,7 +1926,9 @@ function sanitizeSequenceGeneration(
       );
       return {
         ...step,
-        subjectLine: step.subjectLine ? sanitizeGeneratedText(step.subjectLine, safeKeywords) : undefined,
+        subjectLine: step.subjectLine
+          ? sanitizeGeneratedText(step.subjectLine, safeKeywords)
+          : undefined,
         connectionRequest: step.connectionRequest
           ? sanitizeGeneratedText(step.connectionRequest, safeKeywords)
           : undefined,
@@ -1763,19 +1953,17 @@ function recoverSequenceSteps(
   if (issues.some((detail) => !detail.recoverable || detail.stepIndexes.length === 0)) {
     return undefined;
   }
-  const stepIndexes = Array.from(
-    new Set(issues.flatMap((detail) => detail.stepIndexes)),
-  )
+  const stepIndexes = Array.from(new Set(issues.flatMap((detail) => detail.stepIndexes)))
     .filter((index) => !alreadyRecovered.has(index))
     .sort((left, right) => left - right);
   if (stepIndexes.length === 0 || stepIndexes.length >= generated.steps.length) {
     return undefined;
   }
-  const fallbackByNumber = new Map(
-    fallbackGenerated.steps.map((step) => [step.stepNumber, step]),
-  );
+  const fallbackByNumber = new Map(fallbackGenerated.steps.map((step) => [step.stepNumber, step]));
   const recoveredSteps = generated.steps.map((step, index) =>
-    stepIndexes.includes(index) ? fallbackByNumber.get(step.stepNumber) ?? fallbackGenerated.steps[index] ?? step : step,
+    stepIndexes.includes(index)
+      ? (fallbackByNumber.get(step.stepNumber) ?? fallbackGenerated.steps[index] ?? step)
+      : step,
   );
   if (recoveredSteps.some((step) => !step)) {
     return undefined;
@@ -1787,7 +1975,9 @@ function recoverSequenceSteps(
       ...generated.safetyNotes,
       `Final validation recovered step${stepIndexes.length === 1 ? "" : "s"} ${stepIndexes
         .map((index) => index + 1)
-        .join(", ")} with deterministic step fallback: ${issues.map((detail) => detail.reason).join(", ")}.`,
+        .join(
+          ", ",
+        )} with deterministic step fallback: ${issues.map((detail) => detail.reason).join(", ")}.`,
     ],
     diagnostics: {
       ...generated.diagnostics,
@@ -1803,11 +1993,12 @@ function openAiFallbackReason(providerName: string, notes: string[]) {
   if (providerName !== "openai") {
     return undefined;
   }
-  return notes.find((note) =>
-    !/^Hybrid rewrite fell back for step \d+:/i.test(note) &&
-    /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse|did not match the app schema/i.test(
-      note,
-    ),
+  return notes.find(
+    (note) =>
+      !/^Hybrid rewrite fell back for step \d+:/i.test(note) &&
+      /fallback was used|provider failed|not configured|authentication failed|rate limit|model was not found|OpenAI rejected|OpenAI request failed|could not parse|did not match the app schema/i.test(
+        note,
+      ),
   );
 }
 
@@ -2221,7 +2412,10 @@ export async function generateBuildSequence(
   });
   const input = memoryResult.input;
   if (!input.companyName.trim()) {
-    return err("VALIDATION_ERROR", "Build Sequence needs: Company or prospect context with a company.");
+    return err(
+      "VALIDATION_ERROR",
+      "Build Sequence needs: Company or prospect context with a company.",
+    );
   }
 
   const accountStatus = await checkAccountStatus(
@@ -2307,12 +2501,12 @@ export async function generateBuildSequence(
   );
   const sequenceGenerationDurationMs = nowMs() - sequenceStarted;
   let providerMetadata = provider.metadata;
-  const fallbackReason = openAiFallbackReason(provider.metadata.providerName, generated.safetyNotes);
+  const fallbackReason = openAiFallbackReason(
+    provider.metadata.providerName,
+    generated.safetyNotes,
+  );
   if (fallbackReason) {
-    return err(
-      "AI_PROVIDER_FAILED",
-      `OpenAI did not generate this sequence. ${fallbackReason}`,
-    );
+    return err("AI_PROVIDER_FAILED", `OpenAI did not generate this sequence. ${fallbackReason}`);
   }
 
   const firstValidationStarted = nowMs();
@@ -2341,7 +2535,11 @@ export async function generateBuildSequence(
       const recoveryValidationStarted = nowMs();
       let recovered: SequenceGeneration | undefined;
       const recoveredStepIndexes = new Set<number>();
-      for (let attempt = 0; attempt < generated.steps.length - 1 && validationIssueDetails.length > 0; attempt += 1) {
+      for (
+        let attempt = 0;
+        attempt < generated.steps.length && validationIssueDetails.length > 0;
+        attempt += 1
+      ) {
         const nextRecovered = recoverSequenceSteps(
           recovered ?? generated,
           fallbackGenerated,
@@ -2376,7 +2574,11 @@ export async function generateBuildSequence(
       }
       if (validationIssues.length > 0) {
         const fallbackValidationStarted = nowMs();
-        const fallbackValidationIssues = sequenceValidationIssues(input, fallbackGenerated, records);
+        const fallbackValidationIssues = sequenceValidationIssues(
+          input,
+          fallbackGenerated,
+          records,
+        );
         finalValidationDurationMs += nowMs() - fallbackValidationStarted;
         if (fallbackValidationIssues.length > 0) {
           const diagnosticIssues = [
@@ -2427,7 +2629,8 @@ export async function generateBuildSequence(
       (strategyDiagnostics?.firstCallDurationMs ? 1 : 0) +
       (strategyDiagnostics?.retryDurationMs ? 1 : 0) +
       stepDiagnostics.reduce(
-        (total, step) => total + (step.firstCallDurationMs ? 1 : 0) + (step.retryDurationMs ? 1 : 0),
+        (total, step) =>
+          total + (step.firstCallDurationMs ? 1 : 0) + (step.retryDurationMs ? 1 : 0),
         0,
       ),
     totalRetries:

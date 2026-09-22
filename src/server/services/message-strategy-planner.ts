@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
-import { buildProspectBrief, planMessageStrategy } from "@/features/build-sequence/strategy-planner";
+import {
+  buildProspectBrief,
+  planMessageStrategy,
+} from "@/features/build-sequence/strategy-planner";
 import type {
   BuildSequenceInput,
   GoldStandardExample,
@@ -85,28 +88,37 @@ function normalizeStrategyStep(value: unknown, index: number) {
   };
 }
 
-const strategyStepSchema = z.preprocess((value) => normalizeStrategyStep(value, 0), z.object({
-  stepNumber: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-  objective: z.string().trim().min(8).max(220),
-  newInformation: z.string().trim().min(8).max(220),
-  angle: z.string().trim().min(4).max(220),
-  evidenceToUse: z.string().trim().min(4).max(220),
-  proofToUseId: z.string().trim().max(120).optional(),
-  CTAIntent: z.string().trim().min(4).max(260),
-  avoidRepeating: z.string().trim().min(4).max(220),
-}));
+const strategyStepSchema = z.preprocess(
+  (value) => normalizeStrategyStep(value, 0),
+  z.object({
+    stepNumber: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    objective: z.string().trim().min(8).max(220),
+    newInformation: z.string().trim().min(8).max(220),
+    angle: z.string().trim().min(4).max(220),
+    evidenceToUse: z.string().trim().min(4).max(220),
+    proofToUseId: z.string().trim().max(120).optional(),
+    CTAIntent: z.string().trim().min(4).max(260),
+    avoidRepeating: z.string().trim().min(4).max(220),
+  }),
+);
 
 const optionalText = (max: number) =>
-  z.preprocess((value) => (value === null ? undefined : value), z.string().trim().max(max).optional());
+  z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().trim().max(max).optional(),
+  );
 
 const optionalId = optionalText(120);
 
-const confidenceSchema = z.preprocess((value) => {
-  if (typeof value !== "number") return value;
-  if (value >= 0.78) return "HIGH";
-  if (value >= 0.45) return "MEDIUM";
-  return "LOW";
-}, z.enum(["HIGH", "MEDIUM", "LOW"]));
+const confidenceSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "number") return value;
+    if (value >= 0.78) return "HIGH";
+    if (value >= 0.45) return "MEDIUM";
+    return "LOW";
+  },
+  z.enum(["HIGH", "MEDIUM", "LOW"]),
+);
 
 const sequenceNarrativeSchema = z.preprocess((value) => {
   if (!Array.isArray(value)) return value;
@@ -129,23 +141,33 @@ const emailStepPlansSchema = z.preprocess((value) => {
   return value.map((item, index) => normalizeStrategyStep(item, index));
 }, z.array(strategyStepSchema).length(4));
 
-const openingStyleSchema = z.preprocess((value) => {
-  if (typeof value !== "string") return value;
-  const allowed = [
+const openingStyleSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const allowed = [
+      "PROSPECT_FACT",
+      "ACCOUNT_OBSERVATION",
+      "BUSINESS_QUESTION",
+      "SERP_EVIDENCE",
+      "MARKET_INSIGHT",
+    ] as const;
+    return (
+      allowed.find((item) =>
+        value
+          .split("|")
+          .map((part) => part.trim())
+          .includes(item),
+      ) ?? value
+    );
+  },
+  z.enum([
     "PROSPECT_FACT",
     "ACCOUNT_OBSERVATION",
     "BUSINESS_QUESTION",
     "SERP_EVIDENCE",
     "MARKET_INSIGHT",
-  ] as const;
-  return allowed.find((item) => value.split("|").map((part) => part.trim()).includes(item)) ?? value;
-}, z.enum([
-  "PROSPECT_FACT",
-  "ACCOUNT_OBSERVATION",
-  "BUSINESS_QUESTION",
-  "SERP_EVIDENCE",
-  "MARKET_INSIGHT",
-]));
+  ]),
+);
 
 const aiStrategySchema = z.object({
   prospectInsight: z.string().trim().min(4).max(260),
@@ -180,7 +202,9 @@ export type AiMessageStrategyProviderRequest = {
   approvedCapabilities: typeof approvedCapabilities;
   approvedProductGaps: typeof approvedProductGaps;
   proofRecords: Array<{ id: string; text: string }>;
-  goldStandardExamples: Array<Pick<GoldStandardExample, "id" | "reasoningTags" | "whyItWorked" | "outcome">>;
+  goldStandardExamples: Array<
+    Pick<GoldStandardExample, "id" | "reasoningTags" | "whyItWorked" | "outcome">
+  >;
   validationFeedback?: string[];
 };
 
@@ -200,7 +224,10 @@ function normalize(value?: string) {
 function isGrounded(allowedText: string, value?: string) {
   const comparableValue = value
     ?.trim()
-    .replace(/^(?:prospect fact|company fact|approved product gap|approved capability|proof record|gold standard example):\s*/i, "");
+    .replace(
+      /^(?:prospect fact|company fact|approved product gap|approved capability|proof record|gold standard example):\s*/i,
+      "",
+    );
   const normalizedAllowed = normalize(allowedText);
   const normalizedValue = normalize(comparableValue);
   if (!normalizedValue) return false;
@@ -287,28 +314,41 @@ function textHasUnsupportedSerpClaim(text: string, scenario: ProspectIntelligenc
     .replace(/approvedProductGaps?:[^"{}[\]]+/gi, " ")
     .replace(/UNKNOWN_SERP_VISIBILITY_GAP/gi, " ");
   return (
-    /\b(?:supplied|verified|observed|keyword data|screenshot|evidence)\b[^.?!]{0,120}\b(?:solo|contested|competitor appeared|competitor visible|brand is alone|auction is quiet|quiet auction)\b/i.test(cleaned) ||
-    /\b(?:your|their|this|the|current|brand|branded)\b[^.?!]{0,80}\b(?:auction|SERP|keyword|query)\b[^.?!]{0,80}\b(?:is|was|were|appears|looks|shows)\b[^.?!]{0,40}\b(?:solo|contested|quiet|alone)\b/i.test(cleaned)
+    /\b(?:supplied|verified|observed|keyword data|screenshot|evidence)\b[^.?!]{0,120}\b(?:solo|contested|competitor appeared|competitor visible|brand is alone|auction is quiet|quiet auction)\b/i.test(
+      cleaned,
+    ) ||
+    /\b(?:your|their|this|the|current|brand|branded)\b[^.?!]{0,80}\b(?:auction|SERP|keyword|query)\b[^.?!]{0,80}\b(?:is|was|were|appears|looks|shows)\b[^.?!]{0,40}\b(?:solo|contested|quiet|alone)\b/i.test(
+      cleaned,
+    )
   );
 }
 
 function containsUnsupportedOrganicClaim(text: string) {
-  return /\borganic is already enough\b|\borganic would have captured\b|\bwould have captured organically\b/i.test(text);
+  return /\borganic is already enough\b|\borganic would have captured\b|\bwould have captured organically\b/i.test(
+    text,
+  );
 }
 
 function numbers(text: string) {
-  return Array.from(text.matchAll(/(?:[$€£]\s*)?\d+(?:[.,]\d+)?\s*(?:%|m|k|b|million|billion)?\+?/gi)).map((match) =>
-    normalize(match[0]),
-  ).filter((number) => !/^[1-4]$/.test(number));
+  return Array.from(
+    text.matchAll(/(?:[$€£]\s*)?\d+(?:[.,]\d+)?\s*(?:%|m|k|b|million|billion)?\+?/gi),
+  )
+    .map((match) => normalize(match[0]))
+    .filter((number) => !/^[1-4]$/.test(number));
 }
 
 function validateNumbers(allowedText: string, text: string) {
   const allowed = normalize(allowedText);
-  return numbers(text).every((number) => allowed.includes(number.replace(/\s+/g, " ")) || allowed.includes(number.replace(/\+/g, "")));
+  return numbers(text).every(
+    (number) =>
+      allowed.includes(number.replace(/\s+/g, " ")) || allowed.includes(number.replace(/\+/g, "")),
+  );
 }
 
 function hasDistinctNarrative(steps: AiStrategy["emailStepPlans"]) {
-  const values = steps.map((step) => normalize(`${step.objective} ${step.newInformation} ${step.angle}`));
+  const values = steps.map((step) =>
+    normalize(`${step.objective} ${step.newInformation} ${step.angle}`),
+  );
   return new Set(values).size === steps.length;
 }
 
@@ -342,7 +382,10 @@ function validateAiStrategy({
   if (!capability) issues.push("Capability id is not approved.");
   if (!productGap) issues.push("Product gap id is not approved.");
   if (strategy.proofPointId && !proof) issues.push("Proof point id is not approved.");
-  if (strategy.secondaryAngle && normalize(strategy.secondaryAngle) === normalize(strategy.primaryAngle)) {
+  if (
+    strategy.secondaryAngle &&
+    normalize(strategy.secondaryAngle) === normalize(strategy.primaryAngle)
+  ) {
     issues.push("Secondary angle duplicates primary angle.");
   }
   if (containsUnsupportedOrganicClaim(JSON.stringify(strategy))) {
@@ -352,10 +395,26 @@ function validateAiStrategy({
     issues.push("Strategy makes a SERP claim despite UNKNOWN evidence.");
   }
   if (!validateNumbers(allowedText, JSON.stringify(strategy))) {
-    issues.push("Strategy contains numbers not present in allowed prospect context or approved knowledge.");
+    issues.push(
+      "Strategy contains numbers not present in allowed prospect context or approved knowledge.",
+    );
   }
   if (!hasDistinctNarrative(strategy.emailStepPlans)) {
     issues.push("Email step plans do not add distinct information.");
+  }
+  if (
+    /\b(?:defend demand and ease pressure|across markets and query sets,?\s+how do you decide|competitor-present|lone-bidder)\b/i.test(
+      JSON.stringify(strategy),
+    )
+  ) {
+    issues.push("Strategy contains reusable sales prose instead of structured planning data.");
+  }
+  if (
+    /\b(?:for your .{2,100} remit|in your role as|as a [^,.]{2,100}|given your role as)\b/i.test(
+      JSON.stringify(strategy),
+    )
+  ) {
+    issues.push("Strategy mechanically inserts the prospect title into sales copy.");
   }
 
   for (const reference of strategy.groundingReferences) {
@@ -368,12 +427,18 @@ function validateAiStrategy({
     issues.push("Opening style uses prospect fact without selected commercial prospect insights.");
   }
   if (
-    prospectBrief?.factsToAvoid.some((fact) => normalize(strategy.prospectInsight).includes(normalize(fact))) ||
+    prospectBrief?.factsToAvoid.some((fact) =>
+      normalize(strategy.prospectInsight).includes(normalize(fact)),
+    ) ||
     (strategy.openingStyle === "PROSPECT_FACT" && !prospectBrief?.strongestUsableProspectInsight)
   ) {
     issues.push("Strategy tries to personalize from a rejected or weak prospect fact.");
   }
-  if (strategy.confidence === "HIGH" && intelligence.relevantFacts.length === 0 && intelligence.confidence.serp !== "HIGH") {
+  if (
+    strategy.confidence === "HIGH" &&
+    intelligence.relevantFacts.length === 0 &&
+    intelligence.confidence.serp !== "HIGH"
+  ) {
     issues.push("High confidence is unsupported by weak prospect and SERP context.");
   }
 
@@ -445,7 +510,12 @@ function toMessageStrategy({
 function parseJsonObject(content: string) {
   const trimmed = content.trim();
   if (trimmed.startsWith("```")) {
-    return JSON.parse(trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim());
+    return JSON.parse(
+      trimmed
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim(),
+    );
   }
   try {
     return JSON.parse(trimmed);
@@ -522,14 +592,16 @@ async function callOpenAiStrategyPlanner(
                     productGapId: "approvedProductGaps id",
                     relevantCapabilityId: "approvedCapabilities id",
                     proofPointId: "optional proofRecords id",
-                    openingStyle: "PROSPECT_FACT | ACCOUNT_OBSERVATION | BUSINESS_QUESTION | SERP_EVIDENCE | MARKET_INSIGHT",
+                    openingStyle:
+                      "PROSPECT_FACT | ACCOUNT_OBSERVATION | BUSINESS_QUESTION | SERP_EVIDENCE | MARKET_INSIGHT",
                     sequenceNarrative:
                       "4 items: { stepNumber, objective, newInformation, angle, evidenceToUse, proofToUseId?, CTAIntent, avoidRepeating }",
                     emailStepPlans:
                       "same 4-step structure with distinct newInformation across steps",
                     whyThisShouldResonate: "why this exact strategy fits the supplied facts",
                     confidence: "HIGH | MEDIUM | LOW",
-                    groundingReferences: "strings copied or closely grounded in provided context/approved facts",
+                    groundingReferences:
+                      "strings copied or closely grounded in provided context/approved facts",
                     selectedGoldStandardExampleIds: "ids only; reasoning influence, no copying",
                   },
                   strictRules: [
@@ -613,7 +685,10 @@ export async function planAiMessageStrategy({
   provider?: AiMessageStrategyProvider;
   env?: NodeJS.ProcessEnv;
 }): Promise<MessageStrategy> {
-  const goldStandards = selectGoldStandardExamples({ intelligence, primaryAngle: intelligence.primaryAngle });
+  const goldStandards = selectGoldStandardExamples({
+    intelligence,
+    primaryAngle: intelligence.primaryAngle,
+  });
   const proofOptions = proofRecords(records);
   const prospectBrief = buildProspectBrief({ input, intelligence, records });
   const baseRequest: AiMessageStrategyProviderRequest = {
@@ -644,7 +719,10 @@ export async function planAiMessageStrategy({
         durationMs,
         validation: {
           ok: false,
-          issues: parsed.error.issues.map((issue) => `Strategy response schema mismatch at ${issue.path.join(".") || "root"}: ${issue.message}`),
+          issues: parsed.error.issues.map(
+            (issue) =>
+              `Strategy response schema mismatch at ${issue.path.join(".") || "root"}: ${issue.message}`,
+          ),
           capability: undefined,
           productGap: undefined,
           proof: undefined,
@@ -652,7 +730,13 @@ export async function planAiMessageStrategy({
       };
     }
     const ai = parsed.data;
-    const validation = validateAiStrategy({ strategy: ai, input, intelligence, records, prospectBrief });
+    const validation = validateAiStrategy({
+      strategy: ai,
+      input,
+      intelligence,
+      records,
+      prospectBrief,
+    });
     if (!validation.ok || !validation.capability || !validation.productGap) {
       return { ai, validation, durationMs };
     }
@@ -668,7 +752,12 @@ export async function planAiMessageStrategy({
       firstIssues: first.validation.issues,
       retryIssues: [],
     };
-    if (first.ai && first.validation.ok && first.validation.capability && first.validation.productGap) {
+    if (
+      first.ai &&
+      first.validation.ok &&
+      first.validation.capability &&
+      first.validation.productGap
+    ) {
       const strategy = toMessageStrategy({
         ai: first.ai,
         capability: first.validation.capability,
@@ -683,7 +772,12 @@ export async function planAiMessageStrategy({
     diagnostics.retryUsed = true;
     diagnostics.retryDurationMs = second.durationMs;
     diagnostics.retryIssues = second.validation.issues;
-    if (second.ai && second.validation.ok && second.validation.capability && second.validation.productGap) {
+    if (
+      second.ai &&
+      second.validation.ok &&
+      second.validation.capability &&
+      second.validation.productGap
+    ) {
       const strategy = toMessageStrategy({
         ai: second.ai,
         capability: second.validation.capability,

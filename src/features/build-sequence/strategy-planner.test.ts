@@ -77,11 +77,15 @@ describe("Build Sequence strategy planner", () => {
     });
 
     expect(strategy.prospectBrief?.strongestUsableProspectInsight).toBeUndefined();
-    expect(strategy.prospectBrief?.roleCompanyFallback).toContain("Quick question for your Paid Media Lead focus at SearchPilot");
+    expect(strategy.prospectBrief?.roleCompanyFallback).toBe(
+      "Company: SearchPilot; Role: Paid Media Lead.",
+    );
     expect(strategy.prospectBrief?.roleCompanyFallback).not.toContain("scope at");
     expect(strategy.prospectBrief?.roleCompanyFallback).not.toContain("role at SearchPilot");
     expect(strategy.prospectBrief?.factsToAvoid.join(" ")).toMatch(/In-depth knowledge|Skills:/i);
-    expect(strategy.prospectBrief?.copyGuidance.join(" ")).toContain("Do not force personalization");
+    expect(strategy.prospectBrief?.copyGuidance.join(" ")).toContain(
+      "Do not force personalization",
+    );
   });
 
   it("selects the Chris Remofirst gold standard for a paid-search AI automation context", () => {
@@ -128,7 +132,10 @@ describe("Build Sequence strategy planner", () => {
   });
 
   it("does not invent a SERP observation for UNKNOWN scenarios", () => {
-    const { strategy, intelligence } = strategyFor({ keywords: undefined, serpEvidence: undefined });
+    const { strategy, intelligence } = strategyFor({
+      keywords: undefined,
+      serpEvidence: undefined,
+    });
 
     expect(intelligence.serpScenario).toBe("UNKNOWN");
     expect(strategy.sequenceNarrative[2].newInformation).toContain("paid-brand decision question");
@@ -145,8 +152,7 @@ describe("Build Sequence strategy planner", () => {
     const expansion = strategyFor({
       keywords: undefined,
       serpEvidence: undefined,
-      prospectContext:
-        "Chris expanded paid search into five international markets this year.",
+      prospectContext: "Chris expanded paid search into five international markets this year.",
     }).strategy;
     const efficiency = strategyFor({
       keywords: undefined,
@@ -158,8 +164,16 @@ describe("Build Sequence strategy planner", () => {
     expect(aiAutomation.relevantCapability).toContain("automation");
     expect(expansion.relevantCapability).toContain("market-level");
     expect(efficiency.productGap).toContain("necessary defensive spend");
-    expect(new Set([aiAutomation.businessQuestion, expansion.businessQuestion, efficiency.businessQuestion]).size).toBe(3);
-    expect(new Set([aiAutomation.productGap, expansion.productGap, efficiency.productGap]).size).toBe(3);
+    expect(
+      new Set([
+        aiAutomation.businessQuestion,
+        expansion.businessQuestion,
+        efficiency.businessQuestion,
+      ]).size,
+    ).toBe(3);
+    expect(
+      new Set([aiAutomation.productGap, expansion.productGap, efficiency.productGap]).size,
+    ).toBe(3);
   });
 
   it("uses exactly one approved proof point where appropriate", () => {
