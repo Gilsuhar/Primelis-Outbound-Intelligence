@@ -611,6 +611,7 @@ export function BuildSequenceClient() {
   const t = (key: UiTextKey) => translateUi(key, outputLanguage);
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
+  const [contactFirstName, setContactFirstName] = useState("");
   const [contactRole, setContactRole] = useState("");
   const [industry, setIndustry] = useState("");
   const [companyContext, setCompanyContext] = useState("");
@@ -898,6 +899,7 @@ export function BuildSequenceClient() {
           current.trim() ? `${rawProspectContext}\n\n${current}` : rawProspectContext,
         );
         if (record?.company_name) setCompanyName(record.company_name);
+        if (record?.first_name) setContactFirstName(record.first_name);
         if (record?.company_website || record?.company_domain) {
           setCompanyWebsite(record.company_website || record.company_domain || "");
         }
@@ -1110,7 +1112,12 @@ export function BuildSequenceClient() {
                 }}
                 value={companyName}
               />
-              <TextField label={t("workflow.firstName")} name="contactFirstName" />
+              <TextField
+                label={t("workflow.firstName")}
+                name="contactFirstName"
+                onChange={setContactFirstName}
+                value={contactFirstName}
+              />
               <SmartField
                 label={t("workflow.buyerRole")}
                 name="contactRole"

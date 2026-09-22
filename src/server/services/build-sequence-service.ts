@@ -405,7 +405,10 @@ async function persistProspectMemory({
         })
       : undefined;
   return {
-    input: normalizedInputFromExtraction(input, extraction),
+    input: normalizedInputFromExtraction(input, {
+      ...extraction,
+      firstName: input.contactFirstName || extraction.firstName || memory?.prospect.firstName,
+    }),
     memory,
     extractionMode: semanticResult.mode,
     rejectedFacts: semanticResult.rejectedFacts,
@@ -1761,24 +1764,18 @@ function inferredGreetingName(steps: SequenceStep[]) {
     const match = step.messageBody.match(/\bHi\s+([A-Z][A-Za-z'-]{1,40})(?:[,.!]|[\r\n])/);
     if (match?.[1]) return match[1];
   }
-  return "there";
+  return undefined;
 }
 
-function normalizeEmailGreeting(messageBody: string, greetingName: string) {
+function normalizeEmailGreeting(messageBody: string, greetingName?: string) {
   const trimmed = messageBody.trim();
-  if (!trimmed) return `Hi ${greetingName},`;
+  const withoutGreeting = trimmed
+    .replace(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[,.!]\s*/i, "")
+    .trim();
+  if (!greetingName) return withoutGreeting;
+  if (!withoutGreeting) return `Hi ${greetingName},`;
 
-  const greetingMatch = trimmed.match(/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i);
-  if (greetingMatch) {
-    return trimmed.replace(
-      /^Hi\s+([A-Z][A-Za-z'-]{1,40}|there)[.!]\s*/i,
-      (match) => `${match.replace(/[.!]\s*$/, "").trim()},\n\n`,
-    );
-  }
-  if (/^Hi\s+([A-Z][A-Za-z'-]{1,40}|there),/i.test(trimmed)) {
-    return trimmed;
-  }
-  return `Hi ${greetingName},\n\n${trimmed}`;
+  return `Hi ${greetingName},\n\n${withoutGreeting}`;
 }
 
 function hasMarketSequenceContext(generation: SequenceGeneration) {
@@ -1853,8 +1850,11 @@ function normalizeSubjectLine(subjectLine: string | undefined, generation: Seque
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function repairSequenceCopy(generation: SequenceGeneration): SequenceGeneration {
-  const greetingName = inferredGreetingName(generation.steps);
+function repairSequenceCopy(
+  generation: SequenceGeneration,
+  verifiedGreetingName?: string,
+): SequenceGeneration {
+  const greetingName = verifiedGreetingName || inferredGreetingName(generation.steps);
   const steps = generation.steps.map((step) => {
     let messageBody = step.messageBody;
     messageBody = repairGenericMarketMethodologyStep({ ...step, messageBody }, generation);
@@ -1879,7 +1879,7 @@ function repairSequenceCopy(generation: SequenceGeneration): SequenceGeneration 
 
 function sanitizeSequenceGeneration(
   generation: SequenceGeneration,
-  options: { repairCopy?: boolean } = {},
+  options: { repairCopy?: boolean; verifiedGreetingName?: string } = {},
 ): SequenceGeneration {
   const safeKeywords = protectedKeywordPhrases(generation);
   const sanitized = {
@@ -1938,7 +1938,9 @@ function sanitizeSequenceGeneration(
       };
     }),
   };
-  return options.repairCopy ? repairSequenceCopy(sanitized) : sanitized;
+  return options.repairCopy
+    ? repairSequenceCopy(sanitized, options.verifiedGreetingName)
+    : sanitized;
 }
 
 function recoverSequenceSteps(
@@ -2497,7 +2499,10 @@ export async function generateBuildSequence(
       sourceReferences: sources,
       generation: baseGeneration,
     }),
-    { repairCopy: provider.metadata.providerName === "openai" },
+    {
+      repairCopy: provider.metadata.providerName === "openai",
+      verifiedGreetingName: input.contactFirstName,
+    },
   );
   const sequenceGenerationDurationMs = nowMs() - sequenceStarted;
   let providerMetadata = provider.metadata;

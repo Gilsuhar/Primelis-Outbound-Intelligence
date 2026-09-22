@@ -21,6 +21,7 @@ vi.mock("@/app/account-status/actions", () => ({
 }));
 
 vi.mock("@/app/build-sequence/actions", () => ({
+  enrichLinkedInProspectAction: vi.fn(),
   pushSequenceToHubSpotAction: vi.fn(),
 }));
 
@@ -44,7 +45,10 @@ vi.mock("@/features/draft-refinement/draft-refinement-panel", () => ({
 }));
 
 import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-brain-client";
-import { pushSequenceToHubSpotAction } from "@/app/build-sequence/actions";
+import {
+  enrichLinkedInProspectAction,
+  pushSequenceToHubSpotAction,
+} from "@/app/build-sequence/actions";
 import {
   __buildSequenceVariantTest,
   BuildSequenceClient,
@@ -330,6 +334,48 @@ describe("Sales workflow UI", () => {
         rawProspectContext: "Chris from Remofirst manages paid search and AI automation.",
         prospectContext: "Chris from Remofirst manages paid search and AI automation.",
       }),
+    );
+  });
+
+  it("hands an enriched first name to sequence generation", async () => {
+    vi.mocked(enrichLinkedInProspectAction).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        linkedinUrl: "https://www.linkedin.com/in/amit-arora/",
+        record: {
+          success: true,
+          first_name: "Amit",
+          full_name: "Amit Arora",
+          company_name: "StoneX",
+          job_title: "Global Head Of Paid Search",
+        },
+        preview: null,
+        rawProspectContext: "Name: Amit Arora\nTitle: Global Head Of Paid Search\nCompany: StoneX",
+        provider: "GETLEADS",
+      },
+    });
+    render(<BuildSequenceClient />);
+
+    fireEvent.change(
+      document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]')!,
+      {
+        target: { value: "https://www.linkedin.com/in/amit-arora/" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fetch profile" }));
+    await waitFor(() =>
+      expect(
+        document.querySelector<HTMLInputElement>('input[name="contactFirstName"]')?.value,
+      ).toBe("Amit"),
+    );
+
+    const generateButton = await screen.findByRole("button", {
+      name: "Generate intelligence & sequence",
+    });
+    fireEvent.click(generateButton);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(latestBuildSequencePayload()).toEqual(
+      expect.objectContaining({ contactFirstName: "Amit" }),
     );
   });
 

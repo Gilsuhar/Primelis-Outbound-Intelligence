@@ -2663,4 +2663,62 @@ describe("Build Sequence service", () => {
       expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([1, 2, 3, 4]);
     }
   });
+
+  it("renders every email with a verified Amit greeting even when generated prose omits it", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "StoneX",
+        contactFirstName: "Amit",
+        contactRole: "Global Head Of Paid Search",
+      },
+      {
+        persistence: adapter,
+        provider: {
+          metadata: { providerName: "openai", modelName: "regression", deterministic: false },
+          generate: async ({ input, records, generation }) => {
+            const fallback = await new DeterministicBuildSequenceProvider().generate({
+              input,
+              records,
+              sourceReferences: [],
+              generation,
+            });
+            return {
+              ...fallback,
+              steps: fallback.steps.map((step) => ({
+                ...step,
+                messageBody: step.messageBody.replace(/^Hi Amit,\n\n/, ""),
+              })),
+            };
+          },
+        },
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps.every((step) => step.messageBody.startsWith("Hi Amit,"))).toBe(true);
+      expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
+    }
+  });
+
+  it("keeps every email greeting-free when no first name is verified", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "StoneX",
+        contactFirstName: undefined,
+        prospectContext: "Company: StoneX\nRole: Global Head Of Paid Search",
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.steps.every((step) => !/^Hi\b/i.test(step.messageBody))).toBe(true);
+      expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
+    }
+  });
 });
