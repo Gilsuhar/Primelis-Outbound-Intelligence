@@ -186,11 +186,24 @@ function mergeSemanticExtraction(
   semantic: SemanticExtraction,
 ) {
   const rejectedFacts: string[] = [];
-  const groundedSemanticFirstName = isRoleOrSeniorityFragment(semantic.identity.firstName)
+  const rawGroundedSemanticFirstName = isRoleOrSeniorityFragment(semantic.identity.firstName)
     ? undefined
     : groundedField(rawText, semantic.identity.firstName);
-  const groundedSemanticFullName = groundedField(rawText, semantic.identity.fullName);
   const groundedSemanticCompany = groundedField(rawText, semantic.company.companyName);
+  const sameAsCompany = (value?: string) =>
+    Boolean(
+      value &&
+        [deterministic.companyName, groundedSemanticCompany].some(
+          (company) => company && normalizeForGrounding(value) === normalizeForGrounding(company),
+        ),
+    );
+  const groundedSemanticFirstName = sameAsCompany(rawGroundedSemanticFirstName)
+    ? undefined
+    : rawGroundedSemanticFirstName;
+  const rawGroundedSemanticFullName = groundedField(rawText, semantic.identity.fullName);
+  const groundedSemanticFullName = sameAsCompany(rawGroundedSemanticFullName)
+    ? undefined
+    : rawGroundedSemanticFullName;
   const deterministicLooksLikeCompany =
     deterministic.firstName &&
     groundedSemanticCompany &&

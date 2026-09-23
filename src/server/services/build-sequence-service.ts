@@ -407,7 +407,7 @@ async function persistProspectMemory({
   return {
     input: normalizedInputFromExtraction(input, {
       ...extraction,
-      firstName: input.contactFirstName || extraction.firstName || memory?.prospect.firstName,
+      firstName: input.contactFirstName || memory?.prospect.firstName || extraction.firstName,
     }),
     memory,
     extractionMode: semanticResult.mode,

@@ -255,6 +255,23 @@ function scenarioFromExtraction(extraction: Awaited<ReturnType<typeof extractPro
 }
 
 describe("AI semantic prospect intake", () => {
+  it("never promotes the company name to the prospect first name", async () => {
+    const result = await extractProspectSemantic(
+      "LinkedIn: https://www.linkedin.com/in/amit-arora/\nTitle: Global Head Of Paid Search at StoneX\nCompany: StoneX",
+      {
+        provider: async () => ({
+          identity: { firstName: "StoneX", fullName: "StoneX" },
+          company: { companyName: "StoneX" },
+          role: { jobTitle: "Global Head Of Paid Search" },
+        }),
+      },
+    );
+
+    expect(result.extraction.firstName).toBeUndefined();
+    expect(result.extraction.fullName).toBeUndefined();
+    expect(result.extraction.companyName).toBe("StoneX");
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });

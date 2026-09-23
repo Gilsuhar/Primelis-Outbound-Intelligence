@@ -2721,4 +2721,46 @@ describe("Build Sequence service", () => {
       expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
     }
   });
+
+  it("recovers Amit from the matched structured prospect when semantic intake calls StoneX a person", async () => {
+    const { adapter } = prospectPersistence({
+      initialProspects: [
+        existingProspect({
+          firstName: "Amit",
+          lastName: "Arora",
+          fullName: "Amit Arora",
+          companyName: "StoneX",
+          companyDomain: "stonex.com",
+          linkedinUrl: "linkedin.com/in/amit-arora",
+        }),
+      ],
+    });
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "StoneX",
+        companyWebsite: "stonex.com",
+        contactFirstName: undefined,
+        contactRole: "Global Head Of Paid Search",
+        rawProspectContext:
+          "LinkedIn: https://www.linkedin.com/in/amit-arora\nTitle: Global Head Of Paid Search at StoneX\nCompany: StoneX",
+      },
+      {
+        persistence: adapter,
+        semanticExtractionProvider: async () => ({
+          identity: { firstName: "StoneX", fullName: "StoneX" },
+          company: { companyName: "StoneX", companyDomain: "stonex.com" },
+          role: { jobTitle: "Global Head Of Paid Search" },
+        }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.prospectMemory?.prospect.firstName).toBe("Amit");
+      expect(result.data.prospectIntelligence.prospectName).toBe("Amit");
+      expect(result.data.steps.every((step) => step.messageBody.startsWith("Hi Amit,"))).toBe(true);
+      expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
+    }
+  });
 });
