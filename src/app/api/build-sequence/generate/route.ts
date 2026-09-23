@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { generateBuildSequence } from "@/server/services/build-sequence-service";
 import { getCurrentUser } from "@/lib/auth/server";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
