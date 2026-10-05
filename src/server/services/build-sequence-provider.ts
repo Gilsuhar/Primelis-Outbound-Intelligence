@@ -822,13 +822,17 @@ function sanitizeProspectFacingBody(body: string) {
           line,
         ),
     )
-    .map((line) => normalizeProspectPerspective(sanitizeProspectFacingFact(line)))
+    .map((line) => sentenceCaseOpening(normalizeProspectPerspective(sanitizeProspectFacingFact(line))))
     .join("\n")
     .replace(
       /\bGiven your focus on profitability and business outcomes\b/gi,
       "Given your focus on profitability and business outcomes",
     )
     .trim();
+}
+
+function sentenceCaseOpening(line: string) {
+  return line.replace(/^(\s*)(you|your|you've|you're|one|quick|the|this|that|worth)\b/i, (_, prefix: string, word: string) => `${prefix}${word.charAt(0).toUpperCase()}${word.slice(1)}`);
 }
 
 function customerFacingAngle(angleLabel: string) {
@@ -869,7 +873,7 @@ function managesMultipleAccounts(input: BuildSequenceInput, intelligence?: Prosp
         ...intelligence.contextInterpretation.commercialSignals,
       ].map((item) => item.text)
     : [];
-  return /\b(agency|managed accounts|multiple accounts|client accounts|portfolio|clients?|accounts your team manages)\b/i.test(
+  return /\b(managed accounts|multiple accounts|client accounts|portfolio of accounts|client portfolio|client campaigns|clients?|accounts your team manages)\b/i.test(
     [
       input.companyContext,
       input.industry,
@@ -1146,19 +1150,19 @@ function strategyMethodLine(
       /\b(?:growth|acquisition|demand)\b/i.test(buyerRole(input, intelligence));
     if (hasMarketScope) {
       return [
-        `Across markets, the same branded bid may make sense when another advertiser appears and less sense when ${company} is effectively bidding alone.`,
-        "Signal continuously monitors Google and Bing search results so the team can see those changes before deciding what to do with bids.",
+        `Across markets, branded-search decisions can vary by market, but that should stay a measurement question until the live search-page context is visible.`,
+        `Signal monitors Google and Bing search results so ${company} can connect live brand visibility to bid decisions before changing pressure.`,
       ].join("\n\n");
     }
     if (hasGrowthRole) {
       return [
-        "The same branded bid may no longer make sense when competition changes.",
-        "Signal continuously monitors Google and Bing search results so the team can see when another advertiser appears and when the brand may be effectively bidding alone.",
+        "Branded-search efficiency is hard to judge from platform performance alone.",
+        "Signal monitors Google and Bing search results so the team can connect live brand visibility to bid decisions before changing pressure.",
       ].join("\n\n");
     }
     return [
-      "Signal continuously monitors Google and Bing search results to see when another advertiser appears and when the brand may be effectively bidding alone.",
-      "That lets the team see when conditions change before deciding whether bids should change.",
+      "Signal monitors Google and Bing search results alongside the existing Google Ads setup.",
+      "That gives the team a cleaner way to see live brand visibility before deciding whether bids should change.",
     ].join("\n\n");
   }
   return [strategy.primaryAngle, scenarioMethod(input, intelligence)].join("\n\n");
@@ -1190,7 +1194,7 @@ function strategyEvidenceLine(intelligence: ProspectIntelligence) {
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
     return [evidence, mechanics].join("\n\n");
   }
-  return mechanics;
+  return "Signal's useful role is to show live search-page coverage alongside Google Ads decision-making, so the team can decide where bid pressure is needed and where a lower level is worth testing.";
 }
 
 function tailorBody(

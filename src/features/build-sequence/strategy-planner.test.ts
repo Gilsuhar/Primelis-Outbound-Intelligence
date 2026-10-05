@@ -139,6 +139,12 @@ describe("Build Sequence strategy planner", () => {
 
     expect(intelligence.serpScenario).toBe("UNKNOWN");
     expect(strategy.sequenceNarrative[2].newInformation).toContain("paid-brand decision question");
+    expect(strategy.sequenceNarrative[2].newInformation).not.toMatch(
+      /competition drops|lowest CPC|competition returns/i,
+    );
+    expect(strategy.prospectBrief?.copyGuidance.join(" ")).not.toMatch(
+      /competition drops|lowest CPC|competition returns/i,
+    );
     expect(strategy.businessQuestion).toContain("when branded-search competition changes");
   });
 

@@ -147,10 +147,10 @@ describe("Build Sequence OpenAI provider", () => {
     );
     expect(result.steps[0].messageBody).toContain("KAYAK");
     expect(result.steps[1].messageBody).toMatch(
-      /continuously monitors Google and Bing search results/i,
+      /monitors Google and Bing search results/i,
     );
-    expect(result.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
-    expect(result.steps[2].messageBody).toMatch(/lowest CPC or position needed/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|competition drops/i);
     expect(result.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
     expect(result.steps[3].messageBody).not.toMatch(
       /kind of paid-brand efficiency|practical benchmark/i,
@@ -185,8 +185,8 @@ describe("Build Sequence OpenAI provider", () => {
           (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <= 1,
       ),
     ).toBe(true);
-    expect(result.steps[2].messageBody).toMatch(/competition drops/i);
-    expect(result.steps[2].messageBody).toMatch(/react when competition returns/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/competition drops|competition returns/i);
   });
 
   it("keeps the Amit StoneX sequence on the shared safe progression", async () => {
@@ -205,13 +205,38 @@ describe("Build Sequence OpenAI provider", () => {
       /for your Global Head Of Paid Search remit|Hi Amit,\s*\n\nAmit,|competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage/i,
     );
     expect(result.steps[0].messageBody).toMatch(/StoneX.*across markets/i);
-    expect(result.steps[1].messageBody).toMatch(/another advertiser appears/i);
-    expect(result.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
-    expect(result.steps[2].messageBody).toMatch(/lowest CPC or position needed/i);
+    expect(result.steps[1].messageBody).toMatch(/live search-page context/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|another advertiser appears/i);
     expect(result.steps[3].messageBody).toBe(
       "Hi Amit,\n\nAppsFlyer reduced branded spend by 29% while qualified lead volume increased 25% in the first 30 days.",
     );
     expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+  });
+
+  it("keeps in-house agency-partnership context grounded when SERP evidence is unknown", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "McAfee",
+      companyWebsite: "mcafee.com",
+      contactFirstName: undefined,
+      contactRole: "Global Paid Search Sr. Manager",
+      geographyOrMarkets: "Europe and the United States",
+      prospectContext: [
+        "Global Paid Search Sr.",
+        "Performance Marketing leader with 18+ years of international experience driving growth through data, experimentation, and innovation.",
+        "Based in northern Spain, works remotely as a Global Paid Search Senior Manager at McAfee, collaborating with international teams across Europe and the United States.",
+        "Leads global Paid Search strategy for the Consumer Business in partnership with an international marketing agency.",
+      ].join("\n"),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("McAfee branded search visibility");
+    expect(rendered).not.toMatch(
+      /managed accounts|accounts your team manages|McAfee's branded queries often shift|contested and uncontested|competition drops|lowest CPC|brand auction is quiet/i,
+    );
+    expect(result.steps[1].messageBody).toMatch(/live search-page context/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
   });
 
   it("omits the greeting naturally when first name cannot be resolved", async () => {

@@ -273,7 +273,10 @@ function narrativeFor(
     {
       step: 3,
       objective: "Explain Signal's bid mechanics without inventing account impact.",
-      newInformation: `${evidencePhrase} Explain that Signal can reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns; this is not simply on/off.`,
+      newInformation:
+        intelligence.serpScenario === "UNKNOWN"
+          ? `${evidencePhrase} Explain Signal as live brand-visibility measurement connected to bid decisions. Do not claim competitor movement, solo periods, CPC waste, or account impact.`
+          : `${evidencePhrase} Explain that Signal can reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns; this is not simply on/off.`,
       ctaIntent: "Ask if a narrow look would be useful.",
     },
     {
@@ -383,7 +386,9 @@ export function buildProspectBrief({
     copyGuidance: [
       "Email 1 should open on the prospect, role, or company and ask the pain/question.",
       "Email 2 should explain how Signal makes the live SERP decision differently.",
-      "Email 3 should explain Signal mechanics: reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns.",
+      intelligence.serpScenario === "UNKNOWN"
+        ? "Email 3 should explain Signal mechanics as live brand-visibility measurement connected to bid decisions; do not claim competitor movement, solo periods, CPC waste, or account impact."
+        : "Email 3 should explain Signal mechanics: reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns.",
       "Email 4 should use one proof point and close softly.",
       "Do not force personalization when the strongest usable prospect insight is empty.",
       "Never use factsToAvoid as personalization.",
