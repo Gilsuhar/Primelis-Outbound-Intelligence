@@ -793,13 +793,17 @@ function containsSemanticAsk(text: string) {
 
 function hasRequiredSignalMechanics(step: SequenceStep) {
   const text = `${step.messageBody} ${step.cta}`;
-  return (
+  const verifiedSerpMechanics =
     /not simply an on\/off decision|isn['’]t simply an on\/off decision/i.test(text) &&
     /competition drops/i.test(text) &&
     /reduce bids/i.test(text) &&
     /lowest CPC|lowest .*position needed/i.test(text) &&
-    /competition returns|another advertiser returns/i.test(text)
-  );
+    /competition returns|another advertiser returns/i.test(text);
+  const measurementMechanics =
+    /live (?:search-page coverage|brand visibility)|brand-visibility measurement/i.test(text) &&
+    /Google Ads|current .*Ads setup/i.test(text) &&
+    /bid (?:decisions?|pressure)|bids? should change/i.test(text);
+  return verifiedSerpMechanics || measurementMechanics;
 }
 
 function containsDuplicatedProspectName(input: BuildSequenceInput, text: string) {

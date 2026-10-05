@@ -1560,6 +1560,37 @@ describe("Build Sequence service", () => {
     }
   });
 
+  it("accepts safe step 3 mechanics when SERP evidence is unknown", async () => {
+    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+    const result = await generateBuildSequence(
+      {
+        ...baseInput,
+        companyName: "McAfee",
+        companyWebsite: "https://mcafee.com",
+        contactFirstName: undefined,
+        contactRole: "Global Paid Search Sr. Manager",
+        geographyOrMarkets: "Europe and the United States",
+        paidSearchContext: undefined,
+        prospectContext: [
+          "Global Paid Search Sr.",
+          "Performance Marketing leader with 18+ years of international experience driving growth through data, experimentation, and innovation.",
+          "Based in northern Spain, works remotely as a Global Paid Search Senior Manager at McAfee, collaborating with international teams across Europe and the United States.",
+          "Leads global Paid Search strategy for the Consumer Business in partnership with an international marketing agency.",
+        ].join("\n"),
+      },
+      { persistence: adapter },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const rendered = JSON.stringify(result.data.steps);
+      expect(result.data.steps[2].messageBody).toMatch(/live search-page coverage/i);
+      expect(rendered).not.toMatch(
+        /managed accounts|accounts your team manages|competition drops|lowest CPC|contested and uncontested|brand auction is quiet/i,
+      );
+    }
+  });
+
   it("removes a duplicated trailing CTA from OpenAI message bodies before validation", async () => {
     const { adapter } = persistence([knowledge({ id: "product-truth" })]);
     const result = await generateBuildSequence(baseInput, {
