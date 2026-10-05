@@ -88,6 +88,24 @@ describe("Build Sequence strategy planner", () => {
     );
   });
 
+  it("uses commercial profile facts when selected insights are conservative", () => {
+    const { strategy } = strategyFor({
+      companyName: "Zooplus",
+      contactFirstName: "Marzena",
+      contactRole: "Online Marketing Manager",
+      prospectContext: [
+        "Marzena Czernek",
+        "Online Marketing Manager with 10+ years in digital marketing and 4 years of team management.",
+        "Expert in high-budget PPC campaigns, data-driven decisions, and ROI maximization.",
+        "Skilled in A/B testing, budget planning, and performance optimization.",
+      ].join("\n"),
+    });
+
+    expect(strategy.prospectInsight).toMatch(/high-budget PPC|ROI|A\/B testing/i);
+    expect(strategy.openingStyle).toBe("PROSPECT_FACT");
+    expect(strategy.whyThisShouldResonate).toContain("real supplied prospect fact");
+  });
+
   it("selects the Chris Remofirst gold standard for a paid-search AI automation context", () => {
     const { strategy, examples } = strategyFor({
       prospectContext:

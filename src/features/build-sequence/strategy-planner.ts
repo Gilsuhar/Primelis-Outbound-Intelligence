@@ -43,6 +43,51 @@ function firstProspectFact(intelligence: ProspectIntelligence) {
   );
 }
 
+function cleanProfileSignal(value: string) {
+  return value
+    .replace(/^\s*(?:current|about|summary|skills?|experience|profile|context)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function profileCommercialInsight(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
+  const candidates = [
+    ...intelligence.contextInterpretation.currentResponsibilities.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentPrioritiesOrInterests.map((item) => item.text),
+    ...intelligence.contextInterpretation.currentToolsOrChannels.map((item) => item.text),
+    ...intelligence.contextInterpretation.commercialSignals.map((item) => item.text),
+    ...intelligence.relevantFacts,
+    ...(input.prospectContext ?? "").split(/\r?\n|[•;-]\s+/),
+  ]
+    .map(cleanProfileSignal)
+    .filter(Boolean)
+    .filter((fact) => !/\b(?:previously|former|past|historical|prior)\b/i.test(fact))
+    .filter((fact) => !/[,:;/-]\s*$/.test(fact))
+    .filter((fact) => fact.split(/\s+/).length >= 5)
+    .filter((fact) =>
+      /\b(?:ppc|paid search|paid media|performance marketing|google ads|campaigns?|budget|roi|roas|a\/b testing|experimentation|data-driven|team management|growth)\b/i.test(
+        fact,
+      ),
+    )
+    .filter((fact) =>
+      /\b(?:expert|skilled|experience|leader|lead|leads|managed|managing|manager|focused|driving|optimis|optimiz|maximization|maximisation|testing)\b/i.test(
+        fact,
+      ),
+    );
+
+  const first = candidates[0];
+  if (!first) return undefined;
+  const second = candidates.find(
+    (fact) =>
+      fact !== first &&
+      /\b(?:roi|roas|a\/b testing|experimentation|data-driven|team management|budget)\b/i.test(
+        fact,
+      ),
+  );
+  if (!second) return first;
+  return `${first.replace(/\.$/, "")}; ${second.replace(/\.$/, "")}.`;
+}
+
 function hasSelectedInsight(intelligence: ProspectIntelligence) {
   return intelligence.selectedInsights.length > 0;
 }
@@ -240,6 +285,8 @@ function openingStyleFor(intelligence: ProspectIntelligence): MessageStrategy["o
 function prospectInsightFor(input: BuildSequenceInput, intelligence: ProspectIntelligence) {
   const fact = firstProspectFact(intelligence);
   if (fact) return fact;
+  const profileInsight = profileCommercialInsight(input, intelligence);
+  if (profileInsight) return profileInsight;
   const { role, company } = roleCompanyLabel(input, intelligence);
   if (role) {
     return `${role} at ${company}`;
@@ -413,7 +460,9 @@ export function planMessageStrategy({
   const proofPoint = firstCaseStudy(records) ?? intelligence.recommendedProofPoint;
   const primaryAngle = intelligence.primaryAngle;
   const selectedGoldStandards = selectGoldStandardExamples({ intelligence, primaryAngle });
-  const hasProspectFact = hasSelectedInsight(intelligence);
+  const hasProspectFact =
+    hasSelectedInsight(intelligence) ||
+    Boolean(firstProspectFact(intelligence) ?? profileCommercialInsight(input, intelligence));
   const sequenceNarrative = narrativeFor(intelligence, hasProspectFact);
   const confidence: MessageStrategy["confidence"] =
     hasProspectFact && intelligence.confidence.serp !== "LOW"

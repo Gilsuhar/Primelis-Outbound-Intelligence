@@ -239,6 +239,30 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
   });
 
+  it("turns PPC and ROI profile context into a sharper safe sequence", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "Zooplus",
+      companyWebsite: "zooplus.com",
+      contactFirstName: "Marzena",
+      contactRole: "Online Marketing Manager",
+      prospectContext: [
+        "Marzena Czernek",
+        "Online Marketing Manager with 10+ years in digital marketing and 4 years of team management.",
+        "Expert in high-budget PPC campaigns, data-driven decisions, and ROI maximization.",
+        "Skilled in A/B testing, budget planning, and performance optimization.",
+      ].join("\n"),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.messageStrategy.prospectInsight).toMatch(/high-budget PPC|ROI|A\/B testing/i);
+    expect(result.steps[0].messageBody).toMatch(/high-budget PPC|ROI|A\/B testing/i);
+    expect(result.steps[0].messageBody).not.toMatch(/^Hi Marzena,\s+Quick question on Zooplus/i);
+    expect(result.steps[1].messageBody).toMatch(/performance report|budget and ROI/i);
+    expect(result.steps[2].messageBody).toMatch(/same visibility could be protected/i);
+    expect(rendered).not.toMatch(/contested and uncontested|competition drops|lowest CPC/i);
+  });
+
   it("omits the greeting naturally when first name cannot be resolved", async () => {
     const result = await deterministicSequenceFor({
       ...input,

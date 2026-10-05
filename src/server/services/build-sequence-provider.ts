@@ -1023,6 +1023,19 @@ function responsibilityOpening({
   );
   if (!normalizedInsight || !isProspectInsightReadyForPersonalization(normalizedInsight))
     return undefined;
+  const profileLedInsight = normalizedInsight
+    .replace(/^expert\s+in\s+/i, "your experience with ")
+    .replace(/^skilled\s+in\s+/i, "your work across ")
+    .replace(/^experienced\s+in\s+/i, "your experience with ")
+    .replace(/^online marketing manager with\s+/i, "your ");
+  if (
+    profileLedInsight !== normalizedInsight ||
+    /\b(?:high-budget PPC|ROI|A\/B testing|team management|performance marketing)\b/i.test(
+      normalizedInsight,
+    )
+  ) {
+    return `Given ${profileLedInsight}, one branded-search question seemed worth asking.`;
+  }
   if (/^you(?:'ve| are|'re| have|\s)/i.test(normalizedInsight)) {
     return `${normalizedInsight}. One branded-search question seemed worth asking.`;
   }
@@ -1139,6 +1152,13 @@ function strategyMethodLine(
 ) {
   if (intelligence.serpScenario === "UNKNOWN") {
     const company = displayCompanyFor(input, intelligence);
+    const prospectText = [strategy.prospectInsight, input.prospectContext]
+      .filter(Boolean)
+      .join(" ");
+    const hasPpcRoiProfile =
+      /\b(?:high-budget|ppc|paid search|paid media|roi|roas|a\/b testing|experimentation|budget)\b/i.test(
+        prospectText,
+      );
     const hasMarketScope =
       /\b(?:multiple|several|global|international|across)\s+(?:markets?|countries|regions?)\b/i.test(
         [input.geographyOrMarkets, input.prospectContext, input.companyContext]
@@ -1148,6 +1168,12 @@ function strategyMethodLine(
     const hasGrowthRole =
       intelligence.persona === "GROWTH" ||
       /\b(?:growth|acquisition|demand)\b/i.test(buyerRole(input, intelligence));
+    if (hasPpcRoiProfile) {
+      return [
+        "For high-budget PPC work, the gap is usually not another performance report. It is knowing whether the brand-search pressure behind that performance is still justified.",
+        `Signal monitors Google and Bing search results so ${company} can connect live brand visibility to budget and ROI decisions before changing bids.`,
+      ].join("\n\n");
+    }
     if (hasMarketScope) {
       return [
         `Across markets, branded-search decisions can vary by market, but that should stay a measurement question until the live search-page context is visible.`,
@@ -1168,7 +1194,7 @@ function strategyMethodLine(
   return [strategy.primaryAngle, scenarioMethod(input, intelligence)].join("\n\n");
 }
 
-function strategyEvidenceLine(intelligence: ProspectIntelligence) {
+function strategyEvidenceLine(intelligence: ProspectIntelligence, strategy?: MessageStrategy) {
   const mechanics =
     "This is not simply an on/off decision. Signal can reduce bids when competition drops, find the lowest CPC or position needed to maintain visibility, and react when competition returns, all inside the current Google Ads setup.";
   const solo = soloKeyword(intelligence);
@@ -1193,6 +1219,14 @@ function strategyEvidenceLine(intelligence: ProspectIntelligence) {
       ? `In the keyword data, the useful sample is ${examples}: one shows quieter coverage and one shows competition. That is why one static branded-bid rule can miss the decision.`
       : "In the supplied evidence, the useful pattern is mixed: some brand auctions are quieter and some show competition. That is why one static branded-bid rule can miss the coverage and bid decision.";
     return [evidence, mechanics].join("\n\n");
+  }
+  if (
+    strategy?.prospectInsight &&
+    /\b(?:high-budget|ppc|paid search|paid media|roi|roas|a\/b testing|experimentation|budget)\b/i.test(
+      strategy.prospectInsight,
+    )
+  ) {
+    return "The practical test is not to assume branded spend is too high. It is to compare live search-page coverage with Google Ads decisions, then see where the same visibility could be protected with less bid pressure.";
   }
   return "Signal's useful role is to show live search-page coverage alongside Google Ads decision-making, so the team can decide where bid pressure is needed and where a lower level is worth testing.";
 }
@@ -1339,7 +1373,7 @@ function bodyForPurpose({
         "The point is not to cut every branded bid. It is to tell contested and solo moments apart across the accounts your team manages.",
       ].join("\n\n")
     : "The same branded query can move between two different auctions.\n\nWhen competitors appear, maintaining coverage has real defensive value. When the brand is alone, the same CPC may be more pressure than needed.\n\nThat is the useful method: identify solo periods across the accounts your team manages, lower pressure only where coverage is still protected, and restore defense when competitors return.";
-  const managedPpcStepThree = strategyEvidenceLine(intelligence);
+  const managedPpcStepThree = strategyEvidenceLine(intelligence, strategy);
   if (patternBody && purpose === "TECHNICAL_CLARIFICATION") {
     if (channel === "LINKEDIN") {
       return sanitizeProspectFacingBody(
@@ -1376,7 +1410,7 @@ function bodyForPurpose({
     METHODOLOGY_DIFFERENTIATION: [
       greeting(input, intelligence),
       "",
-      isManagedPpcSequence ? managedPpcStepThree : strategyEvidenceLine(intelligence),
+      isManagedPpcSequence ? managedPpcStepThree : strategyEvidenceLine(intelligence, strategy),
       isManagedPpcSequence
         ? ""
         : intelligence.serpScenario === "UNKNOWN"
