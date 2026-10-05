@@ -570,4 +570,41 @@ describe("Prospect Intelligence extraction", () => {
       expect(intelligence.selectedInsights[0]?.text ?? "", item.label).not.toMatch(/managing client accounts.*previously|prior company/i);
     }
   });
+
+  it("does not let an unlabeled Previously line override the supplied current company or role", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "Northwind Retail",
+      contactFirstName: "Dana",
+      contactRole: "Head of Performance Marketing",
+      prospectContext: [
+        "Dana North",
+        "Head of Performance Marketing at Northwind Retail since 2023.",
+        "Owns branded paid-search efficiency and performance reporting.",
+        "Previously Senior PPC Manager at Contoso Travel managing agency accounts.",
+      ].join("\n"),
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBe("Northwind Retail");
+    expect(intelligence.contextInterpretation.currentRole).toBe("Head of Performance Marketing");
+    expect(intelligence.companyName).toBe("Northwind Retail");
+    expect(intelligence.jobTitle).toBe("Head of Performance Marketing");
+    expect(intelligence.contextInterpretation.historicalCompanies.map((item) => item.text)).toContain("Contoso Travel");
+    expect(JSON.stringify(intelligence.selectedInsights)).not.toMatch(/Contoso Travel|agency accounts/i);
+  });
+
+  it("does not turn action context such as EU markets into the current role", () => {
+    const intelligence = buildProspectIntelligence({
+      ...input,
+      companyName: "Northwind Retail",
+      contactFirstName: "Dana",
+      contactRole: "Head of Performance Marketing",
+      prospectContext:
+        "Currently leading paid search across 6 EU markets at Northwind Retail.",
+    });
+
+    expect(intelligence.contextInterpretation.currentCompany).toBe("Northwind Retail");
+    expect(intelligence.contextInterpretation.currentRole).toBe("Head of Performance Marketing");
+    expect(intelligence.jobTitle).toBe("Head of Performance Marketing");
+  });
 });

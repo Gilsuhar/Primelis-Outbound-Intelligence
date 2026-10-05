@@ -178,13 +178,18 @@ function buildRawProspectContext(
     record?.full_name ||
     [record?.first_name, record?.last_name].filter(Boolean).join(" ") ||
     undefined;
+  const role = record?.job_title || record?.headline;
+  const company = record?.company_name;
 
   const lines: string[] = [`LinkedIn: ${record?.linkedin_url || linkedinUrl}`];
   if (fullName) lines.push(`Name: ${fullName}`);
-  if (record?.job_title || record?.headline) {
-    lines.push(`Title: ${record?.job_title || record?.headline}`);
+  if (role && company) {
+    lines.push(`Current: ${role} at ${company}.`);
+  } else if (role) {
+    lines.push(`Current role: ${role}.`);
+  } else if (company) {
+    lines.push(`Current company: ${company}.`);
   }
-  if (record?.company_name) lines.push(`Company: ${record.company_name}`);
   if (record?.company_domain || record?.company_website) {
     lines.push(`Company site: ${record?.company_website || record?.company_domain}`);
   }
@@ -192,16 +197,56 @@ function buildRawProspectContext(
   if (record?.industry) lines.push(`Industry: ${record.industry}`);
   if (record?.email) lines.push(`Email: ${record.email}`);
 
-  if (preview?.title && !fullName) lines.push(`Public headline: ${preview.title}`);
-  if (preview?.description) {
-    lines.push(`Public profile snippet (from LinkedIn link preview): ${preview.description}`);
+  const previewTitle = usefulPreviewText(preview?.title);
+  const previewDescription = usefulPreviewText(preview?.description);
+  if (previewTitle && !fullName) {
+    const headline = parsePreviewHeadline(previewTitle);
+    if (headline) {
+      lines.push(`Name: ${headline.name}`);
+      lines.push(`Current: ${headline.role} at ${headline.company}.`);
+    } else {
+      lines.push(previewTitle);
+    }
+  }
+  if (previewDescription) {
+    const headline = !record && parsePreviewHeadline(previewDescription);
+    if (headline) {
+      lines.push(`Name: ${headline.name}`);
+      lines.push(`Current: ${headline.role} at ${headline.company}.`);
+    } else {
+      lines.push(previewDescription);
+    }
   }
 
-  lines.push(
-    "Note: this is enrichment/preview-level data, not the full profile bio, experience",
-    "history, or posts. Add any of that manually below for sharper personalization.",
-  );
   return lines.join("\n");
+}
+
+function usefulPreviewText(value?: string) {
+  const text = value?.replace(/\s+/g, " ").trim();
+  if (!text) return undefined;
+  if (/\b(?:login|sign in|sign up|join linkedin|keep in touch|professional community|manage your professional identity|\d+\s*million\+?\s+members)\b/i.test(text)) {
+    return undefined;
+  }
+  return text.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+}
+
+function parsePreviewHeadline(value: string) {
+  const clean = value.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+  const atMatch = clean.match(/^(.+?)\s+-\s+(.+?\bat\b.+)$/i);
+  if (atMatch?.[1] && atMatch[2]) {
+    const current = atMatch[2].trim();
+    const currentMatch = current.match(/^(.+?)\s+\bat\b\s+(.+)$/i);
+    return currentMatch?.[1] && currentMatch[2]
+      ? { name: atMatch[1].trim(), role: currentMatch[1].trim(), company: currentMatch[2].trim() }
+      : undefined;
+  }
+  const dashMatch = clean.match(/^(.+?)\s+-\s+(.+?)\s+-\s+(.+)$/);
+  if (!dashMatch?.[1] || !dashMatch[2] || !dashMatch[3]) return undefined;
+  return {
+    name: dashMatch[1].trim(),
+    role: dashMatch[2].trim(),
+    company: dashMatch[3].trim(),
+  };
 }
 
 export async function enrichLinkedInProspect(

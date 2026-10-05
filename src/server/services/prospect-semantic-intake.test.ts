@@ -395,4 +395,18 @@ describe("AI semantic prospect intake", () => {
     expect(result.extraction.firstName).toBe("Chris");
     expect(result.extraction.companyName).toBe("AtlasHR");
   });
+
+  it("keeps deterministic company extraction on the current employer when company is not supplied separately", async () => {
+    const result = await extractProspectSemantic(
+      [
+        "Dana Levi",
+        "Head of Performance Marketing at Northwind Retail since 2023.",
+        "Previously Senior PPC Manager at Contoso Travel.",
+      ].join("\n"),
+      { provider: async () => { throw new Error("provider unavailable"); } },
+    );
+
+    expect(result.extraction.companyName).toBe("Northwind Retail");
+    expect(result.extraction.companyName).not.toMatch(/Contoso|since|\./i);
+  });
 });

@@ -58,6 +58,8 @@ describe("enrichLinkedInProspect", () => {
       expect(result.data.provider).toBe("GETLEADS");
       expect(result.data.rawProspectContext).toContain("Jane Doe");
       expect(result.data.rawProspectContext).toContain("Acme Co");
+      expect(result.data.rawProspectContext).toContain("Current: Head of Performance Marketing at Acme Co.");
+      expect(result.data.rawProspectContext).not.toMatch(/Title:|Note:|preview-level data/i);
       expect(result.data.record?.company_name).toBe("Acme Co");
     }
   });
@@ -75,8 +77,9 @@ describe("enrichLinkedInProspect", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.provider).toBe("PUBLIC_PREVIEW");
-      expect(result.data.rawProspectContext).toContain("Public headline");
+      expect(result.data.rawProspectContext).toContain("Current: Head of Performance Marketing at Acme Co.");
       expect(result.data.rawProspectContext).toContain("paid search and demand gen");
+      expect(result.data.rawProspectContext).not.toMatch(/Public profile snippet|from LinkedIn link preview|Note:/i);
     }
   });
 
@@ -92,6 +95,58 @@ describe("enrichLinkedInProspect", () => {
       expect(result.data.provider).toBe("GETLEADS_AND_PREVIEW");
       expect(result.data.rawProspectContext).toContain("Jane Doe");
       expect(result.data.rawProspectContext).toContain("brand SERP defense");
+      expect(result.data.rawProspectContext).not.toMatch(/Public profile snippet|preview-level data|Note:/i);
+    }
+  });
+
+  it("keeps LinkedIn login-preview boilerplate out of generated context", async () => {
+    const result = await enrichLinkedInProspect(
+      { linkedinUrl: "https://www.linkedin.com/in/jane-doe" },
+      async () => null,
+      async () => ({
+        title: "Login | LinkedIn",
+        description: "Login to LinkedIn to keep in touch with people you know.",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.provider).toBe("PUBLIC_PREVIEW");
+      expect(result.data.rawProspectContext).not.toMatch(/Login to LinkedIn|keep in touch|Public profile snippet/i);
+    }
+  });
+
+  it("parses LinkedIn dash-separated preview titles into clean current context", async () => {
+    const result = await enrichLinkedInProspect(
+      { linkedinUrl: "https://www.linkedin.com/in/dana-levi" },
+      async () => null,
+      async () => ({
+        title: "Dana Levi - Head of Performance Marketing - Northwind Retail | LinkedIn",
+        description: undefined,
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.rawProspectContext).toContain("Name: Dana Levi");
+      expect(result.data.rawProspectContext).toContain("Current: Head of Performance Marketing at Northwind Retail.");
+      expect(result.data.rawProspectContext).not.toMatch(/Dana Levi - Head of Performance Marketing -/i);
+    }
+  });
+
+  it("filters sign-up preview boilerplate", async () => {
+    const result = await enrichLinkedInProspect(
+      { linkedinUrl: "https://www.linkedin.com/in/dana-levi" },
+      async () => null,
+      async () => ({
+        title: "Sign Up | LinkedIn",
+        description: "500 million+ members | Manage your professional identity.",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.rawProspectContext).not.toMatch(/Sign Up|500 million|professional identity/i);
     }
   });
 

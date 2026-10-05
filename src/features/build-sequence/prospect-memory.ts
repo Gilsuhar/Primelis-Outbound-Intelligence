@@ -86,6 +86,29 @@ function labeledValue(rawText: string, labels: string[]) {
   return rawText.match(new RegExp(`(?:^|\\n)\\s*(?:${labelPattern})\\s*[:\\-]\\s*([^\\n]+)`, "i"))?.[1]?.trim();
 }
 
+function isHistoricalContextLine(value: string) {
+  return /\b(?:previously|previous|former|past|prior|historical|earlier|before|during tenure|tenure at|years? at|\d+\s+years?\s+at)\b/i.test(
+    value,
+  );
+}
+
+function nonHistoricalLines(rawText: string) {
+  return lines(rawText).filter((line) => !isHistoricalContextLine(line));
+}
+
+function cleanCompanyCandidate(value?: string) {
+  return compact(
+    value
+      ?.replace(/\s*\|.*$/g, "")
+      .replace(/\s+(?:since|from|as of|starting|started|joined in)\b.*$/i, "")
+      .replace(/\s+\(?\d{4}\s*(?:[-–]\s*(?:present|now|\d{4}))?\)?$/i, "")
+      .replace(/\s+(?:for|where|while|during|as)\b.*$/i, "")
+      .replace(/\s+(?:led|built|managed|managing|launched|scaled|grew|owned|ran|drove)\b.*$/i, "")
+      .replace(/[.]+$/g, "")
+      .trim(),
+  );
+}
+
 function inferredFullName(rawText: string) {
   const labeled = labeledValue(rawText, ["name", "prospect", "full name"]);
   if (labeled && !isRoleOrSeniorityFragment(labeled)) return compact(labeled);
@@ -122,7 +145,7 @@ function splitName(fullName?: string) {
 function inferredRole(rawText: string) {
   const labeled = labeledValue(rawText, ["role", "title", "job title", "current role"]);
   if (labeled) return compact(labeled);
-  return lines(rawText).find((line) =>
+  return nonHistoricalLines(rawText).find((line) =>
     line.length <= 120 &&
     /\b(?:ppc|paid search|sem|performance|growth|marketing|media|acquisition|demand|ecommerce|e-commerce|digital)\b/i.test(line) &&
     /\b(?:lead|manager|director|head|vp|vice president|specialist|strategist|analyst|team lead|consultant)\b/i.test(line),
@@ -134,17 +157,20 @@ function inferredCompany(rawText: string, domain?: string) {
   if (labeled) return compact(labeled);
   const currentSection = rawText.match(/\bcurrent\s*:\s*([\s\S]*?)(?:\n\s*(?:historical|previous|past|former|background)\s*:|$)/i)?.[1];
   const currentAtRole = currentSection?.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1];
-  if (currentAtRole) return compact(currentAtRole);
-  const atRole = rawText.match(/\b(?:current(?:ly)?|now works|works)\b[^.\n]{0,80}\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/i)?.[1] ??
-    rawText.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1];
-  if (atRole) return compact(atRole);
+  if (currentAtRole) return cleanCompanyCandidate(currentAtRole);
+  const currentAtRoleFallback = rawText.match(/\b(?:current(?:ly)?|now works|works)\b[^.\n]{0,120}\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/i)?.[1];
+  if (currentAtRoleFallback) return cleanCompanyCandidate(currentAtRoleFallback);
+  const atRole = nonHistoricalLines(rawText)
+    .map((line) => line.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9&'. -]{2,80})(?:\.|\n|$)/)?.[1])
+    .find((company): company is string => Boolean(company));
+  if (atRole) return cleanCompanyCandidate(atRole);
   if (domain) {
     const token = domain.split(".")[0];
     return token ? token.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) : undefined;
   }
   const fullName = inferredFullName(rawText);
   const role = inferredRole(rawText);
-  return lines(rawText).find((line, index) =>
+  return nonHistoricalLines(rawText).find((line, index) =>
     index > 0 &&
     line !== fullName &&
     line !== role &&

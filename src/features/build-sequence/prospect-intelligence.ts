@@ -233,29 +233,69 @@ function historicalSectionText(input: BuildSequenceInput) {
   return historicalMatch?.[1]?.trim();
 }
 
+function isHistoricalContextLine(value: string) {
+  return /\b(?:previously|previous|former|past|prior|historical|earlier|before|during tenure|tenure at|years? at|\d+\s+years?\s+at)\b/i.test(
+    value,
+  );
+}
+
+function nonHistoricalLines(value?: string) {
+  return lines(value).filter((line) => !isHistoricalContextLine(line));
+}
+
+function cleanCompanyFromRoleMatch(value?: string) {
+  return cleanCompanyCandidate(
+    value
+      ?.replace(/\s*\|.*$/g, "")
+      .replace(/\s+(?:since|from|as of|starting|started|joined in)\b.*$/i, "")
+      .replace(/\s+\(?\d{4}\s*(?:[-–]\s*(?:present|now|\d{4}))?\)?$/i, "")
+      .replace(/[.]+$/g, "")
+      .trim(),
+  );
+}
+
+function isLikelyParsedRole(value?: string) {
+  const text = value?.trim();
+  if (!text || text.length > 90) return false;
+  if (isLikelyLocationText(text) || isTenureMetadata(text)) return false;
+  return /\b(?:cmo|chief marketing|founder|head|lead|manager|director|vp|vice president|coordinator|specialist|strategist|analyst|ppc|paid search|growth|performance marketing|demand generation|acquisition)\b/i.test(
+    text,
+  );
+}
+
 function companyFromRoleLine(value?: string) {
-  const joinedCompany = compact(value)?.match(/\brecently\s+joined\s+([A-Z][A-Za-z0-9&' -]{1,80})\s+as\b/i)?.[1];
-  if (joinedCompany) return cleanCompanyCandidate(joinedCompany);
-  const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? compact(value);
+  const candidates = nonHistoricalLines(value);
+  const joinedCompany = candidates
+    .map((line) => line.match(/\brecently\s+joined\s+([A-Z][A-Za-z0-9&' -]{1,80})\s+as\b/i)?.[1])
+    .find((company): company is string => Boolean(company));
+  if (joinedCompany) return cleanCompanyFromRoleMatch(joinedCompany);
+  const text = candidates.find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ??
+    (value && candidates.length === 0 && !isHistoricalContextLine(value) ? compact(value) : undefined);
   if (!text) return undefined;
   const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:\s*\||$|[.,;])/);
-  return cleanCompanyCandidate(match?.[1]?.replace(/\s*\|.*$/g, ""));
+  return cleanCompanyFromRoleMatch(match?.[1]);
 }
 
 function roleFromRoleLine(value?: string) {
-  const raw = compact(value);
+  const candidates = nonHistoricalLines(value);
+  const raw = compact(candidates.join("\n"));
   const promoted = raw?.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
   if (promoted) return compact(promoted);
   const joinedAs = raw?.match(/\brecently\s+joined\s+[A-Z][A-Za-z0-9&' -]{1,80}\s+as\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
   if (joinedAs) return compact(joinedAs);
-  const text = lines(value).find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? raw;
+  const text = candidates.find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? raw;
   if (!text) return undefined;
   const beforePipe = text.includes("|") ? compact(text.split("|")[0]) : undefined;
   if (beforePipe && !/(?:@|\bat\b)/i.test(beforePipe) && isLikelyRoleLine(beforePipe)) {
     return beforePipe;
   }
   const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:\s*\||$|[.,;])/);
-  return compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
+  const role = compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
+  if (!role) return undefined;
+  if (/^(?:current(?:ly)?|now)\s+(?:leading|managing|running|owning|working|focused)\b/i.test(role)) {
+    return undefined;
+  }
+  return isLikelyParsedRole(role) ? role : undefined;
 }
 
 function companyMentions(value: string) {
@@ -266,7 +306,7 @@ function companyMentions(value: string) {
       .map((item) =>
         item
           .replace(/\s+(?:for|where|while|during|as)\b.*$/i, "")
-          .replace(/\s+(?:led|built|managed|launched|scaled|grew|owned|ran|drove)\b.*$/i, "")
+          .replace(/\s+(?:led|built|managed|managing|launched|scaled|grew|owned|ran|drove)\b.*$/i, "")
           .replace(/\s+\d+\s*(?:yrs?|years?)\b.*$/i, "")
           .replace(/[.]+$/g, "")
           .trim(),
@@ -279,7 +319,7 @@ function temporalStatusForText(text: string, input: BuildSequenceInput) {
   const currentText = currentSectionText(input);
   if (historicalText && historicalText.includes(text)) return "HISTORICAL" as const;
   if (currentText && currentText.includes(text)) return "CURRENT" as const;
-  if (/\b(?:previously|former|past|prior|historical|earlier|before|during tenure|tenure at|years? at|\d+\s+years?\s+at)\b/i.test(text)) {
+  if (isHistoricalContextLine(text)) {
     return "HISTORICAL" as const;
   }
   if (/\b(?:current|currently|now works|works at|today|present|recently joined|promoted to|@)\b/i.test(text)) {
@@ -323,8 +363,8 @@ function currentCompanyFor(input: BuildSequenceInput) {
   const currentText = currentSectionText(input);
   return (
     cleanCompanyCandidate(companyFromRoleLine(currentText)) ??
-    cleanCompanyCandidate(companyFromRoleLine(input.prospectContext)) ??
-    cleanCompanyCandidate(input.companyName)
+    cleanCompanyCandidate(input.companyName) ??
+    cleanCompanyCandidate(companyFromRoleLine(input.prospectContext))
   );
 }
 
@@ -673,7 +713,7 @@ function inferJobTitle(input: BuildSequenceInput) {
   if (suppliedRole && suppliedRole !== "Head of Performance Marketing") {
     return suppliedRole;
   }
-  return lines(input.prospectContext).find(isLikelyRoleLine) ?? suppliedRole;
+  return nonHistoricalLines(input.prospectContext).find(isLikelyRoleLine) ?? suppliedRole;
 }
 
 function keywordFromLine(line: string) {

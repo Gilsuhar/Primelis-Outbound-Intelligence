@@ -193,7 +193,7 @@ function mergeSemanticExtraction(
   const sameAsCompany = (value?: string) =>
     Boolean(
       value &&
-        [deterministic.companyName, groundedSemanticCompany].some(
+        [groundedSemanticCompany].some(
           (company) => company && normalizeForGrounding(value) === normalizeForGrounding(company),
         ),
     );
@@ -224,10 +224,8 @@ function mergeSemanticExtraction(
     ? undefined
     : deterministic.firstName;
   const firstName =
-    deterministicLooksLikeCompany
-      ? groundedSemanticFirstName ?? groundedSemanticFullName?.split(/\s+/)[0]
-      : deterministicFirstName ??
     groundedSemanticFirstName ??
+    (deterministicLooksLikeCompany ? groundedSemanticFullName?.split(/\s+/)[0] : deterministicFirstName) ??
     fullName?.split(/\s+/)[0];
   const lastName =
     deterministic.lastName ??

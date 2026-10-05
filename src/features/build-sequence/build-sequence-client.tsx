@@ -941,26 +941,35 @@ export function BuildSequenceClient() {
     }
     setHubSpotStatus({ state: "sending", message: "Sending to HubSpot..." });
     startTransition(async () => {
-      const response = await pushSequenceToHubSpotAction({
-        companyName: hubSpotCompanyName,
-        companyWebsite: resolvedCompanyWebsite() || undefined,
-        overallStrategy: result.overallStrategy,
-        selectedAngle: result.selectedAngle,
-        persona: result.personaEmphasis.persona,
-        steps: displayedSteps,
-        safetyNotes: result.safetyNotes,
-        sourceTitles: result.sourceReferences.map((source) => source.title),
-      });
+      try {
+        const response = await pushSequenceToHubSpotAction({
+          companyName: hubSpotCompanyName,
+          companyWebsite: resolvedCompanyWebsite() || undefined,
+          overallStrategy: result.overallStrategy,
+          selectedAngle: result.selectedAngle,
+          persona: result.personaEmphasis.persona,
+          steps: displayedSteps,
+          safetyNotes: result.safetyNotes,
+          sourceTitles: result.sourceReferences.map((source) => source.title),
+        });
 
-      if (!response.ok) {
-        setHubSpotStatus({ state: "error", message: safeClientErrorMessage(response.message) });
-        return;
+        if (!response.ok) {
+          setHubSpotStatus({ state: "error", message: safeClientErrorMessage(response.message) });
+          return;
+        }
+
+        setHubSpotStatus({
+          state: "success",
+          message: "Sent to HubSpot as a company note and review task.",
+        });
+      } catch (caught) {
+        setHubSpotStatus({
+          state: "error",
+          message: safeClientErrorMessage(
+            caught instanceof Error ? caught.message : "HubSpot push failed.",
+          ),
+        });
       }
-
-      setHubSpotStatus({
-        state: "success",
-        message: "Sent to HubSpot as a company note and review task.",
-      });
     });
   }
 
