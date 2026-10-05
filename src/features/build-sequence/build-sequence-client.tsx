@@ -14,6 +14,7 @@ import {
 
 import {
   enrichLinkedInProspectAction,
+  generateBuildSequenceAction,
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import { useOutputLanguage } from "@/components/language-selector";
@@ -804,40 +805,40 @@ export function BuildSequenceClient() {
     }
     setIsGenerating(true);
     startTransition(async () => {
+      const payload = {
+        companyName: formString(formData, "companyName"),
+        companyWebsite: formString(formData, "companyWebsite") || undefined,
+        contactFirstName: formString(formData, "contactFirstName") || undefined,
+        contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
+        industry: formString(formData, "industry") || undefined,
+        companyContext:
+          formString(formData, "companyContext") || "Potential fit - validate spend/demand",
+        geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
+        paidSearchContext: formString(formData, "paidSearchContext") || undefined,
+        currentVendor: formString(formData, "currentVendor") || undefined,
+        observedTrigger:
+          formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
+        primaryChannel,
+        sequenceLength,
+        desiredTone: tone,
+        desiredOverallDuration:
+          formString(formData, "desiredOverallDuration") || "12 business days",
+        outputLanguage,
+        accountStatusOverride,
+        rawProspectContext: combinedProspectContext || undefined,
+        prospectContext: combinedProspectContext || undefined,
+        serpEvidence: formString(formData, "serpEvidence") || undefined,
+        keywords: cleanedKeywordEvidence(),
+        internalNotes: formString(formData, "internalNotes") || undefined,
+        screenshotAvailable,
+        screenshotContext: formString(formData, "screenshotContext") || undefined,
+        brandKeyword: formString(formData, "brandKeyword") || undefined,
+        marketCountry: formString(formData, "marketCountry") || undefined,
+        device: formString(formData, "device") || undefined,
+        observationDate: formString(formData, "observationDate") || undefined,
+        screenshotShows: formString(formData, "screenshotShows") || undefined,
+      };
       try {
-        const payload = {
-          companyName: formString(formData, "companyName"),
-          companyWebsite: formString(formData, "companyWebsite") || undefined,
-          contactFirstName: formString(formData, "contactFirstName") || undefined,
-          contactRole: formString(formData, "contactRole") || "Head of Performance Marketing",
-          industry: formString(formData, "industry") || undefined,
-          companyContext:
-            formString(formData, "companyContext") || "Potential fit - validate spend/demand",
-          geographyOrMarkets: formString(formData, "geographyOrMarkets") || undefined,
-          paidSearchContext: formString(formData, "paidSearchContext") || undefined,
-          currentVendor: formString(formData, "currentVendor") || undefined,
-          observedTrigger:
-            formString(formData, "observedTrigger") || "Light discovery before pitching Signal",
-          primaryChannel,
-          sequenceLength,
-          desiredTone: tone,
-          desiredOverallDuration:
-            formString(formData, "desiredOverallDuration") || "12 business days",
-          outputLanguage,
-          accountStatusOverride,
-          rawProspectContext: combinedProspectContext || undefined,
-          prospectContext: combinedProspectContext || undefined,
-          serpEvidence: formString(formData, "serpEvidence") || undefined,
-          keywords: cleanedKeywordEvidence(),
-          internalNotes: formString(formData, "internalNotes") || undefined,
-          screenshotAvailable,
-          screenshotContext: formString(formData, "screenshotContext") || undefined,
-          brandKeyword: formString(formData, "brandKeyword") || undefined,
-          marketCountry: formString(formData, "marketCountry") || undefined,
-          device: formString(formData, "device") || undefined,
-          observationDate: formString(formData, "observationDate") || undefined,
-          screenshotShows: formString(formData, "screenshotShows") || undefined,
-        };
         const apiResponse = await fetch("/api/build-sequence/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -863,12 +864,31 @@ export function BuildSequenceClient() {
         setStepSubjectVariantIndexes({});
         setStepCtaVariantIndexes({});
       } catch (caught) {
-        setResult(null);
-        setError(
-          safeClientErrorMessage(
-            caught instanceof Error ? caught.message : "Sequence generation failed.",
-          ),
-        );
+        try {
+          const response = (await generateBuildSequenceAction(
+            payload,
+          )) as BuildSequenceActionResult;
+          if (!response.ok) {
+            setResult(null);
+            setError(safeClientErrorMessage(response.message));
+            return;
+          }
+
+          setResult(response.data);
+          setStepBodyDrafts({});
+          setStepSubjectDrafts({});
+          setStepCtaDrafts({});
+          setStepBodyVariantIndexes({});
+          setStepSubjectVariantIndexes({});
+          setStepCtaVariantIndexes({});
+        } catch {
+          setResult(null);
+          setError(
+            safeClientErrorMessage(
+              caught instanceof Error ? caught.message : "Sequence generation failed.",
+            ),
+          );
+        }
       } finally {
         setIsGenerating(false);
       }

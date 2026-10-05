@@ -22,6 +22,7 @@ vi.mock("@/app/account-status/actions", () => ({
 
 vi.mock("@/app/build-sequence/actions", () => ({
   enrichLinkedInProspectAction: vi.fn(),
+  generateBuildSequenceAction: vi.fn(),
   pushSequenceToHubSpotAction: vi.fn(),
 }));
 
@@ -47,6 +48,7 @@ vi.mock("@/features/draft-refinement/draft-refinement-panel", () => ({
 import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-brain-client";
 import {
   enrichLinkedInProspectAction,
+  generateBuildSequenceAction,
   pushSequenceToHubSpotAction,
 } from "@/app/build-sequence/actions";
 import {
@@ -73,6 +75,11 @@ beforeEach(() => {
     }),
   }));
   vi.stubGlobal("fetch", fetchMock);
+  vi.mocked(generateBuildSequenceAction).mockResolvedValue({
+    ok: false,
+    code: "VALIDATION_ERROR",
+    message: "Test-visible generation failure.",
+  });
 });
 
 afterEach(() => {
@@ -282,6 +289,39 @@ describe("Sales workflow UI", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText("Test-visible generation failure.")).toBeTruthy());
+  });
+
+  it("falls back to the server action when the Build Sequence API fetch fails", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+    vi.mocked(generateBuildSequenceAction).mockResolvedValueOnce({
+      ok: true,
+      data: buildSequenceResult(),
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: {
+        value:
+          "Morgan Lee\nDirector of Paid Search at Cisco\nOwns paid search across several markets.",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(generateBuildSequenceAction).toHaveBeenCalledTimes(1));
+    expect(generateBuildSequenceAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prospectContext: expect.stringContaining("Director of Paid Search"),
+      }),
+    );
+    expect(screen.queryByText("Failed to fetch")).toBeFalsy();
+    await waitFor(() =>
+      expect(screen.getByText("Build a concise paid-search sequence.")).toBeTruthy(),
+    );
   });
 
   it("does not submit Build Sequence from a LinkedIn URL alone", async () => {
