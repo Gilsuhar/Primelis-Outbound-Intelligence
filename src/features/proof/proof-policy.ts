@@ -139,7 +139,7 @@ function guidanceFor(context: ProofContext, proof: SelectedProof) {
     ? `Allowed metrics: ${proof.allowedMetricNumbers.map((number) => `${number}%`).join(", ")}.`
     : "No numeric metric should be added unless it appears in the approved proof text.";
   if (context.workflow === "BUILD_SEQUENCE") {
-    return `${proof.customerName} is the only selected case study. Use it once, preferably in step 2 as proof or step 3 as method support. ${metricHint} Keep it as observed proof, not a promise.`;
+    return `${proof.customerName} is the only selected case study. Use it once, preferably in step 3 as approved, context-matched social proof. Reserve step 2 for a manually verified SERP screenshot and observation; never substitute case-study claims for missing SERP evidence. ${metricHint} Keep it as observed proof, not a promise.`;
   }
   if (context.workflow === "REPLY_TO_PROSPECT") {
     return `${proof.customerName} is the only selected proof. Use it only if it directly answers the latest prospect message. ${metricHint} Keep the reply short and move toward feedback or a 10-minute walkthrough.`;
