@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { signInWithPassword, signOutAction } from "@/app/auth/actions";
+import { signInWithPassword, signOutAction, sendPasswordRecovery } from "@/app/auth/actions";
 
 const initialState = { ok: false, message: "" };
 
@@ -17,6 +17,7 @@ function Submit() {
 
 export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending = false }: { nextPath?: string; accessPending?: boolean }) {
   const [state, action] = useActionState(signInWithPassword, initialState);
+  const [recoveryState, recoveryAction, recoveryPending] = useActionState(sendPasswordRecovery, initialState);
   return (
     <main className="flex min-h-screen items-center justify-center bg-cream px-4 py-10">
       <section className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-sm">
@@ -39,6 +40,12 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
             </label>
             <Submit />
             {state.message && <p role="alert" className="text-sm text-amber-800">{state.message}</p>}
+          </form>
+          <form action={recoveryAction} className="mt-5 space-y-2 border-t pt-4">
+            <p className="text-sm font-medium">Forgot your password?</p>
+            <input name="email" type="email" required placeholder="Your account email" className="w-full rounded-xl border p-3" />
+            <button type="submit" disabled={recoveryPending} className="text-sm font-semibold underline disabled:opacity-60">Email me a password reset link</button>
+            {recoveryState.message && <p role="status" className="text-sm">{recoveryState.message}</p>}
           </form>
         )}
       </section>
