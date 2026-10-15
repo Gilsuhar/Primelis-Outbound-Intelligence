@@ -21,7 +21,7 @@ type HeadersToSet = Record<string, string>;
 
 function getSafeRedirectUrl(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const next = getSafeInternalPath(requestUrl.searchParams.get("next"));
+  const next = getSafeInternalPath(requestUrl.searchParams.get("next") ?? "/sales-agent");
   return new URL(next, request.url);
 }
 
