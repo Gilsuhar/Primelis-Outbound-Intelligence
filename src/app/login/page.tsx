@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     hasApplicationUser: Boolean(applicationUser),
   });
 
-  if (state === "SIGNED_IN") redirect("/");
+  if (state === "SIGNED_IN") redirect(getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent"));
 
   return (
     <PrivatePasswordLogin
