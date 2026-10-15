@@ -170,3 +170,38 @@ export async function signOutAction() {
   await supabase?.auth.signOut();
   redirect("/login");
 }
+
+const passwordLoginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+  next: z.string().optional(),
+});
+
+export async function signInWithPassword(
+  _state: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const parsed = passwordLoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    next: formData.get("next"),
+  });
+  if (!parsed.success) return { ok: false, message: "Enter your email and password." };
+
+  const supabase = await createSupabaseServerClient({ requireCookieWrites: true });
+  if (!supabase) return { ok: false, message: "Private sign-in is not configured." };
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (error || !data.user) {
+      return { ok: false, message: "Sign-in failed. Check your credentials." };
+    }
+  } catch {
+    return { ok: false, message: "Sign-in is temporarily unavailable." };
+  }
+
+  redirect(getSafeInternalPath(parsed.data.next || "/sales-agent"));
+}
