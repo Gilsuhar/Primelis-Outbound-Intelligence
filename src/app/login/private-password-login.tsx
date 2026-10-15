@@ -30,6 +30,7 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
             <button type="submit" className="w-full rounded-full border border-line px-4 py-3 font-semibold">Sign out</button>
           </form>
         ) : (
+          <>
           <form action={action} className="mt-6 space-y-4">
             <input type="hidden" name="next" value={nextPath} />
             <label className="block text-sm font-medium">Email
@@ -47,6 +48,7 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
             <button type="submit" disabled={recoveryPending} className="text-sm font-semibold underline disabled:opacity-60">Email me a password reset link</button>
             {recoveryState.message && <p role="status" className="text-sm">{recoveryState.message}</p>}
           </form>
+          </>
         )}
       </section>
     </main>
