@@ -126,11 +126,13 @@ export async function collectSalesAgentEvidence(
       "NOT_CONFIGURED",
       "Configure HUBSPOT_PRIVATE_APP_TOKEN with read-only contact/company access",
     );
+  let stage: "database" | "hubspot" | "save" = "database";
   try {
     // Fail before external reads when persistence/suppression checks are unavailable.
     console.info("[sales-agent-collection] stage=suppression_start");
     const records = await store.suppressionRecords();
     console.info("[sales-agent-collection] stage=suppression_ok");
+    stage = "hubspot";
     console.info("[sales-agent-collection] stage=hubspot_start");
     const batch = await (deps.intake ?? new HubSpotReadOnlyIntake()).listOwnedContacts(after);
     console.info("[sales-agent-collection] stage=hubspot_ok count=" + batch.contacts.length);
@@ -203,6 +205,7 @@ export async function collectSalesAgentEvidence(
         collectedAt: completedAt.toISOString(),
       });
     }
+    stage = "save";
     console.info("[sales-agent-collection] stage=save_start count=" + snapshots.length);
     await store.save(actorId, snapshots);
     console.info("[sales-agent-collection] stage=save_ok");
@@ -214,11 +217,18 @@ export async function collectSalesAgentEvidence(
       rows: snapshots.map((snapshot) => reviewEvidenceSnapshot(snapshot, clock())),
     });
   } catch (error) {
-    console.error("[sales-agent-collection] collection_failed", { name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.replace(/(Bearer\\s+|pat-[^\\s]+|sk_live_[^\\s]+)/gi, "[REDACTED]") : "Unknown failure" });
-    return err(
-      "COLLECTION_FAILED",
-      "Evidence collection could not complete. Check database, HubSpot read scopes, network access and rate limits; retry the same page. No CRM changes were made.",
-    );
+    // Log a stage and error type only; provider errors may contain sensitive data.
+    console.error("[sales-agent-collection] collection_failed", {
+      stage,
+      errorType: error instanceof Error ? error.name : "Unknown",
+    });
+    const message =
+      stage === "database"
+        ? "Evidence database is unavailable before HubSpot collection. Check DATABASE_URL and the SuppressionRecord table."
+        : stage === "hubspot"
+          ? "HubSpot read failed. Verify the token supports CRM search, owner filtering and contact/company read scopes."
+          : "HubSpot intake completed, but saving evidence to the application database failed.";
+    return err("COLLECTION_FAILED", message);
   }
 }
 
