@@ -128,8 +128,12 @@ export async function collectSalesAgentEvidence(
     );
   try {
     // Fail before external reads when persistence/suppression checks are unavailable.
+    console.info("[sales-agent-collection] stage=suppression_start");
     const records = await store.suppressionRecords();
+    console.info("[sales-agent-collection] stage=suppression_ok");
+    console.info("[sales-agent-collection] stage=hubspot_start");
     const batch = await (deps.intake ?? new HubSpotReadOnlyIntake()).listOwnedContacts(after);
+    console.info("[sales-agent-collection] stage=hubspot_ok count=" + batch.contacts.length);
     const adapters = [new LocalSuppressionAdapter(records), ...(deps.providers ?? [])];
     const seen = new Map<string, IntakeContact>();
     const excluded = new Set<string>();
@@ -199,7 +203,9 @@ export async function collectSalesAgentEvidence(
         collectedAt: completedAt.toISOString(),
       });
     }
+    console.info("[sales-agent-collection] stage=save_start count=" + snapshots.length);
     await store.save(actorId, snapshots);
+    console.info("[sales-agent-collection] stage=save_ok");
     return ok({
       collected: snapshots.length,
       complete: batch.complete,
@@ -207,7 +213,8 @@ export async function collectSalesAgentEvidence(
       warnings: batch.warnings,
       rows: snapshots.map((snapshot) => reviewEvidenceSnapshot(snapshot, clock())),
     });
-  } catch {
+  } catch (error) {
+    console.error("[sales-agent-collection] collection_failed", { name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.replace(/(Bearer\\s+|pat-[^\\s]+|sk_live_[^\\s]+)/gi, "[REDACTED]") : "Unknown failure" });
     return err(
       "COLLECTION_FAILED",
       "Evidence collection could not complete. Check database, HubSpot read scopes, network access and rate limits; retry the same page. No CRM changes were made.",
