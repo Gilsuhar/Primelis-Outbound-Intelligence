@@ -31,7 +31,12 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
           </form>
         ) : (
           <>
-          <form action={continueWithGoogle} className="mt-6">\n            <input type="hidden" name="next" value={nextPath} />\n            <button type="submit" className="w-full rounded-full border border-line bg-white px-4 py-3 font-semibold text-ink hover:bg-gray-50">Continue with Google</button>\n          </form>\n          <div className="my-4 text-center text-xs text-gray-500">or sign in with password</div>\n          <form action={action} className="space-y-4">
+          <form action={continueWithGoogle} className="mt-6">
+            <input type="hidden" name="next" value={nextPath} />
+            <button type="submit" className="w-full rounded-full border border-line bg-white px-4 py-3 font-semibold text-ink hover:bg-gray-50">Continue with Google</button>
+          </form>
+          <div className="my-4 text-center text-xs text-gray-500">or sign in with password</div>
+          <form action={action} className="space-y-4">
             <input type="hidden" name="next" value={nextPath} />
             <label className="block text-sm font-medium">Email
               <input name="email" type="email" autoComplete="username" required className="mt-2 w-full rounded-xl border border-line p-3" />
