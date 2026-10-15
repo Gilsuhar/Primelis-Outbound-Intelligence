@@ -59,35 +59,32 @@ describe("proof policy", () => {
 
   it("blocks unsupported percentages and non-selected proof customers", () => {
     const records = [
-        record({
-          id: "crocs",
-          title: "Crocs retail case study",
-          type: "CASE_STUDY",
-          approvedText:
-            "Case study: Crocs. Crocs reduced total branded search spend by 71.2% while CPC fell.",
-          sourceIds: ["crocs-source"],
-        }),
-        record({
-          id: "chloe",
-          title: "Chloe luxury case study",
-          type: "CASE_STUDY",
-          approvedText: "Case study: Chloe. Ad cost fell 51% while organic traffic grew 35%.",
-          sourceIds: ["chloe-source"],
-        }),
-      ];
-    const selection = selectProofForContext(
-      records,
-      {
-        workflow: "CREATE_OUTREACH",
-        companyName: "Nike",
-        industry: "Retail",
-        requestedProof: true,
-      },
-    );
+      record({
+        id: "crocs",
+        title: "Crocs retail case study",
+        type: "CASE_STUDY",
+        approvedText:
+          "Case study: Crocs. Crocs reduced total branded search spend by 71.2% while CPC fell.",
+        sourceIds: ["crocs-source"],
+      }),
+      record({
+        id: "chloe",
+        title: "Chloe luxury case study",
+        type: "CASE_STUDY",
+        approvedText: "Case study: Chloe. Ad cost fell 51% while organic traffic grew 35%.",
+        sourceIds: ["chloe-source"],
+      }),
+    ];
+    const selection = selectProofForContext(records, {
+      workflow: "CREATE_OUTREACH",
+      companyName: "Nike",
+      industry: "Retail",
+      requestedProof: true,
+    });
 
     expect(
       validateProofUsage({
-        output: "Crocs reduced branded search spend by 71% while CPC fell.",
+        output: "Crocs reduced branded search spend by 71.2% while CPC fell.",
         selectedProof: selection.selectedProof,
         availableProofRecords: records,
         maxMetricMentions: 1,
@@ -109,6 +106,40 @@ describe("proof policy", () => {
         availableProofRecords: records,
       }),
     ).toMatchObject({ ok: false });
+  });
+
+  it("requires explicit approval and keeps decimal metrics exact", () => {
+    const proof = record({
+      id: "decimal-proof",
+      type: "CASE_STUDY",
+      title: "RetailCo case study",
+      approvedText: "RetailCo reduced CPC by 12.5%.",
+      sourceIds: ["source"],
+    });
+    expect(
+      selectProofForContext([{ ...proof, approvalStatus: undefined }], {
+        workflow: "BUILD_SEQUENCE",
+        requestedProof: true,
+      }).selectedProof,
+    ).toBeUndefined();
+    const selected = selectProofForContext([proof], {
+      workflow: "BUILD_SEQUENCE",
+      requestedProof: true,
+    }).selectedProof;
+    expect(
+      validateProofUsage({
+        output: "RetailCo reduced CPC by 12%.",
+        selectedProof: selected,
+        availableProofRecords: [proof],
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      validateProofUsage({
+        output: "RetailCo reduced CPC by 12.5%.",
+        selectedProof: selected,
+        availableProofRecords: [proof],
+      }),
+    ).toMatchObject({ ok: true });
   });
 
   it("does not select proof when it was not requested and no context matches", () => {

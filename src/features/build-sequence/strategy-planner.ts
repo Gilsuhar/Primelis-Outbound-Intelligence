@@ -39,7 +39,12 @@ function firstProspectFact(intelligence: ProspectIntelligence) {
     intelligence.selectedInsights[0]?.text ??
     intelligence.contextInterpretation.commercialSignals
       .map((item) => item.text)
-      .find((fact) => isCompleteProspectInsight(fact))
+      .find(
+        (fact) =>
+          isCompleteProspectInsight(fact) &&
+          fact !== intelligence.jobTitle &&
+          !/^(?:current:\s*)?[^.]+ (?:at|@) [^.]+\.?$/i.test(fact),
+      )
   );
 }
 
@@ -64,6 +69,7 @@ function profileCommercialInsight(input: BuildSequenceInput, intelligence: Prosp
     .filter((fact) => !/\b(?:previously|former|past|historical|prior)\b/i.test(fact))
     .filter((fact) => !/[,:;/-]\s*$/.test(fact))
     .filter((fact) => fact.split(/\s+/).length >= 5)
+    .filter((fact) => !/[;]|\b(?:current:|paid media lead at|paid search lead at)\b/i.test(fact))
     .filter((fact) =>
       /\b(?:ppc|paid search|paid media|performance marketing|google ads|campaigns?|budget|roi|roas|a\/b testing|experimentation|data-driven|team management|growth)\b/i.test(
         fact,
@@ -75,17 +81,14 @@ function profileCommercialInsight(input: BuildSequenceInput, intelligence: Prosp
       ),
     );
 
+  candidates.sort(
+    (a, b) =>
+      Number(/high-budget|roi|roas|a\/b testing/i.test(b)) -
+      Number(/high-budget|roi|roas|a\/b testing/i.test(a)),
+  );
   const first = candidates[0];
   if (!first) return undefined;
-  const second = candidates.find(
-    (fact) =>
-      fact !== first &&
-      /\b(?:roi|roas|a\/b testing|experimentation|data-driven|team management|budget)\b/i.test(
-        fact,
-      ),
-  );
-  if (!second) return first;
-  return `${first.replace(/\.$/, "")}; ${second.replace(/\.$/, "")}.`;
+  return first;
 }
 
 function hasSelectedInsight(intelligence: ProspectIntelligence) {
@@ -207,7 +210,7 @@ function productGapFor(intelligence: ProspectIntelligence, input?: BuildSequence
     return "Google Ads reports performance, but it does not turn live SERP competition into automated branded-bid decisions.";
   }
   if (driver === "EXPANSION_MARKET") {
-    return "As markets and query sets change, Google Ads does not clearly show where branded coverage needs defending versus where pressure can ease.";
+    return "As markets and keywords change, Google Ads does not clearly show where branded coverage needs defending versus where pressure can ease.";
   }
   if (driver === "EFFICIENCY_PRESSURE") {
     return "Google Ads can show branded performance, but it does not clearly separate necessary defensive spend from pressure that may be broader than needed.";
@@ -258,7 +261,7 @@ function businessQuestionFor(input: BuildSequenceInput, intelligence: ProspectIn
     return `Where does live SERP competition still need to feed paid-search automation before branded bids change${scope}?`;
   }
   if (driver === "EXPANSION_MARKET") {
-    return `Across markets and query sets, how do you decide where branded coverage should defend demand versus ease pressure${scope}?`;
+    return `Across markets and keywords, how do you decide where branded coverage should defend demand versus ease pressure${scope}?`;
   }
   if (driver === "EFFICIENCY_PRESSURE") {
     return `When efficiency is under pressure, how do you know which branded bids still need defending${scope}?`;
@@ -294,14 +297,7 @@ function prospectInsightFor(input: BuildSequenceInput, intelligence: ProspectInt
   return `A ${intelligence.persona.toLowerCase().replaceAll("_", " ")} buyer at ${company}`;
 }
 
-function narrativeFor(
-  intelligence: ProspectIntelligence,
-  hasProspectFact: boolean,
-): MessageStrategy["sequenceNarrative"] {
-  const evidencePhrase =
-    intelligence.serpScenario === "UNKNOWN"
-      ? "Keep this as a paid-brand decision question without claiming account-specific SERP findings."
-      : `Use the ${intelligence.serpScenario.toLowerCase()} branded-search evidence without overclaiming.`;
+function narrativeFor(hasProspectFact: boolean): MessageStrategy["sequenceNarrative"] {
   return [
     {
       step: 1,
@@ -313,23 +309,23 @@ function narrativeFor(
     },
     {
       step: 2,
-      objective: "Expand the business problem and show the process gap.",
-      newInformation: "Why standard reporting or one static bid rule misses the decision.",
+      objective: "Use a manually verified Google SERP screenshot or HOLD this step.",
+      newInformation: "A dated, sourced keyword observation for the prospect market and device.",
       ctaIntent: "Ask whether the team can detect the moment.",
     },
     {
       step: 3,
-      objective: "Explain Signal's bid mechanics without inventing account impact.",
+      objective:
+        "Introduce a different Signal measurement capability with one approved case study.",
       newInformation:
-        intelligence.serpScenario === "UNKNOWN"
-          ? `${evidencePhrase} Explain Signal as live brand-visibility measurement connected to bid decisions. Do not claim competitor movement, solo periods, CPC waste, or account impact.`
-          : `${evidencePhrase} Explain that Signal can reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns; this is not simply on/off.`,
+        "Connect live brand visibility with Google Ads bid decisions and one approved customer result. Do not repeat the screenshot observation or invent account impact.",
       ctaIntent: "Ask if a narrow look would be useful.",
     },
     {
       step: 4,
-      objective: "Use one concrete proof point and convert softly.",
-      newInformation: "One approved customer result or a safe proof fallback.",
+      objective: "Close with a concise, low-pressure follow-up.",
+      newInformation:
+        "A natural invitation to continue when relevant, without restarting the pitch.",
       ctaIntent: "Offer a quick overview without pressure.",
     },
   ];
@@ -345,7 +341,7 @@ function stepPlansFromNarrative(
     newInformation: item.newInformation,
     angle: item.step === 2 ? strategy.relevantCapability : strategy.primaryAngle,
     evidenceToUse: item.newInformation,
-    proofToUse: item.step === 4 ? strategy.proofPoint : undefined,
+    proofToUse: item.step === 3 ? strategy.proofPoint : undefined,
     CTAIntent: item.ctaIntent,
     avoidRepeating:
       item.step === 1
@@ -426,7 +422,7 @@ export function buildProspectBrief({
       "paid-search ownership",
       "branded-search spend",
     ],
-    stepObjectives: narrativeFor(intelligence, Boolean(strongestUsableProspectInsight)).map(
+    stepObjectives: narrativeFor(Boolean(strongestUsableProspectInsight)).map(
       ({ step, objective }) => ({ step, objective }),
     ),
     factsToAvoid,
@@ -436,7 +432,7 @@ export function buildProspectBrief({
       intelligence.serpScenario === "UNKNOWN"
         ? "Email 3 should explain Signal mechanics as live brand-visibility measurement connected to bid decisions; do not claim competitor movement, solo periods, CPC waste, or account impact."
         : "Email 3 should explain Signal mechanics: reduce bids when competition drops, find the lowest CPC or position needed, and react when competition returns.",
-      "Email 4 should use one proof point and close softly.",
+      "Email 3 should use approved proof; Email 4 should close softly.",
       "Do not force personalization when the strongest usable prospect insight is empty.",
       "Never use factsToAvoid as personalization.",
       "Never expose internal uncertainty, validation, or evidence-language.",
@@ -463,7 +459,7 @@ export function planMessageStrategy({
   const hasProspectFact =
     hasSelectedInsight(intelligence) ||
     Boolean(firstProspectFact(intelligence) ?? profileCommercialInsight(input, intelligence));
-  const sequenceNarrative = narrativeFor(intelligence, hasProspectFact);
+  const sequenceNarrative = narrativeFor(hasProspectFact);
   const confidence: MessageStrategy["confidence"] =
     hasProspectFact && intelligence.confidence.serp !== "LOW"
       ? "HIGH"
@@ -486,7 +482,7 @@ export function planMessageStrategy({
     whyThisShouldResonate: hasProspectFact
       ? "The sequence can start from a real supplied prospect fact, then connect it to a specific branded-search decision."
       : "The supplied prospect context is light, so the sequence should stay role- and account-level instead of inventing achievements.",
-    openingStyle: openingStyleFor(intelligence),
+    openingStyle: hasProspectFact ? "PROSPECT_FACT" : openingStyleFor(intelligence),
     sequenceNarrative,
     emailStepPlans: stepPlansFromNarrative(sequenceNarrative, {
       primaryAngle,

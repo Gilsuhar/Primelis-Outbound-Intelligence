@@ -166,6 +166,9 @@ export type BuildSequenceInput = {
   keywords?: SequenceKeywordEvidence[];
   internalNotes?: string;
   screenshotAvailable?: boolean;
+  screenshotManuallyVerified?: boolean;
+  screenshotSource?: "GOOGLE_SERP";
+  screenshotUrl?: string;
   screenshotContext?: string;
   brandKeyword?: string;
   marketCountry?: string;
@@ -214,6 +217,9 @@ export type SequenceSourceReference = {
 };
 
 export type SequenceStep = {
+  threadMode?: "NEW_THREAD" | "REPLY_TO_FIRST";
+  approvalStatus?: "HOLD" | "PENDING_HUMAN_APPROVAL";
+  holdReason?: string;
   stepNumber: number;
   channel: SequenceStepChannel;
   delay: string;

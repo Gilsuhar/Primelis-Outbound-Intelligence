@@ -156,7 +156,10 @@ describe("Build Sequence strategy planner", () => {
     });
 
     expect(intelligence.serpScenario).toBe("UNKNOWN");
-    expect(strategy.sequenceNarrative[2].newInformation).toContain("paid-brand decision question");
+    expect(strategy.sequenceNarrative[2].newInformation).toContain("approved customer result");
+    expect(strategy.sequenceNarrative[2].newInformation).toContain(
+      "Do not repeat the screenshot observation",
+    );
     expect(strategy.sequenceNarrative[2].newInformation).not.toMatch(
       /competition drops|lowest CPC|competition returns/i,
     );

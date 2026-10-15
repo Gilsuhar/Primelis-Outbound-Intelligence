@@ -110,7 +110,7 @@ function metricPhrases(record: ProofKnowledgeRecord) {
   return Array.from(phrases);
 }
 
-function isEligibleProof(record: ProofKnowledgeRecord) {
+export function isEligibleProof(record: ProofKnowledgeRecord) {
   const restrictionText = `${record.usageScope ?? ""} ${record.usageRestrictions ?? ""}`;
   const hasBlockingRestriction =
     /\b(internal only|internal_only|confidential|do not use|restricted|needs review)\b/i.test(
@@ -118,7 +118,7 @@ function isEligibleProof(record: ProofKnowledgeRecord) {
     ) && !/\bapproved\b.*\b(outbound|external|social proof)\b/i.test(restrictionText);
   return (
     record.type === "CASE_STUDY" &&
-    (!record.approvalStatus || record.approvalStatus === "APPROVED") &&
+    (record.approvalStatus === "APPROVED") &&
     record.approvedText.trim().length > 0 &&
     record.sourceIds.length > 0 &&
     !hasBlockingRestriction

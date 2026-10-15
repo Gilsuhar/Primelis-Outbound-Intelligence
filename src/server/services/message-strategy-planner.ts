@@ -616,6 +616,8 @@ async function callOpenAiStrategyPlanner(
                     "Avoid default openings like 'I saw that', 'I noticed that', 'I came across', or 'I saw your profile'. Connect the selected responsibility to the business question instead.",
                     "emailStepPlans must be an array of 4 objects with exactly: stepNumber, objective, newInformation, angle, evidenceToUse, CTAIntent, avoidRepeating, optional proofToUseId.",
                     "sequenceNarrative must use the same 4-object shape, not plain strings.",
+                    "Email 1: prospect/company business angle. Email 2: manually verified Google SERP screenshot observation, or HOLD with missing evidence. Email 3: a different Signal capability plus selected approved case study. Email 4: concise low-pressure close without proof or a renewed pitch. All four emails reply in the first email thread.",
+                    "Assign proofToUseId only to Email 3. Never use case-study proof to replace missing screenshot evidence in Email 2.",
                     "openingStyle must be one enum value, not a list.",
                     "Do not include meeting lengths, day counts, percentages, spend amounts, or numeric claims unless the exact number appears in prospect context or approved proof.",
                     "If serpScenario is UNKNOWN, do not say solo period, solo auction, contested auction, quiet auction, competitor appeared, or brand is alone.",

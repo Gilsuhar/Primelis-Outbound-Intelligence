@@ -242,6 +242,40 @@ describe("Sales workflow UI", () => {
     );
   });
 
+  it("propagates edits to the first subject and keeps all follow-ups in that thread", async () => {
+    const steps: SequenceStep[] = [1, 2, 3, 4].map((stepNumber) => ({
+      stepNumber,
+      channel: "EMAIL",
+      delay: `Day ${stepNumber}`,
+      purpose: "FIRST_TOUCH_RELEVANCE",
+      channelRationale: "Email",
+      subjectLine: "Acme visibility",
+      messageBody: "Draft message body",
+      cta: "",
+      claimsUsed: [],
+      sourceIds: [],
+      approvalStatus: "PENDING_HUMAN_APPROVAL",
+    }));
+    mockBuildSequenceApiResponse({ ok: true, data: buildSequenceResult({ steps }) });
+    render(<BuildSequenceClient />);
+    fireEvent.change(
+      document.querySelector<HTMLTextAreaElement>('textarea[name="rawProspectContext"]')!,
+      {
+        target: { value: "Sam leads paid search at Acme." },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+    await waitFor(() => expect(screen.getByLabelText("Email 1 subject")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Email 1 subject"), {
+      target: { value: "Acme measurement" },
+    });
+    for (const stepNumber of [2, 3, 4]) {
+      const subject = screen.getByLabelText(`Email ${stepNumber} subject`) as HTMLInputElement;
+      expect(subject.value).toBe("Re: Acme measurement");
+      expect(subject.readOnly).toBe(true);
+    }
+  });
+
   it("keeps Build Sequence screenshot context optional and tucked into advanced details", () => {
     render(<BuildSequenceClient />);
 
@@ -249,10 +283,14 @@ describe("Sales workflow UI", () => {
     expect(advanced?.open).toBe(false);
 
     fireEvent.click(screen.getByText("Edit extracted details"));
-    expect(screen.getByText("Screenshot or SERP context available")).toBeTruthy();
+    expect(screen.getByText("Google SERP screenshot available")).toBeTruthy();
 
-    fireEvent.click(screen.getByLabelText("Screenshot or SERP context available"));
+    fireEvent.click(screen.getByLabelText("Google SERP screenshot available"));
     expect(screen.getByLabelText("Screenshot context")).toBeTruthy();
+    expect(screen.getByLabelText("Google SERP screenshot URL")).toBeTruthy();
+    expect(
+      screen.getByLabelText(/I manually verified this prospect Google SERP screenshot/),
+    ).toBeTruthy();
     expect(screen.getByLabelText("What the screenshot shows")).toBeTruthy();
     expect(screen.getByLabelText("Brand keyword")).toBeTruthy();
   });

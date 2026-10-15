@@ -626,6 +626,8 @@ export function BuildSequenceClient() {
     useState<SequenceKeywordEvidence[]>(emptyKeywordEvidence);
   const [internalNotes, setInternalNotes] = useState("");
   const [screenshotAvailable, setScreenshotAvailable] = useState(false);
+  const [screenshotManuallyVerified, setScreenshotManuallyVerified] = useState(false);
+  const [screenshotUrl, setScreenshotUrl] = useState("");
   const [screenshotContext, setScreenshotContext] = useState("");
   const [brandKeyword, setBrandKeyword] = useState("");
   const [marketCountry, setMarketCountry] = useState("");
@@ -659,10 +661,14 @@ export function BuildSequenceClient() {
   const [enrichStatus, setEnrichStatus] = useState<string | null>(null);
   const generationInProgress = isPending || isGenerating;
 
+  const threadSubject = stepSubjectDrafts[1] ?? result?.steps[0]?.subjectLine;
   const displayedSteps =
     result?.steps.map((step) => ({
       ...step,
-      subjectLine: stepSubjectDrafts[step.stepNumber] ?? step.subjectLine,
+      subjectLine:
+        step.stepNumber === 1
+          ? threadSubject
+          : `Re: ${threadSubject?.replace(/^Re:\s*/i, "") ?? "Branded search visibility"}`,
       messageBody: stepBodyDrafts[step.stepNumber] ?? step.messageBody,
       cta: stepCtaDrafts[step.stepNumber] ?? step.cta,
     })) ?? [];
@@ -831,6 +837,9 @@ export function BuildSequenceClient() {
         keywords: cleanedKeywordEvidence(),
         internalNotes: formString(formData, "internalNotes") || undefined,
         screenshotAvailable,
+        screenshotManuallyVerified,
+        screenshotSource: "GOOGLE_SERP",
+        screenshotUrl: screenshotUrl || undefined,
         screenshotContext: formString(formData, "screenshotContext") || undefined,
         brandKeyword: formString(formData, "brandKeyword") || undefined,
         marketCountry: formString(formData, "marketCountry") || undefined,
@@ -1241,8 +1250,8 @@ export function BuildSequenceClient() {
               <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-stone-700 sm:col-span-2">
                 <span className="font-semibold text-ink">Step 2 mode: </span>
                 {screenshotAvailable
-                  ? "Visual example"
-                  : "Approved case study when available, otherwise diagnostic insight"}
+                  ? "Google SERP screenshot — manual verification required"
+                  : "HOLD — verified Google SERP screenshot required"}
               </div>
               <div className="rounded-lg border border-line bg-white p-3 sm:col-span-2">
                 <label className="flex items-start gap-2 text-sm font-semibold text-ink">
@@ -1252,21 +1261,35 @@ export function BuildSequenceClient() {
                     onChange={(event) => setScreenshotAvailable(event.target.checked)}
                     type="checkbox"
                   />
-                  Screenshot or SERP context available
+                  Google SERP screenshot available
                 </label>
                 <p className="mt-1 text-xs leading-5 text-stone-500">
-                  Describe what the image shows. No upload needed. The sequence will use this only
-                  as user-provided context.
+                  Provide a link to the prospect screenshot and verify the keyword, market, device,
+                  date and visible observation. Missing evidence keeps Email 2 on HOLD.
                 </p>
                 {screenshotAvailable ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <TextField
+                      label="Google SERP screenshot URL"
+                      name="screenshotUrl"
+                      onChange={setScreenshotUrl}
+                      value={screenshotUrl}
+                    />
+                    <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={screenshotManuallyVerified}
+                        onChange={(event) => setScreenshotManuallyVerified(event.target.checked)}
+                      />
+                      I manually verified this prospect Google SERP screenshot and its observation.
+                    </label>
                     <label className="space-y-1 text-sm font-medium text-stone-700 sm:col-span-2">
                       Screenshot context
                       <textarea
                         className="min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm leading-6"
                         name="screenshotContext"
                         onChange={(event) => setScreenshotContext(event.target.value)}
-                        placeholder="Example: generic solo-bidder SERP example, not from the prospect account."
+                        placeholder="Describe the prospect Google search capture and its source."
                         value={screenshotContext}
                       />
                     </label>
@@ -1310,8 +1333,6 @@ export function BuildSequenceClient() {
                   value={primaryChannel}
                 >
                   <option value="EMAIL">Email</option>
-                  <option value="LINKEDIN">LinkedIn</option>
-                  <option value="MIXED">Mixed</option>
                 </select>
               </label>
               <div className="sm:col-span-2">
@@ -1623,6 +1644,7 @@ export function BuildSequenceClient() {
                           <span>Step {step.stepNumber}</span>
                           <span>{step.channel}</span>
                           <span>{step.delay}</span>
+                          <span>{step.approvalStatus ?? "PENDING_HUMAN_APPROVAL"}</span>
                         </div>
                         <button
                           className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
@@ -1641,6 +1663,9 @@ export function BuildSequenceClient() {
                         {purposeLabels[step.purpose]}
                       </p>
                       <p className="mt-1 text-xs text-stone-500">{step.channelRationale}</p>
+                      {step.holdReason ? (
+                        <p className="mt-2 text-sm text-amber-800">{step.holdReason}</p>
+                      ) : null}
                       {step.subjectLine ? (
                         <div className="mt-3 rounded-md bg-[#f8f5ef] p-3">
                           <div className="mb-2 flex items-center justify-between gap-2">
@@ -1649,6 +1674,7 @@ export function BuildSequenceClient() {
                             </p>
                             <button
                               className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-stone-700 transition hover:bg-[#f8f5ef]"
+                              disabled={step.stepNumber !== 1}
                               onClick={() => regenerateSubject(step)}
                               type="button"
                             >
@@ -1663,6 +1689,8 @@ export function BuildSequenceClient() {
                                 [step.stepNumber]: event.target.value,
                               }))
                             }
+                            aria-label={`Email ${step.stepNumber} subject`}
+                            readOnly={step.stepNumber !== 1}
                             value={step.subjectLine}
                           />
                         </div>

@@ -146,16 +146,14 @@ describe("Build Sequence OpenAI provider", () => {
       ]),
     );
     expect(result.steps[0].messageBody).toContain("KAYAK");
-    expect(result.steps[1].messageBody).toMatch(
-      /monitors Google and Bing search results/i,
-    );
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
     expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
     expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|competition drops/i);
-    expect(result.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+    expect(result.steps[3].messageBody).toMatch(/priority right now/i);
     expect(result.steps[3].messageBody).not.toMatch(
       /kind of paid-brand efficiency|practical benchmark/i,
     );
-    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
     expect(
       result.steps.every(
         (step) =>
@@ -205,13 +203,13 @@ describe("Build Sequence OpenAI provider", () => {
       /for your Global Head Of Paid Search remit|Hi Amit,\s*\n\nAmit,|competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage/i,
     );
     expect(result.steps[0].messageBody).toMatch(/StoneX.*across markets/i);
-    expect(result.steps[1].messageBody).toMatch(/live search-page context/i);
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
     expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
     expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|another advertiser appears/i);
     expect(result.steps[3].messageBody).toBe(
-      "Hi Amit,\n\nAppsFlyer reduced branded spend by 29% while qualified lead volume increased 25% in the first 30 days.",
+      "Hi Amit,\n\nNot sure if this is a priority right now.",
     );
-    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
   });
 
   it("keeps in-house agency-partnership context grounded when SERP evidence is unknown", async () => {
@@ -235,7 +233,7 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).not.toMatch(
       /managed accounts|accounts your team manages|McAfee's branded queries often shift|contested and uncontested|competition drops|lowest CPC|brand auction is quiet/i,
     );
-    expect(result.steps[1].messageBody).toMatch(/live search-page context/i);
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
     expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
   });
 
@@ -258,8 +256,8 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.messageStrategy.prospectInsight).toMatch(/high-budget PPC|ROI|A\/B testing/i);
     expect(result.steps[0].messageBody).toMatch(/high-budget PPC|ROI|A\/B testing/i);
     expect(result.steps[0].messageBody).not.toMatch(/^Hi Marzena,\s+Quick question on Zooplus/i);
-    expect(result.steps[1].messageBody).toMatch(/performance report|budget and ROI/i);
-    expect(result.steps[2].messageBody).toMatch(/same visibility could be protected/i);
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
     expect(rendered).not.toMatch(/contested and uncontested|competition drops|lowest CPC/i);
   });
 
@@ -377,13 +375,14 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[1].imageContextNote).toContain("outside the email body");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
     expect(JSON.stringify(result.steps)).not.toMatch(
-      /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+      /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
     );
     expect(JSON.stringify(result.steps)).not.toContain("Our tech");
     expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
     expect(result.steps[2].messageBody).not.toContain("40-60%");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
-    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
     expect(JSON.stringify(result.steps)).not.toContain("AI step one");
     expect(result.overallStrategy).toContain("Strategy planner");
     const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
@@ -581,13 +580,11 @@ describe("Build Sequence OpenAI provider", () => {
     });
     const rendered = JSON.stringify(result.steps);
 
-    expect(result.steps[0].messageBody).toContain(
-      "Quick question for your global paid search work at IBM",
-    );
+    expect(result.steps[0].messageBody).toContain("Quick question on IBM's branded search");
     expect(result.steps[0].messageBody.match(/\?/g) ?? []).toHaveLength(0);
     expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
     expect(rendered).not.toMatch(
-      /scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+      /scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
     );
     expect(result.steps[0].messageBody).not.toContain("The practical question is:");
   });
@@ -616,7 +613,7 @@ describe("Build Sequence OpenAI provider", () => {
 
     expect(result.steps[0].subjectLine).toBe("Shine branded search visibility");
     expect(result.steps[0].messageBody).toContain(
-      "Quick question for your Performance Marketing & Acquisition remit at Shine",
+      "Quick question on how Shine handles branded search",
     );
     expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
   });
@@ -644,9 +641,7 @@ describe("Build Sequence OpenAI provider", () => {
     const rendered = JSON.stringify(result.steps);
 
     expect(result.steps[0].subjectLine).toBe("branded search visibility");
-    expect(result.steps[0].messageBody).toContain(
-      "Quick question for your Paid Search Analyst focus",
-    );
+    expect(result.steps[0].messageBody).toContain("Quick question on branded search");
     expect(rendered).not.toMatch(
       /Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i,
     );
@@ -666,10 +661,10 @@ describe("Build Sequence OpenAI provider", () => {
     const stepTwo = result.steps[1].messageBody;
     const stepThree = result.steps[2].messageBody;
 
-    expect(stepTwo).toMatch(/competitors appear or disappear|hold steady/i);
+    expect(stepTwo).toMatch(/Google SERP visibility check/i);
     expect(stepThree).toMatch(/visibility check|decision quality|current Google Ads setup/i);
     expect(`${stepTwo} ${stepThree}`).not.toMatch(
-      /cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+      /cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
     );
     expect(stepThree).not.toMatch(
       /Without account-specific|Based on the available evidence|cannot confirm/i,
@@ -754,9 +749,7 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
-    expect(result.steps[1].messageBody).toContain(
-      "continuously monitors Google and Bing search results",
-    );
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
     expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
@@ -803,8 +796,10 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("Nike's branded search may be worth");
-    expect(result.steps[2].messageBody).toContain("For Nike, the useful part");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
+    expect(result.steps[1].approvalStatus).toBe("HOLD");
+    expect(result.safetyNotes.join(" ")).toContain("AI rewriting is disabled");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
     expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
   });
 
@@ -909,7 +904,7 @@ describe("Build Sequence OpenAI provider", () => {
     expect(rendered).not.toMatch(
       /Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific|hard part is not seeing|harder branded-search question/i,
     );
-    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite accepted on retry for step 1");
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
   });
 
@@ -960,7 +955,10 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
-    expect(result.steps[1].messageBody).toContain("Nike can face two different branded auctions");
+    expect(result.steps[1].approvalStatus).toBe("HOLD");
+    expect(result.steps[1].messageBody).not.toContain(
+      "Nike can face two different branded auctions",
+    );
     expect(JSON.stringify(result.steps)).not.toContain("Gong");
     expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
   });
@@ -1044,9 +1042,9 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
-    expect(result.steps[2].messageBody).not.toContain("Dior example");
-    expect(result.steps[3].messageBody).toContain("Dior example");
-    expect(result.steps[3].messageBody).toContain("54%");
+    expect(result.steps[3].messageBody).not.toContain("Dior");
+    expect(result.steps[2].messageBody).toContain("Dior");
+    expect(result.steps[2].messageBody).toContain("54%");
     expect(result.steps[3].messageBody).not.toContain("AppsFlyer");
     expect(result.steps[2].messageBody).not.toContain("MyHeritage");
   });
@@ -1088,18 +1086,13 @@ describe("Build Sequence OpenAI provider", () => {
     expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
     expect(result.steps[0].messageBody).toContain("Hi Mia");
     expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
-    expect(result.steps[1].messageBody).toContain(
-      "The same branded query can move between two different auctions",
-    );
-    expect(result.steps[2].messageBody).toContain(
-      "For a PPC team, the value is not another dashboard.",
-    );
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
+    expect(result.steps[2].messageBody).toContain("live search-page coverage");
     expect(rendered).not.toContain("{{! Insert screenshot }}");
     expect(result.steps[0].messageBody).toContain("across multiple accounts");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
-    expect(result.steps[3].messageBody).toContain(
-      "one account with meaningful branded-search spend",
-    );
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].messageBody).not.toContain("branded-search spend");
   });
 
   it("turns raw promotion posts into a concise congratulations opener", async () => {
@@ -1184,13 +1177,12 @@ describe("Build Sequence OpenAI provider", () => {
     });
 
     expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
-    expect(result.steps[1].messageBody).toContain(
-      "continuously monitors Google and Bing search results",
-    );
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
     expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
     expect(result.steps[2].messageBody).toContain("current Google Ads setup");
-    expect(result.steps[3].messageBody).toContain("AppsFlyer reduced branded spend by 29%");
-    expect(result.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
     expect(JSON.stringify(result.steps)).not.toContain("duplicated model heading");
   });
 

@@ -272,7 +272,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.safetyNotes).toContain(
@@ -326,7 +326,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual(["approved"]);
     }
@@ -351,7 +351,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
         "approved",
@@ -379,7 +379,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toEqual([
         "product-truth",
@@ -405,7 +405,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\b(pricing|price|poc|trial)\b/i);
       expect(result.data.safetyNotes).toContain(
@@ -452,20 +452,20 @@ describe("Build Sequence service", () => {
       },
       { persistence: adapter },
     );
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.purpose).toBe("PROBLEM_FRAMING");
       expect(stepTwo.imagePlaceholder).toBeUndefined();
-      expect(stepTwo.imageContextNote).toContain("not from Acme");
-      expect(stepTwo.imageContextNote).toContain("supplied example");
+      expect(stepTwo.approvalStatus).toBe("HOLD");
+      expect(stepTwo.holdReason).toContain("Google SERP screenshot");
       expect(stepTwo.imageContextNote).toContain("outside the email body");
       expect(stepTwo.messageBody).not.toMatch(/Acme is a solo bidder|Acme has no competitors/i);
       expect(stepTwo.messageBody).not.toContain("{{! Insert screenshot }}");
     }
   });
 
-  it("keeps approved proof in the final social-proof step instead of Step 2", async () => {
+  it("keeps approved proof in Email 3 and reserves Email 2 for SERP evidence", async () => {
     const { adapter } = persistence([
       knowledge({ id: "product-truth" }),
       knowledge({
@@ -483,17 +483,17 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.messageBody).not.toContain("Dior");
       expect(stepTwo.messageBody).not.toContain("54%");
       expect(stepTwo.messageBody).not.toMatch(/a customer example|one customer|a client/i);
       expect(result.data.steps[2].messageBody).toContain("current Google Ads setup");
-      expect(result.data.steps[2].messageBody).not.toContain("Dior example");
-      expect(result.data.steps[3].purpose).toBe("SOCIAL_PROOF");
-      expect(result.data.steps[3].messageBody).toContain("Dior example");
-      expect(result.data.steps[3].messageBody).toContain("54%");
+      expect(result.data.steps[3].messageBody).not.toContain("Dior");
+      expect(result.data.steps[3].purpose).toBe("BREAKUP_CLOSE_LOOP");
+      expect(result.data.steps[2].messageBody).toContain("Dior");
+      expect(result.data.steps[2].messageBody).toContain("54%");
       expect(result.data.steps[3].messageBody).not.toContain("AppsFlyer");
     }
   });
@@ -512,7 +512,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const stepTwo = result.data.steps[1];
       expect(stepTwo.imagePlaceholder).toBeUndefined();
@@ -540,7 +540,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(rendered).not.toMatch(/doing more work than it should/i);
@@ -651,13 +651,13 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps.map((step) => step.purpose)).toEqual([
         "FIRST_TOUCH_RELEVANCE",
         "PROBLEM_FRAMING",
         "METHODOLOGY_DIFFERENTIATION",
-        "SOCIAL_PROOF",
+        "BREAKUP_CLOSE_LOOP",
       ]);
       expect(result.data.steps[0].messageBody).toMatch(
         /branded bids should change|live search-page context/i,
@@ -671,10 +671,11 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[2].messageBody).toMatch(
         /current Google Ads setup|Google and Bing SERPs/i,
       );
-      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
-      expect(result.data.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+      expect(result.data.steps[3].messageBody).toMatch(/priority right now/i);
+      expect(JSON.stringify(result.data.steps)).not.toContain("AppsFlyer");
+      expect(result.data.steps[3].cta).toBe("Happy to share more if useful.");
       expect(JSON.stringify(result.data.steps)).not.toMatch(
-        /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside|without requiring the team/i,
+        /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
       );
     }
   });
@@ -717,11 +718,14 @@ describe("Build Sequence service", () => {
         { persistence: adapter },
       );
 
-      expect(result.ok).toBe(true);
+      expect(result.ok, JSON.stringify(result)).toBe(true);
       if (result.ok) {
         const rendered = JSON.stringify(result.data.steps);
         expect(result.data.prospectIntelligence.serpScenario).toBe(item.scenario);
-        expect(rendered).toMatch(item.expectedCopy);
+        expect(result.data.steps[1].approvalStatus).toBe("HOLD");
+        expect(result.data.steps[1].messageBody).not.toMatch(
+          /brand appeared alone|competitor visible/i,
+        );
         if (item.forbiddenCopy) {
           expect(rendered).not.toMatch(item.forbiddenCopy);
         }
@@ -741,7 +745,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.prospectIntelligence.persona).toBe("GROWTH");
       expect(result.data.steps[0].messageBody).toContain("experimentation and growth efficiency");
@@ -774,7 +778,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(result.data.steps[0].subjectLine).toBe("branded search across managed accounts");
@@ -782,11 +786,8 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[0].messageBody).toContain(
         "Congrats on your promotion to PPC Team Lead",
       );
-      expect(result.data.steps[1].messageBody).toContain(
-        '"Americaneagle web design" was a contested brand auction with WebFX visible',
-      );
-      expect(result.data.steps[2].messageBody).toContain('"Americaneagle ecommerce"');
-      expect(result.data.steps[2].messageBody).toContain("solo brand auction");
+      expect(result.data.steps[1].approvalStatus).toBe("HOLD");
+      expect(rendered).not.toContain("WebFX visible");
       expect(rendered).toContain("across multiple accounts");
       expect(rendered).not.toContain("Hi About");
       expect(rendered).not.toContain("Oct 2025");
@@ -810,7 +811,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data);
       expect(rendered).not.toContain("Nike running shoes");
@@ -908,7 +909,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.provider.providerName).toBe("openai");
       expect(result.data.steps[0].messageBody).toContain(
@@ -1096,7 +1097,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     expect(providerRecordIds).toContain("product-truth");
     expect(providerRecordIds).toContain("retail-proof");
     expect(providerRecordIds).not.toContain("saas-proof");
@@ -1145,22 +1146,16 @@ describe("Build Sequence service", () => {
     });
   });
 
-  it("creates mixed-channel steps that differ meaningfully", async () => {
-    const { adapter } = persistence([knowledge({ id: "product-truth" })]);
+  it("rejects mixed-channel requests for the four-email engine", async () => {
+    const { adapter, persisted } = persistence([knowledge({ id: "product-truth" })]);
 
     const result = await generateBuildSequence(
       { ...baseInput, primaryChannel: "MIXED", sequenceLength: 4 },
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data.steps.some((step) => step.channel === "EMAIL")).toBe(true);
-      expect(result.data.steps.some((step) => step.channel === "LINKEDIN")).toBe(true);
-      expect(new Set(result.data.steps.map((step) => step.messageBody)).size).toBe(
-        result.data.steps.length,
-      );
-    }
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION_ERROR" });
+    expect(persisted).toEqual([]);
   });
 
   it("creates a concise Nike-style sequence from quick dropdown inputs", async () => {
@@ -1190,12 +1185,12 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.steps[0].subjectLine).toContain("Nike");
       expect(result.data.steps[0].messageBody).toContain("Nike");
-      expect(result.data.steps[0].messageBody).toContain("Acme's branded search");
+      expect(result.data.steps[0].messageBody).toContain("Nike's branded search");
       expect(result.data.steps[0].messageBody).not.toContain("Fashion and Luxury category");
       expect(result.data.steps[0].messageBody).not.toContain("looks like the kind of account");
       expect(result.data.steps[0].messageBody).toMatch(
@@ -1205,12 +1200,13 @@ describe("Build Sequence service", () => {
       expect(result.data.steps[1].messageBody).toMatch(
         /continuously monitors Google and Bing search results|visibility/i,
       );
-      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+      expect(result.data.steps[3].messageBody).toMatch(/priority right now/i);
+      expect(JSON.stringify(result.data.steps)).not.toContain("AppsFlyer");
       expect(result.data.steps[0].messageBody).toMatch(/brand|branded/i);
-      expect(result.data.steps.at(-1)?.purpose).toBe("SOCIAL_PROOF");
+      expect(result.data.steps.at(-1)?.purpose).toBe("BREAKUP_CLOSE_LOOP");
       expect(JSON.stringify(result.data.steps)).not.toMatch(/quick discovery|core icp/i);
       expect(JSON.stringify(result.data.steps)).not.toMatch(
-        /conversion-source|methodology gives|operational than|branded paid search is incremental/i,
+        /methodology gives|operational than|branded paid search is incremental/i,
       );
       expect(JSON.stringify(result.data.steps)).not.toMatch(/\b(pricing|poc|guarantee)\b/i);
     }
@@ -1244,7 +1240,7 @@ describe("Build Sequence service", () => {
       { persistence: recentAwareAdapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.safetyNotes).toContain(
@@ -1284,7 +1280,7 @@ describe("Build Sequence service", () => {
       { persistence: recentAwareAdapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.prospectMemory?.prospect.companyName).toBe("Cisco");
@@ -1308,7 +1304,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps).toHaveLength(4);
       expect(result.data.safetyNotes).not.toEqual(
@@ -1357,15 +1353,15 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps.every((step) => step.delay.length > 0)).toBe(true);
       expect(result.data.steps.at(-1)).toMatchObject({
-        purpose: "SOCIAL_PROOF",
-        cta: "Open to a quick overview?",
+        purpose: "BREAKUP_CLOSE_LOOP",
+        cta: "Happy to share more if useful.",
       });
       expect(`${result.data.steps.at(-1)?.messageBody} ${result.data.steps.at(-1)?.cta}`).toMatch(
-        /AppsFlyer reduced branded spend by 29%|bid decisions/i,
+        /priority right now|happy to share more/i,
       );
     }
   });
@@ -1397,7 +1393,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps.at(-1)).toMatchObject({
         purpose: "BREAKUP_CLOSE_LOOP",
@@ -1417,7 +1413,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(
         result.data.detectedAccountSignals.some((signal) => signal.confidence === "INFERRED"),
@@ -1429,9 +1425,7 @@ describe("Build Sequence service", () => {
           "No SERP evidence was provided, so account-specific search conditions were not claimed.",
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain(
-        "a practical way to test branded CPC decision quality",
-      );
+      expect(JSON.stringify(result.data.steps)).toContain("live search-page coverage");
     }
   });
 
@@ -1456,7 +1450,7 @@ describe("Build Sequence service", () => {
 
     const result = await generateBuildSequence(baseInput, { persistence: adapter });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.draftId).toBe("sequence-draft-id");
       expect(persisted[0].result.provider.providerName).toBe("deterministic-development");
@@ -1544,7 +1538,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.provider.providerName).toBe("openai");
       expect(result.data.safetyNotes.join(" ")).toContain("Final validation recovered");
@@ -1555,7 +1549,7 @@ describe("Build Sequence service", () => {
         "FIRST_TOUCH_RELEVANCE",
         "PROBLEM_FRAMING",
         "METHODOLOGY_DIFFERENTIATION",
-        "SOCIAL_PROOF",
+        "BREAKUP_CLOSE_LOOP",
       ]);
     }
   });
@@ -1581,7 +1575,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(result.data.steps[2].messageBody).toMatch(/live search-page coverage/i);
@@ -1626,7 +1620,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps[0].messageBody).not.toContain(
         "How are you currently deciding when branded bids should change?",
@@ -1672,7 +1666,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps[1].messageBody).not.toContain(
         "Is your team able to detect those moments automatically?",
@@ -1718,7 +1712,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps[0].messageBody).toContain(
         "Google Ads reports branded performance, but it does not show the live search-page context behind each branded bid decision.",
@@ -1783,16 +1777,16 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps[0].subjectLine).toBe("Acme branded search visibility");
       expect(result.data.steps[0].messageBody).toMatch(/^Hi Sam,\n\n/);
       expect(result.data.steps[1].messageBody).toMatch(/^Hi Sam,\n\n/);
-      expect(result.data.steps[2].messageBody).toContain("The operational value is consistency.");
+      expect(result.data.steps[2].messageBody).toContain("live search-page coverage");
       expect(result.data.steps[2].messageBody).not.toContain("For a visibility check");
       expect(result.data.steps[3].messageBody).not.toContain("That is the practical benchmark");
       expect(result.data.steps[3].messageBody).not.toContain("when they used");
-      expect(result.data.steps[3].messageBody).toContain("multi-market paid media team");
+      expect(result.data.steps[3].messageBody).toContain("priority right now");
     }
   });
 
@@ -1839,7 +1833,7 @@ describe("Build Sequence service", () => {
                     ? {
                         ...step,
                         messageBody:
-                          "Hi Sam,\n\nThe useful method is comparing live search-page conditions before changing bids.\n\nSignal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
+                          "Hi Sam,\n\nThe useful method is comparing live search-page conditions and live search-page coverage before changing bid decisions.\n\nSignal can work with the current Google Ads setup, so the test is about decision quality, not rebuilding campaigns.",
                       }
                     : step,
             ),
@@ -1848,7 +1842,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.provider.providerName).toBe("openai");
       expect(result.data.steps[0].messageBody).toContain("Acme's branded-search visibility");
@@ -1905,7 +1899,7 @@ describe("Build Sequence service", () => {
       },
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.provider.providerName).toBe("deterministic-development");
       expect(result.data.steps[0].messageBody).not.toContain(
@@ -1941,7 +1935,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(rendered).toContain("$50M");
@@ -1980,7 +1974,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const bodies = result.data.steps.map((step) => step.messageBody);
       const rendered = bodies.join("\n\n");
@@ -1988,15 +1982,15 @@ describe("Build Sequence service", () => {
         /\b(?:Prospect|Company|Role|Context|Notes|SERP|Keywords|Important):/,
       );
       expect(rendered).not.toContain("I saw that Prospect: Chris.");
-      expect(bodies[0]).toContain("you've managed over $50M in paid media");
+      expect(bodies[0]).toContain("You've managed over $50M in paid media");
       expect(rendered).not.toMatch(/\bChris has\b|\bChris is\b/);
       expect(rendered).not.toContain("I noticed this about Remofirst");
       expect(rendered).not.toContain("over $50M+");
       expect(rendered).toMatch(/AI and automation/i);
       expect(bodies[0]).toMatch(/branded bids should change|live search-page context/i);
-      expect(bodies[1]).toMatch(/Google and Bing/i);
+      expect(bodies[1]).toMatch(/Google SERP visibility check/i);
       expect(bodies[1]).not.toMatch(/harder question/i);
-      expect(bodies[2]).toMatch(/practical read|decision quality/i);
+      expect(bodies[2]).toMatch(/live search-page coverage/i);
       expect(rendered).not.toMatch(
         /organic is already enough|organic would have captured|organic cannot do/i,
       );
@@ -2023,7 +2017,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data);
       expect(rendered).toContain("Cursor pricing");
@@ -2046,12 +2040,11 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
-      expect(rendered).toContain("merrell shoes");
-      expect(rendered).toMatch(/brand appeared alone/i);
-      expect(rendered).toMatch(/does not prove wasted spend|does not prove inefficiency/i);
+      expect(result.data.steps[1].approvalStatus).toBe("HOLD");
+      expect(rendered).not.toMatch(/brand appeared alone|wasted spend/i);
       expect(rendered).not.toMatch(/\bis wasted\b|\bwasting money\b/i);
     }
   });
@@ -2069,7 +2062,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(prospects).toHaveLength(1);
       expect(sources).toHaveLength(1);
@@ -2099,7 +2092,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(prospects).toHaveLength(1);
       expect(sources).toHaveLength(1);
@@ -2154,7 +2147,7 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(prospects).toHaveLength(1);
       expect(sources).toHaveLength(1);
@@ -2297,7 +2290,7 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.messageStrategy.plannerMode).toBe("AI_STRATEGY");
       expect(result.data.messageStrategy.primaryAngle).toContain("Live decision gap");
@@ -2323,7 +2316,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     expect(prospects).toHaveLength(1);
     expect(sources).toHaveLength(1);
     if (result.ok) {
@@ -2354,7 +2347,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     expect(prospects).toHaveLength(1);
     if (result.ok) {
       expect(result.data.prospectMemory?.identityResolution.matchedBy).toContain("linkedinUrl");
@@ -2447,7 +2440,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     expect(prospects[0].jobTitle).toBe("Head of Growth");
     if (result.ok) {
       expect(
@@ -2469,7 +2462,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const extraction = result.data.prospectMemory?.extraction;
       expect(extraction?.serpEvidence).toEqual(
@@ -2478,7 +2471,8 @@ describe("Build Sequence service", () => {
           expect.objectContaining({ keyword: "Cursor AI editor", status: "CONTESTED" }),
         ]),
       );
-      expect(JSON.stringify(result.data.steps)).toContain("Cursor pricing");
+      expect(result.data.prospectIntelligence.serpEvidence.keywords).toContain("Cursor pricing");
+      expect(result.data.steps[1].approvalStatus).toBe("HOLD");
       expect(JSON.stringify(result.data.steps)).not.toContain("Cursor commercial details");
     }
   });
@@ -2496,7 +2490,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.prospectId).toBeTruthy();
       expect(result.data.prospectMemory?.extraction.prospectFacts.join(" ")).not.toMatch(
@@ -2546,16 +2540,16 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.recordsUsed.map((record) => record.id)).toContain("eligible-case-study");
       expect(result.data.steps[1].purpose).toBe("PROBLEM_FRAMING");
       expect(result.data.steps[1].messageBody).not.toContain("Dior");
       expect(result.data.steps[1].messageBody).not.toContain("54%");
       expect(result.data.steps[2].messageBody).toContain("current Google Ads setup");
-      expect(result.data.steps[2].messageBody).not.toContain("Dior");
-      expect(result.data.steps[3].messageBody).toContain("Dior example");
-      expect(result.data.steps[3].messageBody).toContain("54%");
+      expect(result.data.steps[3].messageBody).not.toContain("Dior");
+      expect(result.data.steps[2].messageBody).toContain("Dior");
+      expect(result.data.steps[2].messageBody).toContain("54%");
     }
   });
 
@@ -2605,13 +2599,13 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(rendered).not.toMatch(
         /LinkedIn URL|focus at|Darren Goldstein Darren Goldstein|higher CAC|demand leakage|unexpected rivals/i,
       );
-      expect(result.data.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
+      expect(result.data.steps[2].messageBody).toMatch(/live search-page coverage/i);
       expect(
         result.data.steps.every(
           (step) =>
@@ -2681,16 +2675,17 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       const rendered = JSON.stringify(result.data.steps);
       expect(rendered).not.toMatch(
         /remit at StoneX|Amit,\s*when|lone-bidder|competitor-present|query sets|missed conversions|avoidable CPC increases/i,
       );
-      expect(result.data.steps[2].messageBody).toMatch(/not simply an on\/off decision/i);
-      expect(result.data.steps[3].messageBody).toMatch(/AppsFlyer reduced branded spend by 29%/i);
+      expect(result.data.steps[2].messageBody).toMatch(/live search-page coverage/i);
+      expect(result.data.steps[3].messageBody).toMatch(/priority right now/i);
+      expect(JSON.stringify(result.data.steps)).not.toContain("AppsFlyer");
       expect(result.data.steps[3].messageBody).not.toContain("?");
-      expect(result.data.steps[3].cta).toBe("Worth seeing how Signal makes those bid decisions?");
+      expect(result.data.steps[3].cta).toBe("Happy to share more if useful.");
       expect(result.data.diagnostics?.finalRecoveredStepNumbers).toEqual([1, 2, 3, 4]);
     }
   });
@@ -2727,7 +2722,7 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps.every((step) => step.messageBody.startsWith("Hi Amit,"))).toBe(true);
       expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
@@ -2746,7 +2741,7 @@ describe("Build Sequence service", () => {
       { persistence: adapter },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.steps.every((step) => !/^Hi\b/i.test(step.messageBody))).toBe(true);
       expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
@@ -2786,7 +2781,7 @@ describe("Build Sequence service", () => {
       },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
     if (result.ok) {
       expect(result.data.prospectMemory?.prospect.firstName).toBe("Amit");
       expect(result.data.prospectIntelligence.prospectName).toBe("Amit");
@@ -2794,4 +2789,109 @@ describe("Build Sequence service", () => {
       expect(JSON.stringify(result.data.steps)).not.toContain("Hi there");
     }
   });
+});
+
+describe("Signal Sales Copilot four-email engine", () => {
+  const verifiedScreenshot = {
+    screenshotAvailable: true,
+    screenshotManuallyVerified: true,
+    screenshotSource: "GOOGLE_SERP" as const,
+    screenshotUrl: "https://evidence.example/acme-serp.png",
+    brandKeyword: "acme shoes",
+    marketCountry: "US",
+    device: "desktop",
+    observationDate: "2026-01-01",
+    screenshotShows: "Acme's brand ad appeared above its organic result.",
+  };
+  it("persists a complete same-thread draft with sourced SERP evidence, selected proof and human review", async () => {
+    const { adapter, persisted } = persistence([
+      knowledge({ id: "truth" }),
+      knowledge({
+        id: "retail-proof",
+        type: "CASE_STUDY",
+        title: "RetailCo retail efficiency",
+        approvedText: "RetailCo reduced branded CPC by 12.5% at stable performance.",
+        sourceIds: ["retail-source"],
+      }),
+      knowledge({
+        id: "saas-proof",
+        type: "CASE_STUDY",
+        title: "SaaSCo SaaS pipeline",
+        approvedText: "SaaSCo increased MQL volume by 20%.",
+        sourceIds: ["saas-source"],
+      }),
+    ]);
+    const result = await generateBuildSequence(
+      { ...baseInput, ...verifiedScreenshot },
+      { persistence: adapter },
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const steps = result.data.steps;
+    expect(steps.map((step) => step.channel)).toEqual(["EMAIL", "EMAIL", "EMAIL", "EMAIL"]);
+    expect(steps.map((step) => step.delay)).toEqual(["Day 1", "Day 4", "Day 9", "Day 15"]);
+    expect(steps.slice(1).every((step) => step.subjectLine === `Re: ${steps[0].subjectLine}`)).toBe(
+      true,
+    );
+    expect(steps.every((step) => step.approvalStatus === "PENDING_HUMAN_APPROVAL")).toBe(true);
+    expect(steps[1].messageBody).toContain(verifiedScreenshot.screenshotShows);
+    expect(steps[1].imageContextNote).toContain(verifiedScreenshot.screenshotUrl);
+    expect(steps[1].imageContextNote).toContain("2026-01-01");
+    expect(steps[2].messageBody).toContain("RetailCo reduced branded CPC by 12.5%");
+    expect(steps[2].sourceIds).toContain("retail-source");
+    expect(steps[3].messageBody).not.toMatch(/RetailCo|12.5%|Google Ads|competitor/i);
+    expect(JSON.stringify(steps)).not.toContain("SaaSCo");
+    expect(persisted[0].result.steps).toEqual(steps);
+  });
+  it("holds missing evidence and missing approved proof without inventing customer metrics", async () => {
+    const { adapter } = persistence([knowledge({ id: "truth" })]);
+    const result = await generateBuildSequence(
+      { ...baseInput, serpEvidence: "Acme competitor visible" },
+      { persistence: adapter },
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.steps[1].approvalStatus).toBe("HOLD");
+    expect(result.data.steps[2].approvalStatus).toBe("HOLD");
+    expect(JSON.stringify(result.data.steps)).not.toMatch(
+      /AppsFlyer|Crocs|Dior|\d+(?:\.\d+)?%|competitor visible/,
+    );
+  });
+  it.each(["round", "invent-extra"])(
+    "rejects provider-invented proof metrics (%s) instead of persisting them",
+    async (mode) => {
+      const { adapter, persisted } = persistence([
+        knowledge({ id: "truth" }),
+        knowledge({
+          id: "proof",
+          type: "CASE_STUDY",
+          title: "RetailCo retail",
+          approvedText: "RetailCo reduced branded CPC by 12.5%.",
+          sourceIds: ["proof-source"],
+        }),
+      ]);
+      const provider = new DeterministicBuildSequenceProvider();
+      const generate = provider.generate.bind(provider);
+      provider.generate = async (request) => {
+        const result = await generate(request);
+        return {
+          ...result,
+          steps: result.steps.map((step) =>
+            step.stepNumber === 3
+              ? {
+                  ...step,
+                  messageBody:
+                    mode === "round"
+                      ? step.messageBody.replace("12.5%", "12%")
+                      : `${step.messageBody} Revenue also increased 12.5%.`,
+                }
+              : step,
+          ),
+        };
+      };
+      const result = await generateBuildSequence(baseInput, { persistence: adapter, provider });
+      expect(result).toMatchObject({ ok: false, code: "GENERATION_REJECTED" });
+      expect(persisted).toHaveLength(0);
+    },
+  );
 });

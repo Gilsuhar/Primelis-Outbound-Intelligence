@@ -1,3 +1,8 @@
+import {
+  applySequenceReviewPolicy,
+  hasVerifiedSerpScreenshot,
+  serpEvidenceBody,
+} from "@/features/build-sequence/evidence-policy";
 import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
@@ -18,7 +23,6 @@ import {
   resolveIdentity,
 } from "@/features/build-sequence/prospect-memory";
 import {
-  sequenceChannels,
   sequencePurposes,
   sequenceStepChannels,
   sequenceTones,
@@ -40,13 +44,14 @@ import {
 import type { AccountStatusResult } from "@/features/account-status/types";
 import { mergeDefaultSuppressionRecords } from "@/features/do-not-contact/do-not-contact-policy";
 import type { DoNotContactRecord } from "@/features/do-not-contact/types";
-import { selectProofForContext } from "@/features/proof/proof-policy";
+import { selectProofForContext, validateProofUsage } from "@/features/proof/proof-policy";
 import { defaultOutputLanguage, outputLanguages } from "@/lib/output-language";
 import { prisma, type MinimalPrismaClient } from "@/lib/prisma";
 
 import {
   createBuildSequenceAiProvider,
   DeterministicBuildSequenceProvider,
+  proofSummary,
   type BuildSequenceAiProvider,
 } from "./build-sequence-provider";
 import { checkAccountStatus } from "./account-status-service";
@@ -90,7 +95,7 @@ const buildSequenceSchema = z
       .max(600)
       .optional()
       .transform((value) => value || "Light discovery before pitching Signal"),
-    primaryChannel: z.enum(sequenceChannels),
+    primaryChannel: z.literal("EMAIL"),
     sequenceLength: z.union([z.literal(4), z.coerce.number().pipe(z.literal(4))]),
     desiredTone: z.enum(sequenceTones),
     desiredOverallDuration: z
@@ -125,6 +130,9 @@ const buildSequenceSchema = z
       ),
     internalNotes: z.string().trim().max(1200).optional(),
     screenshotAvailable: z.boolean().optional().default(false),
+    screenshotManuallyVerified: z.boolean().optional().default(false),
+    screenshotSource: z.literal("GOOGLE_SERP").optional(),
+    screenshotUrl: z.string().url().max(2000).optional(),
     screenshotContext: z.string().trim().max(800).optional(),
     brandKeyword: z.string().trim().max(120).optional(),
     marketCountry: z.string().trim().max(120).optional(),
@@ -572,7 +580,7 @@ function isCaseStudyEligible(record: SequenceKnowledgeRecord) {
     ) && !/\bapproved\b.*\b(outbound|external|social proof)\b/i.test(restrictionText);
   return (
     record.type === "CASE_STUDY" &&
-    (!record.approvalStatus || record.approvalStatus === "APPROVED") &&
+    record.approvalStatus === "APPROVED" &&
     record.approvedText.trim().length > 0 &&
     record.sourceIds.length > 0 &&
     !hasBlockingRestriction
@@ -743,10 +751,7 @@ function escapeRegExp(text: string) {
 }
 
 function hasVisualContext(input: BuildSequenceInput) {
-  return Boolean(
-    input.screenshotAvailable &&
-    [input.screenshotContext, input.screenshotShows].some((value) => value?.trim()),
-  );
+  return hasVerifiedSerpScreenshot(input);
 }
 
 function normalizedCta(step: SequenceStep) {
@@ -1075,36 +1080,22 @@ function validateStepOneReference(step: SequenceStep) {
   );
 }
 
-function validateStepTwoReference(step: SequenceStep) {
-  const text = `${step.imageContextNote ?? ""} ${step.messageBody} ${step.cta}`;
-  const hasImageReference = /screenshot|visual|SERP/i.test(step.imageContextNote ?? "");
+function validateStepTwoReference(step: SequenceStep, input: BuildSequenceInput) {
+  const body = normalizeEmailGreeting(step.messageBody).replace(/\s+/g, " ").trim();
+  const expected = serpEvidenceBody(input).replace(/\s+/g, " ").trim();
   return (
-    (hasImageReference || !step.imageContextNote) &&
-    /method|solo periods|defensive efficiency|different auctions|visibility|minimum CPC|auction|competitors appear|competitors disappear|another advertiser|competition changes|same branded bid|hold steady/i.test(
-      text,
-    ) &&
-    /evidence|keyword data|measure|coverage|bid|CPC|performance|search page|Google and Bing (?:search )?results|defend|lower pressure/i.test(
-      text,
-    ) &&
-    !/organic.*captur|wasting money|wasteful|40-60|Crocs|AppsFlyer|MyHeritage/i.test(text) &&
-    !/use the screenshot|call out only what is visible|what it shows|brand keyword|observed:/i.test(
-      text,
-    ) &&
-    !containsVagueAnonymousCustomerStory(text)
+    body === expected &&
+    Boolean(step.imageContextNote) &&
+    (!hasVerifiedSerpScreenshot(input) || step.imageContextNote!.includes(input.screenshotUrl!))
   );
 }
 
 function validateStepThreeReference(step: SequenceStep) {
+  // Validate the capability, not a legacy template's exact wording. Factual
+  // claims and approved proof are checked independently by the common validator.
   const text = `${step.messageBody} ${step.cta}`;
   return (
-    /(?:existing|current) Google Ads setup/i.test(text) &&
-    /without requiring.*rebuild campaigns|without requiring.*change (?:your current|the) bidding strategy|not rebuilding campaigns|decision quality|not simply an on\/off decision/i.test(
-      text,
-    ) &&
-    /snapshot|supplied evidence|keyword data|SERP evidence|at the time of the check|visibility check|business value|operational value|practical read|decision rule|brand auction changes|auction pressure|live market pressure|competition drops/i.test(
-      text,
-    ) &&
-    /measure|visibility|bid|CPC|coverage|auction changes|position needed/i.test(text) &&
+    hasRequiredSignalMechanics(step) &&
     !/use the screenshot|what it shows|brand keyword|observed:/i.test(text)
   );
 }
@@ -1613,6 +1604,12 @@ export function sequenceValidationIssueDetails(
   if (steps[0] && containsUnsupportedStepOneClaim(input, steps[0])) {
     return fail(issue("step1-claim", [0], false));
   }
+  if (!validateStepTwoReference(steps[1], input)) {
+    return fail(issue("step2-reference", [1]));
+  }
+  if (!validateStepFourReference(steps[3])) {
+    return fail(issue("step4-reference", [3]));
+  }
   const hasHybridAcceptedStep = generation.safetyNotes.some((note) =>
     /^Hybrid rewrite accepted(?: on retry)? for step \d+\.$/.test(note),
   );
@@ -1620,17 +1617,11 @@ export function sequenceValidationIssueDetails(
     if (!validateStepOneReference(steps[0])) {
       return fail(issue("step1-reference", [0]));
     }
-    if (!validateStepTwoReference(steps[1])) {
-      return fail(issue("step2-reference", [1]));
-    }
     if (!validateStepThreeReference(steps[2])) {
       return fail(issue("step3-reference", [2]));
     }
-    if (!validateStepFourReference(steps[3])) {
-      return fail(issue("step4-reference", [3]));
-    }
   }
-  if (!hasVisualContext(input) && !input.serpEvidence) {
+  if (!hasVisualContext(input)) {
     const unexpectedImageStep = firstStepIndex(
       steps,
       (step, index) => index !== 1 && Boolean(step.imagePlaceholder || step.imageContextNote),
@@ -1638,9 +1629,8 @@ export function sequenceValidationIssueDetails(
     if (unexpectedImageStep.length > 0) {
       return fail(issue("unexpected-image", unexpectedImageStep, false));
     }
-    const unsupportedVisualStep = firstStepIndex(
-      steps,
-      (step, index) => index !== 1 && containsUnsupportedVisualClaim(step.messageBody),
+    const unsupportedVisualStep = firstStepIndex(steps, (step) =>
+      containsUnsupportedVisualClaim(step.messageBody),
     );
     if (unsupportedVisualStep.length > 0) {
       return fail(issue("unsupported-visual", unsupportedVisualStep, false));
@@ -1708,6 +1698,41 @@ export function sequenceValidationIssueDetails(
   if (containsCommercialTerms(renderedForRestrictedChecks) || containsCompetitorClaim(rendered)) {
     return fail(issue("restricted", [], false));
   }
+  const selectedProof = selectProofForContext(records, {
+    workflow: "BUILD_SEQUENCE",
+    requestedProof: true,
+  }).selectedProof;
+  const proofCheck = validateProofUsage({
+    output: steps
+      .slice(2)
+      .map((step) => `${step.messageBody} ${step.cta}`)
+      .join(" "),
+    selectedProof,
+    availableProofRecords: records,
+  });
+  if (!proofCheck.ok) return fail(issue("proof-metrics", [2], false));
+  if (selectedProof) {
+    const summary = proofSummary(selectedProof.record as SequenceKnowledgeRecord);
+    const normalizeProof = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!normalizeProof(steps[2].messageBody).includes(normalizeProof(summary))) {
+      return fail(issue("proof-grounding", [2], false));
+    }
+    const withoutApprovedProof = normalizeProof(steps[2].messageBody).replace(
+      normalizeProof(summary),
+      "",
+    );
+    if (/\d+(?:\.\d+)?\s*(?:%|percent)/i.test(withoutApprovedProof)) {
+      return fail(issue("proof-grounding", [2], false));
+    }
+    if (
+      steps.some(
+        (step, index) =>
+          index !== 2 && normalizeProof(step.messageBody).includes(normalizeProof(summary)),
+      )
+    ) {
+      return fail(issue("proof-placement", [], false));
+    }
+  }
   if (hasMultipleProofCompanies(generation, records)) {
     return fail(issue("proof-companies", [], false));
   }
@@ -1761,14 +1786,6 @@ function stripDanglingTrailingFragment(text: string) {
     .filter(Boolean)
     .join("\n\n")
     .trim();
-}
-
-function inferredGreetingName(steps: SequenceStep[]) {
-  for (const step of steps) {
-    const match = step.messageBody.match(/\bHi\s+([A-Z][A-Za-z'-]{1,40})(?:[,.!]|[\r\n])/);
-    if (match?.[1]) return match[1];
-  }
-  return undefined;
 }
 
 function normalizeEmailGreeting(messageBody: string, greetingName?: string) {
@@ -1858,7 +1875,7 @@ function repairSequenceCopy(
   generation: SequenceGeneration,
   verifiedGreetingName?: string,
 ): SequenceGeneration {
-  const greetingName = verifiedGreetingName || inferredGreetingName(generation.steps);
+  const greetingName = verifiedGreetingName;
   const steps = generation.steps.map((step) => {
     let messageBody = step.messageBody;
     messageBody = repairGenericMarketMethodologyStep({ ...step, messageBody }, generation);
@@ -2657,6 +2674,11 @@ export async function generateBuildSequence(
   };
   const resultWithoutId = {
     ...generated,
+    steps: applySequenceReviewPolicy(
+      input,
+      generated.steps,
+      records.some((record) => record.type === "CASE_STUDY"),
+    ),
     sequenceLength: input.sequenceLength,
     overallDuration: input.desiredOverallDuration,
     prospectId: memoryResult.memory?.prospect.id,
