@@ -89,7 +89,13 @@ GeneratedDraft/DraftVersion and review services for drafts and approvals;
 InteractionOutcome for later learning; suppression records and provider audit runs.
 None is bypassed or duplicated with a new schema in this milestone.
 
-## Still disconnected and next milestone
+## Evidence collection milestone
+
+[Milestone 2](sales-agent-evidence-collection.md) adds authenticated read-only HubSpot
+intake, persistent source snapshots, local suppression checks and Agent Daily Review.
+The original planning endpoint below retains its caller-supplied contract.
+
+## Planning endpoint limitations and next milestone
 
 Evidence is caller-supplied, not independently collected or certified by this API.
 No background worker dispatches tasks, research is not automatically executed,
@@ -97,9 +103,9 @@ SERP evidence is manual, and four emails are planned rather than generated here.
 There are no Outreach/HubSpot mutations, enrollment, sends, approval writes or
 outcome-learning updates. Existing HubSpot push functionality is not invoked.
 
-Next: add read-only evidence adapters for HubSpot/Outreach and existing suppression
-records, binding facts to a persisted prospect and source IDs. Require fresh actual
-employment/email verification and preserve provider audit provenance. Then execute
+Next: connect the implemented intake to configured read-only credentials and add
+Outreach and independent employment/email verification adapters, preserving original
+provider provenance. HubSpot and local suppression paths now exist in Milestone 2. Then execute
 research and approved-knowledge-backed drafting with durable human review. Keep
 enrollment disabled until fresh eligibility and an explicit audited approval gate
 are implemented.

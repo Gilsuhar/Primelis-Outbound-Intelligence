@@ -10,7 +10,10 @@ type PrismaModelDelegate = {
 export type MinimalPrismaClient = {
   $queryRaw<T = unknown>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T>;
   $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
-  $transaction<T>(callback: (tx: MinimalPrismaClient) => Promise<T>): Promise<T>;
+  $transaction<T>(
+    callback: (tx: MinimalPrismaClient) => Promise<T>,
+    options?: { timeout?: number; maxWait?: number },
+  ): Promise<T>;
   sourceDocument: PrismaModelDelegate;
   caseStudy: PrismaModelDelegate;
   generatedDraft: PrismaModelDelegate;

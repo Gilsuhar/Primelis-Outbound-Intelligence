@@ -1,3 +1,8 @@
+import {
+  getHubSpotPrivateAppToken,
+  HUBSPOT_API_BASE_URL,
+  HUBSPOT_REQUEST_TIMEOUT_MS,
+} from "@/lib/hubspot-config";
 import { z } from "zod";
 
 import { searchDoNotContactRecords } from "@/features/do-not-contact/do-not-contact-policy";
@@ -123,16 +128,16 @@ function noteBody(input: PushSequenceToHubSpotInput) {
 }
 
 export class HubSpotApiClient implements HubSpotPushClient {
-  constructor(private readonly token = process.env.HUBSPOT_PRIVATE_APP_TOKEN) {}
+  constructor(private readonly token = getHubSpotPrivateAppToken()) {}
 
   private async request<T>(path: string, init: RequestInit) {
     if (!this.token) {
       throw new Error("HUBSPOT_PRIVATE_APP_TOKEN is not configured.");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), HUBSPOT_REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`https://api.hubapi.com${path}`, {
+      const response = await fetch(`${HUBSPOT_API_BASE_URL}${path}`, {
         ...init,
         signal: controller.signal,
         headers: {

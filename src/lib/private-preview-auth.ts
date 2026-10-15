@@ -37,6 +37,7 @@ export const adminRoutePrefixes = [
 export const salesRoutePrefixes = [
   "/",
   "/playbook",
+  "/sales-agent",
   "/account-research",
   "/create-outreach",
   "/build-sequence",
