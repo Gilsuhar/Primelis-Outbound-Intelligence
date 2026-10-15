@@ -199,10 +199,19 @@ export async function getPublicUser(): Promise<PublicUser | null> {
 }
 
 export async function getRequestOrigin() {
-  const configured = getAppUrl();
-  if (configured) return configured;
   const headerStore = await headers();
   const host = headerStore.get("host");
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+  // Use the exact preview deployment host, not a branch alias, so recovery
+  // links and PKCE cookies return to the same deployment.
+  if (
+    process.env.VERCEL_ENV === "preview" &&
+    host &&
+    /^primelis-outbound-intelligence-[a-z0-9-]+\\.vercel\\.app$/i.test(host)
+  ) {
+    return `https://${host}`;
+  }
+  const configured = getAppUrl();
+  if (configured) return configured;
+  const proto = headerStore.get("x-forwarded-proto") === "https" ? "https" : "http";
   return host ? `${proto}://${host}` : "http://localhost:3000";
 }
