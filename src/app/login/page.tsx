@@ -7,7 +7,7 @@ import {
   resolveLoginScreenState,
 } from "@/lib/private-preview-auth";
 
-import { LoginForm } from "./login-form";
+import { PrivatePasswordLogin } from "./private-password-login";
 
 type LoginPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -44,10 +44,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (state === "SIGNED_IN") redirect("/");
 
   return (
-    <LoginForm
+    <PrivatePasswordLogin
       accessPending={state === "ACCESS_PENDING"}
-      loginError={getLoginError(params.error)}
-      nextPath={getSafeInternalPath(getSingleParam(params.next))}
+      nextPath={getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent")}
     />
   );
 }
