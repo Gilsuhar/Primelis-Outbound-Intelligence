@@ -26,7 +26,7 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
         {accessPending ? (
           <form action={signOutAction} className="mt-6 space-y-3">
             <p role="alert" className="text-sm text-amber-800">This account is authenticated but is not approved for the workspace.</p>
-            <Submit />
+            <button type="submit" className="w-full rounded-full border border-line px-4 py-3 font-semibold">Sign out</button>
           </form>
         ) : (
           <form action={action} className="mt-6 space-y-4">
