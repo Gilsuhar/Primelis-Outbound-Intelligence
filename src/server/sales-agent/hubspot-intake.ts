@@ -66,10 +66,11 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
         cache: "no-store",
         redirect: "error",
       });
-      if (!response.ok)
-        throw new Error(
-          `HubSpot read failed (HTTP ${response.status}); check read scopes, network access or rate limit`,
-        );
+      if (!response.ok) {
+        // HTTP status and endpoint are safe diagnostics; never log tokens or response bodies.
+        console.error("[hubspot-intake] request_failed", { status: response.status, endpoint: path.split("?")[0].replace(/\/\d+$/, "/:id") });
+        throw new Error(`HubSpot read failed (HTTP ${response.status}); check read scopes, network access or rate limit`);
+      }
       return await response.json();
     } finally {
       clearTimeout(timeout);
