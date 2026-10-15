@@ -4,6 +4,7 @@
  * Adapters must provide independently verified evidence and timestamps.
  */
 export const SIGNAL_HUBSPOT_OWNER_ID = "1087915602";
+export const MAX_EVIDENCE_AGE_DAYS = 30;
 export const MIN_EMPLOYEES = 80;
 export const MIN_REVENUE_USD = 30_000_000;
 
@@ -17,6 +18,7 @@ export type EmailVerification = {
   status: "VALID" | "INVALID" | "CATCH_ALL" | "UNKNOWN";
   independentlyVerified: boolean;
   emailMatchesCurrentRecord: boolean;
+  businessEmailVerified?: boolean;
 };
 
 export type SearchResponsibility = "PROVEN" | "ABSENT" | "UNKNOWN";
@@ -32,6 +34,8 @@ export type ProspectQualificationInput = {
   emailVerification?: Evidence<EmailVerification>;
   lastOutboundAt?: Evidence<string | null>;
   outreachHistoryComplete?: boolean;
+  eligibilityEvidence?: Evidence<boolean>;
+  employmentIndependentlyVerified?: boolean;
   unsubscribed?: boolean;
   hardBounced?: boolean;
   complained?: boolean;
@@ -44,53 +48,74 @@ export type QualificationDecision = {
   reasons: string[];
   nextActions: string[];
   hubspotRecordId?: string;
+  missingVerificationRequirements: string[];
 };
 
-function isValidEvidence<T>(evidence: Evidence<T> | undefined): evidence is Evidence<T> {
-  return Boolean(
-    evidence &&
-      evidence.source.trim() &&
-      evidence.verifiedAt &&
-      !Number.isNaN(Date.parse(evidence.verifiedAt)),
+/** Evidence expires after 30 days; provider adapters must refresh it before reuse. */
+function isValidEvidence<T>(evidence: Evidence<T> | undefined, now: Date): evidence is Evidence<T> {
+  if (!evidence || typeof evidence.source !== "string" || !evidence.source.trim()) return false;
+  const timestamp = parseTimestamp(evidence.verifiedAt);
+  return (
+    timestamp !== null &&
+    timestamp <= now.getTime() &&
+    now.getTime() - timestamp <= MAX_EVIDENCE_AGE_DAYS * 86_400_000
   );
 }
 
-function subtractCalendarMonths(date: Date, months: number): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
-  const targetFirst = new Date(Date.UTC(year, month - months, 1));
+/** Require an explicit timezone and a real calendar date, never locale-dependent parsing. */
+export function parseTimestamp(value: string): number | null {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+  )
+    return null;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate())
+    return null;
+  const [hour, minute, second] = value.slice(11, 19).split(":").map(Number);
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function addCalendarMonths(date: Date, months: number): Date {
+  const target = new Date(date);
+  target.setUTCDate(1);
+  target.setUTCMonth(target.getUTCMonth() + months);
   const lastDay = new Date(
-    Date.UTC(targetFirst.getUTCFullYear(), targetFirst.getUTCMonth() + 1, 0),
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
   ).getUTCDate();
-  return new Date(
-    Date.UTC(
-      targetFirst.getUTCFullYear(),
-      targetFirst.getUTCMonth(),
-      Math.min(day, lastDay),
-      date.getUTCHours(),
-      date.getUTCMinutes(),
-      date.getUTCSeconds(),
-      date.getUTCMilliseconds(),
-    ),
-  );
+  target.setUTCDate(Math.min(date.getUTCDate(), lastDay));
+  return target;
 }
 
-function classifyRole(role: string): "RELEVANT" | "IRRELEVANT" | "NEEDS_SEARCH_PROOF" {
-  const normalized = role.toLowerCase();
-  if (/paid social|social media|\bseo\b|organic search/.test(normalized) &&
-      !/paid search|\bppc\b|\bsem\b|search engine marketing/.test(normalized)) {
+function classifyRole(
+  role: string,
+): "RELEVANT" | "IRRELEVANT" | "NEEDS_SEARCH_PROOF" | "AMBIGUOUS" {
+  const normalized = role.toLowerCase().replace(/[-–—/]+/g, " ");
+  if (/^(unknown|n\/a|not available|not provided|tbd)$/.test(role.trim().toLowerCase()))
+    return "AMBIGUOUS";
+  if (/\b(assistant|intern|junior|former|fractional|consultant)\b/.test(normalized))
+    return "AMBIGUOUS";
+  if (
+    /paid social|social media|\bseo\b|organic search/.test(normalized) &&
+    !/paid search|\bppc\b|\bsem\b|search engine marketing/.test(normalized)
+  ) {
     return "IRRELEVANT";
   }
-  const senior = /\b(head|director|vp|vice president|chief|cmo|lead|senior|manager)\b/.test(normalized);
-  if (/\b(cmo|chief marketing officer|vp marketing|vice president marketing)\b/.test(normalized)) {
+  const senior = /\b(head|director|vp|vice president|chief|cmo|lead)\b/.test(normalized);
+  if (
+    /\b(cmo|chief marketing officer|vp (?:of )?marketing|vice president (?:of )?marketing)\b/.test(
+      normalized,
+    )
+  ) {
     return "RELEVANT";
   }
   if (/paid search|\bppc\b|\bsem\b|search engine marketing/.test(normalized)) {
-    return senior ? "RELEVANT" : "NEEDS_SEARCH_PROOF";
+    return senior ? "RELEVANT" : "AMBIGUOUS";
   }
-  if (/growth|performance|acquisition|marketing/.test(normalized)) {
-    return senior ? "NEEDS_SEARCH_PROOF" : "IRRELEVANT";
+  if (/growth|performance|acquisition|marketing|advertising|\bsearch\b/.test(normalized)) {
+    return senior && /growth|performance/.test(normalized) ? "NEEDS_SEARCH_PROOF" : "AMBIGUOUS";
   }
   return "IRRELEVANT";
 }
@@ -99,6 +124,7 @@ export function qualifyProspect(
   input: ProspectQualificationInput,
   now: Date = new Date(),
 ): QualificationDecision {
+  if (!Number.isFinite(now.getTime())) throw new Error("Invalid qualification clock");
   const rejected: string[] = [];
   const hold: string[] = [];
   const actions = new Set<string>();
@@ -112,39 +138,80 @@ export function qualifyProspect(
     rejected.push("Contact is not owned by the authorized HubSpot owner");
   }
 
-  if (!isValidEvidence(input.employeeCount)) block("Employee count not verified", "Verify employee count");
-  else if (!Number.isFinite(input.employeeCount.value) || input.employeeCount.value < MIN_EMPLOYEES) {
+  if (!isValidEvidence(input.employeeCount, now))
+    block("Employee count not verified", "Verify employee count");
+  else if (!Number.isFinite(input.employeeCount.value))
+    block("Employee count unknown", "Verify employee count");
+  else if (input.employeeCount.value < MIN_EMPLOYEES) {
     rejected.push("Company has fewer than 80 verified employees");
   }
-  if (!isValidEvidence(input.annualRevenueUsd)) block("Annual revenue not verified", "Verify annual revenue");
-  else if (!Number.isFinite(input.annualRevenueUsd.value) || input.annualRevenueUsd.value < MIN_REVENUE_USD) {
+  if (!isValidEvidence(input.annualRevenueUsd, now))
+    block("Annual revenue not verified", "Verify annual revenue");
+  else if (!Number.isFinite(input.annualRevenueUsd.value))
+    block("Annual revenue unknown", "Verify annual revenue");
+  else if (input.annualRevenueUsd.value < MIN_REVENUE_USD) {
     rejected.push("Company annual revenue is below USD 30M");
   }
 
-  if (!isValidEvidence(input.role)) block("Role not verified", "Verify current job title");
+  if (input.paidSearchResponsibility && !isValidEvidence(input.paidSearchResponsibility, now)) {
+    block(
+      "Paid-search responsibility evidence is stale or invalid",
+      "Verify paid-search responsibilities",
+    );
+  }
+
+  if (!isValidEvidence(input.role, now)) block("Role not verified", "Verify current job title");
+  else if (!input.role.value.trim()) block("Role is empty", "Verify current job title");
   else {
     const roleClass = classifyRole(input.role.value);
     if (roleClass === "IRRELEVANT") rejected.push("Role is outside the senior paid-search ICP");
-    else if (roleClass === "NEEDS_SEARCH_PROOF") {
-      if (!isValidEvidence(input.paidSearchResponsibility) ||
-          input.paidSearchResponsibility.value === "UNKNOWN") {
+    else if (roleClass === "AMBIGUOUS")
+      block("Role seniority or remit is ambiguous", "Verify seniority and paid-search remit");
+    else if (
+      isValidEvidence(input.paidSearchResponsibility, now) &&
+      input.paidSearchResponsibility.value === "ABSENT"
+    ) {
+      rejected.push("Role has no paid-search responsibility");
+    } else if (roleClass === "NEEDS_SEARCH_PROOF") {
+      if (
+        !isValidEvidence(input.paidSearchResponsibility, now) ||
+        !["PROVEN", "ABSENT"].includes(input.paidSearchResponsibility.value)
+      ) {
         block("Paid-search ownership is not established", "Verify paid-search responsibilities");
-      } else if (input.paidSearchResponsibility.value === "ABSENT") {
-        rejected.push("Role has no paid-search responsibility");
       }
     }
   }
 
-  if (!isValidEvidence(input.currentEmploymentVerified) ||
-      input.currentEmploymentVerified.value !== true) {
+  if (
+    input.employmentIndependentlyVerified !== true ||
+    !isValidEvidence(input.currentEmploymentVerified, now) ||
+    input.currentEmploymentVerified.value !== true
+  ) {
     block("Current employment is not independently verified", "Verify current employment");
   }
 
-  if (!isValidEvidence(input.emailVerification) ||
-      !input.emailVerification.value.independentlyVerified ||
-      !input.emailVerification.value.emailMatchesCurrentRecord ||
-      input.emailVerification.value.status !== "VALID") {
-    block("Business email lacks current independent VALID verification", "Independently verify current email");
+  if (
+    !isValidEvidence(input.emailVerification, now) ||
+    /boring/i.test(input.emailVerification.source) ||
+    input.emailVerification.value.businessEmailVerified !== true ||
+    input.emailVerification.value.independentlyVerified !== true ||
+    input.emailVerification.value.emailMatchesCurrentRecord !== true ||
+    input.emailVerification.value.status !== "VALID"
+  ) {
+    block(
+      "Business email lacks current independent VALID verification",
+      "Independently verify current email",
+    );
+  }
+
+  if (
+    !isValidEvidence(input.eligibilityEvidence, now) ||
+    input.eligibilityEvidence.value !== true
+  ) {
+    block(
+      "Eligibility snapshot missing or stale",
+      "Refresh suppression, sequence, opportunity and Outreach history checks",
+    );
   }
 
   for (const [flag, reason] of [
@@ -153,34 +220,44 @@ export function qualifyProspect(
     [input.complained, "Spam complaint"],
   ] as const) {
     if (flag === true) rejected.push(reason);
-    else if (flag === undefined) block(reason + " status unknown", "Check suppression status");
+    else if (flag !== false) block(reason + " status unknown", "Check suppression status");
   }
   for (const [flag, reason] of [
     [input.activeSequence, "Active outreach sequence"],
     [input.conflictingActiveOpportunity, "Conflicting active opportunity"],
   ] as const) {
     if (flag === true) block(reason, "Resolve outreach/CRM conflict");
-    else if (flag === undefined) block(reason + " status unknown", "Verify outreach/CRM status");
+    else if (flag !== false) block(reason + " status unknown", "Verify outreach/CRM status");
   }
 
-  if (!input.outreachHistoryComplete) {
+  if (input.outreachHistoryComplete !== true) {
     block("Outreach history incomplete", "Connect or verify full Outreach history");
   }
-  if (!isValidEvidence(input.lastOutboundAt)) {
+  if (!isValidEvidence(input.lastOutboundAt, now)) {
     block("Last outbound date unverified", "Verify last outbound date");
   } else if (input.lastOutboundAt.value !== null) {
-    const sentAt = new Date(input.lastOutboundAt.value);
-    if (Number.isNaN(sentAt.getTime()) || sentAt.getTime() > now.getTime()) {
+    const timestamp = parseTimestamp(input.lastOutboundAt.value);
+    const sentAt = new Date(timestamp ?? NaN);
+    if (timestamp === null || sentAt.getTime() > now.getTime()) {
       block("Invalid last outbound date", "Verify last outbound timestamp");
-    } else if (sentAt.getTime() > subtractCalendarMonths(now, 4).getTime()) {
-      block("Less than four calendar months since last outbound", "Wait until reengagement window opens");
+    } else if (addCalendarMonths(sentAt, 4).getTime() > now.getTime()) {
+      block(
+        "Less than four calendar months since last outbound",
+        "Wait until reengagement window opens",
+      );
     }
   }
 
   const status = rejected.length ? "REJECTED" : hold.length ? "HOLD" : "READY";
   return {
     status,
-    reasons: [...rejected, ...hold],
+    reasons:
+      status === "READY"
+        ? [
+            "Authorized owner, company thresholds, senior role, employment, business email, suppression and Outreach eligibility checks passed",
+          ]
+        : [...rejected, ...hold],
+    missingVerificationRequirements: [...hold],
     nextActions: [...actions],
     hubspotRecordId: input.hubspotRecordId,
   };

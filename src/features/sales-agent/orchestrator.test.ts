@@ -19,9 +19,12 @@ const eligible: ProspectQualificationInput = {
     status: "VALID",
     independentlyVerified: true,
     emailMatchesCurrentRecord: true,
+    businessEmailVerified: true,
   }),
   lastOutboundAt: evidence(null),
   outreachHistoryComplete: true,
+  eligibilityEvidence: evidence(true),
+  employmentIndependentlyVerified: true,
   unsubscribed: false,
   hardBounced: false,
   complained: false,
@@ -31,12 +34,17 @@ const eligible: ProspectQualificationInput = {
 
 describe("Agent workflow planner", () => {
   it("plans research, manual SERP evidence, draft, and human review for qualified contacts", () => {
-    const result = planProspectWorkflow(eligible);
+    const result = planProspectWorkflow(eligible, new Date("2026-10-15T12:00:00Z"));
     expect(result.decision.status).toBe("READY");
     expect(result.tasks.map((task) => task.stage)).toEqual([
-      "ACCOUNT_RESEARCH", "SERP_EVIDENCE", "SEQUENCE_DRAFT", "HUMAN_REVIEW",
+      "ACCOUNT_RESEARCH",
+      "SERP_EVIDENCE",
+      "SEQUENCE_DRAFT",
+      "HUMAN_REVIEW",
     ]);
-    expect(result.tasks.find((task) => task.stage === "SERP_EVIDENCE")?.requiresHumanApproval).toBe(true);
+    expect(result.tasks.find((task) => task.stage === "SERP_EVIDENCE")?.requiresHumanApproval).toBe(
+      true,
+    );
     expect(result.canSend).toBe(false);
   });
 
