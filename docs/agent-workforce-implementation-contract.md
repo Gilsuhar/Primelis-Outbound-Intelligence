@@ -1,6 +1,6 @@
 # Signal Agent Workforce — implementation contract
 
-Status: approved product direction; **not yet implemented**. Branch: `feature/agent-workforce-foundation`. This document is the source of truth for the next implementation, not a claim that integrations exist.
+Status: approved product direction; **Gate A code implemented, live acceptance pending**. See [Gate A validation](agent-workforce-gate-a-validation.md). Branch: `feature/agent-workforce-foundation`. This document is the source of truth for the next implementation, not a claim that integrations exist.
 
 ## North star
 A daily, evidence-led multi-agent sales workflow for Primelis Signal. The user supplies accounts and optionally prospects. Agents research companies, identify and verify additional relevant prospects where permitted, investigate brand-search signals, select a grounded sales angle, and write a **fresh, prospect-specific** four-email sequence. The user approves prospect selection and exact sequence content before any Outreach write. Outreach owns scheduling, sending and engagement tracking.

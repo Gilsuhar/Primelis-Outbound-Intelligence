@@ -1,6 +1,6 @@
 import type { WebsiteFinding } from "./types";
 
-function stripHtml(html: string) {
+export function stripHtml(html: string) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")

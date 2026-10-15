@@ -7,8 +7,10 @@ import { z } from "zod";
 const httpsSource = z.object({
   id: z.string().min(1),
   url: z.string().url().refine((url) => {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && !parsed.username && !parsed.password;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "https:" && !parsed.username && !parsed.password;
+    } catch { return false; }
   }),
   title: z.string().min(1),
   observedAt: z.string().datetime({ offset: true }),

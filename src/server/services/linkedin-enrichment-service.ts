@@ -73,7 +73,7 @@ export type PublicPreviewProvider = (linkedinUrl: string) => Promise<PublicPrevi
 
 const getleadsEndpoint = "https://app.getleads.io/api/v1/enrich/from-linkedin";
 
-async function defaultGetLeadsProvider(
+export async function defaultGetLeadsProvider(
   linkedinUrl: string,
 ): Promise<LinkedInEnrichmentRecord | null> {
   const apiKey = process.env.GETLEADS_API_KEY;
