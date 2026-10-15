@@ -206,7 +206,7 @@ export async function getRequestOrigin() {
   if (
     process.env.VERCEL_ENV === "preview" &&
     host &&
-    /^primelis-outbound-intelligence-[a-z0-9-]+\\.vercel\\.app$/i.test(host)
+    /^primelis-outbound-intelligence-[a-z0-9-]+\.vercel\.app$/i.test(host)
   ) {
     return `https://${host}`;
   }
