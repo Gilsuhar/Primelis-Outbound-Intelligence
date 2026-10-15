@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { signInWithPassword, signOutAction, sendPasswordRecovery } from "@/app/auth/actions";
+import { signInWithPassword, signOutAction, sendPasswordRecovery, continueWithGoogle } from "@/app/auth/actions";
 
 const initialState = { ok: false, message: "" };
 
@@ -23,7 +23,7 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
       <section className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-widest text-olive">Primelis Signal</p>
         <h1 className="mt-2 text-2xl font-semibold text-ink">Private Sales Copilot</h1>
-        <p className="mt-3 text-sm text-gray-600">Sign in with your approved account. Google sign-in is not required.</p>
+        <p className="mt-3 text-sm text-gray-600">Sign in with your approved account. Use Google or your existing account password.</p>
         {accessPending ? (
           <form action={signOutAction} className="mt-6 space-y-3">
             <p role="alert" className="text-sm text-amber-800">This account is authenticated but is not approved for the workspace.</p>
@@ -31,7 +31,7 @@ export function PrivatePasswordLogin({ nextPath = "/sales-agent", accessPending 
           </form>
         ) : (
           <>
-          <form action={action} className="mt-6 space-y-4">
+          <form action={continueWithGoogle} className="mt-6">\n            <input type="hidden" name="next" value={nextPath} />\n            <button type="submit" className="w-full rounded-full border border-line bg-white px-4 py-3 font-semibold text-ink hover:bg-gray-50">Continue with Google</button>\n          </form>\n          <div className="my-4 text-center text-xs text-gray-500">or sign in with password</div>\n          <form action={action} className="space-y-4">
             <input type="hidden" name="next" value={nextPath} />
             <label className="block text-sm font-medium">Email
               <input name="email" type="email" autoComplete="username" required className="mt-2 w-full rounded-xl border border-line p-3" />
