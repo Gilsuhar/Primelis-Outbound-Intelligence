@@ -15,5 +15,11 @@ export function getSupabaseAuthConfig(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export function getAppUrl(env: NodeJS.ProcessEnv = process.env) {
+  if (env.VERCEL_ENV === "preview") {
+    const host = env.VERCEL_BRANCH_URL || env.VERCEL_URL;
+    if (nonEmpty(host) && /^[a-z0-9][a-z0-9.-]*\.vercel\.app$/i.test(host)) {
+      return `https://${host}`;
+    }
+  }
   return nonEmpty(env.NEXT_PUBLIC_APP_URL) ? env.NEXT_PUBLIC_APP_URL : undefined;
 }
