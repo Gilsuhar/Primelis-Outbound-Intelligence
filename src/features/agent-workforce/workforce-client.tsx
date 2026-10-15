@@ -323,6 +323,33 @@ export function WorkforceClient() {
               ))}
             </article>
           )}
+          {run.sequence?.creativePlan && (
+            <details className="rounded border p-4">
+              <summary>Creative approaches and selection</summary>
+              <p>{run.sequence.creativePlan.selectionRationale}</p>
+              {run.sequence.creativePlan.approaches.map((approach) => (
+                <article key={approach.id} className="my-3 space-y-1">
+                  <h3 className="font-semibold">
+                    {approach.concept}
+                    {approach.id === run.sequence?.creativePlan?.selectedApproachId
+                      ? " — selected"
+                      : ""}
+                  </h3>
+                  <p>
+                    {approach.voice}: {approach.narrative}
+                  </p>
+                  <p>Prospect fit: {approach.prospectFit}</p>
+                  <p>Tradeoffs: {approach.tradeoffs}</p>
+                </article>
+              ))}
+              {run.sequence.creativePlan.hypotheses.map((item, index) => (
+                <p key={index}>
+                  Hypothesis (unverified): {item.hypothesis} Uncertainty: {item.uncertainty}{" "}
+                  Evidence: {item.supportingFactIds.join(", ")}
+                </p>
+              ))}
+            </details>
+          )}
           {edited && (
             <section className="space-y-3">
               <h2 className="font-semibold">Four original drafts — pending human approval</h2>
@@ -356,7 +383,7 @@ export function WorkforceClient() {
                       Body {message.step}
                       <textarea
                         className="block min-h-48 w-full rounded border p-2"
-                        maxLength={2000}
+                        maxLength={6000}
                         value={message.body}
                         disabled={running || busy || run.status === "REJECTED"}
                         onChange={(e) =>

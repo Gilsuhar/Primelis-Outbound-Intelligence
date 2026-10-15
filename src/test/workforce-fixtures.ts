@@ -132,6 +132,30 @@ export class MockWorkforceModel implements WorkforceModel {
       payload = {
         prospectId: c.prospectId,
         accountDomain: c.accountDomain,
+        creativePlan: {
+          approaches: [
+            {
+              id: "measurement",
+              concept: "Explore measurement choices",
+              voice: "Analytical",
+              narrative: "Question then context",
+              prospectFit: c.intake.prospectTitle,
+              tradeoffs: "Requires interest in measurement",
+            },
+            {
+              id: "decision",
+              concept: "Discuss decision ownership",
+              voice: "Conversational",
+              narrative: "Perspective then invitation",
+              prospectFit: c.intake.prospectTitle,
+              tradeoffs: "Responsibilities remain uncertain",
+            },
+          ],
+          selectedApproachId: "measurement",
+          selectionRationale:
+            "The verified role supports a measurement conversation, not claims of waste.",
+          hypotheses: [],
+        },
         strategy: c.strategy,
         messages: [
           "Business context",
@@ -170,6 +194,8 @@ export class MockWorkforceModel implements WorkforceModel {
           naturalLanguage: true,
           commercialUsefulness: true,
           approvedClaimsOnly: true,
+          originality: !this.revise,
+          strategicFit: true,
         },
         checkedSteps: [1, 2, 3, 4],
         unsupportedAssertions: [],

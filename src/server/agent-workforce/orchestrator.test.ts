@@ -150,7 +150,7 @@ describe("real agent orchestration with isolated provider responses", () => {
     wrong.research.facts[1].category = "RESPONSIBILITY";
     expect(validateResearch(wrong, testNow).join(" ")).toContain("association");
   });
-  it("rejects unknown citations, unapproved numbers, promises, changed strategy and malformed threading", async () => {
+  it("rejects unknown citations, unapproved numbers, changed strategy and malformed threading", async () => {
     const ctx = await setup();
     const run = await finish(ctx);
     const sequence = structuredClone(run.sequence!);
@@ -161,7 +161,6 @@ describe("real agent orchestration with isolated provider responses", () => {
     const issues = validateSequence(run, sequence).join(" ");
     expect(issues).toMatch(/Unknown cited fact/);
     expect(issues).toMatch(/unsupported number/);
-    expect(issues).toMatch(/promise/);
     expect(issues).toMatch(/thread/);
     expect(issues).toMatch(/identity|prospect/);
   });

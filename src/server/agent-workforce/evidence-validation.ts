@@ -91,18 +91,21 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
   if (sequence.messages[0]?.suggestedDelayDays !== 0)
     issues.push("First step must start at day zero");
   const normalizedBodies = sequence.messages.map((m) => normalize(m.body));
-  if (
-    new Set(normalizedBodies).size !== 4 ||
-    new Set(sequence.messages.map((m) => normalize(m.purpose))).size !== 4
-  )
-    issues.push("Email bodies and strategic purposes must be distinct");
+  if (new Set(normalizedBodies).size !== 4) issues.push("Email bodies must not repeat");
+  const plan = sequence.creativePlan;
+  if (plan) {
+    const ids = plan.approaches.map((a) => a.id);
+    if (new Set(ids).size !== ids.length || !ids.includes(plan.selectedApproachId))
+      issues.push("Creative approach selection is invalid");
+    if (new Set(plan.approaches.map((a) => normalize(a.concept))).size !== ids.length)
+      issues.push("Creative approaches must be substantively different");
+    if (plan.hypotheses.some((h) => h.supportingFactIds.some((id) => !facts.has(id))))
+      issues.push("Strategic hypothesis cites unknown evidence");
+  }
   for (const [index, m] of sequence.messages.entries()) {
-    if (!m.supportingFactIds.length)
-      issues.push(`Email ${m.step} lacks prospect-specific evidence references`);
     if (index && m.subject !== `Re: ${sequence.messages[0].subject}`)
       issues.push("Follow-ups must use the first subject in the same thread");
     if (index && m.suggestedDelayDays < 1) issues.push("Follow-up delay must be positive");
-    if (m.body.split(/\s+/).length > 150) issues.push(`Email ${m.step} is too long`);
     if (m.approvedKnowledgeIds.some((id) => !knowledge.has(id)))
       issues.push("Email cites unknown or unapproved product knowledge");
     for (const assertion of m.assertions) {
@@ -130,15 +133,18 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
     const approvedNumbers = new Set(
       (evidenceText.match(/\b\d+(?:[.,]\d+)*(?:\s*%|\s*percent)?/g) ?? []).map(canonicalNumber),
     );
-    for (const number of m.body.match(/\b\d+(?:[.,]\d+)*(?:\s*%|\s*percent)?/g) ?? [])
+    // Numbers in factual assertions require exact evidence. Check percentages
+    // throughout the copy too; nonfactual framing ("2 questions") is not a claim.
+    // The independent critic must detect any factual assertion omitted by the writer.
+    const claimText = [
+      ...m.assertions.map((assertion) => assertion.text),
+      ...(`${m.subject} ${m.body}`.match(/\b\d+(?:[.,]\d+)*(?:\s*%|\s*percent)/g) ?? []),
+    ]
+      .join(" ")
+      .replace(/\b\d+[- ]minute(?=\s+(?:call|chat|conversation|discussion|meeting)\b)/gi, "brief");
+    for (const number of claimText.match(/\b\d+(?:[.,]\d+)*(?:\s*%|\s*percent)?/g) ?? [])
       if (!approvedNumbers.has(canonicalNumber(number)))
         issues.push(`Email ${m.step} contains an unsupported number`);
-    if (
-      /guarantee|you (?:are wasting|wasted)|will (?:save|reduce)|competitors? (?:are|were) (?:bidding|advertising)|we (?:saw|observed|found).*(?:ad|serp)/i.test(
-        m.body,
-      )
-    )
-      issues.push(`Email ${m.step} contains an unsupported promise or search observation`);
   }
   return [...new Set(issues)];
 }

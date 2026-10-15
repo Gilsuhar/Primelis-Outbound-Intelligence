@@ -16,7 +16,6 @@ import {
   duplicatesAnotherProspect,
 } from "./evidence-validation";
 import {
-  selectRelevantProof,
   validateGroundingWithAi,
   chooseSalesStrategy,
   generatePersonalSequence,
@@ -174,7 +173,6 @@ export class WorkforceOrchestrator {
         return;
       }
     } else if (stage === "STRATEGY") {
-      selectRelevantProof(run);
       run.strategy = await chooseSalesStrategy(run, this.model);
       const facts = new Set(run.research.facts.map((f) => f.id));
       if (
@@ -230,7 +228,7 @@ export class WorkforceOrchestrator {
         run.stage = "SEQUENCE";
         if (!run.issues.length)
           run.issues = [
-            "Quality checks did not all pass; revise for specificity, accuracy and distinct purposes",
+            "Quality checks did not all pass; rethink the approach for originality, strategic fit, accuracy and coherent progression",
           ];
         return;
       }

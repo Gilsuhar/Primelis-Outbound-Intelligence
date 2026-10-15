@@ -112,23 +112,57 @@ export const strategySchema = agentStrategySchema.extend({
 const baseMessage = personalSequenceSchema.shape.messages.element;
 export const messageSchema = baseMessage.extend({
   subject: text(160),
-  body: text(2000),
+  body: text(6000),
   purpose: text(300),
   suggestedDelayDays: z.number().int().min(0).max(30),
-  approvedKnowledgeIds: z.array(text(200)).min(1).max(8),
+  approvedKnowledgeIds: z.array(text(200)).max(8),
   assertions: z
     .array(
       z
-        .object({ text: text(2000), factIds: z.array(text(160)), knowledgeIds: z.array(text(200)) })
+        .object({ text: text(6000), factIds: z.array(text(160)), knowledgeIds: z.array(text(200)) })
         .strict(),
     )
-    .min(1)
     .max(10),
 });
+export const creativePlanSchema = z
+  .object({
+    approaches: z
+      .array(
+        z
+          .object({
+            id: text(80),
+            concept: text(1200),
+            voice: text(400),
+            narrative: text(1200),
+            prospectFit: text(1200),
+            tradeoffs: text(800),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(4),
+    selectedApproachId: text(80),
+    selectionRationale: text(1600),
+    hypotheses: z
+      .array(
+        z
+          .object({
+            hypothesis: text(1000),
+            supportingFactIds: z.array(text(160)).min(1),
+            uncertainty: text(1000),
+          })
+          .strict(),
+      )
+      .max(6),
+  })
+  .strict();
 export const sequenceSchema = personalSequenceSchema.extend({
+  // Legacy persisted drafts remain readable; fresh generation requires a plan below.
+  creativePlan: creativePlanSchema.nullable().default(null),
   strategy: strategySchema,
   messages: z.array(messageSchema).length(4),
 });
+export const creativeSequenceSchema = sequenceSchema.extend({ creativePlan: creativePlanSchema });
 export type WorkforceSequence = z.infer<typeof sequenceSchema>;
 export const criticSchema = z
   .object({
@@ -142,6 +176,8 @@ export const criticSchema = z
         naturalLanguage: z.boolean(),
         commercialUsefulness: z.boolean(),
         approvedClaimsOnly: z.boolean(),
+        originality: z.boolean().default(false),
+        strategicFit: z.boolean().default(false),
       })
       .strict(),
     checkedSteps: z.array(z.number().int().min(1).max(4)).length(4),
@@ -149,6 +185,9 @@ export const criticSchema = z
     concerns: z.array(text()).max(20),
   })
   .strict();
+export const creativeCriticSchema = criticSchema.extend({
+  checks: criticSchema.shape.checks.extend({ originality: z.boolean(), strategicFit: z.boolean() }),
+});
 export const groundingReviewSchema = z
   .object({
     supportedFactIds: z.array(text(160)),

@@ -55,3 +55,10 @@ Daily queue of accounts/prospects; concise per-prospect research brief; visible 
 
 ## Success metric
 For a supplied real company and real prospect, the user can review dated sources, understand the chosen angle, see four original non-repetitive emails, approve or reject them, and identify every unsupported claim. Later, an approved prospect-specific sequence is correctly represented in Outreach without the app sending mail itself.
+
+## Creative intelligence contract (Gate A)
+Four emails are a delivery format, not predefined angles or templates. The strategist must understand the commercial opportunity, individual buyer priorities and objections, using approved product knowledge and verified research. General search/industry concepts are analytical lenses, never evidence about an account. Clearly labeled hypotheses are welcome; fabricated observations and results are not.
+
+The writer independently explores two to four materially different approaches, records tradeoffs and prospect fit, then selects a narrative. Voice, opening, vocabulary, length, proof selection and CTA style remain discretionary. Research and approved customer proof may be omitted or combined when relevant; approval restrictions still apply. No mandatory competitor, SERP, savings, case-study or product mention per email. A closing note can contain no factual claims. The 6,000-character body ceiling is a resource bound, not a target or editorial formula.
+
+The critic evaluates originality, naturalness, commercial effectiveness and strategic fit alongside factual grounding. Generic, repetitive or predictable copy requests a new approach within the existing one-revision budget. Claims in all subject/body text are reviewed even when omitted from the writer's assertion ledger. Human approval remains pending. A ten-prospect live comparison, including same-company different-role prospects, is the creative acceptance target; mocked contract tests do not prove this outcome.
