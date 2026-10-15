@@ -15,7 +15,9 @@ collected. Collection is on demand, not a scheduled background job.
 
 The review displays READY, HOLD and REJECTED counts, filters, reasons, missing
 requirements, ordered verification/research tasks and expandable provenance. READY
-means ready for research planning only. Human approval remains ungranted. Existing
+means ready for research and draft preparation, not approval to contact. The
+[four-email review slice](sales-agent-four-email-drafts.md) adds actual drafts and
+explicit fictional review without changing collection or qualification gates. Human approval remains ungranted. Existing
 saved evidence is re-evaluated on each refresh; refreshing never extends an old
 verification timestamp. Current local suppression records are also checked during
 review. All API responses use `Cache-Control: no-store`.

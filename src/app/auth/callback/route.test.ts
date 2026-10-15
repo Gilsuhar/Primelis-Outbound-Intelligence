@@ -115,7 +115,7 @@ describe("Supabase auth callback", () => {
       id: "auth-user-id",
       email: "user@example.com",
     });
-    expect(response.headers.get("location")).toBe("https://preview.example/");
+    expect(response.headers.get("location")).toBe("https://preview.example/sales-agent");
     expect(response.headers.get("set-cookie")).toContain("sb-access-token=access-cookie");
     expect(response.headers.get("set-cookie")).toContain("sb-refresh-token=refresh-cookie");
   });

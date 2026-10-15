@@ -81,6 +81,18 @@ export class MemoryEvidenceStore implements EvidenceStore {
   async list(actorId: string) {
     return [...(this.actors.get(actorId)?.values() ?? [])];
   }
+  async edit(
+    actorId: string,
+    contactId: string,
+    update: (raw: unknown) => EvidenceSnapshot | null,
+  ) {
+    const current = this.actors.get(actorId)?.get(contactId);
+    if (!current) return false;
+    const next = update(structuredClone(current));
+    if (!next) return false;
+    await this.save(actorId, [next]);
+    return true;
+  }
   async suppressionRecords(): Promise<DoNotContactRecord[]> {
     return [];
   }

@@ -256,6 +256,7 @@ describe("unreadable saved source isolation", () => {
       ...deps,
       store: {
         save: deps.store.save.bind(deps.store),
+        edit: deps.store.edit.bind(deps.store),
         suppressionRecords: deps.store.suppressionRecords.bind(deps.store),
         list: async () => [...valid, null],
       },

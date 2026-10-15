@@ -7,6 +7,7 @@ import {
   observationSchema,
   type IntakeContact,
 } from "@/features/sales-agent/evidence";
+import { buildSalesAgentDrafts, draftResearchSchema } from "@/features/sales-agent/draft-engine";
 import { planProspectWorkflow } from "@/features/sales-agent/orchestrator";
 import {
   MAX_EVIDENCE_AGE_DAYS,
@@ -27,12 +28,17 @@ import {
   type ProviderStatus,
 } from "@/server/sales-agent/providers";
 import { err, ok } from "./result";
+import {
+  recheckDraftProofs,
+  verifyApprovedDraftProof,
+} from "@/server/sales-agent/approved-draft-proof";
 
 export type CollectionDependencies = {
   intake?: ContactIntakeAdapter;
   providers?: ProspectEvidenceAdapter[];
   store?: EvidenceStore;
   now?: () => Date;
+  verifyProof?: typeof verifyApprovedDraftProof;
 };
 const contactSchema = z.object({
   hubspotRecordId: z.string().min(1),
@@ -46,7 +52,7 @@ const contactSchema = z.object({
   observations: z.array(observationSchema),
   warnings: z.array(z.string()),
 });
-const snapshotSchema = z.object({
+export const snapshotSchema = z.object({
   version: z.literal(1),
   contact: contactSchema,
   observations: z.array(observationSchema),
@@ -59,6 +65,7 @@ const snapshotSchema = z.object({
     }),
   ),
   collectedAt: z.string(),
+  research: z.array(draftResearchSchema).max(100).optional(),
 });
 
 export function reviewEvidenceSnapshot(
@@ -109,6 +116,7 @@ export function reviewEvidenceSnapshot(
       ],
     },
     providers: snapshot.providers,
+    drafting: buildSalesAgentDrafts(snapshot.contact, plan, snapshot.research, now),
   };
 }
 export type DailyReviewRow = ReturnType<typeof reviewEvidenceSnapshot>;
@@ -252,6 +260,7 @@ export async function getSalesAgentDailyReview(actorId: string, deps: Collection
         reviewEvidenceSnapshot(
           {
             ...result.data,
+            research: await recheckDraftProofs(result.data.research, deps.verifyProof),
             observations: [...result.data.observations, ...currentSuppression.observations],
           },
           now,

@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { DailyReviewRow } from "@/server/services/sales-agent-collection-service";
+
+import { DraftReview } from "./draft-review";
 
 type ReviewData = {
   evaluatedAt: string;
@@ -12,6 +14,9 @@ type ReviewData = {
 };
 
 export function EvidenceReviewClient() {
+  const [demo, setDemo] = useState(false);
+  const currentMode = useRef(false);
+  const requestVersion = useRef<symbol | null>(null);
   const [data, setData] = useState<ReviewData | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -20,20 +25,32 @@ export function EvidenceReviewClient() {
   const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [retryCursor, setRetryCursor] = useState<string | undefined>();
   const load = useCallback(async () => {
+    if (currentMode.current !== demo) return;
+    const version = Symbol();
+    requestVersion.current = version;
+    setData(null);
+    setError("");
     try {
-      const response = await fetch("/api/sales-agent/evidence", { cache: "no-store" });
+      const response = await fetch(demo ? "/api/sales-agent/demo" : "/api/sales-agent/evidence", {
+        cache: "no-store",
+      });
       if (response.redirected) throw new Error("Sign in again to review evidence");
       const result = await response.json();
       if (!response.ok || !result.ok)
         throw new Error(result.message || "Evidence review is unavailable");
+      if (version !== requestVersion.current) return;
       setData(result.data);
       setError("");
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Evidence review is unavailable");
+      if (version === requestVersion.current)
+        setError(failure instanceof Error ? failure.message : "Evidence review is unavailable");
     }
-  }, []);
+  }, [demo]);
   useEffect(() => {
     void load();
+    return () => {
+      requestVersion.current = null;
+    };
   }, [load]);
   async function collect(after?: string) {
     setBusy(true);
@@ -72,18 +89,43 @@ export function EvidenceReviewClient() {
           changes.
         </p>
         <p>
-          READY permits research planning only. Independent verification, SERP evidence and human
-          review are required before any future outreach.
+          READY permits research and draft preparation only. Independent verification, SERP evidence
+          and human review are required before any future outreach.
         </p>
       </header>
       <div className="flex flex-wrap gap-3">
-        <button className="rounded border px-3 py-2" disabled={busy} onClick={() => void collect()}>
+        <button
+          className="rounded border px-3 py-2"
+          disabled={busy}
+          onClick={() => {
+            requestVersion.current = null;
+            currentMode.current = !demo;
+            setData(null);
+            setNotice("");
+            setFilter("ALL");
+            setDemo(!demo);
+          }}
+        >
+          {demo ? "Return to saved contacts" : "Explore five fictional test prospects"}
+        </button>
+      </div>
+      <p className="rounded border p-3 font-semibold" role="status">
+        {demo
+          ? "FICTIONAL TEST DATA — simulated evidence; not real HubSpot records"
+          : "SAVED CONTACTS — live intake only; no fictional data substituted"}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <button
+          className="rounded border px-3 py-2"
+          disabled={busy || demo}
+          onClick={() => void collect()}
+        >
           Read HubSpot evidence
         </button>
         {nextCursor && (
           <button
             className="rounded border px-3 py-2"
-            disabled={busy}
+            disabled={busy || demo}
             onClick={() => void collect(nextCursor)}
           >
             Collect next page
@@ -91,7 +133,7 @@ export function EvidenceReviewClient() {
         )}
         <button
           className="rounded border px-3 py-2"
-          disabled={busy}
+          disabled={busy || demo}
           onClick={() => void collect(retryCursor)}
         >
           Retry last page
@@ -230,6 +272,14 @@ export function EvidenceReviewClient() {
                   </table>
                 </div>
               </details>
+              <DraftReview
+                row={row}
+                demo={demo}
+                onSaved={async () => {
+                  await load();
+                  setNotice("Research saved locally; qualification and draft evidence rechecked.");
+                }}
+              />
               <p>Human approval: required, not granted. Sending and enrollment: disabled.</p>
             </article>
           ))}

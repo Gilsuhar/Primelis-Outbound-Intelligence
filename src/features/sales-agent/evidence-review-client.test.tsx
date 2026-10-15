@@ -84,4 +84,29 @@ describe("daily evidence review", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Configure the database");
     expect(screen.queryByText("READY Prospect — READY")).toBeNull();
   });
+  it("explicitly switches to fictional data, disables collection and ignores a late live response", async () => {
+    let resolveLive!: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      resolveLive = resolve;
+    });
+    const demoResult = { ...result, data: { ...result.data, rows: [row("fixture", "READY")] } };
+    const fetcher = vi
+      .fn()
+      .mockImplementation((url: string) =>
+        url.endsWith("/demo")
+          ? Promise.resolve({ ok: true, json: async () => demoResult })
+          : pending,
+      );
+    vi.stubGlobal("fetch", fetcher);
+    render(<EvidenceReviewClient />);
+    fireEvent.click(screen.getByRole("button", { name: "Explore five fictional test prospects" }));
+    await screen.findByText("READY Prospect — READY");
+    expect(screen.getByText(/FICTIONAL TEST DATA — simulated/)).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Read HubSpot evidence" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    resolveLive({ ok: true, json: async () => result });
+    await waitFor(() => expect(screen.queryByText("HOLD Prospect — HOLD")).toBeNull());
+    expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  });
 });
