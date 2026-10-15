@@ -22,7 +22,7 @@ export type LoginScreenState = "LOGIN_FORM" | "ACCESS_PENDING" | "SIGNED_IN";
 export type LoginErrorCode =
   "access_denied" | "configuration_error" | "oauth_failed" | "oauth_start_failed";
 
-export const publicRoutes = ["/login", "/auth/callback", "/favicon.ico"] as const;
+export const publicRoutes = ["/login", "/auth/callback", "/auth/reset-password", "/favicon.ico"] as const;
 
 export const adminRoutePrefixes = [
   "/knowledge-library",
