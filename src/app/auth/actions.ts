@@ -205,3 +205,36 @@ export async function signInWithPassword(
 
   redirect(getSafeInternalPath(parsed.data.next || "/sales-agent"));
 }
+
+const recoverySchema = z.object({ email: z.string().trim().email() });
+export async function sendPasswordRecovery(
+  _state: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const parsed = recoverySchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { ok: false, message: "Enter a valid email address." };
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, message: "Password recovery is unavailable." };
+  const origin = await getRequestOrigin();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: new URL("/auth/callback?next=%2Fauth%2Freset-password", origin).toString(),
+  });
+  if (error) return { ok: false, message: "Unable to send a reset email right now." };
+  return { ok: true, message: "If this account exists, a password reset link has been sent." };
+}
+
+export async function updateRecoveredPassword(
+  _state: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const password = formData.get("password");
+  if (typeof password !== "string" || password.length < 12 || password.length > 128)
+    return { ok: false, message: "Use a password of at least 12 characters." };
+  const supabase = await createSupabaseServerClient({ requireCookieWrites: true });
+  if (!supabase) return { ok: false, message: "Authentication is unavailable." };
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return { ok: false, message: "Your reset link has expired. Request another one." };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { ok: false, message: "Password update failed. Request a new link." };
+  redirect("/sales-agent");
+}
