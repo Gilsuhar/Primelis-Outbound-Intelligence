@@ -24,7 +24,11 @@ async function completed() {
     model,
     knowledge: async () => structuredClone(testKnowledge),
     reader: testReader(),
-    eligibility: async () => ({ status: "READY", reasons: ["Verified isolated test evidence"], blockDrafting: false }),
+    eligibility: async () => ({
+      status: "READY",
+      reasons: ["Verified isolated test evidence"],
+      blockDrafting: false,
+    }),
     now: () => testNow,
   });
   let run = await engine.start("test", {
@@ -127,9 +131,9 @@ describe("creative freedom with factual boundaries", () => {
     expect(run.approved).toBe(false);
     expect(instructions.join()).toContain("reconsider the approach rather than swapping synonyms");
   });
-  it("requires a skeptical semantic review even when a fabricated nonnumeric claim escapes deterministic checks", async () => {
+  it("requires a skeptical semantic review for unsupported implications beyond narrow deterministic checks", async () => {
     const { run } = await completed();
-    run.sequence!.messages[3].body = "We observed competitor ads for your brand.";
+    run.sequence!.messages[3].body = "Your team paused branded search last month.";
     let reviewed = false;
     const model = new MockWorkforceModel();
     const original = model.structured.bind(model);
@@ -140,7 +144,7 @@ describe("creative freedom with factual boundaries", () => {
       const result = await original(stage, schema, instruction, context, usage);
       return Object.assign(result as object, {
         verdict: "HOLD",
-        unsupportedAssertions: ["No SERP evidence supports the observation"],
+        unsupportedAssertions: ["No retrieved evidence supports the claimed campaign change"],
         checks: { ...(result as { checks: object }).checks, factualAccuracy: false },
       }) as typeof result;
     };

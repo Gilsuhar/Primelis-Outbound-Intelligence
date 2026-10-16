@@ -55,6 +55,7 @@ export type IntegrationHealth = {
   detail: string;
 };
 export type DashboardProspect = DailyReviewRow & {
+  opportunityPriority?: import("@/server/agent-workforce/opportunity-priority").OpportunityPriority;
   review: DashboardReview | null;
   runIds: string[];
   draftReady: boolean;

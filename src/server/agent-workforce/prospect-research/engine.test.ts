@@ -372,3 +372,42 @@ it("an explicit retry cannot revive stale identities or evidence", async () => {
   ctx.setNow(new Date(testNow.getTime() + 2 * 86400000));
   await expect(ctx.engine.retryFailed("actor", ctx.id)).rejects.toThrow("INTAKE_REFRESH_REQUIRED");
 });
+
+it("reuses reviewed public company evidence for another contact without discovery, extraction or donor-person leakage", async () => {
+  const ctx = await setup();
+  const first = await finish(ctx);
+  const second = structuredClone(ctx.snapshot);
+  second.contact.hubspotRecordId = "43";
+  second.contact.fullName = "Second Fictional Person";
+  second.contact.email = "second@example.com";
+  second.observations.forEach((o) => {
+    o.hubspotRecordId = "43";
+    o.subjectEmail = "second@example.com";
+  });
+  await ctx.evidence.save("actor", [second]);
+  const queued = await ctx.engine.enqueue("actor", { contactId: "43" });
+  const count = ctx.model.calls.length;
+  const cached = await ctx.engine.advance("actor", queued.records[0].runId!);
+  expect(cached.prospectResearch!.stages.COMPANY).toMatchObject({
+    status: "COMPLETE",
+    code: "COMPANY_REUSED",
+  });
+  expect(ctx.model.calls).toHaveLength(count);
+  expect(cached.research.facts.every((f) => f.subject === "ACCOUNT")).toBe(true);
+  expect(JSON.stringify(cached.research)).not.toContain(first.intake.prospectName);
+  expect(cached.prospectResearch!.expiresAt).toBe(first.prospectResearch!.expiresAt);
+  expect(cached.eligibility.status).toBe("HOLD");
+  expect(cached.sequence).toBeNull();
+});
+
+it("does not reuse another operator's company research", async () => {
+  const ctx = await setup();
+  await finish(ctx);
+  await ctx.evidence.save("other-operator", [ctx.snapshot]);
+  const queued = await ctx.engine.enqueue("other-operator");
+  const count = ctx.model.calls.length;
+  const fresh = await ctx.engine.advance("other-operator", queued.records[0].runId!);
+  expect(fresh.prospectResearch!.stages.COMPANY.status).toBe("COMPLETE");
+  expect(fresh.prospectResearch!.stages.COMPANY.code).toBeNull();
+  expect(ctx.model.calls.length - count).toBe(3);
+});

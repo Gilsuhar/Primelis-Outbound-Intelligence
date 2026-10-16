@@ -1,4 +1,5 @@
 import "server-only";
+import { opportunityPriority, compareOpportunityPriority } from "../opportunity-priority";
 import { researchIdentity } from "../prospect-research/engine";
 import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
 import { PrismaIntegrationStore, type IntegrationStore } from "@/server/integrations/store";
@@ -176,6 +177,16 @@ export async function getWorkforceDashboard(
     const currentRole = row.provenance.find(
       (item) => item.field === "role" && item.accepted && item.freshness === "FRESH",
     );
+    // Ranking needs full quoted sources, not the excerpt-truncated client projection.
+    const priorityRun =
+      savedRuns.status === "fulfilled"
+        ? savedRuns.value
+            .filter((r) => r.prospectResearch && matching.some((m) => m.id === r.id))
+            .sort(
+              (a, b) =>
+                b.createdAt.localeCompare(a.createdAt) || b.updatedAt.localeCompare(a.updatedAt),
+            )[0]
+        : undefined;
     const candidate =
       savedRuns.status === "fulfilled"
         ? savedRuns.value.find(
@@ -206,12 +217,20 @@ export async function getWorkforceDashboard(
       ...row,
       // The queue carries evidence, never legacy template bodies or unreviewed AI drafts.
       drafting: { ...row.drafting, emails: [] },
+      opportunityPriority: opportunityPriority(priorityRun, now),
       review: raw.find((item) => item.contact.hubspotRecordId === id)?.dashboardReview ?? null,
       runIds: matching.map((run) => run.id),
       draftReady,
       draftRunId: draftReady ? candidate!.id : null,
     });
   }
+  prospects.sort(
+    (a, b) =>
+      Number(a.plan.decision.status === "REJECTED") -
+        Number(b.plan.decision.status === "REJECTED") ||
+      compareOpportunityPriority(a.opportunityPriority!, b.opportunityPriority!) ||
+      a.contact.hubspotRecordId.localeCompare(b.contact.hubspotRecordId),
+  );
   const configured = deps.configured ?? {
     hubspot: !!process.env.HUBSPOT_PRIVATE_APP_TOKEN,
     openai:

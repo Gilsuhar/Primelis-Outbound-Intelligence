@@ -210,3 +210,35 @@ describe("persistent daily intelligence projections", () => {
     expect(JSON.stringify(failed)).not.toContain("private provider error");
   });
 });
+
+it("orders the actual queue by reviewed opportunity evidence independently of eligibility", async () => {
+  const { qualityFixture } = await import("@/test/workforce-quality-fixtures");
+  const eligible = qualityFixture("SAAS"),
+    hold = qualityFixture("HISTORY_HOLD"),
+    rejected = qualityFixture("PAID_SOCIAL");
+  const evidence = new MemoryEvidenceStore(),
+    runs = new MemoryWorkforceStore();
+  await evidence.save("synthetic-operator", [eligible.snapshot, rejected.snapshot, hold.snapshot]);
+  for (const f of [eligible, rejected, hold]) {
+    f.run.sequence = null;
+    // Keep the quoted company evidence beyond the bounded client excerpt, as on real pages.
+    f.run.research.sources[0].excerpt =
+      "Source preamble. ".repeat(100) + f.run.research.sources[0].excerpt;
+    runs.records.set(`synthetic-operator:${f.run.id}`, f.run);
+  }
+  const data = await getWorkforceDashboard("synthetic-operator", {
+    evidence,
+    runs,
+    now: () => testNow,
+    configured: { hubspot: false, openai: false },
+  });
+  expect(data.prospects.map((p) => p.contact.hubspotRecordId)).toEqual([
+    hold.snapshot.contact.hubspotRecordId,
+    eligible.snapshot.contact.hubspotRecordId,
+    rejected.snapshot.contact.hubspotRecordId,
+  ]);
+  expect(data.prospects[0].opportunityPriority?.level).toBe("OBSERVED_SIGNAL");
+  expect(data.prospects[0].plan.decision.status).toBe("HOLD");
+  expect(data.prospects[0].draftReady).toBe(false);
+  expect(data.metrics).toMatchObject({ eligible: 1, hold: 1, rejected: 1 });
+});

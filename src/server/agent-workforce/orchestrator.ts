@@ -1,4 +1,5 @@
 import "server-only";
+import { strategyGroundingConcerns } from "./commercial-quality";
 import { BudgetError } from "./daily/budget";
 import { z } from "zod";
 import {
@@ -201,9 +202,14 @@ export class WorkforceOrchestrator {
           "INVALID_MODEL_OUTPUT",
           "Strategy has incorrect identity or unknown evidence references",
         );
-      if (run.strategy.angle === "NO_PITCH" || !run.strategy.supportingFactIds.length) {
+      const strategyIssues = strategyGroundingConcerns(run, run.strategy);
+      if (
+        run.strategy.angle === "NO_PITCH" ||
+        !run.strategy.supportingFactIds.length ||
+        strategyIssues.length
+      ) {
         run.status = "INSUFFICIENT_EVIDENCE";
-        run.issues = [run.strategy.rationale];
+        run.issues = [...strategyIssues, run.strategy.rationale];
         return;
       }
     } else if (stage === "SEQUENCE") {

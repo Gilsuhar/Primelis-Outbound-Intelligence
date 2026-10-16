@@ -165,18 +165,25 @@ export class MockWorkforceModel implements WorkforceModel {
         ].map((purpose, index) => ({
           step: index + 1,
           subject: index ? "Re: Brand coverage review" : "Brand coverage review",
-          body: `${c.intake.companyName} sells outdoor equipment through its online store. Signal monitors branded search conditions. ${purpose}: would a short discussion be useful?`,
+          body: [
+            `${c.intake.companyName} sells outdoor equipment through its online store. Signal monitors branded search conditions. Would a brief exchange about coverage decisions be useful?`,
+            "When branded queries differ by product, how do you decide where defensive coverage earns its place? Happy to compare approaches if that is useful.",
+            "Would separating paid conversions from traffic that might arrive organically make the coverage question easier to evaluate? I can share the measurement questions first.",
+            "Happy to leave this here if it is not a priority. Thanks for considering it.",
+          ][index],
           purpose,
-          supportingFactIds: ["account:business"],
+          supportingFactIds: index ? [] : ["account:business"],
           suggestedDelayDays: index ? 4 : 0,
-          approvedKnowledgeIds: ["product-1"],
-          assertions: [
-            {
-              text: "Signal monitors branded search conditions.",
-              factIds: [],
-              knowledgeIds: ["product-1"],
-            },
-          ],
+          approvedKnowledgeIds: index ? [] : ["product-1"],
+          assertions: index
+            ? []
+            : [
+                {
+                  text: "Signal monitors branded search conditions.",
+                  factIds: [],
+                  knowledgeIds: ["product-1"],
+                },
+              ],
         })),
         review: { verdict: "NEEDS_REVIEW", concerns: [] },
         approved: false,

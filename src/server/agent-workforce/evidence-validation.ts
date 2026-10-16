@@ -1,10 +1,12 @@
 import "server-only";
+import { isDeepStrictEqual } from "node:util";
 import { validateAgentOutput } from "@/features/agent-workforce/contracts";
 import { parseTimestamp, MAX_EVIDENCE_AGE_DAYS } from "@/features/sales-agent/qualification";
 import type { WorkforceRun, WorkforceSequence } from "@/features/agent-workforce/gate-a-contracts";
 import { allowedSourceUrl } from "./public-sources";
+import { editorialConcerns, strategyGroundingConcerns } from "./commercial-quality";
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-export function validateResearch(run: WorkforceRun, now: Date) {
+export function validateResearch(run: Pick<WorkforceRun, "id" | "intake" | "research">, now: Date) {
   const { research, intake } = run;
   const issues: string[] = [];
   if (research.prospectId !== run.id || research.accountDomain !== intake.companyDomain)
@@ -78,10 +80,11 @@ export function validateResearch(run: WorkforceRun, now: Date) {
 }
 export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence) {
   const issues = validateAgentOutput(run.research, sequence).concerns;
+  issues.push(...editorialConcerns(sequence), ...strategyGroundingConcerns(run, sequence.strategy));
   if (
     sequence.prospectId !== run.id ||
     sequence.accountDomain !== run.intake.companyDomain ||
-    JSON.stringify(sequence.strategy) !== JSON.stringify(run.strategy)
+    !isDeepStrictEqual(sequence.strategy, run.strategy)
   )
     issues.push("Generated sequence changed its prospect, company or selected strategy");
   if (sequence.review.verdict === "HOLD" || sequence.review.concerns.length)
@@ -106,13 +109,21 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
   for (const [index, m] of sequence.messages.entries()) {
     if ((m.supportingObservationIds ?? []).some((id) => !observations.has(id)))
       issues.push(`Email ${m.step} cites an unknown SERP observation`);
-    if (
-      run.draftStudio &&
-      /i hope this email finds you well|revolutionize your strategy|unlock unprecedented savings|game[- ]changing solution|just checking in/i.test(
-        `${m.subject} ${m.body}`,
+    for (const sentence of `${m.subject}. ${m.body}`.split(/(?<=[.!?])\s+|\n+/)) {
+      // These are observed-condition assertions, not general product capabilities or conditional inquiries.
+      const observedAds =
+        /\b(?:we|i) (?:saw|observed|noticed|found)\b[^.!?]*(?:competitor|advertiser|ads\b)/i.test(
+          sentence,
+        );
+      if (observedAds && !(m.supportingObservationIds ?? []).some((id) => observations.has(id)))
+        issues.push(`Email ${m.step} claims an ad observation without cited SERP evidence`);
+      if (
+        /\b(?:competitors?|advertisers?) (?:always|never|regularly|consistently) (?:bid|advertis|appear)|\bno competitors? (?:bid|are bidding|advertise)/i.test(
+          sentence,
+        )
       )
-    )
-      issues.push(`Email ${m.step} needs a more natural, non-generic opening or phrasing`);
+        issues.push(`Email ${m.step} generalizes beyond a single SERP snapshot`);
+    }
     if (index && m.subject !== `Re: ${sequence.messages[0].subject}`)
       issues.push("Follow-ups must use the first subject in the same thread");
     if (index && m.suggestedDelayDays < 1) issues.push("Follow-up delay must be positive");
