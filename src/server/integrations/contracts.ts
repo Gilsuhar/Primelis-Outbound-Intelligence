@@ -28,6 +28,8 @@ export type IntegrationState = {
   checkedAt: string | null;
   lastSuccessfulSync: string | null;
   watermark?: string;
+  workforceTurn?: "RESEARCH" | "DRAFT";
+  draftIntake?: { cursor: string | null; checkedAt: string };
   researchIntake?: { cursor: string | null; checkedAt: string; error: string | null };
   requestKeys?: string[];
   missingScopes: string[];

@@ -156,3 +156,21 @@ describe("public source retrieval boundaries", () => {
     expect(isPublicIpv4("93.184.216.34")).toBe(true);
   });
 });
+
+it("uses configured writing and review models while keeping unknown override prices explicit", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json(payload()));
+  const provider = new OpenAiWorkforceModel(
+    {
+      ...env,
+      OPENAI_WRITING_MODEL: "efficient-writer",
+      OPENAI_QUALITY_MODEL: "configured-reviewer",
+    },
+    fetcher,
+  );
+  const usage: Parameters<typeof provider.discover>[1] = [];
+  await provider.structured("SEQUENCE", schema, "write", {}, usage);
+  await provider.structured("QUALITY_REVIEW", schema, "review", {}, usage);
+  expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).model).toBe("efficient-writer");
+  expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).model).toBe("configured-reviewer");
+  expect(usage.every((u) => u.estimatedCostUsd === null)).toBe(true);
+});

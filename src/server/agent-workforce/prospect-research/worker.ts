@@ -4,7 +4,18 @@ import { ProspectResearchEngine } from "./engine";
 export async function drainProspectResearch(actor: string, runId?: string) {
   if (process.env.VERCEL_ENV === "production") return;
   const engine = new ProspectResearchEngine();
-  if (runId) return engine.advance(actor, runId);
+  if (runId) {
+    const result = await engine.advance(actor, runId);
+    if (result.prospectResearch?.stages.REVIEW.status === "COMPLETE") {
+      try {
+        const { DraftStudioEngine } = await import("../draft-studio/engine");
+        await new DraftStudioEngine().prepare(actor, result.id);
+      } catch {
+        /* Eligibility or dependencies remain unresolved; research progress is unaffected. */
+      }
+    }
+    return result;
+  }
   const now = Date.now();
   const runs = await (engine.store.pendingResearch?.(actor) ?? engine.store.list(actor));
   const candidate = runs
@@ -23,5 +34,5 @@ export async function drainProspectResearch(actor: string, runId?: string) {
         ),
     )
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))[0];
-  if (candidate) return engine.advance(actor, candidate.id);
+  if (candidate) return drainProspectResearch(actor, candidate.id);
 }

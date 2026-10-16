@@ -25,6 +25,7 @@ import { checkWorkforceEligibility } from "./safety";
 import { PrismaWorkforceStore, digest, type WorkforceStore } from "./store";
 import type { SourceReader } from "./public-sources";
 export type WorkforceDependencies = {
+  studioAuthorized?: boolean;
   store?: WorkforceStore;
   model?: WorkforceModel;
   knowledge?: typeof loadApprovedProductKnowledge;
@@ -53,7 +54,12 @@ export class WorkforceOrchestrator {
   async advance(actor: string, id: string) {
     const original = await this.store.get(actor, id);
     if (!original) throw new Error("NOT_FOUND");
-    if (original.prospectResearch || original.status !== "RUNNING") return original;
+    if (
+      original.prospectResearch ||
+      (original.draftStudio && !this.deps.studioAuthorized) ||
+      original.status !== "RUNNING"
+    )
+      return original;
     const now = this.now();
     if (original.leaseUntil && Date.parse(original.leaseUntil) > now.getTime()) return original;
     if (original.leaseUntil) {
@@ -270,6 +276,7 @@ export class WorkforceOrchestrator {
     const input = z.union([editSchema, rejectSchema]).parse(raw);
     const run = await this.store.get(actor, id);
     if (!run) throw new Error("NOT_FOUND");
+    if (run.draftStudio && !this.deps.studioAuthorized) throw new Error("DRAFT_STUDIO_REQUIRED");
     if (run.version !== input.expectedVersion || run.status === "RUNNING")
       throw new Error("VERSION_CONFLICT");
     const expected = run.version;
@@ -290,13 +297,19 @@ export class WorkforceOrchestrator {
         throw new Error("DRAFT_ELIGIBILITY_HOLD");
       run.sequence.messages = input.messages.map((message) => ({
         ...message,
-        assertions: [
-          {
-            text: message.body,
-            factIds: message.supportingFactIds,
-            knowledgeIds: message.approvedKnowledgeIds,
-          },
-        ],
+        assertions:
+          message.supportingFactIds.length ||
+          message.approvedKnowledgeIds.length ||
+          (message.supportingObservationIds ?? []).length
+            ? [
+                {
+                  text: message.body,
+                  factIds: message.supportingFactIds,
+                  knowledgeIds: message.approvedKnowledgeIds,
+                  observationIds: message.supportingObservationIds ?? [],
+                },
+              ]
+            : [],
       }));
       run.sequence.review = {
         verdict: "NEEDS_REVIEW",

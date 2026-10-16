@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { DraftStudioPanel } from "./draft-studio-panel";
 import { ProspectResearchPanel } from "./prospect-research-panel";
 import { VerificationPanel } from "./verification-panel";
 import { IntegrationControls } from "./integration-controls";
@@ -400,32 +401,7 @@ function ProspectWorkspace({
           </p>
         </details>
       </section>
-      <section className={panel}>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-olive" />
-          <h2 className="font-semibold">Draft Studio</h2>
-        </div>
-        {prospect.draftReady && prospect.draftRunId ? (
-          <>
-            <p className="mt-2 text-sm">
-              Eligible contact with a quality-reviewed research run. Current evidence and approved
-              knowledge are rechecked when you open the draft; human approval remains pending.
-            </p>
-            <Link
-              className={`${button} mt-3`}
-              href={`/sales-agent/runs/${encodeURIComponent(prospect.draftRunId)}`}
-            >
-              Open draft review
-            </Link>
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-amber-900">
-            Locked. Contact eligibility, fresh source-backed research, approved knowledge and
-            automated quality review must all pass. Completing research or marking a contact
-            reviewed does not unlock drafts.
-          </p>
-        )}
-      </section>
+      <DraftStudioPanel key={prospect.contact.hubspotRecordId} prospect={prospect} runs={runs} />
       <RunActivity run={run} />
     </div>
   );

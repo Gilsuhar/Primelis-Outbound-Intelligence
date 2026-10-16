@@ -39,7 +39,28 @@ export function workforceFailure(error: unknown) {
       {
         ok: false,
         message:
-          "Contact eligibility changed. Refresh the workspace and resolve HOLD reasons before editing. The draft remains unapproved.",
+          "Contact eligibility changed. Refresh the workspace and resolve HOLD reasons before editing. The draft remains unapproved. Human content approval cannot override eligibility.",
+      },
+      409,
+    );
+  if (
+    [
+      "DRAFT_ELIGIBILITY_HOLD",
+      "RESEARCH_IDENTITY_CHANGED",
+      "RESEARCH_REVIEW_REQUIRED",
+      "RESEARCH_REQUIRED",
+      "APPROVED_KNOWLEDGE_REQUIRED",
+      "QUALITY_REVIEW_REQUIRED",
+      "VERSION_LIMIT_REACHED",
+      "REGENERATION_LIMIT_REACHED",
+      "DRAFT_STUDIO_REQUIRED",
+    ].includes(code)
+  )
+    return workforceResponse(
+      {
+        ok: false,
+        message:
+          "Draft preparation or review is blocked. Refresh eligibility, verified research and approved product knowledge, and inspect the quality/retry/version limits. Human approval cannot override these gates.",
       },
       409,
     );

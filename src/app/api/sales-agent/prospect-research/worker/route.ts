@@ -1,7 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { workforceBody, workforceResponse } from "@/server/agent-workforce/http";
+import { PrismaIntegrationStore } from "@/server/integrations/store";
 import { enqueueResearchBatch } from "@/server/agent-workforce/prospect-research/intake";
+import { enqueueDraftBatch, drainDraftStudio } from "@/server/agent-workforce/draft-studio/worker";
 import { drainProspectResearch } from "@/server/agent-workforce/prospect-research/worker";
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -26,7 +28,19 @@ export async function POST(request: Request) {
     if (body.actorId !== process.env.INTEGRATION_OPERATOR_USER_ID)
       return workforceResponse({ ok: false }, 403);
     const batch = await enqueueResearchBatch(body.actorId);
-    await drainProspectResearch(body.actorId);
+    await enqueueDraftBatch(body.actorId);
+    // Alternate research and writing while sharing the existing one-stage operator lease.
+    const store = new PrismaIntegrationStore();
+    const turn = (await store.get(body.actorId, "HUBSPOT")).state.workforceTurn ?? "RESEARCH";
+    if (turn === "RESEARCH") {
+      if (!(await drainProspectResearch(body.actorId))) await drainDraftStudio(body.actorId);
+    } else {
+      if (!(await drainDraftStudio(body.actorId))) await drainProspectResearch(body.actorId);
+    }
+    await store.change(body.actorId, "HUBSPOT", async (row) => {
+      row.state.workforceTurn = turn === "RESEARCH" ? "DRAFT" : "RESEARCH";
+      return { row, value: undefined };
+    });
     return workforceResponse({ ok: true, ...batch });
   } catch {
     return workforceResponse(

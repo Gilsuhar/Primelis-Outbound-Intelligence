@@ -418,6 +418,10 @@ export async function protectRunDrafts(
     now?: Date;
   } = {},
 ) {
+  if (raw.draftStudio) {
+    const { DraftStudioEngine } = await import("../draft-studio/engine");
+    return new DraftStudioEngine().read(actor, raw.id);
+  }
   if (!raw.sequence) return raw;
   const run = structuredClone(raw);
   run.eligibility = {

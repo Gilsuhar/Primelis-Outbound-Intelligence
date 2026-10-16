@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { prospectResearchSchema } from "./prospect-research-contracts";
+import {
+  prospectResearchSchema,
+  serpObservationSchema,
+  opportunitySchema,
+} from "./prospect-research-contracts";
 import {
   agentFactSchema,
   agentSourceSchema,
@@ -122,10 +126,16 @@ export const messageSchema = baseMessage.extend({
   purpose: text(300),
   suggestedDelayDays: z.number().int().min(0).max(30),
   approvedKnowledgeIds: z.array(text(200)).max(8),
+  supportingObservationIds: z.array(text(160)).max(6).default([]),
   assertions: z
     .array(
       z
-        .object({ text: text(6000), factIds: z.array(text(160)), knowledgeIds: z.array(text(200)) })
+        .object({
+          text: text(6000),
+          factIds: z.array(text(160)),
+          knowledgeIds: z.array(text(200)),
+          observationIds: z.array(text(160)).default([]),
+        })
         .strict(),
     )
     .max(10),
@@ -219,6 +229,71 @@ export const runStatuses = [
   "READY_FOR_REVIEW",
   "REJECTED",
 ] as const;
+export const draftStudioSchema = z
+  .object({
+    sourceRunId: text(100),
+    dependencyHash: text(64),
+    qualityDecision: z.enum(["PASS", "REVISE", "BLOCKED"]).nullable(),
+    reviewStatus: z.enum(["PENDING", "CONTENT_APPROVED", "INVALIDATED", "REJECTED"]),
+    approval: z
+      .object({
+        actor: text(200),
+        at: z.string().datetime(),
+        contentHash: text(64),
+        dependencyHash: text(64),
+        scope: z.literal("CONTENT_REVIEW_ONLY"),
+      })
+      .strict()
+      .nullable(),
+    context: z
+      .object({
+        serp: z.array(serpObservationSchema).max(6),
+        opportunity: opportunitySchema.nullable(),
+        missingInformation: z.array(text(2000)).max(30),
+        personalizationMode: z.enum(["EVIDENCE_LED", "ROLE_RELEVANT"]),
+      })
+      .strict(),
+    versions: z
+      .array(
+        z
+          .object({
+            number: z.number().int().positive(),
+            at: z.string().datetime(),
+            origin: z.enum(["AI", "HUMAN"]),
+            contentHash: text(64),
+            messages: z.array(messageSchema).length(4).nullable(),
+            qualityDecision: z.enum(["PENDING", "PASS", "REVISE", "BLOCKED"]),
+          })
+          .strict(),
+      )
+      .max(10),
+    events: z
+      .array(
+        z
+          .object({
+            at: z.string().datetime(),
+            actor: text(200),
+            action: z.enum([
+              "CREATED",
+              "EDITED",
+              "REGENERATED",
+              "APPROVED",
+              "REJECTED",
+              "INVALIDATED",
+              "RETRY",
+            ]),
+            requestKey: text(100).optional(),
+            requestHash: text(64).optional(),
+            contentHash: text(64).nullable(),
+          })
+          .strict(),
+      )
+      .max(60),
+    regenerations: z.number().int().min(0).max(3),
+    failures: z.number().int().min(0).max(3),
+    nextRetryAt: z.string().datetime().nullable(),
+  })
+  .strict();
 export const runSchema = z
   .object({
     id: text(100),
@@ -226,6 +301,7 @@ export const runSchema = z
     intake: intakeSchema,
     inputHash: text(64),
     prospectResearch: prospectResearchSchema.optional(),
+    draftStudio: draftStudioSchema.optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
     status: z.enum(runStatuses),

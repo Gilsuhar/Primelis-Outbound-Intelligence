@@ -102,7 +102,17 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
     if (plan.hypotheses.some((h) => h.supportingFactIds.some((id) => !facts.has(id))))
       issues.push("Strategic hypothesis cites unknown evidence");
   }
+  const observations = new Map((run.draftStudio?.context.serp ?? []).map((s) => [s.id, s]));
   for (const [index, m] of sequence.messages.entries()) {
+    if ((m.supportingObservationIds ?? []).some((id) => !observations.has(id)))
+      issues.push(`Email ${m.step} cites an unknown SERP observation`);
+    if (
+      run.draftStudio &&
+      /i hope this email finds you well|revolutionize your strategy|unlock unprecedented savings|game[- ]changing solution|just checking in/i.test(
+        `${m.subject} ${m.body}`,
+      )
+    )
+      issues.push(`Email ${m.step} needs a more natural, non-generic opening or phrasing`);
     if (index && m.subject !== `Re: ${sequence.messages[0].subject}`)
       issues.push("Follow-ups must use the first subject in the same thread");
     if (index && m.suggestedDelayDays < 1) issues.push("Follow-up delay must be positive");
@@ -111,8 +121,13 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
     for (const assertion of m.assertions) {
       if (
         !m.body.includes(assertion.text) ||
-        (!assertion.factIds.length && !assertion.knowledgeIds.length) ||
+        (!assertion.factIds.length &&
+          !assertion.knowledgeIds.length &&
+          !(assertion.observationIds ?? []).length) ||
         assertion.factIds.some((id) => !facts.has(id) || !m.supportingFactIds.includes(id)) ||
+        (assertion.observationIds ?? []).some(
+          (id) => !observations.has(id) || !(m.supportingObservationIds ?? []).includes(id),
+        ) ||
         assertion.knowledgeIds.some(
           (id) => !knowledge.has(id) || !m.approvedKnowledgeIds.includes(id),
         )

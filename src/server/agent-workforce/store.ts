@@ -13,6 +13,8 @@ export interface WorkforceStore {
   get(actor: string, id: string): Promise<WorkforceRun | null>;
   list(actor: string): Promise<WorkforceRun[]>;
   pendingResearch?(actor: string): Promise<WorkforceRun[]>;
+  pendingDrafts?(actor: string): Promise<WorkforceRun[]>;
+  byContact?(actor: string, contactId: string): Promise<WorkforceRun[]>;
   change(actor: string, expectedVersion: number, run: WorkforceRun): Promise<boolean>;
 }
 export function initialRun(
@@ -110,6 +112,36 @@ export class PrismaWorkforceStore implements WorkforceStore {
       }
     });
   }
+  private parseRows(rows: { draftContent: string }[]) {
+    return rows.flatMap((row) => {
+      try {
+        const parsed = runSchema.safeParse(JSON.parse(row.draftContent));
+        return parsed.success ? [parsed.data] : [];
+      } catch {
+        return [];
+      }
+    });
+  }
+  async byContact(actor: string, contactId: string) {
+    const rows = await (
+      await this.db()
+    ).$queryRaw<{ draftContent: string }[]>`
+      SELECT "draftContent" FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE'
+      AND "inputSnapshot"->>'hubspotRecordId'=${contactId} ORDER BY "createdAt" DESC LIMIT 12`;
+    return this.parseRows(rows);
+  }
+  async pendingDrafts(actor: string) {
+    const rows = await (
+      await this.db()
+    ).$queryRaw<{ draftContent: string }[]>`
+      SELECT "draftContent" FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE'
+      AND "draftContent"::jsonb ? 'draftStudio' AND "draftContent"::jsonb->>'status'='RUNNING'
+      AND "draftContent"::jsonb->'draftStudio'->>'reviewStatus'='PENDING'
+      AND ("draftContent"::jsonb->'draftStudio'->>'nextRetryAt' IS NULL OR
+        ("draftContent"::jsonb->'draftStudio'->>'nextRetryAt')::timestamptz<=clock_timestamp())
+      ORDER BY "updatedAt" ASC LIMIT 25`;
+    return this.parseRows(rows);
+  }
   async pendingResearch(actor: string) {
     const rows = await (
       await this.db()
@@ -135,13 +167,13 @@ export class PrismaWorkforceStore implements WorkforceStore {
   async change(actor: string, expectedVersion: number, run: WorkforceRun): Promise<boolean> {
     runSchema.parse(run);
     if (run.version !== expectedVersion + 1) throw new Error("INVALID_VERSION");
-    if (run.prospectResearch && run.leaseUntil && !this.researchLocked) {
+    if ((run.prospectResearch || run.draftStudio) && run.leaseUntil && !this.researchLocked) {
       const db = await this.db();
       return db.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`research:${actor}`}, 0))`;
         const live = await tx.$queryRaw<{ id: string }[]>`
           SELECT id FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE'
-          AND id<>${run.id} AND "draftContent"::jsonb ? 'prospectResearch'
+          AND id<>${run.id} AND ("draftContent"::jsonb ? 'prospectResearch' OR "draftContent"::jsonb ? 'draftStudio')
           AND ("draftContent"::jsonb->>'leaseUntil')::timestamptz > clock_timestamp() LIMIT 1`;
         if (live.length) return false;
         return new PrismaWorkforceStore(tx, true).change(actor, expectedVersion, run);

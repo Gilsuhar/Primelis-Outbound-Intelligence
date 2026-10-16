@@ -118,7 +118,11 @@ export class OpenAiWorkforceModel implements WorkforceModel {
     const model = normalizeOpenAiModel(
       stage === "DISCOVERY"
         ? (this.env.OPENAI_RESEARCH_MODEL ?? this.env.OPENAI_MODEL)
-        : this.env.OPENAI_MODEL,
+        : stage === "SEQUENCE"
+          ? this.env.OPENAI_WRITING_MODEL?.trim() || this.env.OPENAI_MODEL
+          : stage === "QUALITY_REVIEW"
+            ? this.env.OPENAI_QUALITY_MODEL?.trim() || this.env.OPENAI_MODEL
+            : this.env.OPENAI_MODEL,
     );
     for (let attempt = 1; attempt <= 2; attempt++) {
       const remaining = this.deadline - Date.now();
