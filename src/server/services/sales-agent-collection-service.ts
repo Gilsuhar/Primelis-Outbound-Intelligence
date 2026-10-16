@@ -1,4 +1,6 @@
 import "server-only";
+import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
+import type { IntegrationStore } from "@/server/integrations/store";
 
 import { z } from "zod";
 import { dashboardReviewSchema } from "@/features/agent-workforce/dashboard/contracts";
@@ -35,6 +37,7 @@ import {
 } from "@/server/sales-agent/approved-draft-proof";
 
 export type CollectionDependencies = {
+  integrationStore?: IntegrationStore;
   intake?: ContactIntakeAdapter;
   providers?: ProspectEvidenceAdapter[];
   store?: EvidenceStore;
@@ -49,6 +52,8 @@ const contactSchema = z.object({
   companyName: z.string().optional(),
   companyDomain: z.string().optional(),
   emailModifiedAt: z.string().optional(),
+  hubspotRecordUrl: z.string().url().optional(),
+  outreachProspectId: z.string().optional(),
   hubspotCreatedAt: z.string().optional(),
   ownerAssignedAt: z.string().optional(),
   intakeSince: z.string().optional(),
@@ -57,6 +62,16 @@ const contactSchema = z.object({
   warnings: z.array(z.string()),
 });
 export const snapshotSchema = z.object({
+  integrationReceipts: z
+    .object({
+      HUBSPOT: z
+        .object({ jobId: z.string(), operation: z.enum(["IMPORTED", "UPDATED"]) })
+        .optional(),
+      OUTREACH: z
+        .object({ jobId: z.string(), operation: z.enum(["IMPORTED", "UPDATED"]) })
+        .optional(),
+    })
+    .optional(),
   version: z.literal(1),
   dashboardReview: dashboardReviewSchema.optional(),
   contact: contactSchema,
@@ -252,6 +267,10 @@ export async function getSalesAgentDailyReview(actorId: string, deps: Collection
     const snapshots = await store.list(actorId);
     const localSuppression = new LocalSuppressionAdapter(await store.suppressionRecords());
     const now = (deps.now ?? (() => new Date()))();
+    const integrationBlockers =
+      deps.integrationStore || !deps.store
+        ? await integrationEligibilityBlockers(actorId, now, deps.integrationStore)
+        : [];
     const rows: DailyReviewRow[] = [];
     let unreadable = 0;
     for (const raw of snapshots) {
@@ -265,6 +284,7 @@ export async function getSalesAgentDailyReview(actorId: string, deps: Collection
         reviewEvidenceSnapshot(
           {
             ...result.data,
+            blockers: [...result.data.blockers, ...integrationBlockers],
             research: await recheckDraftProofs(result.data.research, deps.verifyProof),
             observations: [...result.data.observations, ...currentSuppression.observations],
           },

@@ -124,6 +124,8 @@ enum ExtractedFactCategory {
 }
 
 model User {
+  integrationStates IntegrationState[]
+  integrationAuditEvents IntegrationAuditEvent[]
   id                  String                @id @default(cuid())
   authUserId          String?               @unique
   email               String                @unique
@@ -547,6 +549,7 @@ model ProspectSource {
   @@index([prospectId])
   @@index([type])
   @@index([createdAt])
+  @@index([sourceLabel, createdAt])
 }
 
 model ProspectFact {
@@ -788,4 +791,30 @@ model ProviderSyncAudit {
   @@index([enrichmentRunId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// Dedicated server-only integration state. Never included in draft/prospect listing APIs.
+model IntegrationState {
+  userId     String
+  provider   String
+  state      Json
+  secret     String?
+  version    Int       @default(1)
+  leaseOwner String?
+  leaseUntil DateTime?
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, provider])
+}
+
+model IntegrationAuditEvent {
+  id        String   @id
+  userId    String
+  provider  String
+  event     Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, createdAt])
 }

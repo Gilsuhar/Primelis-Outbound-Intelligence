@@ -72,6 +72,8 @@ export type IntakeContact = {
   companyName?: string;
   companyDomain?: string;
   emailModifiedAt?: string;
+  hubspotRecordUrl?: string;
+  outreachProspectId?: string;
   hubspotCreatedAt?: string;
   ownerAssignedAt?: string;
   intakeSince?: string;
@@ -201,7 +203,7 @@ export function normalizeCollectedEvidence(
         }
       }
       if (
-        ["outreachHistoryComplete", "lastOutboundAt", "activeSequence"].includes(field) &&
+        ["outreachHistoryComplete", "activeSequence"].includes(field) &&
         item.provider !== "OUTREACH"
       ) {
         item.explanation = "Requires complete Outreach evidence, not CRM last activity";
@@ -246,6 +248,30 @@ export function normalizeCollectedEvidence(
       blocked.accepted = true;
       blocked.explanation = "Conservative safety block; reverify before clearing";
       continue;
+    }
+    if (field === "lastOutboundAt") {
+      const dates = usable.filter(
+        (item) =>
+          ["HUBSPOT", "OUTREACH"].includes(item.provider) &&
+          typeof item.value === "string" &&
+          parseTimestamp(item.value) !== null &&
+          parseTimestamp(item.value)! <= now.getTime(),
+      );
+      const latest = dates.sort(
+        (a, b) => parseTimestamp(String(b.value))! - parseTimestamp(String(a.value))!,
+      )[0];
+      if (latest) {
+        latest.accepted = true;
+        latest.explanation = "Latest reliable outbound email across connected sources";
+        input.lastOutboundAt = {
+          value: latest.value as string,
+          source: `${latest.provider}:${latest.sourceRecordId}`,
+          verifiedAt: latest.verifiedAt!,
+        };
+        continue;
+      }
+      // A null/never-contacted assertion still requires the existing complete Outreach proof.
+      usable.splice(0, usable.length, ...usable.filter((item) => item.provider === "OUTREACH"));
     }
     const canonical = (item: EvidenceProvenance) => {
       const parsed = values[field].safeParse(item.value);

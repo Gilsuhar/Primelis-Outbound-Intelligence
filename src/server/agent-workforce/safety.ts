@@ -1,4 +1,5 @@
 import "server-only";
+import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { normalizeDomain } from "@/features/connected-research/url-safety";
 import { qualifyProspect } from "@/features/sales-agent/qualification";
@@ -54,8 +55,23 @@ export async function checkWorkforceEligibility(
   if (matching.length === 1) {
     const reviewed = reviewEvidenceSnapshot(matching[0], now);
     const decision = reviewed.plan.decision;
-    const currentRole = reviewed.provenance.find(item => item.field === "role" && item.accepted && item.freshness === "FRESH");
-    if (currentRole && String(currentRole.value).trim().toLowerCase() !== input.prospectTitle.trim().toLowerCase()) return {status:"HOLD",reasons:["Current verified role differs from research intake; refresh prospect research"],blockDrafting:true};
+    const integrationBlocks = await integrationEligibilityBlockers(actorId, now);
+    if (integrationBlocks.length) {
+      if (decision.status !== "REJECTED") decision.status = "HOLD";
+      decision.reasons.push(...integrationBlocks);
+    }
+    const currentRole = reviewed.provenance.find(
+      (item) => item.field === "role" && item.accepted && item.freshness === "FRESH",
+    );
+    if (
+      currentRole &&
+      String(currentRole.value).trim().toLowerCase() !== input.prospectTitle.trim().toLowerCase()
+    )
+      return {
+        status: "HOLD",
+        reasons: ["Current verified role differs from research intake; refresh prospect research"],
+        blockDrafting: true,
+      };
     const restriction = decision.reasons.some((reason) =>
       /four calendar months|active outreach sequence|conflicting active opportunity|unauthorized|not owned/i.test(
         reason,

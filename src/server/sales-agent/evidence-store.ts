@@ -17,6 +17,9 @@ import type { ProviderStatus } from "./providers";
 import type { DraftResearch } from "@/features/sales-agent/draft-engine";
 
 export type EvidenceSnapshot = {
+  integrationReceipts?: Partial<
+    Record<"HUBSPOT" | "OUTREACH", { jobId: string; operation: "IMPORTED" | "UPDATED" }>
+  >;
   dashboardReview?: import("@/features/agent-workforce/dashboard/contracts").DashboardReview;
   research?: DraftResearch[];
   version: 1;
@@ -30,6 +33,7 @@ export type EvidenceSnapshot = {
 export interface EvidenceStore {
   save(actorId: string, snapshots: EvidenceSnapshot[]): Promise<void>;
   list(actorId: string): Promise<unknown[]>;
+  find?(actorId: string, hubspotRecordId: string): Promise<unknown>;
   suppressionRecords(): Promise<DoNotContactRecord[]>;
   edit(
     actorId: string,
@@ -72,7 +76,11 @@ export class PrismaEvidenceStore implements EvidenceStore {
       async (tx) => {
         await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`sales-agent:${actorId}`}, 0))`;
         // Retain only schema-validated research bound to the same contact and current company.
-        const previous = await new PrismaEvidenceStore(tx).list(actorId);
+        const previous = await Promise.all(
+          snapshots.map((snapshot) =>
+            new PrismaEvidenceStore(tx).find(actorId, snapshot.contact.hubspotRecordId),
+          ),
+        );
         const research = z.object({
           contact: z.object({ hubspotRecordId: z.string() }),
           research: z.array(draftResearchSchema).optional(),
@@ -86,7 +94,14 @@ export class PrismaEvidenceStore implements EvidenceStore {
             : [];
         });
         for (const snapshot of snapshots) {
-          const prior = previous.find((raw) => typeof raw === "object" && raw !== null && "contact" in raw && (raw as EvidenceSnapshot).contact?.hubspotRecordId === snapshot.contact.hubspotRecordId) as EvidenceSnapshot | undefined;
+          const prior = previous.find(
+            (raw) =>
+              typeof raw === "object" &&
+              raw !== null &&
+              "contact" in raw &&
+              (raw as EvidenceSnapshot).contact?.hubspotRecordId ===
+                snapshot.contact.hubspotRecordId,
+          ) as EvidenceSnapshot | undefined;
           await this.append(tx, actorId, {
             ...snapshot,
             dashboardReview: snapshot.dashboardReview ?? prior?.dashboardReview,
@@ -114,14 +129,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
     return client.$transaction(
       async (tx) => {
         await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`sales-agent:${actorId}`}, 0))`;
-        const current = (await new PrismaEvidenceStore(tx).list(actorId)).find(
-          (raw) =>
-            typeof raw === "object" &&
-            raw !== null &&
-            "contact" in raw &&
-            (raw as { contact?: { hubspotRecordId?: string } }).contact?.hubspotRecordId ===
-              contactId,
-        );
+        const current = await new PrismaEvidenceStore(tx).find(actorId, contactId);
         if (!current) return false;
         const updated = update(current);
         if (!updated) return false;
@@ -132,6 +140,21 @@ export class PrismaEvidenceStore implements EvidenceStore {
       },
       { timeout: 60_000, maxWait: 10_000 },
     );
+  }
+  async find(actorId: string, hubspotRecordId: string): Promise<unknown> {
+    const rows = await (
+      await this.db()
+    ).$queryRaw<{ rawContent: string }[]>`
+      SELECT DISTINCT ON (s."sourceLabel") s."rawContent"
+      FROM "ProspectSource" s JOIN "Prospect" p ON p.id = s."prospectId"
+      WHERE p."userId" = ${actorId} AND s."sourceLabel" = ${label(hubspotRecordId)}
+      ORDER BY s."sourceLabel", s."createdAt" DESC, s.id DESC LIMIT 1
+    `;
+    try {
+      return rows[0] ? (JSON.parse(rows[0].rawContent) as unknown) : null;
+    } catch {
+      return null;
+    }
   }
   async list(actorId: string) {
     const rows = await (

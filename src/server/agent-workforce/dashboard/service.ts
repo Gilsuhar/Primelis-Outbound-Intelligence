@@ -1,4 +1,6 @@
 import "server-only";
+import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
+import { PrismaIntegrationStore, type IntegrationStore } from "@/server/integrations/store";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { stages, type WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
 import type {
@@ -67,6 +69,7 @@ export function summarizeRun(run: WorkforceRun, now: Date): RunSummary {
 }
 export type DashboardDependencies = {
   evidence?: EvidenceStore;
+  integrations?: IntegrationStore;
   runs?: WorkforceStore;
   now?: () => Date;
   configured?: { hubspot: boolean; openai: boolean };
@@ -81,7 +84,12 @@ export async function getWorkforceDashboard(
   const runsStore = deps.runs ?? new PrismaWorkforceStore();
   const now = (deps.now ?? (() => new Date()))();
   const [review, savedRuns, snapshots] = await Promise.allSettled([
-    getSalesAgentDailyReview(actor, { store: evidence, now: () => now }),
+    getSalesAgentDailyReview(actor, {
+      store: evidence,
+      now: () => now,
+      integrationStore:
+        deps.integrations ?? (!deps.evidence ? new PrismaIntegrationStore() : undefined),
+    }),
     runsStore.list(actor),
     evidence.list(actor),
   ]);
@@ -186,7 +194,7 @@ export async function getWorkforceDashboard(
       status: "NOT_IMPLEMENTED",
       observedAt: null,
       detail:
-        "No read-only history/sequence adapter is registered. Unknown outbound, suppression and active sequence history means HOLD. Writes and enrollment are disabled.",
+        "Read-only synchronization requires configured OAuth and an authenticated check. Unknown outbound, suppression and active sequence history means HOLD. Writes and enrollment are disabled.",
     },
     {
       id: "SIMILARWEB",
@@ -217,6 +225,26 @@ export async function getWorkforceDashboard(
         "No independent business-email/employment verification adapter is registered. ZoomInfo needs matching evidence and a fresh timestamp; Boring/Surfe/HubSpot status alone cannot clear this gate.",
     },
   ];
+  // Existing fixture-injected dashboards remain isolated from live storage.
+  if (deps.integrations || !deps.evidence) {
+    const store = deps.integrations ?? new PrismaIntegrationStore();
+    for (const provider of ["HUBSPOT", "OUTREACH"] as const) {
+      const target = integrations.find((entry) => entry.id === provider)!;
+      try {
+        const { state } = await store.get(actor, provider);
+        const stale = !state.checkedAt || now.getTime() - Date.parse(state.checkedAt) > 86400000;
+        target.status =
+          state.status === "CONNECTED" && stale ? "CONFIGURED_UNTESTED" : state.status;
+        target.observedAt = state.checkedAt;
+        target.detail = state.detail;
+        target.sync = state;
+      } catch {
+        target.status = "ERROR";
+        target.detail =
+          "Integration persistence unavailable. Apply the reviewed migration to the Preview database and configure server-side credentials. No connection has been verified.";
+      }
+    }
+  }
   return {
     evaluatedAt: now.toISOString(),
     prospects,
@@ -278,11 +306,19 @@ export async function markProspectReviewed(
     .find((p) => p.success && p.data.contact.hubspotRecordId === id);
   if (!parsed?.success || !isInOwnedIntakeScope(parsed.data.contact)) throw new Error("NOT_FOUND");
   const latestSuppression = await suppression.collect(parsed.data.contact, now);
+  const integrationBlocks =
+    deps.integrations || !deps.evidence
+      ? await integrationEligibilityBlockers(actor, now, deps.integrations)
+      : [];
   const changed = await store.edit(actor, id, (raw) => {
     const p = snapshotSchema.safeParse(raw);
     if (!p.success || !isInOwnedIntakeScope(p.data.contact)) return null;
     const decision = reviewEvidenceSnapshot(
-      { ...p.data, observations: [...p.data.observations, ...latestSuppression.observations] },
+      {
+        ...p.data,
+        blockers: [...p.data.blockers, ...integrationBlocks],
+        observations: [...p.data.observations, ...latestSuppression.observations],
+      },
       now,
     ).plan.decision;
     return {

@@ -40,7 +40,16 @@ export type RunSummary = Pick<
 export type IntegrationHealth = {
   id: "HUBSPOT" | "OUTREACH" | "SIMILARWEB" | "OPENAI" | "EMAIL_VERIFICATION";
   label: string;
-  status: "NOT_CONFIGURED" | "CONFIGURED_UNTESTED" | "LAST_SUCCESS" | "ERROR" | "NOT_IMPLEMENTED";
+  status:
+    | "NOT_CONFIGURED"
+    | "CONFIGURED_UNTESTED"
+    | "LAST_SUCCESS"
+    | "ERROR"
+    | "NOT_IMPLEMENTED"
+    | "CONNECTED"
+    | "DISCONNECTED"
+    | "PERMISSION_MISSING";
+  sync?: import("@/server/integrations/contracts").IntegrationState;
   observedAt: string | null;
   detail: string;
 };

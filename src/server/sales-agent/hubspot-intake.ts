@@ -148,16 +148,25 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
     };
   }
 
-  private async readContact(id: string, since: string): Promise<IntakeContact | null> {
+  async readContact(id: string, since: string): Promise<IntakeContact | null> {
     const detail = objectSchema.parse(
       await this.read(
-        `/crm/v3/objects/contacts/${encodeURIComponent(id)}?properties=firstname,lastname,email,jobtitle,createdate,hubspot_owner_assigneddate,hubspot_owner_id,hs_email_optout,hs_email_hard_bounce_reason&propertiesWithHistory=email&associations=companies`,
+        `/crm/v3/objects/contacts/${encodeURIComponent(id)}?properties=firstname,lastname,email,jobtitle,createdate,hubspot_owner_assigneddate,hubspot_owner_id,hs_email_optout,hs_email_hard_bounce_reason&propertiesWithHistory=email,hubspot_owner_id&associations=companies`,
       ),
     );
     if (detail.id !== id) throw new Error("HubSpot contact identity mismatch");
     if (detail.properties.hubspot_owner_id !== SIGNAL_HUBSPOT_OWNER_ID) return null;
     const observedAt = this.clock().toISOString();
     const p = detail.properties;
+    // Property history is assignment evidence; lastmodifieddate is never treated as reassignment.
+    const assignment = (detail.propertiesWithHistory?.hubspot_owner_id ?? [])
+      .filter(
+        (entry) =>
+          entry.value === SIGNAL_HUBSPOT_OWNER_ID && Number.isFinite(Date.parse(entry.timestamp)),
+      )
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+    if (!p.hubspot_owner_assigneddate && assignment)
+      p.hubspot_owner_assigneddate = assignment.timestamp;
     if (
       !isInOwnedIntakeScope({
         hubspotRecordId: id,

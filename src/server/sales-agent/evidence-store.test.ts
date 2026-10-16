@@ -23,7 +23,11 @@ function fixtureDatabase() {
     if (sql.includes("SELECT DISTINCT")) {
       const latest = new Map<string, string>();
       sources
-        .filter((source) => prospects.get(source.prospectId) === params[0])
+        .filter(
+          (source) =>
+            prospects.get(source.prospectId) === params[0] &&
+            (params[1] === undefined || source.label === params[1]),
+        )
         .forEach((source) => latest.set(source.label, source.content));
       return [...latest.values()].map((rawContent) => ({ rawContent }));
     }

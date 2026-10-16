@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { IntegrationControls } from "./integration-controls";
 import {
   Activity,
   ArrowRight,
@@ -278,8 +279,10 @@ function ProspectWorkspace({
           </Link>
         </div>
         <p className="mt-3 text-xs text-stone-600">
-          HubSpot record {prospect.contact.hubspotRecordId} · owner {prospect.contact.ownerId} ·
-          read-only HubSpot intake
+          <SafeSource url={prospect.contact.hubspotRecordUrl}>
+            HubSpot record {prospect.contact.hubspotRecordId}
+          </SafeSource>{" "}
+          · owner {prospect.contact.ownerId} · read-only HubSpot intake
         </p>
         <p className="mt-1 break-words text-xs text-stone-600">
           Created {prospect.contact.hubspotCreatedAt ?? "unknown"} · assigned{" "}
@@ -717,6 +720,7 @@ export function DashboardView({
                       <Badge status={integration.status} />
                     </div>
                     <p className="mt-2 text-xs leading-5 text-stone-600">{integration.detail}</p>
+                    <IntegrationControls integration={integration} refresh={onRefresh} />
                     {integration.observedAt && (
                       <p className="mt-1 break-words text-xs text-stone-600">
                         Recorded observation: {integration.observedAt}
@@ -772,7 +776,13 @@ export function WorkforceDashboard({ contactId }: { contactId?: string }) {
     };
   }, [load]);
   useEffect(() => {
-    if (!data?.runs.some((run) => run.status === "RUNNING")) return;
+    if (
+      !data?.runs.some((run) => run.status === "RUNNING") &&
+      !data?.integrations.some((item) =>
+        ["QUEUED", "RUNNING"].includes(item.sync?.job?.status ?? ""),
+      )
+    )
+      return;
     const timer = setInterval(() => void load(), 20000);
     return () => clearInterval(timer);
   }, [data, load]);

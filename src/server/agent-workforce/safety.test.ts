@@ -1,3 +1,7 @@
+// Integration capability/coverage gates are tested independently in integrations.test.ts.
+vi.mock("@/server/integrations/eligibility", () => ({
+  integrationEligibilityBlockers: async () => [],
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   collectedContact,
