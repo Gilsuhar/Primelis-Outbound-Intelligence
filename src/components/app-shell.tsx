@@ -46,9 +46,11 @@ function NavigationSection({
                 "flex min-w-0 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
                 isActive
                   ? "bg-lime text-ink"
-                  : muted
-                    ? "text-[#6f6d5f] hover:bg-white hover:text-ink"
-                    : "text-[#34352e] hover:bg-white hover:text-ink",
+                  : item.href === "/sales-agent"
+                    ? "bg-signal text-white hover:bg-[#1d4e5f]"
+                    : muted
+                      ? "text-[#6f6d5f] hover:bg-white hover:text-ink"
+                      : "text-[#34352e] hover:bg-white hover:text-ink",
               ].join(" ")}
               href={item.href}
               key={item.href}
@@ -115,10 +117,16 @@ export function AppShell({
 
   const role: UserRole = viewer.role;
   const navigation = getNavigationForRole(role);
+  const workspaceNavigation = navigation.sales.filter(
+    (item) => item.href === "/" || item.href === "/sales-agent",
+  );
+  const legacyNavigation = navigation.sales.filter(
+    (item) => item.href !== "/" && item.href !== "/sales-agent",
+  );
 
   return (
     <div className="min-h-screen bg-white lg:flex">
-      <aside className="border-b border-line bg-cream/95 px-4 py-4 lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+      <aside className="border-b border-line bg-cream/95 px-4 py-4 lg:fixed lg:inset-y-0 lg:w-72 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 lg:block">
           <Link className="flex min-w-0 items-center gap-3" href="/">
             <Image
@@ -141,6 +149,13 @@ export function AppShell({
           </div>
         </div>
 
+        <Link
+          className="mx-auto mt-4 flex min-h-11 max-w-6xl items-center justify-center gap-2 rounded-xl bg-signal px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive lg:hidden"
+          href="/sales-agent"
+        >
+          Open Agent Workforce
+        </Link>
+
         <details className="mx-auto mt-3 max-w-6xl rounded-2xl border border-line bg-white p-2 shadow-soft lg:hidden [&>summary::-webkit-details-marker]:hidden">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive">
             <span className="inline-flex items-center gap-2">
@@ -150,9 +165,10 @@ export function AppShell({
             <span className="text-xs font-medium text-[#6f6d5f]">Open tools</span>
           </summary>
           <div className="mt-2 space-y-5 border-t border-line pt-4">
+            <NavigationSection label="Workspace" items={workspaceNavigation} language={language} />
             <NavigationSection
-              label={translateUi("nav.sales", language)}
-              items={navigation.sales}
+              label="Legacy Signal tools"
+              items={legacyNavigation}
               language={language}
             />
             {navigation.admin.length > 0 ? (
@@ -170,9 +186,10 @@ export function AppShell({
         </details>
 
         <div className="mx-auto mt-4 hidden max-w-6xl space-y-6 lg:mt-8 lg:block">
+          <NavigationSection label="Workspace" items={workspaceNavigation} language={language} />
           <NavigationSection
-            label={translateUi("nav.sales", language)}
-            items={navigation.sales}
+            label="Legacy Signal tools"
+            items={legacyNavigation}
             language={language}
           />
           {navigation.admin.length > 0 ? (

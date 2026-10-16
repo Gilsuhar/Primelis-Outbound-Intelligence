@@ -4,6 +4,7 @@ export type UiTextKey =
   | "language.selector"
   | "nav.sales"
   | "nav.admin"
+  | "nav.Agent Workforce"
   | "nav.Home"
   | "nav.Signal Playbook"
   | "nav.Account Research"
@@ -177,6 +178,7 @@ const english: Record<UiTextKey, string> = {
   "language.selector": "Language",
   "nav.sales": "Sales",
   "nav.admin": "Admin",
+  "nav.Agent Workforce": "Agent Workforce",
   "nav.Home": "Home",
   "nav.Signal Playbook": "Signal Playbook",
   "nav.Account Research": "Account Research",
@@ -364,6 +366,7 @@ const french: Record<UiTextKey, string> = {
   "language.selector": "Langue",
   "nav.sales": "Vente",
   "nav.admin": "Admin",
+  "nav.Agent Workforce": "Agent Workforce",
   "nav.Home": "Accueil",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Recherche compte",
@@ -545,6 +548,7 @@ const portuguese: Record<UiTextKey, string> = {
   "language.selector": "Idioma",
   "nav.sales": "Vendas",
   "nav.admin": "Admin",
+  "nav.Agent Workforce": "Agent Workforce",
   "nav.Home": "Início",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Pesquisa de conta",

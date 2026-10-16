@@ -24,7 +24,7 @@ export const salesNavigation = [
     href: "/",
     icon: Home,
   },
-  { label: "Agent Daily Review", href: "/sales-agent", icon: ListChecks },
+  { label: "Agent Workforce", href: "/sales-agent", icon: ListChecks },
   {
     label: "Signal Playbook",
     href: "/playbook",

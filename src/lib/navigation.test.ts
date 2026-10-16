@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { canApplyReviewAction } from "@/features/review/status-transition";
+import { translateNavigationLabel } from "@/lib/ui-translations";
 import { getNavigationForRole } from "@/lib/navigation";
 import { getTrustedRoleContext, normalizeTrustedRole } from "@/lib/role-context";
 
@@ -21,6 +22,15 @@ describe("role-based navigation", () => {
       "/do-not-contact",
     ]);
     expect(navigation.admin).toEqual([]);
+  });
+
+  it("keeps the Agent Workforce label visible in every supported language", () => {
+    const item = getNavigationForRole("SALES_USER").sales.find(
+      (item) => item.href === "/sales-agent",
+    )!;
+    expect(item.label).toBe("Agent Workforce");
+    for (const language of ["ENGLISH", "FRENCH", "PORTUGUESE"] as const)
+      expect(translateNavigationLabel(item.label, language)).toBe("Agent Workforce");
   });
 
   it("adds admin navigation for knowledge admins", () => {

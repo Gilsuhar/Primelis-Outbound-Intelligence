@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Ban, BookOpen, Brain, Building2, Layers3, MessageSquareReply, Send } from "lucide-react";
+import {
+  ArrowRight,
+  Ban,
+  BookOpen,
+  Brain,
+  Building2,
+  Layers3,
+  MessageSquareReply,
+  Send,
+} from "lucide-react";
 
 import { useOutputLanguage } from "@/components/language-selector";
 import { SignalCard, SignalHero } from "@/components/signal-ui";
@@ -96,27 +105,32 @@ const mobileWorkspaceActions = [
 
 export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
   const language = useOutputLanguage();
-  const [activeMobileHref, setActiveMobileHref] = useState<(typeof mobileWorkspaceActions)[number]["href"]>(
-    mobileWorkspaceActions[0].href,
-  );
+  const [activeMobileHref, setActiveMobileHref] = useState<
+    (typeof mobileWorkspaceActions)[number]["href"]
+  >(mobileWorkspaceActions[0].href);
   const activeMobileAction =
-    mobileWorkspaceActions.find((action) => action.href === activeMobileHref) ?? mobileWorkspaceActions[0];
+    mobileWorkspaceActions.find((action) => action.href === activeMobileHref) ??
+    mobileWorkspaceActions[0];
   const ActiveMobileIcon = activeMobileAction.icon;
 
   return (
     <div className="space-y-5 sm:space-y-8">
       <SignalHero
-        action={{ href: "/playbook", label: translateUi("home.openPlaybook", language) }}
+        action={{ href: "/sales-agent", label: "Open Agent Workforce" }}
         compactOnMobile
-        description={translateUi("home.description", language)}
-        eyebrow={translateUi("home.eyebrow", language)}
-        title={translateUi("home.title", language)}
+        description="Research a company and prospect, explore a sales strategy, and review four personalized email drafts before human approval."
+        eyebrow="Primelis Signal · AI research and drafting"
+        title="Agent Workforce"
       />
 
-      <section
-        aria-label="Mobile workspace"
-        className="space-y-3 overflow-x-hidden lg:hidden"
-      >
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-ink">Legacy Signal tools</h2>
+        <p className="text-sm text-[#6f6d5f]">
+          Your existing Playbook, research and outreach tools remain available below.
+        </p>
+      </div>
+
+      <section aria-label="Mobile workspace" className="space-y-3 overflow-x-hidden lg:hidden">
         <div
           aria-label="Workspace tools"
           className="rounded-2xl border border-line bg-white p-1.5 shadow-soft"
