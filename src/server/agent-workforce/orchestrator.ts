@@ -1,4 +1,5 @@
 import "server-only";
+import { BudgetError } from "./daily/budget";
 import { z } from "zod";
 import {
   stages,
@@ -108,20 +109,28 @@ export class WorkforceOrchestrator {
       run.events.push({ stage: original.stage, state: "COMPLETED", at: this.now().toISOString() });
     } catch (error) {
       run.status =
-        error instanceof WorkforceError &&
-        [
-          "NOT_CONFIGURED",
-          "WEB_SEARCH_UNAVAILABLE",
-          "MISSING_KNOWLEDGE",
-          "UNSUPPORTED_EVIDENCE",
-        ].includes(error.code)
-          ? "RESEARCH_INCOMPLETE"
-          : "GENERATION_FAILED";
+        error instanceof BudgetError
+          ? "RUNNING"
+          : error instanceof WorkforceError &&
+              [
+                "NOT_CONFIGURED",
+                "WEB_SEARCH_UNAVAILABLE",
+                "MISSING_KNOWLEDGE",
+                "UNSUPPORTED_EVIDENCE",
+              ].includes(error.code)
+            ? "RESEARCH_INCOMPLETE"
+            : "GENERATION_FAILED";
       run.issues = [
-        error instanceof WorkforceError
-          ? error.message
-          : "Agent step failed safely. Check database/provider availability; no partial run was approved.",
+        error instanceof BudgetError
+          ? `Processing paused: ${error.code}`
+          : error instanceof WorkforceError
+            ? error.message
+            : "Agent step failed safely. Check database/provider availability; no partial run was approved.",
       ];
+      if (error instanceof WorkforceError && error.retryAfterMs && run.draftStudio)
+        run.draftStudio.nextRetryAt = new Date(
+          this.now().getTime() + error.retryAfterMs,
+        ).toISOString();
       run.events.push({ stage: original.stage, state: "FAILED", at: this.now().toISOString() });
     }
     run.leaseUntil = null;

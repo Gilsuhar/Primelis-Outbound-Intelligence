@@ -29,6 +29,7 @@ const mutationSchema = z.discriminatedUnion("action", [
     .strict(),
 ]);
 type Dependencies = {
+  maxRetries?: number;
   store?: WorkforceStore;
   evidence?: EvidenceStore;
   eligibility?: typeof checkWorkforceEligibility;
@@ -329,7 +330,7 @@ export class DraftStudioEngine {
         action: "RETRY",
         contentHash: messagesHash(run),
       });
-      if (meta.failures >= 3) {
+      if (meta.failures >= Math.min(3, (this.deps.maxRetries ?? 2) + 1)) {
         run.status = "GENERATION_FAILED";
         meta.qualityDecision = "BLOCKED";
       }
@@ -401,12 +402,19 @@ export class DraftStudioEngine {
       )
         ? "BLOCKED"
         : "REVISE";
-    if (run.status === "GENERATION_FAILED" && !run.critic && current.failures < 3) {
+    if (
+      run.status === "GENERATION_FAILED" &&
+      !run.critic &&
+      current.failures < Math.min(3, (this.deps.maxRetries ?? 2) + 1)
+    ) {
       current.failures++;
-      if (current.failures < 3) {
+      if (current.failures < Math.min(3, (this.deps.maxRetries ?? 2) + 1)) {
         run.status = "RUNNING";
         current.nextRetryAt = new Date(
-          this.now().getTime() + 60000 * 2 ** (current.failures - 1),
+          Math.max(
+            this.now().getTime() + 60000 * 2 ** (current.failures - 1),
+            current.nextRetryAt ? Date.parse(current.nextRetryAt) : 0,
+          ),
         ).toISOString();
       } else current.qualityDecision = "BLOCKED";
     } else current.nextRetryAt = null;

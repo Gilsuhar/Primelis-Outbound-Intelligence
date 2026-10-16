@@ -1,3 +1,11 @@
+// Explicit mocked budget boundary for these isolated, mocked HTTP transport tests.
+vi.mock("@/server/agent-workforce/daily/budget", () => ({
+  reserveProvider: vi.fn(async () => ({ finish: vi.fn(async () => {}) })),
+  unitCost: () => 0.01,
+  openAiPricing: () => ({ input: 1, output: 1 }),
+  webSearchCost: () => 0.01,
+  providerAttempts: (limit: number) => limit,
+}));
 import { describe, expect, it, vi } from "vitest";
 import { observeBrandSerp } from "./serp";
 import { workforceIntake, testNow } from "@/test/workforce-fixtures";

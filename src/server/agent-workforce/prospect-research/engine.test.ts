@@ -321,7 +321,7 @@ it("excludes a positively suppressed contact before any provider call", async ()
 
 it("persists terminal recovery when a third attempt is interrupted", async () => {
   const ctx = await setup();
-  let run = await finish(ctx);
+  const run = await finish(ctx);
   const expected = run.version;
   run.version++;
   run.leaseUntil = "2026-10-15T18:00:30Z";
@@ -336,4 +336,39 @@ it("persists terminal recovery when a third attempt is interrupted", async () =>
   expect(run.leaseUntil).toBeNull();
   expect(run.prospectResearch?.stages.REVIEW.status).toBe("FAILED");
   expect(run.prospectResearch?.opportunity).toBeNull();
+});
+
+it("a centralized budget pause retains a resumable stage without consuming provider retries", async () => {
+  const ctx = await setup();
+  const { BudgetError } = await import("../daily/budget");
+  vi.spyOn(ctx.model, "discover").mockRejectedValueOnce(new BudgetError("DAILY_BUDGET"));
+  const paused = await ctx.engine.advance("actor", ctx.id);
+  expect(paused.prospectResearch!.stages.COMPANY).toMatchObject({
+    status: "WAITING",
+    attempts: 0,
+    code: "DAILY_BUDGET",
+  });
+  expect(paused.leaseUntil).toBeNull();
+  const resumed = await ctx.engine.advance("actor", ctx.id);
+  expect(resumed.prospectResearch!.stages.COMPANY.status).toBe("COMPLETE");
+});
+it("explicit retry retains completed sources and reruns failed stages plus factual review", async () => {
+  const ctx = await setup();
+  const run = await finish(ctx);
+  const expected = run.version;
+  run.prospectResearch!.stages.SERP.status = "FAILED";
+  run.prospectResearch!.stages.SERP.attempts = 3;
+  run.version++;
+  await ctx.store.change("actor", expected, run);
+  const retried = await ctx.engine.retryFailed("actor", ctx.id);
+  expect(retried.prospectResearch!.stages.COMPANY.status).toBe("COMPLETE");
+  expect(retried.prospectResearch!.stages.SERP).toMatchObject({ status: "WAITING", attempts: 0 });
+  expect(retried.prospectResearch!.stages.REVIEW.status).toBe("WAITING");
+  expect(retried.prospectResearch!.opportunity).toBeNull();
+  expect(retried.research.facts).toEqual(run.research.facts);
+});
+it("an explicit retry cannot revive stale identities or evidence", async () => {
+  const ctx = await setup();
+  ctx.setNow(new Date(testNow.getTime() + 2 * 86400000));
+  await expect(ctx.engine.retryFailed("actor", ctx.id)).rejects.toThrow("INTAKE_REFRESH_REQUIRED");
 });

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { BudgetError } from "../daily/budget";
 import {
   researchStages,
   opportunitySchema,
@@ -33,6 +34,7 @@ const reviewSchema = z
   .object({ grounded: z.boolean(), concerns: z.array(z.string().min(1).max(1500)).max(20) })
   .strict();
 type Dependencies = {
+  maxRetries?: number;
   evidence?: EvidenceStore;
   store?: WorkforceStore;
   model?: () => WorkforceModel;
@@ -258,7 +260,7 @@ export class ProspectResearchEngine {
       return (
         state.status === "WAITING" ||
         (state.status === "FAILED" &&
-          state.attempts < 3 &&
+          state.attempts < Math.min(3, (this.deps.maxRetries ?? 2) + 1) &&
           (!state.retryAt || Date.parse(state.retryAt) <= now.getTime()))
       );
     });
@@ -306,32 +308,47 @@ export class ProspectResearchEngine {
       state.code = null;
       state.detail = "Completed with source validation; eligibility unchanged";
     } catch (error) {
-      const missing =
-        (error instanceof ResearchProviderError && !error.retryable) ||
-        (error instanceof WorkforceError &&
-          ["NOT_CONFIGURED", "WEB_SEARCH_UNAVAILABLE", "MISSING_KNOWLEDGE"].includes(error.code));
-      state.status = missing ? "DATA_UNAVAILABLE" : "FAILED";
-      state.code =
-        error instanceof ResearchProviderError || error instanceof WorkforceError
-          ? error.code
-          : "STAGE_FAILED";
-      state.detail =
-        error instanceof ResearchProviderError || error instanceof WorkforceError
-          ? error.message
-          : "Research stage failed safely; provider details withheld";
-      state.retryAt =
-        !missing && state.attempts < 3
-          ? new Date(
-              this.now().getTime() +
-                Math.max(
-                  60000 * 2 ** (state.attempts - 1),
-                  error instanceof ResearchProviderError ? error.retryAfterMs : 0,
-                ),
-            ).toISOString()
-          : null;
+      if (error instanceof BudgetError) {
+        state.status = "WAITING";
+        state.attempts = Math.max(0, state.attempts - 1);
+        state.code = error.code;
+        state.detail = "Processing paused by centralized cost controls; no factual result accepted";
+        state.retryAt = null;
+      } else {
+        const missing =
+          (error instanceof ResearchProviderError && !error.retryable) ||
+          (error instanceof WorkforceError &&
+            ["NOT_CONFIGURED", "WEB_SEARCH_UNAVAILABLE", "MISSING_KNOWLEDGE"].includes(error.code));
+        state.status = missing ? "DATA_UNAVAILABLE" : "FAILED";
+        state.code =
+          error instanceof ResearchProviderError || error instanceof WorkforceError
+            ? error.code
+            : "STAGE_FAILED";
+        state.detail =
+          error instanceof ResearchProviderError || error instanceof WorkforceError
+            ? error.message
+            : "Research stage failed safely; provider details withheld";
+        state.retryAt =
+          !missing && state.attempts < Math.min(3, (this.deps.maxRetries ?? 2) + 1)
+            ? new Date(
+                this.now().getTime() +
+                  Math.max(
+                    60000 * 2 ** (state.attempts - 1),
+                    error instanceof ResearchProviderError || error instanceof WorkforceError
+                      ? error.retryAfterMs
+                      : 0,
+                  ),
+              ).toISOString()
+            : null;
+      }
     }
     state.finishedAt = this.now().toISOString();
-    research.history.push({ stage, state: state.status, at: state.finishedAt, code: state.code });
+    research.history.push({
+      stage,
+      state: state.status === "WAITING" ? "FAILED" : state.status,
+      at: state.finishedAt,
+      code: state.code,
+    });
     if (stage !== "ASSESSMENT" && stage !== "REVIEW") {
       for (const dependent of ["ASSESSMENT", "REVIEW"] as const) {
         const prior = research.stages[dependent];
@@ -354,6 +371,42 @@ export class ProspectResearchEngine {
     run.version++;
     await this.store.change(actor, claimed, run);
     return (await this.store.get(actor, id))!;
+  }
+  /** Explicit operator retry only. Completed source stages are retained; all factual review gates rerun. */
+  async retryFailed(actor: string, id: string) {
+    const run = await this.store.get(actor, id);
+    if (!run?.prospectResearch) throw new Error("NOT_FOUND");
+    const snapshot = await this.snapshot(actor, run.intake.hubspotRecordId!);
+    if (
+      researchIdentity(snapshot) !== run.prospectResearch.identityHash ||
+      Date.parse(run.prospectResearch.expiresAt) <= this.now().getTime() ||
+      run.prospectResearch.status === "STALE"
+    )
+      throw new Error("INTAKE_REFRESH_REQUIRED");
+    if (run.leaseUntil && Date.parse(run.leaseUntil) > this.now().getTime())
+      throw new Error("VERSION_CONFLICT");
+    const failed = researchStages.filter((s) =>
+      ["FAILED", "DATA_UNAVAILABLE"].includes(run.prospectResearch!.stages[s].status),
+    );
+    if (!failed.length) return run;
+    if (run.prospectResearch.history.length > 100) throw new Error("RESEARCH_RETRY_LIMIT");
+    const expected = run.version;
+    for (const stage of new Set([...failed, "ASSESSMENT", "REVIEW"] as ResearchStage[])) {
+      Object.assign(run.prospectResearch.stages[stage], {
+        status: "WAITING",
+        attempts: 0,
+        retryAt: null,
+        code: null,
+        detail: "Explicit operator retry requested; evidence review required",
+      });
+    }
+    run.prospectResearch.status = "RUNNING";
+    run.prospectResearch.opportunity = null;
+    run.prospectResearch.reviewIssues = [];
+    run.version++;
+    run.updatedAt = this.now().toISOString();
+    if (!(await this.store.change(actor, expected, run))) throw new Error("VERSION_CONFLICT");
+    return run;
   }
   private async invalidate(actor: string, run: WorkforceRun, reason: string) {
     const expected = run.version;

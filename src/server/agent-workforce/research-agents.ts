@@ -1,4 +1,5 @@
 import "server-only";
+import { BudgetError } from "./daily/budget";
 import { createHash } from "node:crypto";
 import {
   extractedResearchSchema,
@@ -63,7 +64,8 @@ export async function researchSubject(
       if (authorized) sources.push(authorized);
       else
         providerGaps.push("GetLeads did not return a matching current person/title/company record");
-    } catch {
+    } catch (error) {
+      if (error instanceof BudgetError) throw error;
       providerGaps.push(
         "Authorized GetLeads enrichment was unavailable; no provider fields were substituted",
       );

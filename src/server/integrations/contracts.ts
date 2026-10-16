@@ -28,6 +28,7 @@ export type IntegrationState = {
   checkedAt: string | null;
   lastSuccessfulSync: string | null;
   watermark?: string;
+  daily?: import("@/features/agent-workforce/daily/contracts").DailyState;
   workforceTurn?: "RESEARCH" | "DRAFT";
   draftIntake?: { cursor: string | null; checkedAt: string };
   researchIntake?: { cursor: string | null; checkedAt: string; error: string | null };

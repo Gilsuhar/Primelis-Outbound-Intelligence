@@ -1,3 +1,7 @@
+vi.mock("./daily/budget", () => ({
+  unitCost: () => 0.01,
+  reserveProvider: async () => ({ finish: async () => {} }),
+}));
 import { describe, expect, it, vi } from "vitest";
 import { authorizedProspectSource } from "./prospect-provider";
 import { workforceIntake, testNow } from "@/test/workforce-fixtures";

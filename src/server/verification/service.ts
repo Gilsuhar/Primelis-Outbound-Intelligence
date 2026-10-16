@@ -1,4 +1,5 @@
 import "server-only";
+import { BudgetError } from "@/server/agent-workforce/daily/budget";
 import { type EvidenceObservation, type IntakeContact } from "@/features/sales-agent/evidence";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { parseTimestamp, MAX_EVIDENCE_AGE_DAYS } from "@/features/sales-agent/qualification";
@@ -211,7 +212,10 @@ export async function retryVerification(
     // Discard rejected payloads, including another contact's identity; never persist them for display.
     result = undefined;
     state = "FAILED";
-    message = error instanceof VerificationProviderError ? error.code : "INVALID_RESPONSE";
+    message =
+      error instanceof VerificationProviderError || error instanceof BudgetError
+        ? error.code
+        : "INVALID_RESPONSE";
     if (error instanceof VerificationProviderError)
       retryAfterMs = Math.max(retryAfterMs, error.retryAfterMs);
   }

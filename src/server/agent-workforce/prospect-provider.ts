@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveProvider, unitCost } from "./daily/budget";
 import { createHash } from "node:crypto";
 import { normalizeLinkedInUrl } from "@/features/build-sequence/prospect-memory";
 import { normalizeDomain } from "@/features/connected-research/url-safety";
@@ -16,7 +17,17 @@ export async function authorizedProspectSource(
   provider: (url: string) => Promise<LinkedInEnrichmentRecord | null> = defaultGetLeadsProvider,
 ) {
   if (!input.linkedinUrl) return null;
-  const record = await provider(input.linkedinUrl);
+  if (provider === defaultGetLeadsProvider && !process.env.GETLEADS_API_KEY) return null;
+  const cost = unitCost("RESEARCH"),
+    reservation = await reserveProvider("RESEARCH", cost);
+  let record: LinkedInEnrichmentRecord | null;
+  try {
+    record = await provider(input.linkedinUrl);
+  } catch (error) {
+    await reservation.finish();
+    throw error;
+  }
+  await reservation.finish({ estimatedUsd: cost });
   if (
     !record ||
     record.success === false ||

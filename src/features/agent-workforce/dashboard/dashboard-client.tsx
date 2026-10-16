@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { DailyOperationsPanel } from "./daily-operations-panel";
 import { DraftStudioPanel } from "./draft-studio-panel";
 import { ProspectResearchPanel } from "./prospect-research-panel";
 import { VerificationPanel } from "./verification-panel";
@@ -490,6 +491,7 @@ export function DashboardView({
           Manual Research <ArrowRight className="h-4 w-4" />
         </Link>
       </header>
+      <DailyOperationsPanel />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Queue summary">
         {[
           ["Reviewed Today", data?.metrics.reviewedToday, "Unique contacts marked reviewed · UTC"],

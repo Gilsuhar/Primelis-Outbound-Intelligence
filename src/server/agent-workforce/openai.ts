@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { reserveProvider, openAiPricing, webSearchCost, providerAttempts } from "./daily/budget";
 import { normalizeOpenAiModel, shouldUseOpenAiProvider } from "@/server/services/ai-provider";
 import type { WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
 
@@ -13,6 +14,7 @@ export class WorkforceError extends Error {
       | "MISSING_KNOWLEDGE"
       | "UNSUPPORTED_EVIDENCE",
     message: string,
+    public readonly retryAfterMs = 0,
   ) {
     super(message);
   }
@@ -124,9 +126,20 @@ export class OpenAiWorkforceModel implements WorkforceModel {
             ? this.env.OPENAI_QUALITY_MODEL?.trim() || this.env.OPENAI_MODEL
             : this.env.OPENAI_MODEL,
     );
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= providerAttempts(2); attempt++) {
       const remaining = this.deadline - Date.now();
       if (remaining < 1000) throw new WorkforceError("MODEL_FAILED", "Agent step deadline reached");
+      const rates = openAiPricing(model, this.env);
+      const toolCost = stage === "DISCOVERY" ? webSearchCost(this.env) : 0;
+      // UTF-8 bytes conservatively bound input tokens; include transport/schema overhead.
+      const reservation = await reserveProvider(
+        "OPENAI",
+        ((Buffer.byteLength(JSON.stringify(request), "utf8") + 4096) * rates.input) / 1e6 +
+          (maxTokens * rates.output) / 1e6 +
+          toolCost,
+        model,
+      );
+      let settled = false;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), Math.min(40_000, remaining));
       try {
@@ -146,7 +159,23 @@ export class OpenAiWorkforceModel implements WorkforceModel {
             ...request,
           }),
         });
-        if ((response.status === 429 || response.status >= 500) && attempt === 1) continue;
+        if (response.status === 429 || response.status >= 500) {
+          const raw = response.headers.get("retry-after");
+          const delay = raw
+            ? /^\d+$/.test(raw)
+              ? Number(raw) * 1000
+              : Date.parse(raw) - Date.now()
+            : 1000;
+          if (attempt < providerAttempts(2) && Number.isFinite(delay) && delay <= 1000) {
+            await new Promise((resolve) => setTimeout(resolve, Math.max(500, delay)));
+            continue;
+          }
+          throw new WorkforceError(
+            "MODEL_FAILED",
+            `OpenAI request failed (HTTP ${response.status}); rate limited or unavailable, retry deferred to the durable stage checkpoint`,
+            Number.isFinite(delay) ? Math.min(86400000, Math.max(60000, delay)) : 60000,
+          );
+        }
         if (!response.ok)
           throw new WorkforceError(
             stage === "DISCOVERY" && [400, 403, 404].includes(response.status)
@@ -169,6 +198,15 @@ export class OpenAiWorkforceModel implements WorkforceModel {
           outputRate >= 0
             ? (data.usage.input_tokens * inputRate + data.usage.output_tokens * outputRate) / 1e6
             : null;
+        await reservation.finish({
+          estimatedUsd:
+            (data.usage.input_tokens * rates.input + data.usage.output_tokens * rates.output) /
+              1e6 +
+            toolCost,
+          inputTokens: data.usage.input_tokens,
+          outputTokens: data.usage.output_tokens,
+        });
+        settled = true;
         usage.push({
           stage,
           model,
@@ -196,6 +234,7 @@ export class OpenAiWorkforceModel implements WorkforceModel {
         );
       } finally {
         clearTimeout(timer);
+        if (!settled) await reservation.finish();
       }
     }
     throw new WorkforceError("MODEL_FAILED", "OpenAI retry limit reached");

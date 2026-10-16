@@ -1,4 +1,5 @@
 import "server-only";
+import { providerAttempts } from "@/server/agent-workforce/daily/budget";
 export class IntegrationError extends Error {
   constructor(
     public readonly code:
@@ -45,7 +46,7 @@ export class ReadTransport {
         ? /^\/crm\/(?:v3\/(?:objects\/(?:contacts|companies|deals|emails)(?:\/[A-Za-z0-9_-]+)?|pipelines\/deals)|v4\/objects\/(?:contacts|companies)\/[A-Za-z0-9_-]+\/associations\/(?:companies|deals|emails))$/
         : /^\/api\/v2\/(?:prospects|accounts|mailings|sequenceStates)(?:\/[A-Za-z0-9_-]+)?$/;
     if (!allowed.test(url.pathname)) throw new IntegrationError("CONFIGURATION");
-    for (let attempt = 0; attempt < (this.options.attempts ?? 3); attempt++) {
+    for (let attempt = 0; attempt < providerAttempts(this.options.attempts ?? 3); attempt++) {
       if (this.options.deadline && Date.now() >= this.options.deadline)
         throw new IntegrationError("UNAVAILABLE");
       let response: Response;
@@ -68,7 +69,8 @@ export class ReadTransport {
         });
       } catch (error) {
         if (error instanceof IntegrationError) throw error;
-        if (attempt + 1 >= (this.options.attempts ?? 3)) throw new IntegrationError("UNAVAILABLE");
+        if (attempt + 1 >= providerAttempts(this.options.attempts ?? 3))
+          throw new IntegrationError("UNAVAILABLE");
         await this.delay(300 * 2 ** attempt);
         continue;
       }
@@ -89,7 +91,7 @@ export class ReadTransport {
         : 300 * 2 ** attempt;
       if (
         (response.status === 429 || response.status >= 500) &&
-        attempt + 1 < (this.options.attempts ?? 3) &&
+        attempt + 1 < providerAttempts(this.options.attempts ?? 3) &&
         retryMs <= 2000
       ) {
         await this.delay(retryMs);

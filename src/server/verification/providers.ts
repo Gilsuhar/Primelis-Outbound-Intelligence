@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveProvider, unitCost, providerAttempts } from "@/server/agent-workforce/daily/budget";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { validatePublicCompanyUrl } from "@/features/connected-research/url-safety";
@@ -28,7 +29,9 @@ export interface VerificationAdapter {
   ): Promise<VerificationResult | null>;
 }
 async function request(fetcher: typeof fetch, url: string, init: RequestInit): Promise<unknown> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < providerAttempts(2); attempt++) {
+    const cost = unitCost("VERIFICATION");
+    const reservation = await reserveProvider("VERIFICATION", cost);
     let response: Response;
     try {
       response = await fetcher(url, {
@@ -38,8 +41,10 @@ async function request(fetcher: typeof fetch, url: string, init: RequestInit): P
         signal: AbortSignal.timeout(10000),
       });
     } catch {
+      await reservation.finish();
       throw new VerificationProviderError("UNAVAILABLE");
     }
+    await reservation.finish({ estimatedUsd: cost });
     if (response.status === 401 || response.status === 403)
       throw new VerificationProviderError("PERMISSION_MISSING");
     if (response.status === 429 || response.status >= 500) {
@@ -49,7 +54,7 @@ async function request(fetcher: typeof fetch, url: string, init: RequestInit): P
             ? Number(raw) * 1000
             : Math.max(0, Date.parse(raw) - Date.now())
           : 500;
-      if (attempt === 0 && Number.isFinite(retry) && retry <= 1000) {
+      if (attempt + 1 < providerAttempts(2) && Number.isFinite(retry) && retry <= 1000) {
         await new Promise((resolve) => setTimeout(resolve, retry));
         continue;
       }

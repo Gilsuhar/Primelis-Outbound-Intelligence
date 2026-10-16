@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveProvider, unitCost } from "../daily/budget";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import {
@@ -60,16 +61,20 @@ export async function observeBrandSerp(
     no_cache: "true",
   }))
     url.searchParams.set(key, value);
+  const cost = unitCost("SERP", env);
+  const reservation = await reserveProvider("SERP", cost);
   let response: Response;
   try {
     response = await fetcher(url, { redirect: "error", signal: AbortSignal.timeout(20000) });
   } catch {
+    await reservation.finish();
     throw new ResearchProviderError(
       "NETWORK_ERROR",
       true,
       "SERP provider connection failed; no observation accepted",
     );
   }
+  await reservation.finish({ estimatedUsd: cost });
   if (!response.ok)
     throw new ResearchProviderError(
       [401, 403].includes(response.status) ? "PERMISSION_MISSING" : `HTTP_${response.status}`,
