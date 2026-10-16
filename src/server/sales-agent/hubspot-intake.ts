@@ -244,6 +244,7 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
       ownerId: p.hubspot_owner_id!,
       fullName: [p.firstname, p.lastname].filter(Boolean).join(" ") || `HubSpot contact ${id}`,
       email: p.email || undefined,
+      emailSource: "HUBSPOT",
       companyName: company?.properties.name || undefined,
       companyDomain: company?.properties.domain?.toLowerCase() || undefined,
       emailModifiedAt: timestamps[0],

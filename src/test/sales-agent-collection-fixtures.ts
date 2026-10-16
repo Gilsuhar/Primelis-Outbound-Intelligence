@@ -38,6 +38,28 @@ export function observation(
     verifiedAt: "2026-10-15T08:00:00.000Z",
     independent: true,
     supportingEvidence: ["fixture supporting provider record; not a live observation"],
+    // Fictional authoritative fixture, not a claim about real provider capabilities.
+    authority: [
+      "unsubscribed",
+      "hardBounced",
+      "complained",
+      "activeSequence",
+      "outreachHistoryComplete",
+      "lastOutboundAt",
+      "conflictingActiveOpportunity",
+    ].includes(field)
+      ? {
+          state: "COMPLETE",
+          sources: ["HUBSPOT", "OUTREACH"],
+          checkedAt: collectionNow.toISOString(),
+          through: collectionNow.toISOString(),
+          identityMatched: true,
+          permissionsVerified: true,
+          allUserHistory: true,
+          retentionComplete: true,
+          evidence: ["Fictional complete-coverage test receipt"],
+        }
+      : undefined,
     subjectEmail: "prospect@example.com",
     subjectCompanyDomain: "example.com",
     ...override,

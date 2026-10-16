@@ -17,6 +17,7 @@ import type { ProviderStatus } from "./providers";
 import type { DraftResearch } from "@/features/sales-agent/draft-engine";
 
 export type EvidenceSnapshot = {
+  verification?: import("@/features/sales-agent/verification/contracts").VerificationState;
   integrationReceipts?: Partial<
     Record<"HUBSPOT" | "OUTREACH", { jobId: string; operation: "IMPORTED" | "UPDATED" }>
   >;
@@ -105,6 +106,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
           await this.append(tx, actorId, {
             ...snapshot,
             dashboardReview: snapshot.dashboardReview ?? prior?.dashboardReview,
+            verification: snapshot.verification ?? prior?.verification,
             research:
               snapshot.research ??
               entries.filter(

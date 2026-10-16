@@ -373,6 +373,7 @@ export class IntegrationSync {
         return {
           ...snapshot,
           dashboardReview: latest.dashboardReview,
+          verification: latest.verification,
           research: identityChanged ? [] : latest.research,
           integrationReceipts: {
             ...latest.integrationReceipts,

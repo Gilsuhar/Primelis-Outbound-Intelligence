@@ -235,6 +235,22 @@ export class HubSpotConnector {
         active,
         `contact:${id}:complete-contact-and-company-deals`,
       );
+    for (const observation of contact.observations.filter(
+      (item) => item.field === "conflictingActiveOpportunity",
+    ))
+      observation.authority = {
+        state: "COMPLETE",
+        sources: ["HUBSPOT"],
+        checkedAt: now,
+        through: now,
+        identityMatched: true,
+        permissionsVerified: true,
+        allUserHistory: false,
+        retentionComplete: false,
+        evidence: [
+          "Complete contact/company deal associations and recognized pipeline stage metadata",
+        ],
+      };
     if (unknown)
       contact.warnings.push("Deal stage closedness is unknown; opportunity clearance unavailable");
     const emails = await this.associated("contacts", id, "emails");

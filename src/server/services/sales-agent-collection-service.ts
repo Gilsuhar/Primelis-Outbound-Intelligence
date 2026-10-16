@@ -1,5 +1,10 @@
 import "server-only";
-import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
+import { buildQualificationReport } from "@/features/sales-agent/qualification-report";
+import { verificationStateSchema } from "@/features/sales-agent/verification/contracts";
+import {
+  integrationEligibilityBlockers,
+  integrationMissingPermissions,
+} from "@/server/integrations/eligibility";
 import type { IntegrationStore } from "@/server/integrations/store";
 
 import { z } from "zod";
@@ -52,6 +57,7 @@ const contactSchema = z.object({
   companyName: z.string().optional(),
   companyDomain: z.string().optional(),
   emailModifiedAt: z.string().optional(),
+  emailSource: z.string().optional(),
   hubspotRecordUrl: z.string().url().optional(),
   outreachProspectId: z.string().optional(),
   hubspotCreatedAt: z.string().optional(),
@@ -62,6 +68,7 @@ const contactSchema = z.object({
   warnings: z.array(z.string()),
 });
 export const snapshotSchema = z.object({
+  verification: verificationStateSchema.optional(),
   integrationReceipts: z
     .object({
       HUBSPOT: z
@@ -91,6 +98,7 @@ export const snapshotSchema = z.object({
 export function reviewEvidenceSnapshot(
   snapshot: Omit<EvidenceSnapshot, "provenanceAtCollection">,
   now: Date,
+  missingPermissions: string[] = [],
 ) {
   const normalized = normalizeCollectedEvidence(snapshot.contact, snapshot.observations, now);
   const plan = planProspectWorkflow(normalized.input, now);
@@ -106,6 +114,19 @@ export function reviewEvidenceSnapshot(
     blockers.push("HubSpot identity/owner observation is stale or invalid; recollect intake");
   if (snapshot.contact.ownerId !== SIGNAL_HUBSPOT_OWNER_ID)
     blockers.push("Unauthorized HubSpot owner");
+  const qualification = buildQualificationReport(
+    snapshot.contact,
+    normalized.provenance,
+    plan.decision,
+    now,
+    blockers,
+    missingPermissions,
+    snapshot.verification,
+  );
+  if (qualification.status !== "ELIGIBLE")
+    blockers.push(
+      ...qualification.gates.filter((gate) => gate.state !== "CLEAR").map((gate) => gate.reason),
+    );
   if (blockers.length) {
     if (plan.decision.status === "READY") plan.decision.reasons = [];
     if (plan.decision.status !== "REJECTED") plan.decision.status = "HOLD";
@@ -126,6 +147,8 @@ export function reviewEvidenceSnapshot(
     collectedAt: snapshot.collectedAt,
     evaluatedAt: now.toISOString(),
     provenance: normalized.provenance,
+    qualification,
+    verification: snapshot.verification ?? {},
     plan,
     humanApproval: {
       required: true,
@@ -271,6 +294,10 @@ export async function getSalesAgentDailyReview(actorId: string, deps: Collection
       deps.integrationStore || !deps.store
         ? await integrationEligibilityBlockers(actorId, now, deps.integrationStore)
         : [];
+    const missingPermissions =
+      deps.integrationStore || !deps.store
+        ? await integrationMissingPermissions(actorId, deps.integrationStore)
+        : [];
     const rows: DailyReviewRow[] = [];
     let unreadable = 0;
     for (const raw of snapshots) {
@@ -289,6 +316,7 @@ export async function getSalesAgentDailyReview(actorId: string, deps: Collection
             observations: [...result.data.observations, ...currentSuppression.observations],
           },
           now,
+          missingPermissions,
         ),
       );
     }

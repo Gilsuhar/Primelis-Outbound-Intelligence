@@ -167,6 +167,19 @@ export class OutreachConnector {
         observedAt: now.toISOString(),
         verifiedAt: now.toISOString(),
         independent: false,
+        authority: {
+          state: "UNRESOLVED_PROVIDER",
+          sources: ["OUTREACH"],
+          checkedAt: now.toISOString(),
+          through: now.toISOString(),
+          identityMatched: true,
+          permissionsVerified: false,
+          allUserHistory: false,
+          retentionComplete: false,
+          evidence: [
+            "API-visible records; full retention, all-user visibility and complete suppression clearance are unavailable",
+          ],
+        },
         supportingEvidence: [source],
       });
     let candidates: Resource[];

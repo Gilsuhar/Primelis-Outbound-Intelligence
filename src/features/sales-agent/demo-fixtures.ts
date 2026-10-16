@@ -35,6 +35,27 @@ export function createDemoFixtures() {
       verifiedAt: "2026-10-15T08:00:00.000Z",
       independent: true,
       supportingEvidence: [DEMO_LABEL],
+      authority: [
+        "unsubscribed",
+        "hardBounced",
+        "complained",
+        "activeSequence",
+        "outreachHistoryComplete",
+        "lastOutboundAt",
+        "conflictingActiveOpportunity",
+      ].includes(field)
+        ? {
+            state: "COMPLETE",
+            sources: ["HUBSPOT", "OUTREACH"],
+            checkedAt: DEMO_TIME,
+            through: DEMO_TIME,
+            identityMatched: true,
+            permissionsVerified: true,
+            allUserHistory: true,
+            retentionComplete: true,
+            evidence: [DEMO_LABEL],
+          }
+        : undefined,
       subjectEmail: contact.email,
       subjectCompanyDomain: domain,
     });

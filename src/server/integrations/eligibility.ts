@@ -30,3 +30,23 @@ export async function integrationEligibilityBlockers(
     return ["Integration diagnostics unavailable; connection/history UNKNOWN"];
   }
 }
+
+export async function integrationMissingPermissions(
+  actor: string,
+  store: IntegrationStore = new PrismaIntegrationStore(),
+) {
+  try {
+    return (
+      await Promise.all(
+        (["HUBSPOT", "OUTREACH"] as const).map(async (provider) => {
+          const { state } = await store.get(actor, provider);
+          return state.missingScopes.map(
+            (scope) => `${provider}: ${scope} (required scope / user visibility to review)`,
+          );
+        }),
+      )
+    ).flat();
+  } catch {
+    return ["Integration permissions could not be inspected"];
+  }
+}

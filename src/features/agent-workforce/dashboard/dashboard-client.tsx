@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { VerificationPanel } from "./verification-panel";
 import { IntegrationControls } from "./integration-controls";
 import {
   Activity,
@@ -313,6 +314,7 @@ function ProspectWorkspace({
           </>
         )}
       </section>
+      <VerificationPanel prospect={prospect} />
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <EvidenceGroup
           prospect={prospect}

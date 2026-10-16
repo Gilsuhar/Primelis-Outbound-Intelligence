@@ -78,7 +78,7 @@ export function parseTimestamp(value: string): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function addCalendarMonths(date: Date, months: number): Date {
+export function addCalendarMonths(date: Date, months: number): Date {
   const target = new Date(date);
   target.setUTCDate(1);
   target.setUTCMonth(target.getUTCMonth() + months);

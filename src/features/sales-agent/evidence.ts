@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { historyAuthoritySchema, hasHistoricalAuthority } from "./history-authority";
+import { identitySchema, sameVerificationIdentity } from "./verification/contracts";
 
 import {
   MAX_EVIDENCE_AGE_DAYS,
@@ -53,6 +55,8 @@ export const observationSchema = z
     verifiedAt: z.string().max(80).nullable(),
     independent: z.boolean(),
     supportingEvidence: z.array(z.string().trim().min(1).max(1000)).max(20),
+    authority: historyAuthoritySchema.optional(),
+    subjectIdentity: identitySchema.optional(),
     subjectEmail: z.string().email().optional(),
     subjectCompanyDomain: z.string().max(240).optional(),
   })
@@ -71,6 +75,7 @@ export type IntakeContact = {
   email?: string;
   companyName?: string;
   companyDomain?: string;
+  emailSource?: string;
   emailModifiedAt?: string;
   hubspotRecordUrl?: string;
   outreachProspectId?: string;
@@ -169,6 +174,26 @@ export function normalizeCollectedEvidence(
       }
       if (item.freshness !== "FRESH" || item.supportingEvidence.length === 0) {
         item.explanation = `${item.freshness}: requires timestamped supporting evidence`;
+        return false;
+      }
+      if (item.subjectIdentity && !sameVerificationIdentity(item.subjectIdentity, contact)) {
+        item.explanation = "Verification identity/source changed; obtain fresh evidence";
+        return false;
+      }
+      if (
+        [
+          "unsubscribed",
+          "hardBounced",
+          "complained",
+          "activeSequence",
+          "conflictingActiveOpportunity",
+          "outreachHistoryComplete",
+        ].includes(field) &&
+        item.value === false &&
+        item.authority &&
+        !hasHistoricalAuthority(item.authority, field, now)
+      ) {
+        item.explanation = "Provider does not establish authoritative complete clearance";
         return false;
       }
       if (field === "emailVerification" || field === "currentEmploymentVerified") {

@@ -175,6 +175,20 @@ export async function getWorkforceDashboard(
           .filter((run) => run.usage.some((u) => u.model !== "mock-test-only" && u.attempts > 0))
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
       : undefined;
+  const verificationAttempts = raw
+    .flatMap((snapshot) => Object.values(snapshot.verification ?? {}))
+    .filter((attempt) => !!attempt)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const verificationConfigured =
+    !!(
+      process.env.EMAIL_VERIFICATION_PROVIDER === "ZEROBOUNCE" && process.env.ZEROBOUNCE_API_KEY
+    ) ||
+    !!(
+      process.env.VERIFICATION_GATEWAY_URL &&
+      process.env.VERIFICATION_GATEWAY_TOKEN &&
+      process.env.VERIFICATION_GATEWAY_PROVIDER_ID
+    );
+  const lastVerification = verificationAttempts[0];
   const integrations: IntegrationHealth[] = [
     {
       id: "HUBSPOT",
@@ -218,11 +232,17 @@ export async function getWorkforceDashboard(
     },
     {
       id: "EMAIL_VERIFICATION",
-      label: "Email verification",
-      status: "NOT_IMPLEMENTED",
-      observedAt: null,
+      label: "Email & employment verification",
+      status: !verificationConfigured
+        ? "NOT_CONFIGURED"
+        : lastVerification?.state === "FAILED"
+          ? "ERROR"
+          : lastVerification?.state === "COMPLETED"
+            ? "LAST_SUCCESS"
+            : "CONFIGURED_UNTESTED",
+      observedAt: lastVerification?.result?.proof.checkedAt ?? null,
       detail:
-        "No independent business-email/employment verification adapter is registered. ZoomInfo needs matching evidence and a fresh timestamp; Boring/Surfe/HubSpot status alone cannot clear this gate.",
+        "Optional ZeroBounce email validation and authorized verification gateway adapters. Configuration is not proof; last recorded response does not establish current eligibility. Employment requires independently sourced employer, seniority and Search evidence. Boring green cannot clear verification.",
     },
   ];
   // Existing fixture-injected dashboards remain isolated from live storage.

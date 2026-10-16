@@ -88,8 +88,11 @@ describe("persistent daily intelligence projections", () => {
     expect(data.metrics).toEqual({ reviewedToday: 0, eligible: 1, hold: 0, rejected: 0 });
     expect(data.integrations.find((i) => i.id === "HUBSPOT")?.status).toBe("LAST_SUCCESS");
     expect(data.integrations.find((i) => i.id === "OPENAI")?.status).toBe("CONFIGURED_UNTESTED");
-    for (const id of ["OUTREACH", "SIMILARWEB", "EMAIL_VERIFICATION"])
+    for (const id of ["OUTREACH", "SIMILARWEB"])
       expect(data.integrations.find((i) => i.id === id)?.status).toBe("NOT_IMPLEMENTED");
+    expect(data.integrations.find((i) => i.id === "EMAIL_VERIFICATION")?.status).toBe(
+      "NOT_CONFIGURED",
+    );
     expect(data.prospects[0].draftReady).toBe(false);
   });
   it("persists explicit reviews without approving contact or draft and isolates other actors", async () => {
