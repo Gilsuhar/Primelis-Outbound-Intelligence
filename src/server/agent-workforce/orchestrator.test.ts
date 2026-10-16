@@ -18,8 +18,8 @@ async function setup() {
   const store = new MemoryWorkforceStore();
   const model = new MockWorkforceModel();
   const eligibility = vi.fn(async () => ({
-    status: "HOLD" as const,
-    reasons: ["Unknown contact history; drafting only, no outreach clearance"],
+    status: "READY" as "READY" | "HOLD" | "REJECTED",
+    reasons: ["Verified eligibility in isolated fixture"],
     blockDrafting: false,
   }));
   const deps = {
@@ -44,6 +44,38 @@ async function finish(ctx: Awaited<ReturnType<typeof setup>>) {
   return run;
 }
 describe("real agent orchestration with isolated provider responses", () => {
+  it("rejects edits to an old draft after eligibility becomes HOLD", async () => {
+    const ctx = await setup();
+    const run = await finish(ctx);
+    ctx.deps.eligibility.mockResolvedValue({
+      status: "HOLD",
+      reasons: ["Email verification expired"],
+      blockDrafting: false,
+    });
+    await expect(
+      ctx.engine.edit("actor-a", run.id, {
+        action: "EDIT",
+        expectedVersion: run.version,
+        messages: run.sequence!.messages,
+      }),
+    ).rejects.toThrow("DRAFT_ELIGIBILITY_HOLD");
+    expect((await ctx.store.get("actor-a", run.id))?.version).toBe(run.version);
+  });
+
+  it("allows research but never invokes the writer on unknown-history HOLD", async () => {
+    const ctx = await setup();
+    ctx.deps.eligibility.mockResolvedValue({
+      status: "HOLD",
+      reasons: ["Unknown Outreach history"],
+      blockDrafting: false,
+    });
+    const run = await finish(ctx);
+    expect(ctx.model.calls).toContain("STRATEGY");
+    expect(ctx.model.calls).not.toContain("SEQUENCE");
+    expect(run.status).toBe("INSUFFICIENT_EVIDENCE");
+    expect(run.sequence).toBeNull();
+  });
+
   it("executes research, independent grounding, strategy, original provider generation and critic with persistent pending approval", async () => {
     const ctx = await setup();
     const run = await finish(ctx);
@@ -59,7 +91,7 @@ describe("real agent orchestration with isolated provider responses", () => {
       "SEQUENCE",
       "QUALITY_REVIEW",
     ]);
-    expect(run.eligibility.status).toBe("HOLD");
+    expect(run.eligibility.status).toBe("READY");
     expect(run).toMatchObject({
       approved: false,
       canSend: false,

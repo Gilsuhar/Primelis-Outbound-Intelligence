@@ -12,6 +12,7 @@ export const eligibleProspect: ProspectQualificationInput = {
   employeeCount: verifiedEvidence(80),
   annualRevenueUsd: verifiedEvidence(30_000_000),
   role: verifiedEvidence("Director of Paid Search"),
+  paidSearchResponsibility: verifiedEvidence("PROVEN"),
   currentEmploymentVerified: verifiedEvidence(true),
   employmentIndependentlyVerified: true,
   emailVerification: verifiedEvidence({

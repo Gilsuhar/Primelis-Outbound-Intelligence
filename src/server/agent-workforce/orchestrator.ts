@@ -89,7 +89,8 @@ export class WorkforceOrchestrator {
         run.intake,
         this.now(),
       );
-      if (run.eligibility.blockDrafting) {
+      if (run.eligibility.blockDrafting ||
+          (["SEQUENCE", "QUALITY_REVIEW"].includes(run.stage) && run.eligibility.status !== "READY")) {
         run.status = "INSUFFICIENT_EVIDENCE";
         run.issues = [
           "Qualification/suppression restrictions block drafting",
@@ -278,6 +279,8 @@ export class WorkforceOrchestrator {
       run.issues = ["Draft rejected by the authenticated reviewer"];
     } else {
       if (!run.sequence) throw new Error("NO_SEQUENCE");
+      const eligibility = await (this.deps.eligibility ?? checkWorkforceEligibility)(actor, run.intake, this.now());
+      if (eligibility.status !== "READY" || eligibility.blockDrafting) throw new Error("DRAFT_ELIGIBILITY_HOLD");
       run.sequence.messages = input.messages.map((message) => ({
         ...message,
         assertions: [

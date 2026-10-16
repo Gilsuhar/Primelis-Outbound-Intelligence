@@ -14,6 +14,7 @@ const eligible: ProspectQualificationInput = {
   employeeCount: evidence(200),
   annualRevenueUsd: evidence(100_000_000),
   role: evidence("Head of Paid Search"),
+  paidSearchResponsibility: evidence("PROVEN" as const),
   currentEmploymentVerified: evidence(true),
   emailVerification: evidence({
     status: "VALID",

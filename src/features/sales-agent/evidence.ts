@@ -72,6 +72,9 @@ export type IntakeContact = {
   companyName?: string;
   companyDomain?: string;
   emailModifiedAt?: string;
+  hubspotCreatedAt?: string;
+  ownerAssignedAt?: string;
+  intakeSince?: string;
   observedAt: string;
   observations: EvidenceObservation[];
   warnings: string[];

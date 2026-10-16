@@ -25,7 +25,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { GET, POST } from "./route";
 import { collectionNow } from "@/test/sales-agent-collection-fixtures";
 
-const request = (body: unknown, origin?: string) =>
+const request = (body: unknown, origin: string = "https://app.example.com") =>
   new Request("https://app.example.com/api/sales-agent/evidence", {
     method: "POST",
     body: JSON.stringify(body),
@@ -49,6 +49,14 @@ describe("authenticated evidence collection/review API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("blocks missing-Origin and Production collection before external reads", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(request({}, ""))).status).toBe(403);
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect((await POST(request({}))).status).toBe(403);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("authenticates before any provider request or evidence access", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null);
     const fetcher = vi.fn();
@@ -68,6 +76,7 @@ describe("authenticated evidence collection/review API", () => {
         id: "42",
         properties: {
           hubspot_owner_id: "1087915602",
+          createdate: "2026-10-15T01:00:00.000Z",
           firstname: "Fixture",
           jobtitle: "Director of PPC",
         },

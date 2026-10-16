@@ -17,6 +17,7 @@ import type { ProviderStatus } from "./providers";
 import type { DraftResearch } from "@/features/sales-agent/draft-engine";
 
 export type EvidenceSnapshot = {
+  dashboardReview?: import("@/features/agent-workforce/dashboard/contracts").DashboardReview;
   research?: DraftResearch[];
   version: 1;
   contact: IntakeContact;
@@ -85,8 +86,10 @@ export class PrismaEvidenceStore implements EvidenceStore {
             : [];
         });
         for (const snapshot of snapshots) {
+          const prior = previous.find((raw) => typeof raw === "object" && raw !== null && "contact" in raw && (raw as EvidenceSnapshot).contact?.hubspotRecordId === snapshot.contact.hubspotRecordId) as EvidenceSnapshot | undefined;
           await this.append(tx, actorId, {
             ...snapshot,
+            dashboardReview: snapshot.dashboardReview ?? prior?.dashboardReview,
             research:
               snapshot.research ??
               entries.filter(

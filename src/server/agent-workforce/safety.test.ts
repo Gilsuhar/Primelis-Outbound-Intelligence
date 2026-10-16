@@ -37,6 +37,23 @@ function saved() {
   };
 }
 describe("existing qualification and suppression protections", () => {
+  it("does not reuse evidence across HubSpot IDs or a changed verified role", async () => {
+    state.snapshots = [saved()];
+    expect(
+      (
+        await checkWorkforceEligibility(
+          "owner",
+          { ...intake, hubspotRecordId: "other" },
+          collectionNow,
+        )
+      ).status,
+    ).toBe("HOLD");
+    expect(
+      (await checkWorkforceEligibility("owner", { ...intake, prospectTitle: "CMO" }, collectionNow))
+        .status,
+    ).toBe("HOLD");
+  });
+
   it("leaves unknown history and manual identity HOLD without claiming outreach clearance", async () => {
     const result = await checkWorkforceEligibility("owner", intake, collectionNow);
     expect(result.status).toBe("HOLD");

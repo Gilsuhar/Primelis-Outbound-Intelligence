@@ -82,6 +82,15 @@ describe("authenticated real-agent API boundary", () => {
     expect((await POST(request())).status).toBe(403);
     expect(calls.start).not.toHaveBeenCalled();
   });
+  it("reports an eligibility HOLD distinctly from a provider failure", async () => {
+    calls.edit.mockRejectedValue(new Error("DRAFT_ELIGIBILITY_HOLD"));
+    const response = await PATCH(
+      request('{"action":"EDIT","expectedVersion":1}', "https://preview.example", "PATCH"),
+      context,
+    );
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("resolve HOLD reasons");
+  });
   it("withholds provider/database secrets and rejects oversized input", async () => {
     calls.start.mockRejectedValue(new Error("secret upstream value"));
     const response = await POST(request());

@@ -24,7 +24,7 @@ async function completed() {
     model,
     knowledge: async () => structuredClone(testKnowledge),
     reader: testReader(),
-    eligibility: async () => ({ status: "HOLD", reasons: ["Test only"], blockDrafting: false }),
+    eligibility: async () => ({ status: "READY", reasons: ["Verified isolated test evidence"], blockDrafting: false }),
     now: () => testNow,
   });
   let run = await engine.start("test", {
@@ -111,7 +111,7 @@ describe("creative freedom with factual boundaries", () => {
       model,
       knowledge: async () => structuredClone(testKnowledge),
       reader: testReader(),
-      eligibility: async () => ({ status: "HOLD", reasons: [], blockDrafting: false }),
+      eligibility: async () => ({ status: "READY", reasons: [], blockDrafting: false }),
       now: () => testNow,
     });
     let run = await engine.start("test", {

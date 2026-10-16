@@ -1,4 +1,5 @@
 import "server-only";
+import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { normalizeDomain } from "@/features/connected-research/url-safety";
 import { qualifyProspect } from "@/features/sales-agent/qualification";
 import type { WorkforceIntake, WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
@@ -42,6 +43,8 @@ export async function checkWorkforceEligibility(
   const matching = (await store.list(actorId)).flatMap((raw) => {
     const p = snapshotSchema.safeParse(raw);
     return p.success &&
+      isInOwnedIntakeScope(p.data.contact) &&
+      (!input.hubspotRecordId || p.data.contact.hubspotRecordId === input.hubspotRecordId) &&
       p.data.contact.fullName.trim().toLowerCase() === input.prospectName.trim().toLowerCase() &&
       p.data.contact.companyDomain &&
       normalizeDomain(p.data.contact.companyDomain) === domain
@@ -49,7 +52,10 @@ export async function checkWorkforceEligibility(
       : [];
   });
   if (matching.length === 1) {
-    const decision = reviewEvidenceSnapshot(matching[0], now).plan.decision;
+    const reviewed = reviewEvidenceSnapshot(matching[0], now);
+    const decision = reviewed.plan.decision;
+    const currentRole = reviewed.provenance.find(item => item.field === "role" && item.accepted && item.freshness === "FRESH");
+    if (currentRole && String(currentRole.value).trim().toLowerCase() !== input.prospectTitle.trim().toLowerCase()) return {status:"HOLD",reasons:["Current verified role differs from research intake; refresh prospect research"],blockDrafting:true};
     const restriction = decision.reasons.some((reason) =>
       /four calendar months|active outreach sequence|conflicting active opportunity|unauthorized|not owned/i.test(
         reason,

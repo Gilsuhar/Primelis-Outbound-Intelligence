@@ -34,6 +34,15 @@ export async function workforceBody(request: Request) {
 }
 export function workforceFailure(error: unknown) {
   const code = error instanceof Error ? error.message : "";
+  if (code === "DRAFT_ELIGIBILITY_HOLD")
+    return workforceResponse(
+      {
+        ok: false,
+        message:
+          "Contact eligibility changed. Refresh the workspace and resolve HOLD reasons before editing. The draft remains unapproved.",
+      },
+      409,
+    );
   const status =
     error instanceof z.ZodError || ["INVALID_JSON", "NO_SEQUENCE"].includes(code)
       ? 400

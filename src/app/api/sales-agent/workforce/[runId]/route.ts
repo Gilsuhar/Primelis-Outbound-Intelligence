@@ -1,3 +1,4 @@
+import { protectRunDrafts } from "@/server/agent-workforce/dashboard/service";
 import { WorkforceOrchestrator } from "@/server/agent-workforce/orchestrator";
 import {
   workforceActor,
@@ -15,7 +16,7 @@ export async function GET(_request: Request, context: Context) {
       (await context.params).runId,
     );
     if (!run) throw new Error("NOT_FOUND");
-    return workforceResponse({ ok: true, run });
+    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id,run) });
   } catch (error) {
     return workforceFailure(error);
   }
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, context: Context) {
       (await context.params).runId,
       await workforceBody(request),
     );
-    return workforceResponse({ ok: true, run });
+    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id,run) });
   } catch (error) {
     return workforceFailure(error);
   }

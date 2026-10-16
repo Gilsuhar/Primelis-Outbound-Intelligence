@@ -45,9 +45,10 @@ export async function POST(request: Request) {
         { ok: false, code: "UNAUTHENTICATED", message: "Sign in to collect evidence" },
         401,
       );
+    if (process.env.VERCEL_ENV === "production") return respond({ok:false,message:"Collection writes are disabled in Production; use Preview"},403);
     // CSRF protection for cookie-authenticated collection writes to local evidence storage.
     const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    if (origin !== new URL(request.url).origin)
       return respond({ ok: false, code: "FORBIDDEN" }, 403);
     let input: z.infer<typeof collectionInput>;
     try {

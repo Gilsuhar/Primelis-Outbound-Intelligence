@@ -22,9 +22,9 @@ async function completed() {
     knowledge: async () => testKnowledge,
     reader: testReader(),
     eligibility: async () => ({
-      status: "HOLD",
+      status: "READY",
       blockDrafting: false,
-      reasons: ["Unknown history"],
+      reasons: ["Verified fictional test evidence"],
     }),
     now: () => testNow,
   });
@@ -64,19 +64,19 @@ describe("minimal real-agent intake and human review", () => {
       screen.queryByText("Test Company sells outdoor equipment through its online store."),
     ).toBeNull();
   });
-  it("shows source links, strategy, all four editable drafts, HOLD eligibility and automated review", async () => {
+  it("shows source links, strategy, all four editable drafts, eligible contact and automated review", async () => {
     const run = await completed();
     const fetcher = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => ({
       ok: true,
       json: async () => (init?.method === "POST" ? { ok: true, run } : { ok: true, runs: [] }),
     }));
     vi.stubGlobal("fetch", fetcher);
-    render(<WorkforceClient />);
+    render(<WorkforceClient initialIntake={{ ...workforceIntake, hubspotRecordId: "42" }} />);
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Start research" }));
     await screen.findByText("Four original drafts — pending human approval");
     for (let i = 1; i <= 4; i++) expect(screen.getByLabelText(`Body ${i}`)).toBeTruthy();
-    expect(screen.getByText(/Contact eligibility:/).textContent).toContain("HOLD");
+    expect(screen.getByText(/Contact eligibility:/).textContent).toContain("READY");
     expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
     expect(screen.getByText("Automated quality review: PASS")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /send|enroll/i })).toBeNull();
@@ -84,6 +84,7 @@ describe("minimal real-agent intake and human review", () => {
       fetcher.mock.calls.find(([, init]) => init?.method === "POST")![1].body,
     );
     expect(sent.intake.companyDomain).toBe("example.com");
+    expect(sent.intake.hubspotRecordId).toBe("42");
     expect(sent).not.toHaveProperty("actorId");
   });
   it("saves edits as unapproved content for a fresh quality check", async () => {

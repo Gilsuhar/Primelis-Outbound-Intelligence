@@ -172,7 +172,7 @@ export function qualifyProspect(
       input.paidSearchResponsibility.value === "ABSENT"
     ) {
       rejected.push("Role has no paid-search responsibility");
-    } else if (roleClass === "NEEDS_SEARCH_PROOF") {
+    } else if (!/\b(cmo|chief marketing officer)\b/i.test(input.role.value)) {
       if (
         !isValidEvidence(input.paidSearchResponsibility, now) ||
         !["PROVEN", "ABSENT"].includes(input.paidSearchResponsibility.value)

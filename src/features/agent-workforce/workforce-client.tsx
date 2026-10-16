@@ -1,6 +1,11 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { stages, type WorkforceRun, type WorkforceSequence } from "./gate-a-contracts";
+import {
+  stages,
+  type WorkforceRun,
+  type WorkforceSequence,
+  type WorkforceIntake,
+} from "./gate-a-contracts";
 const angleClass: Record<string, string> = {
   COMPETITOR_DEFENSE: "border-l-indigo-500",
   BRAND_SPEND_EFFICIENCY: "border-l-emerald-500",
@@ -21,7 +26,10 @@ async function api(url: string, method = "GET", body?: unknown) {
   if (!response.ok || !data.ok) throw new Error(data.message ?? "Agent request failed");
   return data;
 }
-export function WorkforceClient() {
+export function WorkforceClient({
+  initialRunId,
+  initialIntake,
+}: { initialRunId?: string; initialIntake?: WorkforceIntake } = {}) {
   const [run, setRun] = useState<WorkforceRun | null>(null);
   const [runs, setRuns] = useState<WorkforceRun[]>([]);
   const [error, setError] = useState("");
@@ -40,6 +48,12 @@ export function WorkforceClient() {
     void api("/api/sales-agent/workforce")
       .then((r) => {
         if (mounted) setRuns(r.runs);
+        if (initialRunId)
+          return api(`/api/sales-agent/workforce/${encodeURIComponent(initialRunId)}`).then(
+            (result) => {
+              if (mounted) acceptRun(result.run);
+            },
+          );
       })
       .catch((failure) => {
         if (mounted)
@@ -49,7 +63,7 @@ export function WorkforceClient() {
       mounted = false;
       generation.current = null;
     };
-  }, []);
+  }, [initialRunId, acceptRun]);
   useEffect(() => {
     setEdited(run?.sequence?.messages ?? null);
   }, [run]);
@@ -81,7 +95,10 @@ export function WorkforceClient() {
   async function start(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const fingerprint = JSON.stringify(Object.fromEntries(form.entries()));
+    const fingerprint = JSON.stringify({
+      hubspotRecordId: initialIntake?.hubspotRecordId,
+      ...Object.fromEntries(form.entries()),
+    });
     if (!key.current || keyInput.current !== fingerprint) {
       key.current = crypto.randomUUID();
       keyInput.current = fingerprint;
@@ -92,6 +109,9 @@ export function WorkforceClient() {
       const data = await api("/api/sales-agent/workforce", "POST", {
         idempotencyKey: key.current,
         intake: {
+          ...(initialIntake?.hubspotRecordId
+            ? { hubspotRecordId: initialIntake.hubspotRecordId }
+            : {}),
           companyName: form.get("companyName"),
           companyDomain: String(form.get("companyDomain")).trim().toLowerCase(),
           prospectName: form.get("prospectName"),
@@ -128,13 +148,20 @@ export function WorkforceClient() {
     }
   }
   const running = run?.status === "RUNNING";
+  const studioReady =
+    run?.eligibility.status === "READY" &&
+    run.status === "READY_FOR_REVIEW" &&
+    run.critic?.verdict === "PASS" &&
+    Object.values(run.critic.checks).every(Boolean) &&
+    !run.issues.length;
   return (
     <section className="space-y-5 rounded border p-4 sm:p-6" aria-label="Real agent research">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Signal Agent Workforce</h1>
         <p>
           Research one company and prospect, select an evidence-led angle and write four original
-          OpenAI drafts. No email sending or Outreach writes. All content awaits human approval.
+          OpenAI drafts when mandatory eligibility gates pass. No email sending or Outreach writes.
+          All content awaits human approval.
         </p>
         <p className="text-sm">
           Requires live OpenAI web-search access, public source retrieval and approved product
@@ -154,6 +181,7 @@ export function WorkforceClient() {
             {label}
             <input
               name={name}
+              defaultValue={initialIntake?.[name as keyof WorkforceIntake] ?? ""}
               required={!["linkedinUrl", "targetMarket"].includes(name)}
               type={name === "linkedinUrl" ? "url" : "text"}
               maxLength={name === "linkedinUrl" ? 500 : 240}
@@ -323,6 +351,13 @@ export function WorkforceClient() {
               ))}
             </article>
           )}
+          {!studioReady && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4" role="status">
+              Draft Studio is locked until contact eligibility, research and automated quality
+              checks all pass. Research completion is separate from eligibility. All drafts remain
+              unapproved.
+            </p>
+          )}
           {run.sequence?.creativePlan && (
             <details className="rounded border p-4">
               <summary>Creative approaches and selection</summary>
@@ -350,7 +385,7 @@ export function WorkforceClient() {
               ))}
             </details>
           )}
-          {edited && (
+          {edited && studioReady && (
             <section className="space-y-3">
               <h2 className="font-semibold">Four original drafts — pending human approval</h2>
               <p>

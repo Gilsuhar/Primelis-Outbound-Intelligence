@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import {
   getHubSpotPrivateAppToken,
   HUBSPOT_API_BASE_URL,
@@ -68,8 +69,13 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
       });
       if (!response.ok) {
         // HTTP status and endpoint are safe diagnostics; never log tokens or response bodies.
-        console.error("[hubspot-intake] request_failed", { status: response.status, endpoint: path.split("?")[0].replace(/\/\d+$/, "/:id") });
-        throw new Error(`HubSpot read failed (HTTP ${response.status}); check read scopes, network access or rate limit`);
+        console.error("[hubspot-intake] request_failed", {
+          status: response.status,
+          endpoint: path.split("?")[0].replace(/\/\d+$/, "/:id"),
+        });
+        throw new Error(
+          `HubSpot read failed (HTTP ${response.status}); check read scopes, network access or rate limit`,
+        );
       }
       return await response.json();
     } finally {
@@ -78,14 +84,19 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
   }
 
   async listOwnedContacts(after?: string): Promise<IntakeBatch> {
+    const today = this.clock();
+    const since = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+    ).toISOString();
     const data = searchSchema.parse(
       await this.read("/crm/v3/objects/contacts/search", {
         filterGroups: [
-          {
+          ...["createdate", "hubspot_owner_assigneddate"].map((propertyName) => ({
             filters: [
               { propertyName: "hubspot_owner_id", operator: "EQ", value: SIGNAL_HUBSPOT_OWNER_ID },
+              { propertyName, operator: "GTE", value: String(Date.parse(since)) },
             ],
-          },
+          })),
         ],
         properties: ["hubspot_owner_id"],
         limit: 100,
@@ -114,9 +125,12 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
         while (index < records.length) {
           const record = records[index++];
           try {
-            const contact = await this.readContact(record.id);
+            const contact = await this.readContact(record.id, since);
             if (contact) contacts.push(contact);
-            else warnings.push("Excluded contact whose owner changed during collection");
+            else
+              warnings.push(
+                "Excluded contact outside the authorized owner/new-contact intake window",
+              );
           } catch {
             complete = false;
             warnings.push(`Unable to read HubSpot contact ${record.id}; retry this page`);
@@ -134,16 +148,30 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
     };
   }
 
-  private async readContact(id: string): Promise<IntakeContact | null> {
+  private async readContact(id: string, since: string): Promise<IntakeContact | null> {
     const detail = objectSchema.parse(
       await this.read(
-        `/crm/v3/objects/contacts/${encodeURIComponent(id)}?properties=firstname,lastname,email,jobtitle,hubspot_owner_id,hs_email_optout,hs_email_hard_bounce_reason&propertiesWithHistory=email&associations=companies`,
+        `/crm/v3/objects/contacts/${encodeURIComponent(id)}?properties=firstname,lastname,email,jobtitle,createdate,hubspot_owner_assigneddate,hubspot_owner_id,hs_email_optout,hs_email_hard_bounce_reason&propertiesWithHistory=email&associations=companies`,
       ),
     );
     if (detail.id !== id) throw new Error("HubSpot contact identity mismatch");
     if (detail.properties.hubspot_owner_id !== SIGNAL_HUBSPOT_OWNER_ID) return null;
     const observedAt = this.clock().toISOString();
     const p = detail.properties;
+    if (
+      !isInOwnedIntakeScope({
+        hubspotRecordId: id,
+        ownerId: p.hubspot_owner_id!,
+        fullName: "",
+        observedAt,
+        observations: [],
+        warnings: [],
+        intakeSince: since,
+        hubspotCreatedAt: p.createdate ?? undefined,
+        ownerAssignedAt: p.hubspot_owner_assigneddate ?? undefined,
+      })
+    )
+      return null;
     const observations: EvidenceObservation[] = [];
     const add = (field: EvidenceObservation["field"], value: unknown, sourceRecordId: string) => {
       observations.push({
@@ -210,6 +238,9 @@ export class HubSpotReadOnlyIntake implements ContactIntakeAdapter {
       companyName: company?.properties.name || undefined,
       companyDomain: company?.properties.domain?.toLowerCase() || undefined,
       emailModifiedAt: timestamps[0],
+      intakeSince: since,
+      hubspotCreatedAt: p.createdate ?? undefined,
+      ownerAssignedAt: p.hubspot_owner_assigneddate ?? undefined,
       observedAt,
       observations,
       warnings,

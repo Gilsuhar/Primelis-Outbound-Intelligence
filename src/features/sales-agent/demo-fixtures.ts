@@ -42,6 +42,7 @@ export function createDemoFixtures() {
       obs("employeeCount", 120),
       obs("annualRevenueUsd", 50_000_000),
       obs("role", scenario === "irrelevant" ? "Office Administrator" : "Head of Paid Search"),
+      obs("paidSearchResponsibility", "PROVEN"),
       obs("currentEmploymentVerified", true),
       obs("emailVerification", {
         status: "VALID",

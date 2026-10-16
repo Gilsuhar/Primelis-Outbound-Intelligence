@@ -9,6 +9,7 @@ import {
 const text = (max = 1000) => z.string().trim().min(1).max(max);
 export const intakeSchema = z
   .object({
+    hubspotRecordId: text(200).optional(),
     companyName: text(180),
     companyDomain: z
       .string()

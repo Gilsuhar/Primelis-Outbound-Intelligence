@@ -3,7 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { HubSpotReadOnlyIntake, normalizeHubSpotNumber } from "./hubspot-intake";
 import { collectionNow } from "@/test/sales-agent-collection-fixtures";
 
-function fixtures(options: { next?: string; owner?: string; companyFailure?: boolean } = {}) {
+function fixtures(
+  options: {
+    next?: string;
+    owner?: string;
+    companyFailure?: boolean;
+    createdAt?: string;
+    assignedAt?: string;
+  } = {},
+) {
   return vi.fn<typeof fetch>(async (url, init) => {
     const path = String(url);
     if (path.endsWith("/contacts/search"))
@@ -19,6 +27,8 @@ function fixtures(options: { next?: string; owner?: string; companyFailure?: boo
       return Response.json({
         id: "42",
         properties: {
+          createdate: options.createdAt ?? "2026-10-15T01:00:00.000Z",
+          hubspot_owner_assigneddate: options.assignedAt ?? null,
           firstname: "Fixture",
           lastname: "Prospect",
           jobtitle: "Head of Paid Search",
@@ -46,6 +56,26 @@ function fixtures(options: { next?: string; owner?: string; companyFailure?: boo
 }
 
 describe("HubSpot read-only intake", () => {
+  it("admits a newly assigned older contact but excludes an old unchanged or future-created contact", async () => {
+    const older = "2020-01-01T00:00:00.000Z";
+    const assigned = await new HubSpotReadOnlyIntake(
+      "token",
+      fixtures({ createdAt: older, assignedAt: "2026-10-15T02:00:00.000Z" }),
+      () => collectionNow,
+    ).listOwnedContacts();
+    expect(assigned.contacts).toHaveLength(1);
+    for (const createdAt of [older, "2026-10-16T00:00:00.000Z"])
+      expect(
+        (
+          await new HubSpotReadOnlyIntake(
+            "token",
+            fixtures({ createdAt }),
+            () => collectionNow,
+          ).listOwnedContacts()
+        ).contacts,
+      ).toEqual([]);
+  });
+
   it("filters by fixed owner, deduplicates IDs, reads primary company and never mutates CRM", async () => {
     const fetcher = fixtures();
     const result = await new HubSpotReadOnlyIntake(
@@ -70,9 +100,16 @@ describe("HubSpot read-only intake", () => {
       ),
     ).toBe(true);
     const search = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
-    expect(search.filterGroups[0].filters).toEqual([
-      { propertyName: "hubspot_owner_id", operator: "EQ", value: "1087915602" },
-    ]);
+    expect(search.filterGroups).toHaveLength(2);
+    for (const [index, group] of search.filterGroups.entries())
+      expect(group.filters).toEqual([
+        { propertyName: "hubspot_owner_id", operator: "EQ", value: "1087915602" },
+        {
+          propertyName: index === 0 ? "createdate" : "hubspot_owner_assigneddate",
+          operator: "GTE",
+          value: String(Date.parse("2026-10-15T00:00:00.000Z")),
+        },
+      ]);
     expect(fetcher.mock.calls).toHaveLength(3);
     for (const [url, init] of fetcher.mock.calls) {
       expect(init?.method).toBe(String(url).endsWith("/search") ? "POST" : "GET");
@@ -87,7 +124,7 @@ describe("HubSpot read-only intake", () => {
       () => collectionNow,
     ).listOwnedContacts();
     expect(result.contacts).toEqual([]);
-    expect(result.warnings.join(" ")).toContain("owner changed");
+    expect(result.warnings.join(" ")).toContain("owner/new-contact");
   });
   it("reports pagination explicitly and uses cursor without changing owner scope", async () => {
     const fetcher = fixtures({ next: "101" });

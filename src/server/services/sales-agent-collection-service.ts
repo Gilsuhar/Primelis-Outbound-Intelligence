@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { dashboardReviewSchema } from "@/features/agent-workforce/dashboard/contracts";
 
 import {
   normalizeCollectedEvidence,
@@ -48,12 +49,16 @@ const contactSchema = z.object({
   companyName: z.string().optional(),
   companyDomain: z.string().optional(),
   emailModifiedAt: z.string().optional(),
+  hubspotCreatedAt: z.string().optional(),
+  ownerAssignedAt: z.string().optional(),
+  intakeSince: z.string().optional(),
   observedAt: z.string(),
   observations: z.array(observationSchema),
   warnings: z.array(z.string()),
 });
 export const snapshotSchema = z.object({
   version: z.literal(1),
+  dashboardReview: dashboardReviewSchema.optional(),
   contact: contactSchema,
   observations: z.array(observationSchema),
   blockers: z.array(z.string()),

@@ -16,6 +16,8 @@ export const collectedContact: IntakeContact = {
   companyName: "Fixture Company",
   companyDomain: "example.com",
   emailModifiedAt: "2026-10-14T08:00:00.000Z",
+  intakeSince: "2026-10-15T00:00:00.000Z",
+  hubspotCreatedAt: "2026-10-15T01:00:00.000Z",
   observedAt: collectionNow.toISOString(),
   observations: [],
   warnings: [],
@@ -45,6 +47,7 @@ export const verifiedObservations: EvidenceObservation[] = [
   observation("employeeCount", 100),
   observation("annualRevenueUsd", 50_000_000),
   observation("role", "Head of Paid Search"),
+  observation("paidSearchResponsibility", "PROVEN"),
   observation("currentEmploymentVerified", true),
   observation("emailVerification", {
     status: "VALID",

@@ -17,6 +17,7 @@ const valid: ProspectQualificationInput = {
   employeeCount: evidence(80),
   annualRevenueUsd: evidence(30_000_000),
   role: evidence("Director of Paid Search"),
+  paidSearchResponsibility: evidence("PROVEN" as const),
   currentEmploymentVerified: evidence(true),
   emailVerification: evidence({
     status: "VALID",
@@ -60,7 +61,7 @@ describe("Signal Sales Agent qualification", () => {
   });
 
   it("holds Growth roles without proven search responsibility", () => {
-    expect(qualifyProspect({ ...valid, role: evidence("VP Growth") }, now).status).toBe("HOLD");
+    expect(qualifyProspect({ ...valid, role: evidence("VP Growth"), paidSearchResponsibility:undefined }, now).status).toBe("HOLD");
     expect(
       qualifyProspect(
         {
@@ -318,5 +319,14 @@ describe("ambiguous source signals", () => {
         now,
       ).status,
     ).toBe("HOLD");
+  });
+});
+
+describe("strict role responsibility gate",()=>{
+  it("requires proof beyond a senior Search title and does not grant VP Marketing the CMO exception",()=>{
+    for(const title of ["Head of Paid Search","VP Marketing","Director of PPC","VP Performance Marketing"])
+      expect(qualifyProspect({...valid,role:evidence(title),paidSearchResponsibility:undefined},now).status).toBe("HOLD");
+    expect(qualifyProspect({...valid,role:evidence("CMO"),paidSearchResponsibility:undefined},now).status).toBe("READY");
+    expect(qualifyProspect({...valid,role:evidence("Head of Paid Social"),paidSearchResponsibility:evidence("PROVEN")},now).status).toBe("REJECTED");
   });
 });
