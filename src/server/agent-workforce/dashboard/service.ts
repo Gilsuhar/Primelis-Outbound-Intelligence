@@ -1,4 +1,5 @@
 import "server-only";
+import { researchIdentity } from "../prospect-research/engine";
 import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
 import { PrismaIntegrationStore, type IntegrationStore } from "@/server/integrations/store";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
@@ -25,13 +26,34 @@ import { loadApprovedProductKnowledge } from "../knowledge-agent";
 export function summarizeRun(run: WorkforceRun, now: Date): RunSummary {
   return {
     id: run.id,
+    ...(run.prospectResearch
+      ? {
+          prospectResearch: {
+            ...run.prospectResearch,
+            ...(Date.parse(run.prospectResearch.expiresAt) <= now.getTime()
+              ? { status: "STALE" as const, opportunity: null }
+              : {}),
+          },
+        }
+      : {}),
     intake: run.intake,
     status: run.status,
-    stage: run.stage,
+    stage: run.prospectResearch
+      ? (Object.entries(run.prospectResearch.stages).find(
+          ([, s]) => s.status === "RUNNING" || s.status === "WAITING",
+        )?.[0] ?? "REVIEW")
+      : run.stage,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
     issues: run.issues,
-    research: run.research,
+    // Send quoted findings and bounded source previews; full documents stay in the actor-scoped run.
+    research: {
+      ...run.research,
+      sources: run.research.sources.map((source) => ({
+        ...source,
+        excerpt: source.excerpt.slice(0, 1200),
+      })),
+    },
     strategy: run.strategy,
     brandSearch: run.brandSearch,
     qualityVerdict: run.critic?.verdict ?? null,
@@ -46,25 +68,39 @@ export function summarizeRun(run: WorkforceRun, now: Date): RunSummary {
       !validateSequence(run, run.sequence).length
         ? "PENDING_HUMAN_REVIEW"
         : "HOLD",
-    stages: stages.map((stage) => {
-      const last = run.events.filter((event) => event.stage === stage).at(-1);
-      const blocked =
-        run.stage === stage && run.status !== "RUNNING" && run.status !== "READY_FOR_REVIEW";
-      const status = blocked
-        ? last?.state === "FAILED"
-          ? "FAILED"
-          : "BLOCKED"
-        : last?.state === "FAILED"
-          ? "FAILED"
-          : last?.state === "COMPLETED"
-            ? "COMPLETED"
-            : last?.state === "STARTED"
-              ? run.leaseUntil && Date.parse(run.leaseUntil) > now.getTime()
-                ? "RUNNING"
-                : "INTERRUPTED"
-              : "WAITING";
-      return { stage, status, at: last?.at ?? null };
-    }),
+    stages: run.prospectResearch
+      ? Object.entries(run.prospectResearch.stages).map(([stage, state]) => ({
+          stage,
+          status:
+            state.status === "COMPLETE"
+              ? ("COMPLETED" as const)
+              : state.status === "DATA_UNAVAILABLE"
+                ? ("BLOCKED" as const)
+                : state.status === "RUNNING" &&
+                    (!run.leaseUntil || Date.parse(run.leaseUntil) <= now.getTime())
+                  ? ("INTERRUPTED" as const)
+                  : state.status,
+          at: state.finishedAt ?? state.startedAt,
+        }))
+      : stages.map((stage) => {
+          const last = run.events.filter((event) => event.stage === stage).at(-1);
+          const blocked =
+            run.stage === stage && run.status !== "RUNNING" && run.status !== "READY_FOR_REVIEW";
+          const status = blocked
+            ? last?.state === "FAILED"
+              ? "FAILED"
+              : "BLOCKED"
+            : last?.state === "FAILED"
+              ? "FAILED"
+              : last?.state === "COMPLETED"
+                ? "COMPLETED"
+                : last?.state === "STARTED"
+                  ? run.leaseUntil && Date.parse(run.leaseUntil) > now.getTime()
+                    ? "RUNNING"
+                    : "INTERRUPTED"
+                  : "WAITING";
+          return { stage, status, at: last?.at ?? null };
+        }),
   };
 }
 export type DashboardDependencies = {
@@ -103,7 +139,19 @@ export async function getWorkforceDashboard(
         })
       : [];
   const runs =
-    savedRuns.status === "fulfilled" ? savedRuns.value.map((run) => summarizeRun(run, now)) : [];
+    savedRuns.status === "fulfilled"
+      ? savedRuns.value
+          .filter(
+            (run) =>
+              !run.prospectResearch ||
+              raw.some(
+                (s) =>
+                  s.contact.hubspotRecordId === run.intake.hubspotRecordId &&
+                  researchIdentity(s) === run.prospectResearch!.identityHash,
+              ),
+          )
+          .map((run) => summarizeRun(run, now))
+      : [];
   const rows = review.status === "fulfilled" && review.value.ok ? review.value.data.rows : [];
   const prospects: DashboardProspect[] = [];
   const seen = new Set<string>();
@@ -116,6 +164,12 @@ export async function getWorkforceDashboard(
     const matching = runs.filter(
       (run) =>
         run.intake.hubspotRecordId === id &&
+        (!run.prospectResearch ||
+          raw.some(
+            (s) =>
+              s.contact.hubspotRecordId === id &&
+              researchIdentity(s) === run.prospectResearch!.identityHash,
+          )) &&
         run.intake.companyDomain.toLowerCase() === row.contact.companyDomain?.toLowerCase() &&
         run.intake.prospectName.trim().toLowerCase() === row.contact.fullName.trim().toLowerCase(),
     );

@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ProspectResearchPanel } from "./prospect-research-panel";
 import { VerificationPanel } from "./verification-panel";
 import { IntegrationControls } from "./integration-controls";
 import {
@@ -20,6 +21,12 @@ const button =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive disabled:opacity-50";
 const panel = "min-w-0 rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-6";
 const stageNames: Record<string, string> = {
+  COMPANY: "Company research",
+  SIMILARWEB: "Similarweb",
+  SERP: "Brand SERP",
+  CONTACT: "Contact research",
+  ASSESSMENT: "Opportunity assessment",
+  REVIEW: "Research review",
   KNOWLEDGE: "Product knowledge",
   ACCOUNT_RESEARCH: "Company research",
   PROSPECT_INTELLIGENCE: "Prospect intelligence",
@@ -225,11 +232,13 @@ function ProspectWorkspace({
   prospect,
   runs,
   onReview,
+  onRefresh,
   busy,
 }: {
   prospect: DashboardProspect;
   runs: RunSummary[];
   onReview: (id: string) => void;
+  onRefresh: () => void;
   busy: boolean;
 }) {
   const run = runs.find((item) => prospect.runIds.includes(item.id));
@@ -276,7 +285,7 @@ function ProspectWorkspace({
             className={button}
             href={`/sales-agent/manual?contactId=${encodeURIComponent(prospect.contact.hubspotRecordId)}`}
           >
-            Research this prospect
+            Manual evidence & legacy research
           </Link>
         </div>
         <p className="mt-3 text-xs text-stone-600">
@@ -315,6 +324,7 @@ function ProspectWorkspace({
         )}
       </section>
       <VerificationPanel prospect={prospect} />
+      <ProspectResearchPanel prospect={prospect} runs={runs} onRefresh={onRefresh} />
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <EvidenceGroup
           prospect={prospect}
@@ -463,7 +473,13 @@ export function DashboardView({
               : "Loading prospect evidence…"}
           </p>
         ) : prospect ? (
-          <ProspectWorkspace prospect={prospect} runs={data.runs} onReview={onReview} busy={busy} />
+          <ProspectWorkspace
+            prospect={prospect}
+            runs={data.runs}
+            onReview={onReview}
+            onRefresh={onRefresh}
+            busy={busy}
+          />
         ) : (
           <section className={panel}>
             <h1 className="text-xl font-semibold">Prospect unavailable</h1>
@@ -779,7 +795,9 @@ export function WorkforceDashboard({ contactId }: { contactId?: string }) {
   }, [load]);
   useEffect(() => {
     if (
-      !data?.runs.some((run) => run.status === "RUNNING") &&
+      !data?.runs.some(
+        (run) => run.status === "RUNNING" || run.prospectResearch?.status === "RUNNING",
+      ) &&
       !data?.integrations.some((item) =>
         ["QUEUED", "RUNNING"].includes(item.sync?.job?.status ?? ""),
       )

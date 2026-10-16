@@ -28,6 +28,7 @@ export type IntegrationState = {
   checkedAt: string | null;
   lastSuccessfulSync: string | null;
   watermark?: string;
+  researchIntake?: { cursor: string | null; checkedAt: string; error: string | null };
   requestKeys?: string[];
   missingScopes: string[];
   detail: string;

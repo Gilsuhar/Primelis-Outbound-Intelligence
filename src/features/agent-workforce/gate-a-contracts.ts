@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { prospectResearchSchema } from "./prospect-research-contracts";
 import {
   agentFactSchema,
   agentSourceSchema,
@@ -51,6 +52,10 @@ export const groundedFactSchema = agentFactSchema.extend({
     "PRODUCTS",
     "MARKETS",
     "DEVELOPMENT",
+    "EMPLOYEES",
+    "REVENUE",
+    "GEOGRAPHY",
+    "WEBSITE",
     "POSITION",
     "RESPONSIBILITY",
   ]),
@@ -220,6 +225,7 @@ export const runSchema = z
     version: z.number().int().min(1),
     intake: intakeSchema,
     inputHash: text(64),
+    prospectResearch: prospectResearchSchema.optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
     status: z.enum(runStatuses),

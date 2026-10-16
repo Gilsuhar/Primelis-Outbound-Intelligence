@@ -88,3 +88,33 @@ describe("existing database-backed run storage", () => {
     });
   });
 });
+
+describe("research provider concurrency claim", () => {
+  it("serializes actor claims and refuses a different job while its lease is active", async () => {
+    const { newResearch } = await import("./prospect-research/engine");
+    const run = initialRun("actor", "research-key", workforceIntake, testNow);
+    run.prospectResearch = newResearch("a".repeat(64), testNow);
+    run.version = 2;
+    run.leaseUntil = new Date(testNow.getTime() + 110000).toISOString();
+    const query = vi.fn(async (strings: TemplateStringsArray) =>
+      strings.join("?").includes("SELECT id") ? [{ id: "another-job-with-live-lease" }] : [],
+    );
+    const execute = vi.fn();
+    const client = {
+      $queryRaw: query,
+      $executeRaw: execute,
+      $transaction: async (fn: (tx: MinimalPrismaClient) => Promise<boolean>) =>
+        fn(client as unknown as MinimalPrismaClient),
+    };
+    expect(
+      await new PrismaWorkforceStore(client as unknown as MinimalPrismaClient).change(
+        "actor",
+        1,
+        run,
+      ),
+    ).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+    expect(query.mock.calls[0][0].join("?")).toContain("pg_advisory_xact_lock");
+    expect(query.mock.calls[1][0].join("?")).toContain('"userId"=');
+  });
+});

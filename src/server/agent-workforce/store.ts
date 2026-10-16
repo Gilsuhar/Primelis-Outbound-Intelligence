@@ -12,6 +12,7 @@ export interface WorkforceStore {
   create(actor: string, key: string, input: WorkforceIntake, now: Date): Promise<WorkforceRun>;
   get(actor: string, id: string): Promise<WorkforceRun | null>;
   list(actor: string): Promise<WorkforceRun[]>;
+  pendingResearch?(actor: string): Promise<WorkforceRun[]>;
   change(actor: string, expectedVersion: number, run: WorkforceRun): Promise<boolean>;
 }
 export function initialRun(
@@ -65,7 +66,10 @@ export function initialRun(
   };
 }
 export class PrismaWorkforceStore implements WorkforceStore {
-  constructor(private readonly client?: MinimalPrismaClient) {}
+  constructor(
+    private readonly client?: MinimalPrismaClient,
+    private readonly researchLocked = false,
+  ) {}
   private async db() {
     if (this.client) return this.client;
     if (!process.env.DATABASE_URL) throw new Error("WORKFORCE_DATABASE_UNAVAILABLE");
@@ -96,7 +100,7 @@ export class PrismaWorkforceStore implements WorkforceStore {
       await this.db()
     ).$queryRaw<
       { draftContent: string }[]
-    >`SELECT "draftContent" FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE' ORDER BY "createdAt" DESC LIMIT 10`;
+    >`SELECT "draftContent" FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE' ORDER BY "updatedAt" DESC LIMIT 25`;
     return rows.flatMap((row) => {
       try {
         const r = runSchema.safeParse(JSON.parse(row.draftContent));
@@ -106,9 +110,43 @@ export class PrismaWorkforceStore implements WorkforceStore {
       }
     });
   }
-  async change(actor: string, expectedVersion: number, run: WorkforceRun) {
+  async pendingResearch(actor: string) {
+    const rows = await (
+      await this.db()
+    ).$queryRaw<{ draftContent: string }[]>`
+      SELECT "draftContent" FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE'
+      AND "draftContent"::jsonb->'prospectResearch'->>'status' IN ('RUNNING','PARTIAL')
+      AND EXISTS (
+        SELECT 1 FROM jsonb_each("draftContent"::jsonb->'prospectResearch'->'stages') AS stage
+        WHERE stage.value->>'status' IN ('WAITING','RUNNING') OR
+          (stage.value->>'status'='FAILED' AND (stage.value->>'attempts')::integer<3
+           AND (stage.value->>'retryAt' IS NULL OR (stage.value->>'retryAt')::timestamptz<=clock_timestamp()))
+      )
+      ORDER BY "updatedAt" ASC LIMIT 100`;
+    return rows.flatMap((row) => {
+      try {
+        const parsed = runSchema.safeParse(JSON.parse(row.draftContent));
+        return parsed.success ? [parsed.data] : [];
+      } catch {
+        return [];
+      }
+    });
+  }
+  async change(actor: string, expectedVersion: number, run: WorkforceRun): Promise<boolean> {
     runSchema.parse(run);
     if (run.version !== expectedVersion + 1) throw new Error("INVALID_VERSION");
+    if (run.prospectResearch && run.leaseUntil && !this.researchLocked) {
+      const db = await this.db();
+      return db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`research:${actor}`}, 0))`;
+        const live = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM "GeneratedDraft" WHERE "userId"=${actor} AND workflow='AGENT_WORKFORCE'
+          AND id<>${run.id} AND "draftContent"::jsonb ? 'prospectResearch'
+          AND ("draftContent"::jsonb->>'leaseUntil')::timestamptz > clock_timestamp() LIMIT 1`;
+        if (live.length) return false;
+        return new PrismaWorkforceStore(tx, true).change(actor, expectedVersion, run);
+      });
+    }
     const changed = await (
       await this.db()
     ).$executeRaw`

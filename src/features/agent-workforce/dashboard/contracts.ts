@@ -24,15 +24,16 @@ export type RunSummary = Pick<
   | "id"
   | "intake"
   | "status"
-  | "stage"
   | "createdAt"
   | "updatedAt"
   | "issues"
   | "research"
   | "strategy"
   | "brandSearch"
+  | "prospectResearch"
 > & {
-  stages: { stage: WorkforceRun["stage"]; status: StageStatus; at: string | null }[];
+  stage: string;
+  stages: { stage: string; status: StageStatus; at: string | null }[];
   qualityVerdict: string | null;
   draftStatus: "PENDING_HUMAN_REVIEW" | "HOLD";
 };
