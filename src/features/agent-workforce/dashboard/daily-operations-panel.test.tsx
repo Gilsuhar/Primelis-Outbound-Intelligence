@@ -28,6 +28,7 @@ const report: DailyReport = {
 };
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 describe("daily operational controls", () => {
@@ -69,4 +70,30 @@ describe("daily operational controls", () => {
     expect(Object.keys(body).sort()).toEqual(["action", "requestKey"]);
     expect(body.action).toBe("RUN");
   });
+});
+it("removes stale readiness and disables actions when a later refresh loses access", async () => {
+  let refresh: (() => void) | undefined;
+  const actualInterval = globalThis.setInterval.bind(globalThis);
+  vi.spyOn(globalThis, "setInterval").mockImplementation((callback, interval) => {
+    if (interval === 20000) {
+      refresh = callback as () => void;
+      return 123 as unknown as ReturnType<typeof setInterval>;
+    }
+    return actualInterval(callback, interval);
+  });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ ok: true, report }))
+    .mockResolvedValue(Response.json({ ok: false }, { status: 403 }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<DailyOperationsPanel />);
+  await screen.findByText(/No daily runs recorded/);
+  refresh!();
+  await waitFor(() =>
+    expect((screen.getByRole("button", { name: "Run now" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    ),
+  );
+  expect(screen.queryByText(/No daily runs recorded/)).toBeNull();
+  vi.restoreAllMocks();
 });

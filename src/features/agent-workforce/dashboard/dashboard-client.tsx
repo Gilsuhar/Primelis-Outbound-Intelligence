@@ -47,9 +47,10 @@ const label = (value: string) =>
 export function SafeSource({ url, children }: { url?: string; children: React.ReactNode }) {
   try {
     const u = new URL(url ?? "");
-    if (u.protocol !== "https:" || u.username || u.password) return <span>{children}</span>;
+    if (u.protocol !== "https:" || u.username || u.password)
+      return <span className="break-words">{children}</span>;
   } catch {
-    return <span>{children}</span>;
+    return <span className="break-words">{children}</span>;
   }
   return (
     <a
@@ -119,7 +120,7 @@ function EvidenceGroup({
               <p className="break-words text-stone-600">
                 Observed {item.observedAt}; verified {item.verifiedAt ?? "not verified"}
               </p>
-              <p className="mt-1">{item.explanation}</p>
+              <p className="mt-1 break-words">{item.explanation}</p>
               <SafeSource url={item.sourceUrl}>{item.sourceRecordId}</SafeSource>
               {item.supportingEvidence.map((text, i) => (
                 <p className="mt-1 break-words text-stone-600" key={i}>
@@ -385,7 +386,7 @@ function ProspectWorkspace({
             <SafeSource url={item.sourceUrl}>Source</SafeSource>
           </article>
         ))}
-        <p className="mt-3 text-sm">
+        <p className="mt-3 break-words text-sm">
           Suggested capture (not a finding): Google results for “
           {prospect.contact.companyName ?? prospect.contact.companyDomain ?? "company brand"}”.
           Record the exact keyword, target market, device, observation date, screenshot and source

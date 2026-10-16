@@ -7,6 +7,14 @@ export async function POST(request: Request) {
   try {
     const actor = await getCurrentUser();
     if (!actor) return respond({ ok: false, message: "Sign in to save research" }, 401);
+    if (
+      process.env.VERCEL_ENV === "production" ||
+      actor.id !== process.env.INTEGRATION_OPERATOR_USER_ID
+    )
+      return respond(
+        { ok: false, message: "Research writes require the configured Preview operator" },
+        403,
+      );
     // Same-origin manual review writes only. Fail closed without Origin.
     if (request.headers.get("origin") !== new URL(request.url).origin)
       return respond({ ok: false, message: "Same-origin request required" }, 403);

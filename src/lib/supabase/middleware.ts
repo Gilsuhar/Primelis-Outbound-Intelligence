@@ -45,20 +45,38 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 export async function updateSession(request: NextRequest) {
-  const config = getSupabaseAuthConfig();
   const pathname = request.nextUrl.pathname;
   let response = NextResponse.next({ request });
 
+  // These exact POST routes authenticate their server worker bearer independently.
+  // Do not require a browser's Supabase cookie before the route can validate it.
+  if (
+    request.method === "POST" &&
+    [
+      "/api/sales-agent/daily/worker",
+      "/api/sales-agent/integrations/worker",
+      "/api/sales-agent/prospect-research/worker",
+    ].includes(pathname)
+  )
+    return response;
+  const config = getSupabaseAuthConfig();
+  const deny = () =>
+    pathname.startsWith("/api/")
+      ? NextResponse.json(
+          { ok: false, message: "Authentication required" },
+          { status: 401, headers: { "Cache-Control": "private, no-store" } },
+        )
+      : redirectToLogin(request, pathname);
   if (isPublicRoute(pathname)) {
     return response;
   }
 
   if (!config) {
-    return redirectToLogin(request, pathname);
+    return deny();
   }
 
   if (!hasSupabaseAuthCookie(request)) {
-    return redirectToLogin(request, pathname);
+    return deny();
   }
 
   const supabase = createServerClient(config.url, config.anonKey, {
@@ -79,17 +97,23 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const result = await withTimeout(supabase.auth.getClaims(), authCheckTimeoutMs);
+  let result;
+  try {
+    result = await withTimeout(supabase.auth.getClaims(), authCheckTimeoutMs);
+  } catch {
+    return deny();
+  }
   if (!result) {
-    return redirectToLogin(request, pathname);
+    return deny();
   }
 
   const { data, error } = result;
   const user = error ? null : data?.claims;
 
   if (!user) {
-    return redirectToLogin(request, pathname);
+    return deny();
   }
 
+  response.headers.set("Cache-Control", "private, no-store");
   return response;
 }

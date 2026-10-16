@@ -103,7 +103,9 @@ describe("Supabase middleware session refresh", () => {
   it("does not call Supabase for public login routes", async () => {
     mockSupabaseUser({ id: "auth-user-id", email: "user@example.com" });
 
-    const response = await updateSession(request("/login", "sb-project-auth-token=callback-cookie"));
+    const response = await updateSession(
+      request("/login", "sb-project-auth-token=callback-cookie"),
+    );
 
     expect(response.headers.get("location")).toBeNull();
     expect(createServerClientMock).not.toHaveBeenCalled();
@@ -123,7 +125,9 @@ describe("Supabase middleware session refresh", () => {
   it("redirects unauthenticated protected requests to login", async () => {
     mockSupabaseUser(null);
 
-    const response = await updateSession(request("/reply-to-prospect", "sb-project-auth-token=stale-cookie"));
+    const response = await updateSession(
+      request("/reply-to-prospect", "sb-project-auth-token=stale-cookie"),
+    );
 
     expect(response.headers.get("location")).toBe(
       "https://preview.example/login?next=%2Freply-to-prospect",
@@ -150,4 +154,47 @@ describe("Supabase middleware session refresh", () => {
     );
     vi.useRealTimers();
   });
+});
+
+it.each(["daily", "integrations", "prospect-research"])(
+  "lets only the exact %s POST worker reach its bearer authentication",
+  async (kind) => {
+    getSupabaseAuthConfigMock.mockReturnValue(null);
+    createServerClientMock.mockClear();
+    const input = request(`/api/sales-agent/${kind}/worker`);
+    Object.assign(input, { method: "POST" });
+    const response = await updateSession(input);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("location")).toBeNull();
+    expect(createServerClientMock).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  "/api/sales-agent/daily/worker/extra",
+  "/api/sales-agent/daily/worker",
+  "/api/sales-agent/daily",
+])("does not grant session-free access to %s GET", async (path) => {
+  getSupabaseAuthConfigMock.mockReturnValue(null);
+  const response = await updateSession(request(path));
+  expect(response.status).toBe(401);
+  expect(response.headers.get("location")).toBeNull();
+  expect(response.headers.get("cache-control")).toContain("no-store");
+});
+it("fails closed with JSON when Supabase verification rejects rather than redirecting an API to HTML", async () => {
+  getSupabaseAuthConfigMock.mockReturnValue({
+    url: "https://project.supabase.co",
+    anonKey: "fictional",
+  });
+  createServerClientMock.mockReturnValue({
+    auth: {
+      getClaims: vi.fn(async () => {
+        throw new Error("sensitive upstream detail");
+      }),
+    },
+  } as never);
+  const response = await updateSession(
+    request("/api/sales-agent/daily", "sb-project-auth-token=fictional"),
+  );
+  expect(response.status).toBe(401);
+  expect(await response.text()).not.toContain("sensitive");
 });

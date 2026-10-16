@@ -223,7 +223,11 @@ export class DailyEngine {
       } else {
         if (
           state.runs.some(
-            (r) => r.id !== runId && (r.status === "RUNNING" || r.status === "PAUSED"),
+            (r) =>
+              r.id !== runId &&
+              (r.status === "RUNNING" ||
+                r.status === "PAUSED" ||
+                !!(r.lease && Date.parse(r.lease.until) > this.now().getTime())),
           )
         )
           throw new Error("VERSION_CONFLICT");

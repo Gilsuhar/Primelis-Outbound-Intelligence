@@ -1,0 +1,2 @@
+# Managed by Prisma Migrate. Keep the migration provider consistent across environments.
+provider = "postgresql"

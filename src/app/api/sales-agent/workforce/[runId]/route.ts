@@ -16,21 +16,21 @@ export async function GET(_request: Request, context: Context) {
       (await context.params).runId,
     );
     if (!run) throw new Error("NOT_FOUND");
-    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id,run) });
+    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id, run) });
   } catch (error) {
     return workforceFailure(error);
   }
 }
 export async function PATCH(request: Request, context: Context) {
   try {
-    const auth = await workforceActor(request);
+    const auth = await workforceActor(request, true);
     if (auth.response) return auth.response;
     const run = await new WorkforceOrchestrator().edit(
       auth.actor.id,
       (await context.params).runId,
       await workforceBody(request),
     );
-    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id,run) });
+    return workforceResponse({ ok: true, run: await protectRunDrafts(auth.actor.id, run) });
   } catch (error) {
     return workforceFailure(error);
   }

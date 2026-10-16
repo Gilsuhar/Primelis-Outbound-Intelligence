@@ -167,3 +167,13 @@ describe("HubSpot contact enrichment", () => {
     ).rejects.toThrow("PERMISSION_MISSING");
   });
 });
+it("uses an owner-scoped contact search for authenticated health checks", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => Response.json({ results: [] }));
+  await new HubSpotConnector({ token: "fictional", portalId: "123" }, { fetcher }).check();
+  const [url, request] = fetcher.mock.calls[0];
+  expect(String(url)).toContain("/contacts/search");
+  expect(request!.method).toBe("POST");
+  expect(JSON.parse(String(request!.body)).filterGroups[0].filters).toEqual([
+    { propertyName: "hubspot_owner_id", operator: "EQ", value: "1087915602" },
+  ]);
+});

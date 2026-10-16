@@ -36,10 +36,7 @@ function normalizeRole(role: string | null | undefined): UserRole {
 }
 
 function isSupabaseAuthCookieName(name: string) {
-  return (
-    name.startsWith("sb-") &&
-    (name.includes("auth-token") || name.includes("access-token"))
-  );
+  return name.startsWith("sb-") && (name.includes("auth-token") || name.includes("access-token"));
 }
 
 async function hasSupabaseAuthCookie() {
@@ -99,11 +96,11 @@ export async function resolveApplicationUser(authUser: { id: string; email?: str
     },
   })) as LocalProfile | null;
 
-  if (!existing) return null;
+  if (!existing || (existing.authUserId && existing.authUserId !== authUser.id)) return null;
 
   if (!existing.authUserId) {
     return (await prisma.user.update({
-      where: { id: existing.id },
+      where: { id: existing.id, authUserId: null },
       data: { authUserId: authUser.id, email: normalizedEmail },
       select: {
         id: true,
@@ -147,7 +144,10 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 
   if (error || !user) return null;
 
-  const profile = await withTimeout(resolveApplicationUser(user), applicationProfileLookupTimeoutMs);
+  const profile = await withTimeout(
+    resolveApplicationUser(user),
+    applicationProfileLookupTimeoutMs,
+  );
   if (!profile) return null;
 
   return {

@@ -52,7 +52,17 @@ export class HubSpotConnector {
   async check() {
     // Every required resource is authenticated. No "Connected" from an environment variable.
     z.object({ results: z.array(record) }).parse(
-      await this.transport.read("/crm/v3/objects/contacts?limit=1&properties=hubspot_owner_id"),
+      await this.transport.read("/crm/v3/objects/contacts/search", {
+        filterGroups: [
+          {
+            filters: [
+              { propertyName: "hubspot_owner_id", operator: "EQ", value: SIGNAL_HUBSPOT_OWNER_ID },
+            ],
+          },
+        ],
+        properties: ["hubspot_owner_id"],
+        limit: 1,
+      }),
     );
     z.object({ results: z.array(record) }).parse(
       await this.transport.read("/crm/v3/objects/companies?limit=1"),

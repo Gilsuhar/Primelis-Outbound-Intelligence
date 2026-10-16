@@ -189,7 +189,12 @@ export function openAiPricing(
   } catch {
     pricingError();
   }
-  if (!rates && model === normalizeOpenAiModel(env.OPENAI_MODEL))
+  if (
+    !rates &&
+    model === normalizeOpenAiModel(env.OPENAI_MODEL) &&
+    env.OPENAI_INPUT_USD_PER_MILLION?.trim() &&
+    env.OPENAI_OUTPUT_USD_PER_MILLION?.trim()
+  )
     rates = {
       input: Number(env.OPENAI_INPUT_USD_PER_MILLION),
       output: Number(env.OPENAI_OUTPUT_USD_PER_MILLION),
@@ -215,7 +220,9 @@ export function webSearchCost(env: Record<string, string | undefined> = process.
 
 export function providerAttempts(existingLimit: number) {
   const context = scope.getStore();
-  return context ? Math.min(existingLimit, context.config!.maxRetries + 1) : existingLimit;
+  return context
+    ? Math.min(existingLimit, (context.config ?? dailyConfig()).maxRetries + 1)
+    : existingLimit;
 }
 export async function recordResearchAttempt(
   actor: string,

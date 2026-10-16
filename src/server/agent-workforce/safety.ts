@@ -4,7 +4,8 @@ import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { normalizeDomain } from "@/features/connected-research/url-safety";
 import { qualifyProspect } from "@/features/sales-agent/qualification";
 import type { WorkforceIntake, WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
-import { PrismaEvidenceStore } from "@/server/sales-agent/evidence-store";
+import type { IntegrationStore } from "@/server/integrations/store";
+import { PrismaEvidenceStore, type EvidenceStore } from "@/server/sales-agent/evidence-store";
 import { LocalSuppressionAdapter } from "@/server/sales-agent/local-suppression";
 import {
   snapshotSchema,
@@ -15,8 +16,9 @@ export async function checkWorkforceEligibility(
   actorId: string,
   input: WorkforceIntake,
   now: Date,
+  deps: { evidence?: EvidenceStore; integrations?: IntegrationStore } = {},
 ): Promise<WorkforceRun["eligibility"]> {
-  const store = new PrismaEvidenceStore();
+  const store = deps.evidence ?? new PrismaEvidenceStore();
   const domain = normalizeDomain(input.companyDomain);
   const records = (await store.suppressionRecords()).map((record) => ({
     ...record,
@@ -55,7 +57,7 @@ export async function checkWorkforceEligibility(
   if (matching.length === 1) {
     const reviewed = reviewEvidenceSnapshot(matching[0], now);
     const decision = reviewed.plan.decision;
-    const integrationBlocks = await integrationEligibilityBlockers(actorId, now);
+    const integrationBlocks = await integrationEligibilityBlockers(actorId, now, deps.integrations);
     if (integrationBlocks.length) {
       if (decision.status !== "REJECTED") decision.status = "HOLD";
       decision.reasons.push(...integrationBlocks);

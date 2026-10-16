@@ -162,6 +162,16 @@ export function dailyHandlers(config: DailyConfig): DailyHandlers {
         ) {
           return { done: false, contact, retryAt: verified.nextRetryAt };
         }
+        if (kind === "EMPLOYMENT") {
+          try {
+            if (!(await new IntegrationSync(actor).refreshAfterVerification(contact.id)))
+              return { done: false, contact, retryAt: new Date(Date.now() + 60000).toISOString() };
+          } catch {
+            contact.reasons.push(
+              "Outreach history recheck after independent verification failed; history remains UNKNOWN",
+            );
+          }
+        }
         contact.stage = kind === "EMAIL" ? "VERIFY_EMPLOYMENT" : "RESEARCH";
         return { done: false, contact };
       }

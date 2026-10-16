@@ -44,7 +44,11 @@ describe("actual OpenAI Responses transport, mocked HTTP only", () => {
     expect(sent.store).toBe(false);
     expect(sent.max_output_tokens).toBeLessThanOrEqual(6000);
     expect(String(request?.body)).not.toContain("test-key-not-real");
-    expect(usage[0]).toMatchObject({ inputTokens: 100, outputTokens: 40, estimatedCostUsd: null });
+    expect(usage[0]).toMatchObject({
+      inputTokens: 100,
+      outputTokens: 40,
+      estimatedCostUsd: 0.00014,
+    });
   });
   it("requires configuration and never returns deterministic fixture copy", async () => {
     const fetcher = vi.fn();
@@ -165,7 +169,7 @@ describe("public source retrieval boundaries", () => {
   });
 });
 
-it("uses configured writing and review models while keeping unknown override prices explicit", async () => {
+it("uses configured writing and review models with the same configured estimates as the budget ledger", async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json(payload()));
   const provider = new OpenAiWorkforceModel(
     {
@@ -180,5 +184,14 @@ it("uses configured writing and review models while keeping unknown override pri
   await provider.structured("QUALITY_REVIEW", schema, "review", {}, usage);
   expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).model).toBe("efficient-writer");
   expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).model).toBe("configured-reviewer");
-  expect(usage.every((u) => u.estimatedCostUsd === null)).toBe(true);
+  expect(usage.every((u) => typeof u.estimatedCostUsd === "number")).toBe(true);
+});
+it.each([
+  { input_tokens: -1, output_tokens: 10 },
+  { input_tokens: 10.5, output_tokens: 1 },
+])("rejects malformed usage before budget settlement (%j)", async (usage) => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ...payload(), usage }));
+  await expect(
+    new OpenAiWorkforceModel(env, fetcher).structured("STRATEGY", schema, "write", {}, []),
+  ).rejects.toMatchObject({ code: "INVALID_MODEL_OUTPUT" });
 });

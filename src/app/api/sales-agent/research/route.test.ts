@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/auth/server", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/server/services/sales-agent-research-service", () => ({
   saveSalesAgentResearch: vi.fn(),
@@ -14,6 +14,7 @@ const request = (body: string, origin?: string) =>
     headers: origin ? { origin } : {},
   });
 beforeEach(() => {
+  vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "signed-in-actor");
   vi.clearAllMocks();
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: "signed-in-actor",
@@ -22,6 +23,7 @@ beforeEach(() => {
   });
   vi.mocked(saveSalesAgentResearch).mockResolvedValue({ ok: true, data: { saved: true } });
 });
+afterEach(() => vi.unstubAllEnvs());
 describe("manual research route security", () => {
   it("authenticates before touching storage", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null);
@@ -52,4 +54,10 @@ describe("manual research route security", () => {
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain("sensitive-database-value");
   });
+});
+
+it("rejects a different approved operator before persistence", async () => {
+  vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "another-user");
+  expect((await POST(request("{}", "https://app.example"))).status).toBe(403);
+  expect(saveSalesAgentResearch).not.toHaveBeenCalled();
 });

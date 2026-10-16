@@ -22,6 +22,8 @@ export async function POST(request: Request) {
       .object({ actorId: z.string().min(1).max(200), provider: providerSchema })
       .strict()
       .parse(await workforceBody(request));
+    if (body.actorId !== process.env.INTEGRATION_OPERATOR_USER_ID)
+      return workforceResponse({ ok: false }, 403);
     await drainSync(body.actorId, body.provider);
     return workforceResponse({ ok: true });
   } catch {

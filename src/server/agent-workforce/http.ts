@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 export const workforceResponse = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
-export async function workforceActor(request?: Request) {
+export async function workforceActor(request?: Request, requireOperator = false) {
   const actor = await getCurrentUser();
   if (!actor)
     return {
@@ -20,6 +20,13 @@ export async function workforceActor(request?: Request) {
   if (request && request.headers.get("origin") !== new URL(request.url).origin)
     return {
       response: workforceResponse({ ok: false, message: "Same-origin request required" }, 403),
+    };
+  if (requireOperator && actor.id !== process.env.INTEGRATION_OPERATOR_USER_ID)
+    return {
+      response: workforceResponse(
+        { ok: false, message: "Agent execution requires the configured integration operator" },
+        403,
+      ),
     };
   return { actor };
 }

@@ -221,3 +221,45 @@ describe("real provider transport boundaries with mocked HTTP only", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+it("does not silently price blank base-model input rates as zero", () => {
+  expect(() =>
+    openAiPricing("gpt-4.1-mini", {
+      OPENAI_MODEL: "gpt-4.1-mini",
+      OPENAI_INPUT_USD_PER_MILLION: "",
+      OPENAI_OUTPUT_USD_PER_MILLION: "2",
+    }),
+  ).toThrow("PRICING_REQUIRED");
+});
+it("uses the same configured model override estimate in the run and central ledger", async () => {
+  vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "actor");
+  const store = new MemoryDailyStore(),
+    usage: Parameters<OpenAiWorkforceModel["discover"]>[1] = [];
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      status: "completed",
+      output_text: '{"ok":true}',
+      usage: { input_tokens: 100, output_tokens: 10 },
+    }),
+  );
+  const env = {
+    NODE_ENV: "test" as const,
+    AI_PROVIDER: "openai",
+    OPENAI_API_KEY: "fictional",
+    OPENAI_MODEL: "gpt-4.1-mini",
+    OPENAI_WRITING_MODEL: "approved-override",
+    WORKFORCE_MODEL_PRICES_JSON: '{"approved-override":{"input":4,"output":8}}',
+  };
+  await withBudgetContext({ actor: "actor", store, config, now: () => now }, () =>
+    new OpenAiWorkforceModel(env, fetcher).structured(
+      "SEQUENCE",
+      z.object({ ok: z.boolean() }),
+      "write",
+      {},
+      usage,
+    ),
+  );
+  expect(usage[0].estimatedCostUsd).toBeCloseTo(0.00048);
+  expect((await store.get("actor")).days["2026-10-19"].estimatedUsd).toBeCloseTo(
+    usage[0].estimatedCostUsd!,
+  );
+});

@@ -45,7 +45,16 @@ export async function POST(request: Request) {
         { ok: false, code: "UNAUTHENTICATED", message: "Sign in to collect evidence" },
         401,
       );
-    if (process.env.VERCEL_ENV === "production") return respond({ok:false,message:"Collection writes are disabled in Production; use Preview"},403);
+    if (process.env.VERCEL_ENV === "production")
+      return respond(
+        { ok: false, message: "Collection writes are disabled in Production; use Preview" },
+        403,
+      );
+    if (actor.id !== process.env.INTEGRATION_OPERATOR_USER_ID)
+      return respond(
+        { ok: false, message: "Collection requires the configured integration operator" },
+        403,
+      );
     // CSRF protection for cookie-authenticated collection writes to local evidence storage.
     const origin = request.headers.get("origin");
     if (origin !== new URL(request.url).origin)

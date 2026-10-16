@@ -54,3 +54,18 @@ describe("Product Knowledge Agent uses the actual approved database contract", (
     expect(rows[1].text).toBe(base.approvedExternalWording);
   });
 });
+it("does not let an approved wording phrase cancel an explicit confidentiality restriction", async () => {
+  const base = {
+    id: "restricted-case",
+    title: "Fictional restricted proof",
+    approvalStatus: "APPROVED",
+    approvedExternalWording: "A fictional customer outcome.",
+    usageScope: "EMAIL_AND_LINKEDIN",
+    usageRestrictions: "Confidential; not approved for external social proof",
+    sources: [
+      { id: "source", approvalStatus: "APPROVED", externalUrl: "https://example.com/proof" },
+    ],
+  };
+  const records = await loadApprovedProductKnowledge(client(testKnowledge, [base]));
+  expect(records.some((r) => r.id === base.id)).toBe(false);
+});

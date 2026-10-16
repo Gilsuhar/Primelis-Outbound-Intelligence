@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   syncStart: vi.fn(),
   syncStep: vi.fn(),
+  historyRecheck: vi.fn(async () => true),
   integrationGet: vi.fn(),
   integrationChange: vi.fn(),
 }));
@@ -43,6 +44,7 @@ vi.mock("@/server/integrations/sync", () => ({
   IntegrationSync: class {
     start = mocks.syncStart;
     step = mocks.syncStep;
+    refreshAfterVerification = mocks.historyRecheck;
     resume = vi.fn();
   },
 }));

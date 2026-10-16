@@ -1,5 +1,7 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { sameVerificationIdentity } from "@/features/sales-agent/verification/contracts";
+import { randomUUID, createHash } from "node:crypto";
+import { normalizeCollectedEvidence } from "@/features/sales-agent/evidence";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import type { EvidenceObservation, IntakeContact } from "@/features/sales-agent/evidence";
 import { snapshotSchema } from "@/server/services/sales-agent-collection-service";
@@ -406,6 +408,74 @@ export class IntegrationSync {
     if (previous) job.updated++;
     else job.imported++;
   }
+  /** Resolve the intake/verification dependency without treating a missing match as cleared history. */
+  async refreshAfterVerification(id: string): Promise<boolean> {
+    const snapshot = await this.findSnapshot(id);
+    if (!snapshot || !isInOwnedIntakeScope(snapshot.contact))
+      throw new IntegrationError("CONFIGURATION");
+    if (snapshot.contact.outreachProspectId) return true;
+    const verified = normalizeCollectedEvidence(
+      snapshot.contact,
+      snapshot.observations,
+      this.now(),
+    ).provenance.find(
+      (o) => o.field === "emailVerification" && o.accepted && o.freshness === "FRESH",
+    );
+    const valid = verified?.value as
+      | { status?: string; independentlyVerified?: boolean; businessEmailVerified?: boolean }
+      | undefined;
+    if (
+      !verified ||
+      valid?.status !== "VALID" ||
+      !valid.independentlyVerified ||
+      !valid.businessEmailVerified
+    )
+      return true;
+    const hubspot = (await this.store.get(this.actor, "HUBSPOT")).state;
+    const observed = Date.parse(snapshot.contact.observedAt);
+    if (
+      hubspot.status !== "CONNECTED" ||
+      hubspot.job?.status !== "COMPLETED" ||
+      !hubspot.lastSuccessfulSync ||
+      !Number.isFinite(Date.parse(hubspot.lastSuccessfulSync)) ||
+      Date.parse(hubspot.lastSuccessfulSync) > this.now().getTime() ||
+      this.now().getTime() - Date.parse(hubspot.lastSuccessfulSync) > 86400000 ||
+      !Number.isFinite(observed) ||
+      observed > this.now().getTime() ||
+      this.now().getTime() - observed > 86400000
+    )
+      throw new IntegrationError("CONFIGURATION");
+    const state = (await this.store.get(this.actor, "OUTREACH")).state;
+    const fresh =
+      state.lastSuccessfulSync &&
+      Date.parse(state.lastSuccessfulSync) <= this.now().getTime() &&
+      this.now().getTime() - Date.parse(state.lastSuccessfulSync) <= 86400000;
+    if (state.status !== "CONNECTED" || state.job?.status !== "COMPLETED" || !fresh)
+      throw new IntegrationError("CONFIGURATION");
+    const worker = randomUUID();
+    if (!(await this.store.claim(this.actor, "OUTREACH", worker))) return false;
+    try {
+      const key =
+        "verified-history-" +
+        createHash("sha256")
+          .update(
+            JSON.stringify({
+              actor: this.actor,
+              contact: snapshot.contact,
+              proof: verified.sourceRecordId,
+              sync: state.job.id,
+            }),
+          )
+          .digest("hex");
+      await this.refreshOutreach(id, { ...state.job, id: key });
+      return true;
+    } catch (error) {
+      await this.failure("OUTREACH", error);
+      throw error;
+    } finally {
+      await this.store.release(this.actor, "OUTREACH", worker);
+    }
+  }
   private async refreshOutreach(id: string, job: SyncJob) {
     const previous = await this.findSnapshot(id);
     if (!previous) throw new IntegrationError("INVALID_RESPONSE");
@@ -419,8 +489,8 @@ export class IntegrationSync {
       const latest = snapshotSchema.parse(raw);
       // Refuse to attach history fetched for an identity which changed during the request.
       if (
-        latest.contact.email !== previous.contact.email ||
-        latest.contact.companyDomain !== previous.contact.companyDomain ||
+        !sameVerificationIdentity(latest.contact, previous.contact) ||
+        !isInOwnedIntakeScope(latest.contact) ||
         latest.contact.outreachProspectId !== previous.contact.outreachProspectId
       )
         throw new IntegrationError("INVALID_RESPONSE");

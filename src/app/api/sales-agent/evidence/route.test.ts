@@ -34,6 +34,7 @@ const request = (body: unknown, origin: string = "https://app.example.com") =>
 
 describe("authenticated evidence collection/review API", () => {
   beforeEach(() => {
+    vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "sales-user");
     vi.useFakeTimers();
     vi.setSystemTime(collectionNow);
     vi.mocked(getCurrentUser).mockResolvedValue({
@@ -49,6 +50,13 @@ describe("authenticated evidence collection/review API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects another approved user before reading the operator CRM", async () => {
+    vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "another-user");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(request({}))).status).toBe(403);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("blocks missing-Origin and Production collection before external reads", async () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);

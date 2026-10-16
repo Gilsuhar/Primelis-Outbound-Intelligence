@@ -33,6 +33,7 @@ const request = (
 const context = { params: Promise.resolve({ runId: "owned-run" }) };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "session-user");
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: "session-user",
     email: "test@example.com",
@@ -98,4 +99,15 @@ describe("authenticated real-agent API boundary", () => {
     expect(await response.text()).not.toContain("secret upstream value");
     expect((await POST(request("x".repeat(20001)))).status).toBe(413);
   });
+});
+
+it("prevents a different approved user from consuming the operator's provider account", async () => {
+  vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "different-operator");
+  expect((await POST(request())).status).toBe(403);
+  expect((await ADVANCE(request(), context)).status).toBe(403);
+  expect((await PATCH(request("{}", "https://preview.example", "PATCH"), context)).status).toBe(
+    403,
+  );
+  expect(calls.start).not.toHaveBeenCalled();
+  expect(calls.advance).not.toHaveBeenCalled();
 });

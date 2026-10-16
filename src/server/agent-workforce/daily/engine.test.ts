@@ -256,3 +256,17 @@ describe("durable daily controller — fictional fixtures", () => {
     expect((await engine.report("actor-b")).runs).toEqual([]);
   });
 });
+it("cannot retry an older job while a cancelled newer worker lease is draining", async () => {
+  const { engine, store } = setup();
+  const old = await engine.start("actor", "older-job-001", "MANUAL");
+  await engine.control("actor", old.id, "CANCEL");
+  const recent = await engine.start("actor", "newer-job-002", "MANUAL");
+  await store.change("actor", (s) => {
+    s.runs.find((r) => r.id === recent.id)!.lease = {
+      token: "inflight",
+      until: "2026-10-19T06:32:00Z",
+    };
+  });
+  await engine.control("actor", recent.id, "CANCEL");
+  await expect(engine.control("actor", old.id, "RETRY")).rejects.toThrow("VERSION_CONFLICT");
+});

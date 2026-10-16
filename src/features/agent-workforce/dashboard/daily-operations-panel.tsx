@@ -29,6 +29,7 @@ export function DailyOperationsPanel() {
       setReport(body.report);
       setNotice((current) => (current.startsWith("Daily operations unavailable.") ? "" : current));
     } catch {
+      setReport(null);
       setNotice(
         "Daily operations unavailable. Sign in as the configured operator and check database access; no substitute counts are shown.",
       );
@@ -95,7 +96,9 @@ export function DailyOperationsPanel() {
       )}
       {!report ? (
         <p className="mt-3 text-sm text-stone-600">
-          Loading persisted operations. No daily runs or spend have been assumed.
+          {notice.startsWith("Daily operations unavailable.")
+            ? "Restore operator and database access, then refresh to retry."
+            : "Loading persisted operations. No daily runs or spend have been assumed."}
         </p>
       ) : (
         <>

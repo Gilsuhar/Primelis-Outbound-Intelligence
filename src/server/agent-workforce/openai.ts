@@ -68,7 +68,12 @@ const outputSchema = z
   .object({
     status: z.string().optional(),
     output_text: z.string().optional(),
-    usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }).optional(),
+    usage: z
+      .object({
+        input_tokens: z.number().int().nonnegative().finite(),
+        output_tokens: z.number().int().nonnegative().finite(),
+      })
+      .optional(),
     output: z
       .array(
         z
@@ -186,18 +191,9 @@ export class OpenAiWorkforceModel implements WorkforceModel {
         const data = outputSchema.parse(await response.json());
         if (!data.usage)
           throw new WorkforceError("INVALID_MODEL_OUTPUT", "OpenAI usage metadata is missing");
-        const inputRate = Number(this.env.OPENAI_INPUT_USD_PER_MILLION),
-          outputRate = Number(this.env.OPENAI_OUTPUT_USD_PER_MILLION);
         const cost =
-          model === normalizeOpenAiModel(this.env.OPENAI_MODEL) &&
-          this.env.OPENAI_INPUT_USD_PER_MILLION &&
-          this.env.OPENAI_OUTPUT_USD_PER_MILLION &&
-          Number.isFinite(inputRate) &&
-          Number.isFinite(outputRate) &&
-          inputRate >= 0 &&
-          outputRate >= 0
-            ? (data.usage.input_tokens * inputRate + data.usage.output_tokens * outputRate) / 1e6
-            : null;
+          (data.usage.input_tokens * rates.input + data.usage.output_tokens * rates.output) / 1e6 +
+          toolCost;
         await reservation.finish({
           estimatedUsd:
             (data.usage.input_tokens * rates.input + data.usage.output_tokens * rates.output) /

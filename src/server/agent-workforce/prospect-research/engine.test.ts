@@ -321,7 +321,7 @@ it("excludes a positively suppressed contact before any provider call", async ()
 
 it("persists terminal recovery when a third attempt is interrupted", async () => {
   const ctx = await setup();
-  const run = await finish(ctx);
+  let run = await finish(ctx);
   const expected = run.version;
   run.version++;
   run.leaseUntil = "2026-10-15T18:00:30Z";

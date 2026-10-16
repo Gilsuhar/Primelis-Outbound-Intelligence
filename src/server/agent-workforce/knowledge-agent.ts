@@ -26,6 +26,7 @@ export async function loadApprovedProductKnowledge(
     FROM "KnowledgeItem" k
     JOIN "_KnowledgeItemSources" ks ON ks."A" = k.id
     JOIN "SourceDocument" s ON s.id = ks."B" AND s."approvalStatus" = 'APPROVED'
+      AND COALESCE(s."usageRestrictions", '') !~* 'internal.only|confidential|do not use|restricted|reply.only|deck.only|needs review'
     WHERE k."approvalStatus" = 'APPROVED' AND k."productScope" = 'Signal'
       AND 'EMAIL' = ANY(k.channels) AND k."approvedWording" IS NOT NULL
       AND k.type::text IN ('PRODUCT_TRUTH', 'ICP')
@@ -37,6 +38,7 @@ export async function loadApprovedProductKnowledge(
     FROM "Claim" c JOIN "Product" p ON p.id = c."productId" AND p.name = 'Signal'
     JOIN "_ClaimSources" cs ON cs."A" = c.id
     JOIN "SourceDocument" s ON s.id = cs."B" AND s."approvalStatus" = 'APPROVED'
+      AND COALESCE(s."usageRestrictions", '') !~* 'internal.only|confidential|do not use|restricted|reply.only|deck.only|needs review'
     WHERE c."approvalStatus" = 'APPROVED' AND 'EMAIL' = ANY(c."allowedChannels") AND c."approvedWording" IS NOT NULL GROUP BY c.id
     LIMIT 24
   `;
@@ -64,9 +66,22 @@ export async function loadApprovedProductKnowledge(
   for (const raw of cases) {
     const c = raw as Record<string, unknown>;
     const sources = Array.isArray(c.sources)
-      ? (c.sources as { id: string; externalUrl?: string; approvalStatus: string }[])
+      ? (c.sources as {
+          id: string;
+          externalUrl?: string;
+          approvalStatus: string;
+          usageRestrictions?: string;
+        }[])
       : [];
-    const sourceIds = sources.filter((s) => s.approvalStatus === "APPROVED").map((s) => s.id);
+    const sourceIds = sources
+      .filter(
+        (s) =>
+          s.approvalStatus === "APPROVED" &&
+          !/internal.only|confidential|do not use|restricted|reply.only|deck.only|needs review/i.test(
+            s.usageRestrictions ?? "",
+          ),
+      )
+      .map((s) => s.id);
     const proof = {
       id: String(c.id),
       title: String(c.title),
@@ -77,7 +92,14 @@ export async function loadApprovedProductKnowledge(
       usageRestrictions: String(c.usageRestrictions ?? ""),
       sourceIds,
     };
-    if (!isEligibleProof(proof)) continue;
+    if (
+      !isEligibleProof(proof) ||
+      !["EMAIL_AND_LINKEDIN", "PUBLIC_MARKETING"].includes(proof.usageScope) ||
+      /internal.only|confidential|do not use|restricted|reply.only|deck.only|needs review/i.test(
+        proof.usageRestrictions,
+      )
+    )
+      continue;
     const parsed = knowledgeRecordSchema.safeParse({
       id: proof.id,
       title: proof.title,
@@ -86,7 +108,14 @@ export async function loadApprovedProductKnowledge(
       restrictions: proof.usageRestrictions,
       sourceIds,
       sourceUrls: sources
-        .filter((s) => s.approvalStatus === "APPROVED" && s.externalUrl?.startsWith("https://"))
+        .filter(
+          (s) =>
+            s.approvalStatus === "APPROVED" &&
+            !/internal.only|confidential|do not use|restricted|reply.only|deck.only|needs review/i.test(
+              s.usageRestrictions ?? "",
+            ) &&
+            s.externalUrl?.startsWith("https://"),
+        )
         .map((s) => s.externalUrl),
     });
     if (parsed.success) records.push(parsed.data);
