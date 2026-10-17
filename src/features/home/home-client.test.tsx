@@ -14,6 +14,12 @@ describe("Home mobile workspace", () => {
     expect(link.getAttribute("href")).toBe("/sales-agent");
     expect(title.closest("section")?.contains(link)).toBe(true);
     expect(link.closest("section")?.className).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
+    expect(link.className).toContain("min-h-12");
+    expect(link.className).toContain("w-full");
+    expect(screen.getByText("New workspace")).toBeTruthy();
+    const legacyShortcut = screen.getByRole("link", { name: "Use legacy Signal tools" });
+    expect(legacyShortcut.getAttribute("href")).toBe("#legacy-signal-tools");
+    expect(document.getElementById("legacy-signal-tools")).toBeTruthy();
     const legacy = screen.getByRole("heading", { name: "Legacy Signal tools" });
     expect(title.compareDocumentPosition(legacy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: /Learn Signal/ }).getAttribute("href")).toBe(

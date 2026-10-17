@@ -40,12 +40,14 @@ describe("AppShell responsive navigation", () => {
     expect(direct.getAttribute("href")).toBe("/sales-agent");
     expect(direct.closest("details")).toBeNull();
     expect(direct.className).toContain("min-h-11");
+    expect(direct.className).not.toContain("lg:hidden");
     const menu = container.querySelector("details")!;
     menu.open = true;
     expect(within(menu).getByRole("link", { name: "Agent Workforce" }).getAttribute("href")).toBe(
       "/sales-agent",
     );
     expect(within(menu).getByRole("navigation", { name: "Legacy Signal tools" })).toBeTruthy();
+    expect(within(menu).getByRole("link", { name: "Agent Workforce" }).textContent).toContain("New");
     expect(within(menu).getByRole("link", { name: "Build Sequence" }).getAttribute("href")).toBe(
       "/build-sequence",
     );

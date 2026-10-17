@@ -59,6 +59,14 @@ function NavigationSection({
               <span className="min-w-0 truncate">
                 {translateNavigationLabel(item.label, language)}
               </span>
+              {item.href === "/sales-agent" && (
+                <span
+                  aria-hidden="true"
+                  className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                >
+                  New
+                </span>
+              )}
             </Link>
           );
         })}
@@ -150,7 +158,7 @@ export function AppShell({
         </div>
 
         <Link
-          className="mx-auto mt-4 flex min-h-11 max-w-6xl items-center justify-center gap-2 rounded-xl bg-signal px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive lg:hidden"
+          className="mx-auto mt-4 flex min-h-11 max-w-6xl items-center justify-center gap-2 rounded-xl bg-signal px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d4e5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive"
           href="/sales-agent"
         >
           Open Agent Workforce

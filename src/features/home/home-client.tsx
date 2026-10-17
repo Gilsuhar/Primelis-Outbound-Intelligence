@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { useOutputLanguage } from "@/components/language-selector";
-import { SignalCard, SignalHero } from "@/components/signal-ui";
+import { SignalCard } from "@/components/signal-ui";
 import { adminNavigation } from "@/lib/navigation";
 import { translateNavigationLabel, translateUi } from "@/lib/ui-translations";
 
@@ -115,15 +115,37 @@ export function HomeClient({ showAdmin }: { showAdmin: boolean }) {
 
   return (
     <div className="space-y-5 sm:space-y-8">
-      <SignalHero
-        action={{ href: "/sales-agent", label: "Open Agent Workforce" }}
-        compactOnMobile
-        description="Research a company and prospect, explore a sales strategy, and review four personalized email drafts before human approval."
-        eyebrow="Primelis Signal · AI research and drafting"
-        title="Agent Workforce"
-      />
+      <section
+        aria-label="Agent Workforce workspace"
+        className="rounded-2xl bg-signal p-5 text-white shadow-soft sm:p-8"
+      >
+        <span className="inline-flex rounded-full bg-lime px-3 py-1 text-xs font-bold uppercase tracking-wide text-ink">
+          New workspace
+        </span>
+        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight sm:text-5xl">
+          Agent Workforce
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 sm:text-base">
+          Your workspace for company research, prospect review and personalized email drafts. Review
+          the evidence and drafts before human approval.
+        </p>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+          <Link
+            href="/sales-agent"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-lime px-5 py-3 text-sm font-bold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-auto"
+          >
+            Open Agent Workforce <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+          </Link>
+          <a
+            href="#legacy-signal-tools"
+            className="inline-flex min-h-11 items-center justify-center text-sm font-medium underline underline-offset-4 sm:justify-start"
+          >
+            Use legacy Signal tools
+          </a>
+        </div>
+      </section>
 
-      <div className="space-y-1">
+      <div id="legacy-signal-tools" className="scroll-mt-4 space-y-1">
         <h2 className="text-xl font-semibold text-ink">Legacy Signal tools</h2>
         <p className="text-sm text-[#6f6d5f]">
           Your existing Playbook, research and outreach tools remain available below.
