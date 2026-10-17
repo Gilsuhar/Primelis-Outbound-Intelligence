@@ -183,6 +183,28 @@ describe("Supabase auth callback", () => {
     );
   });
 
+  it.each([
+    [new Error("PREVIEW_DATABASE_ISOLATION_REQUIRED"), "preview_database_configuration"],
+    [
+      { code: "P1000", message: "sensitive database credentials" },
+      "profile_database_authentication",
+    ],
+    [{ code: "P1001", message: "sensitive database host" }, "profile_database_unavailable"],
+    [{ code: "P2021", message: "sensitive table name" }, "profile_database_schema"],
+    [{ code: "P2022", message: "sensitive column name" }, "profile_database_schema"],
+    [new Error("sensitive unexpected failure"), "profile_lookup_failed"],
+  ])(
+    "shows a safe cause after successful OAuth and failed profile lookup (%s)",
+    async (error, code) => {
+      const exchange = mockCodeExchange({});
+      resolveApplicationUserMock.mockRejectedValue(error);
+      const response = await GET(callbackRequest("/auth/callback?code=sensitive-code"));
+      expect(response.headers.get("location")).toBe(`https://preview.example/login?error=${code}`);
+      expect(response.headers.get("location")).not.toContain("sensitive");
+      expect(exchange.signOut).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("rejects a Google account without an email and signs out immediately", async () => {
     const exchange = mockCodeExchange({ user: { id: "auth-user-id", email: null } });
 

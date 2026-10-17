@@ -1,10 +1,9 @@
+import React from "react";
 import { redirect } from "next/navigation";
+import { parseLoginError } from "@/lib/auth/login-errors";
 
 import { getCurrentUser, getSupabaseAuthUser } from "@/lib/auth/server";
-import {
-  getSafeInternalPath,
-  resolveLoginScreenState,
-} from "@/lib/private-preview-auth";
+import { getSafeInternalPath, resolveLoginScreenState } from "@/lib/private-preview-auth";
 
 import { PrivatePasswordLogin } from "./private-password-login";
 
@@ -27,10 +26,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     hasApplicationUser: Boolean(applicationUser),
   });
 
-  if (state === "SIGNED_IN") redirect(getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent"));
+  if (state === "SIGNED_IN")
+    redirect(getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent"));
 
   return (
     <PrivatePasswordLogin
+      loginError={parseLoginError(getSingleParam(params.error))}
       accessPending={state === "ACCESS_PENDING"}
       nextPath={getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent")}
     />

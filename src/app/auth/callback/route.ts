@@ -3,6 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
+import { profileLookupError } from "@/lib/auth/login-errors";
+import type { LoginErrorCode } from "@/lib/private-preview-auth";
 import {
   getSafeSupabaseCallbackError,
   getSafeSupabaseError,
@@ -25,10 +27,7 @@ function getSafeRedirectUrl(request: NextRequest) {
   return new URL(next, request.url);
 }
 
-function getLoginErrorUrl(
-  request: NextRequest,
-  error: "access_denied" | "configuration_error" | "oauth_failed",
-) {
+function getLoginErrorUrl(request: NextRequest, error: LoginErrorCode) {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("error", error);
   return loginUrl;
@@ -149,7 +148,7 @@ export async function GET(request: NextRequest) {
       email_confirmed_at: user.email_confirmed_at,
       is_anonymous: user.is_anonymous,
     });
-  } catch {
+  } catch (error) {
     logAuthDiagnostic("warn", {
       operation: "google_oauth",
       stage: "callback_application_user_lookup_failed",
@@ -160,7 +159,7 @@ export async function GET(request: NextRequest) {
     });
     await supabase.auth.signOut();
     return redirectWithCookies(
-      getLoginErrorUrl(request, "configuration_error"),
+      getLoginErrorUrl(request, profileLookupError(error)),
       cookiesToSet,
       headersToSet,
     );

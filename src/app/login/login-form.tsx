@@ -6,17 +6,11 @@ import Image from "next/image";
 
 import { continueWithGoogle, requestLoginLink, signOutAction } from "@/app/auth/actions";
 import type { LoginErrorCode } from "@/lib/private-preview-auth";
+import { loginErrorMessages } from "@/lib/auth/login-errors";
 
 const initialState = {
   ok: false,
   message: "",
-};
-
-const loginErrorMessages: Record<LoginErrorCode, string> = {
-  access_denied: "This Google account is not approved for the private preview.",
-  configuration_error: "Private preview authentication is not configured correctly.",
-  oauth_failed: "We could not finish Google sign-in. Please try again.",
-  oauth_start_failed: "We could not start Google sign-in. Please try again.",
 };
 
 function PendingSubmitButton({

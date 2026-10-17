@@ -20,9 +20,22 @@ export type PublicUser = {
 export type LoginScreenState = "LOGIN_FORM" | "ACCESS_PENDING" | "SIGNED_IN";
 
 export type LoginErrorCode =
-  "access_denied" | "configuration_error" | "oauth_failed" | "oauth_start_failed";
+  | "access_denied"
+  | "configuration_error"
+  | "oauth_failed"
+  | "oauth_start_failed"
+  | "preview_database_configuration"
+  | "profile_database_authentication"
+  | "profile_database_unavailable"
+  | "profile_database_schema"
+  | "profile_lookup_failed";
 
-export const publicRoutes = ["/login", "/auth/callback", "/auth/reset-password", "/favicon.ico"] as const;
+export const publicRoutes = [
+  "/login",
+  "/auth/callback",
+  "/auth/reset-password",
+  "/favicon.ico",
+] as const;
 
 export const adminRoutePrefixes = [
   "/knowledge-library",
