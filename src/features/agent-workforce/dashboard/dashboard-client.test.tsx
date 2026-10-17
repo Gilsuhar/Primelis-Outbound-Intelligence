@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DashboardView, SafeSource, WorkforceDashboard } from "./dashboard-client";
 import { getWorkforceDashboard } from "@/server/agent-workforce/dashboard/service";
 import { collectSalesAgentEvidence } from "@/server/services/sales-agent-collection-service";
@@ -37,6 +37,39 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("operational dashboard without invented records", () => {
+  it("renders integration actions for a successful dashboard response without sync metadata", async () => {
+    const data = await fixture();
+    data.integrations = data.integrations.map((integration) => ({
+      ...integration,
+      status: integration.id === "HUBSPOT" ? "CONFIGURED_UNTESTED" : integration.status,
+      detail:
+        integration.id === "OUTREACH"
+          ? "No read-only history/sequence adapter is registered. Unknown outbound, suppression and active sequence history means HOLD. Writes and enrollment are disabled."
+          : integration.detail,
+    }));
+    expect(data.integrations.find((integration) => integration.id === "OUTREACH")?.status).toBe(
+      "NOT_IMPLEMENTED",
+    );
+    expect(data.integrations.every((integration) => integration.sync === undefined)).toBe(true);
+    const fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url === "/api/sales-agent/dashboard"
+          ? { ok: true, data }
+          : { ok: false, message: "Unrelated panel unavailable" },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    render(<WorkforceDashboard />);
+    await screen.findByRole("link", { name: /Fixture Prospect/ });
+    const health = within(screen.getByRole("region", { name: "Integration Health" }));
+    for (const name of ["HubSpot", "Outreach"]) {
+      const card = health.getByRole("heading", { name }).closest("li")!;
+      expect(within(card).getByRole("button", { name: "Check access" })).toBeTruthy();
+      expect(within(card).getByRole("button", { name: "Sync read-only" })).toBeTruthy();
+    }
+    expect(health.queryByRole("button", { name: "Resume sync" })).toBeNull();
+    expect(fetch.mock.calls.every(([url]) => url !== "/api/sales-agent/integrations")).toBe(true);
+  });
   it("renders actionable empty states with secondary Manual Research, not an intake form", async () => {
     const data = await fixture();
     data.prospects = [];
