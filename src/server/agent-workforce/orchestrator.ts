@@ -1,4 +1,5 @@
 import "server-only";
+import { qualityReviewPassed } from "./oiq";
 import { strategyGroundingConcerns } from "./commercial-quality";
 import { BudgetError } from "./daily/budget";
 import { z } from "zod";
@@ -215,6 +216,7 @@ export class WorkforceOrchestrator {
     } else if (stage === "SEQUENCE") {
       await this.assertKnowledgeCurrent(run);
       run.sequence = await generatePersonalSequence(run, this.model);
+      run.critic = null;
       run.issues = validateSequence(run, run.sequence);
       run.contentHash = digest(run.sequence);
     } else if (stage === "QUALITY_REVIEW") {
@@ -227,7 +229,7 @@ export class WorkforceOrchestrator {
       }
       if (!run.sequence) throw new WorkforceError("INVALID_MODEL_OUTPUT", "No sequence to review");
       run.issues = validateSequence(run, run.sequence);
-      run.critic = await reviewSequenceWithAi(run, this.model);
+      run.critic = await reviewSequenceWithAi(run, this.model, this.now());
       const critic = run.critic;
       if ((await this.store.list(actor)).some((other) => duplicatesAnotherProspect(run, other)))
         run.issues.push(
@@ -237,6 +239,7 @@ export class WorkforceOrchestrator {
         ...new Set([...run.issues, ...critic.concerns, ...critic.unsupportedAssertions]),
       ];
       const pass =
+        qualityReviewPassed(run, this.now()) &&
         critic.verdict === "PASS" &&
         Object.values(critic.checks).every(Boolean) &&
         new Set(critic.checkedSteps).size === 4 &&
@@ -245,6 +248,11 @@ export class WorkforceOrchestrator {
         run.status = "READY_FOR_REVIEW";
         run.sequence.review = { verdict: "NEEDS_REVIEW", concerns: [] };
         run.contentHash = digest(run.sequence);
+        return;
+      }
+      if (critic.oiq?.decision === "BLOCKED") {
+        run.status = "GENERATION_FAILED";
+        run.sequence.review = { verdict: "HOLD", concerns: run.issues };
         return;
       }
       if (run.revisionAttempts < 1) {

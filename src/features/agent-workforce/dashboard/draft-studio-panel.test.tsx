@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DraftStudioPanel } from "./draft-studio-panel";
 import { draftStudioSchema } from "../gate-a-contracts";
 import { getWorkforceDashboard } from "@/server/agent-workforce/dashboard/service";
@@ -74,6 +74,7 @@ async function fixture() {
         contentHash: "b".repeat(64),
         messages: run.sequence!.messages,
         qualityDecision: "PASS",
+        oiq: run.critic?.oiq,
       },
     ],
     events: [],
@@ -171,3 +172,44 @@ describe("persistent review-first studio controls", () => {
     expect(screen.getByText(/Development-only synthetic previews/)).toBeTruthy();
   });
 });
+
+it("shows the total, weighted components, traceable evidence and concrete OIQ suggestions", async () => {
+  const { prospect, run } = await fixture();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async () => Response.json({ ok: true, run })),
+  );
+  render(<DraftStudioPanel prospect={prospect} runs={[]} />);
+  await screen.findByLabelText("Email body 1");
+  const assessment = within(screen.getAllByRole("region", { name: "Outreach Insight Quality" })[0]);
+  expect(assessment.getByText(/93\/100/)).toBeTruthy();
+  expect(assessment.getByText("Company-specific insight")).toBeTruthy();
+  expect(assessment.getByText("Verified supporting evidence")).toBeTruthy();
+  expect(assessment.getByText("Relevance to Search responsibilities")).toBeTruthy();
+  expect(assessment.getByText("Commercially interesting angle")).toBeTruthy();
+  expect(assessment.getByText("Natural writing and low-friction CTA")).toBeTruthy();
+  expect(assessment.getByText(/not a prediction of replies or meetings/)).toBeTruthy();
+  expect(assessment.getByText(/Ask about the current coverage/)).toBeTruthy();
+  expect(
+    assessment.getAllByRole("link").every((a) => a.getAttribute("href")?.startsWith("https://")),
+  ).toBe(true);
+});
+it.each(["REVISE", "BLOCKED"] as const)(
+  "keeps approval disabled for OIQ %s despite a stale PASS label",
+  async (decision) => {
+    const { prospect, run } = await fixture();
+    run.critic!.oiq!.decision = decision;
+    run.critic!.oiq!.weakPersonalization = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => Response.json({ ok: true, run })),
+    );
+    render(<DraftStudioPanel prospect={prospect} runs={[]} />);
+    await screen.findByLabelText("Email body 1");
+    expect(
+      (screen.getByRole("button", { name: "Approve content for review" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(screen.getAllByText(/Weak personalization/).length).toBeGreaterThan(0);
+  },
+);

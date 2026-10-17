@@ -483,3 +483,111 @@ it("resumes personalization after provider configuration becomes available inste
   expect(run.draftStudio?.approval).toBeNull();
   expect(run.canSend).toBe(false);
 });
+
+it("retains OIQ per version and requires a new assessment after human edits", async () => {
+  const ctx = await setup();
+  let run = await finish(ctx);
+  const first = structuredClone(run.critic!.oiq!);
+  expect(first.score).toBe(93);
+  expect(run.draftStudio!.versions[0].oiq).toEqual(first);
+  run = await ctx.engine.mutate("actor", run.id, {
+    action: "APPROVE",
+    expectedVersion: run.version,
+    requestKey: "oiq-first-approval",
+  });
+  const messages = structuredClone(run.sequence!.messages);
+  messages[3].body += " Happy to leave the timing with you.";
+  run = await ctx.engine.mutate("actor", run.id, {
+    action: "EDIT",
+    expectedVersion: run.version,
+    requestKey: "oiq-human-edit",
+    messages,
+  });
+  expect(run.critic).toBeNull();
+  expect(run.draftStudio!.approval).toBeNull();
+  expect(run.draftStudio!.versions[0].oiq).toEqual(first);
+  expect(run.draftStudio!.versions[1].oiq).toBeUndefined();
+  run = await ctx.engine.advance("actor", run.id);
+  expect(run.critic!.oiq!.contentHash).not.toBe(first.contentHash);
+  expect(run.draftStudio!.versions[1].oiq).toEqual(run.critic!.oiq);
+  expect(run.canSend || run.canEnroll).toBe(false);
+});
+it("revises company-name substitution once and blocks it after retry exhaustion", async () => {
+  const ctx = await setup(),
+    original = ctx.model.structured.bind(ctx.model);
+  ctx.model.structured = async (stage, schema, instruction, context, usage) => {
+    const value = await original(stage, schema, instruction, context, usage);
+    if (stage === "QUALITY_REVIEW")
+      (
+        value as { oiq: { companySwapTest: { equallyRelevant: boolean } } }
+      ).oiq.companySwapTest.equallyRelevant = true;
+    return value;
+  };
+  const run = await finish(ctx);
+  expect(run.critic!.oiq!.decision).toBe("REVISE");
+  expect(run.status).toBe("GENERATION_FAILED");
+  expect(ctx.model.calls.filter((s) => s === "SEQUENCE")).toHaveLength(2);
+  await expect(
+    ctx.engine.mutate("actor", run.id, {
+      action: "APPROVE",
+      expectedVersion: run.version,
+      requestKey: "oiq-denied-approval",
+    }),
+  ).rejects.toThrow("QUALITY_REVIEW_REQUIRED");
+});
+it("blocks missing core evidence without spending a rewrite trying to invent it", async () => {
+  const ctx = await setup(),
+    original = ctx.model.structured.bind(ctx.model);
+  ctx.model.structured = async (stage, schema, instruction, context, usage) => {
+    const value = await original(stage, schema, instruction, context, usage);
+    if (stage === "QUALITY_REVIEW")
+      (value as { oiq: { missingCoreEvidence: string[] } }).oiq.missingCoreEvidence = [
+        "No evidence supports the core commercial observation",
+      ];
+    return value;
+  };
+  const run = await finish(ctx);
+  expect(run.critic!.oiq!.decision).toBe("BLOCKED");
+  expect(run.draftStudio!.qualityDecision).toBe("BLOCKED");
+  expect(ctx.model.calls.filter((s) => s === "SEQUENCE")).toHaveLength(1);
+});
+it("requires OIQ for legacy unscored drafts and invalidates an old approval rather than grandfathering it", async () => {
+  const ctx = await setup();
+  let run = await finish(ctx);
+  run = await ctx.engine.mutate("actor", run.id, {
+    action: "APPROVE",
+    expectedVersion: run.version,
+    requestKey: "legacy-approval",
+  });
+  delete run.critic!.oiq;
+  const expected = run.version;
+  run.version++;
+  await ctx.store.change("actor", expected, run);
+  const read = await ctx.engine.read("actor", run.id);
+  expect(read.draftStudio!.reviewStatus).toBe("INVALIDATED");
+  expect(read.draftStudio!.approval).toBeNull();
+  expect(read.sequence).toBeNull();
+});
+
+it("preserves historical OIQ when an identical regeneration is waiting for a new review", async () => {
+  const ctx = await setup();
+  let run = await finish(ctx);
+  const original = structuredClone(run.critic!.oiq);
+  run = await ctx.engine.mutate("actor", run.id, {
+    action: "REGENERATE",
+    expectedVersion: run.version,
+    requestKey: "same-content-regeneration",
+  });
+  run = await ctx.engine.advance("actor", run.id);
+  expect(run.stage).toBe("QUALITY_REVIEW");
+  expect(run.critic).toBeNull();
+  expect(run.draftStudio!.qualityDecision).toBeNull();
+  expect(run.draftStudio!.versions[0].oiq).toEqual(original);
+  await expect(
+    ctx.engine.mutate("actor", run.id, {
+      action: "APPROVE",
+      expectedVersion: run.version,
+      requestKey: "cannot-approve-old-oiq",
+    }),
+  ).rejects.toThrow("VERSION_CONFLICT");
+});

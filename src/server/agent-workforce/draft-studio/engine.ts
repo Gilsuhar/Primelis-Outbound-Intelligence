@@ -1,4 +1,5 @@
 import "server-only";
+import { qualityReviewPassed, oiqContentHash } from "../oiq";
 import { z } from "zod";
 import { messageSchema, type WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
 import { snapshotSchema } from "@/server/services/sales-agent-collection-service";
@@ -268,9 +269,15 @@ export class DraftStudioEngine {
           approval.dependencyHash !== ctx.dependencyHash ||
           run.status !== "READY_FOR_REVIEW" ||
           run.draftStudio.qualityDecision !== "PASS" ||
+          !qualityReviewPassed(run, this.now()) ||
           validateSequence(run, run.sequence!).length)
       )
         throw new Error("APPROVAL_INVALIDATED");
+      if (run.status === "READY_FOR_REVIEW" && !qualityReviewPassed(run, this.now())) {
+        run.draftStudio.qualityDecision =
+          run.critic?.oiq?.decision === "BLOCKED" ? "BLOCKED" : "REVISE";
+        run.issues = [...new Set([...run.issues, "OIQ_REVIEW_REQUIRED"])];
+      }
       return run;
     } catch (error) {
       if (run.draftStudio.reviewStatus === "INVALIDATED") return this.redact(run);
@@ -305,6 +312,10 @@ export class DraftStudioEngine {
         qualityDecision: "PENDING",
       });
     }
+    // An identical rewrite is still the same content version. Keep its historical
+    // assessment while a fresh review is pending; never use that history as current approval.
+    if (run.critic?.oiq?.contentHash === oiqContentHash(run))
+      meta.versions.at(-1)!.oiq = structuredClone(run.critic.oiq);
     meta.versions.at(-1)!.qualityDecision =
       run.status === "READY_FOR_REVIEW" ? "PASS" : (meta.qualityDecision ?? "PENDING");
   }
@@ -457,6 +468,7 @@ export class DraftStudioEngine {
       if (
         run.status !== "READY_FOR_REVIEW" ||
         current.qualityDecision !== "PASS" ||
+        !qualityReviewPassed(run, this.now()) ||
         !run.sequence ||
         validateSequence(run, run.sequence).length
       )

@@ -2,6 +2,47 @@ import type { z } from "zod";
 import type { WorkforceIntake, WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
 import { initialRun, type WorkforceStore } from "@/server/agent-workforce/store";
 import type { WorkforceModel } from "@/server/agent-workforce/openai";
+export const syntheticOiqJudgment = (factIds = ["account:business", "prospect:position"]) => ({
+  components: {
+    companyInsight: {
+      score: 28,
+      reason:
+        "Synthetic reviewer: the company business context supports a specific coverage question",
+    },
+    verifiedEvidence: {
+      score: 24,
+      reason: "Synthetic reviewer: exact sourced company facts support the insight",
+    },
+    searchRelevance: {
+      score: 18,
+      reason:
+        "Synthetic reviewer: verified Search role supports relevance without inventing responsibilities",
+    },
+    commercialAngle: {
+      score: 14,
+      reason:
+        "Synthetic reviewer: useful decision question rather than an unmeasured savings claim",
+    },
+    writingAndCta: {
+      score: 9,
+      reason: "Synthetic reviewer: concise language and one low-friction invitation",
+    },
+  },
+  coreInsight: {
+    summary:
+      "Synthetic source-backed company context supports a branded-coverage decision question",
+    factIds,
+    observationIds: [] as string[],
+    messageSteps: [1],
+  },
+  companySwapTest: {
+    equallyRelevant: false,
+    reason: "Synthetic reviewer: the cited business context is material to this inquiry",
+  },
+  unsupportedClaims: [] as string[],
+  missingCoreEvidence: [] as string[],
+  improvements: ["Ask about the current coverage decision process before proposing a test"],
+});
 export const testNow = new Date("2026-10-15T18:00:00Z");
 export const workforceIntake: WorkforceIntake = {
   companyName: "Test Company",
@@ -179,6 +220,11 @@ export class MockWorkforceModel implements WorkforceModel {
             ? []
             : [
                 {
+                  text: `${c.intake.companyName} sells outdoor equipment through its online store.`,
+                  factIds: ["account:business"],
+                  knowledgeIds: [],
+                },
+                {
                   text: "Signal monitors branded search conditions.",
                   factIds: [],
                   knowledgeIds: ["product-1"],
@@ -192,6 +238,7 @@ export class MockWorkforceModel implements WorkforceModel {
       };
     else if (stage === "QUALITY_REVIEW")
       payload = {
+        oiq: syntheticOiqJudgment(),
         verdict: this.revise ? "REVISE" : "PASS",
         checks: {
           factualAccuracy: true,

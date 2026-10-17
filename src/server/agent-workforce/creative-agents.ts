@@ -7,6 +7,7 @@ import {
   type WorkforceRun,
 } from "@/features/agent-workforce/gate-a-contracts";
 import type { WorkforceModel } from "./openai";
+import { assessOiq, oiqReviewInstruction } from "./oiq";
 import { commercialRelevanceRubric, writingQualityRubric } from "./commercial-quality";
 
 /** Drafting reuses verified evidence rather than paying to resend every fetched page. */
@@ -115,13 +116,19 @@ export async function generatePersonalSequence(run: WorkforceRun, model: Workfor
     ),
   );
 }
-export function reviewSequenceWithAi(run: WorkforceRun, model: WorkforceModel) {
-  return model.structured(
+export async function reviewSequenceWithAi(
+  run: WorkforceRun,
+  model: WorkforceModel,
+  now: Date = new Date(),
+) {
+  const review = await model.structured(
     "QUALITY_REVIEW",
     creativeCriticSchema,
     (run.draftStudio
       ? "Review Gil’s preferred natural, concise, non-salesy style, appropriate length, a proportionate low-friction CTA and meaningful progression without repeated pitches. Assess progression in context; these purposes are guidance, not a requirement to force an irrelevant incrementality pitch. Read optional SERP observations conservatively: one snapshot is not a pattern and an advertiser is not automatically a competitor. Check all supportingObservationIds and assertion observationIds. Reject unsupported statistics, CPC, savings and product claims, including those absent from the assertion ledger. "
       : "") +
+      oiqReviewInstruction +
+      " " +
       commercialRelevanceRubric +
       " " +
       writingQualityRubric +
@@ -139,4 +146,23 @@ export function reviewSequenceWithAi(run: WorkforceRun, model: WorkforceModel) {
     },
     run.usage,
   );
+  const oiq = assessOiq(run, review.oiq, review, now);
+  return {
+    ...review,
+    oiq,
+    verdict:
+      oiq.decision === "BLOCKED"
+        ? ("HOLD" as const)
+        : oiq.decision === "REVISE" && review.verdict === "PASS"
+          ? ("REVISE" as const)
+          : review.verdict,
+    concerns: [
+      ...new Set([
+        ...review.concerns,
+        ...(oiq.decision === "READY_FOR_HUMAN_REVIEW"
+          ? []
+          : [`OIQ ${oiq.score}/100: ${oiq.decision}`, ...oiq.blockingReasons, ...oiq.improvements]),
+      ]),
+    ].slice(0, 20),
+  };
 }

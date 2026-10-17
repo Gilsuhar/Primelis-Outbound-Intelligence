@@ -1,4 +1,5 @@
 import "server-only";
+import { qualityReviewPassed } from "../oiq";
 import { opportunityPriority, compareOpportunityPriority } from "../opportunity-priority";
 import { researchIdentity } from "../prospect-research/engine";
 import { integrationEligibilityBlockers } from "@/server/integrations/eligibility";
@@ -62,6 +63,7 @@ export function summarizeRun(run: WorkforceRun, now: Date): RunSummary {
     draftStatus:
       run.status === "READY_FOR_REVIEW" &&
       run.sequence &&
+      qualityReviewPassed(run, now) &&
       run.critic?.verdict === "PASS" &&
       Object.values(run.critic.checks).every(Boolean) &&
       !run.issues.length &&

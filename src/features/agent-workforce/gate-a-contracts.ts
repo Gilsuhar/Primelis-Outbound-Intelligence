@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { oiqJudgmentSchema, oiqAssessmentSchema } from "./oiq-contracts";
 import {
   prospectResearchSchema,
   serpObservationSchema,
@@ -182,6 +183,7 @@ export const creativeSequenceSchema = sequenceSchema.extend({ creativePlan: crea
 export type WorkforceSequence = z.infer<typeof sequenceSchema>;
 export const criticSchema = z
   .object({
+    oiq: oiqAssessmentSchema.optional(),
     verdict: z.enum(["PASS", "REVISE", "HOLD"]),
     checks: z
       .object({
@@ -202,6 +204,7 @@ export const criticSchema = z
   })
   .strict();
 export const creativeCriticSchema = criticSchema.extend({
+  oiq: oiqJudgmentSchema,
   checks: criticSchema.shape.checks.extend({ originality: z.boolean(), strategicFit: z.boolean() }),
 });
 export const groundingReviewSchema = z
@@ -263,6 +266,7 @@ export const draftStudioSchema = z
             contentHash: text(64),
             messages: z.array(messageSchema).length(4).nullable(),
             qualityDecision: z.enum(["PENDING", "PASS", "REVISE", "BLOCKED"]),
+            oiq: oiqAssessmentSchema.optional(),
           })
           .strict(),
       )

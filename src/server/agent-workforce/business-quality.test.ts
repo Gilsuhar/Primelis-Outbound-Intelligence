@@ -5,6 +5,7 @@ import { creativeSequenceSchema } from "@/features/agent-workforce/gate-a-contra
 import { qualityCases, qualityFixture } from "@/test/workforce-quality-fixtures";
 import { MemoryEvidenceStore } from "@/test/sales-agent-collection-fixtures";
 import {
+  syntheticOiqJudgment,
   MemoryWorkforceStore,
   MockWorkforceModel,
   testNow,
@@ -79,6 +80,7 @@ describe("synthetic commercial goldens — editorial targets, not live model eva
               : stage === "SEQUENCE"
                 ? f.sequence
                 : {
+                    oiq: syntheticOiqJudgment(["account:business", "prospect:remit"]),
                     verdict: "PASS",
                     checks: {
                       factualAccuracy: true,
@@ -100,7 +102,7 @@ describe("synthetic commercial goldens — editorial targets, not live model eva
       };
       f.run.strategy = await chooseSalesStrategy(f.run, model);
       f.run.sequence = await generatePersonalSequence(f.run, model);
-      expect((await reviewSequenceWithAi(f.run, model)).verdict).toBe("PASS");
+      expect((await reviewSequenceWithAi(f.run, model, testNow)).verdict).toBe("PASS");
       expect(prompts[1]).toContain("do not stack a meeting");
       expect(prompts[2]).toContain("question is not a license");
       expect(vi.mocked(fetch)).not.toHaveBeenCalled();

@@ -1,11 +1,14 @@
 "use client";
 import Link from "next/link";
+import { OiqReview } from "./oiq-review";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { DashboardProspect, RunSummary } from "./contracts";
 import type { WorkforceRun, WorkforceSequence } from "../gate-a-contracts";
 const button =
   "min-h-11 rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50";
 const issueText: Record<string, string> = {
+  OIQ_REVIEW_REQUIRED:
+    "OIQ assessment is missing or no longer current. Regenerate and complete quality review before approval.",
   DRAFT_ELIGIBILITY_HOLD:
     "Contact eligibility no longer passes. Resolve the verification and history gates before preparing drafts.",
   DRAFT_DEPENDENCIES_CHANGED:
@@ -110,6 +113,8 @@ export function DraftStudioPanel({
     eligible &&
     run?.status === "READY_FOR_REVIEW" &&
     meta?.qualityDecision === "PASS" &&
+    run.critic?.oiq?.decision === "READY_FOR_HUMAN_REVIEW" &&
+    run.critic.oiq.score >= 85 &&
     meta.reviewStatus !== "INVALIDATED";
   const changed =
     !!run?.sequence && JSON.stringify(edited) !== JSON.stringify(run.sequence.messages);
@@ -158,7 +163,8 @@ export function DraftStudioPanel({
         !fresh?.sequence ||
         fresh.id !== run?.id ||
         fresh.version !== run.version ||
-        fresh.draftStudio?.qualityDecision !== "PASS"
+        fresh.draftStudio?.qualityDecision !== "PASS" ||
+        fresh.critic?.oiq?.decision !== "READY_FOR_HUMAN_REVIEW"
       ) {
         accept(fresh);
         throw new Error("Draft or evidence changed. Review the refreshed version before copying.");
@@ -410,6 +416,10 @@ export function DraftStudioPanel({
               Reject draft
             </button>
           </div>
+          <OiqReview
+            assessment={run.critic?.oiq}
+            historical={changed || !eligible || meta?.reviewStatus === "INVALIDATED"}
+          />
           {run.critic && (
             <details className="mt-4 text-sm">
               <summary className="min-h-11 cursor-pointer font-semibold">
@@ -435,6 +445,7 @@ export function DraftStudioPanel({
                   Version {version.number} · {version.origin} · {version.qualityDecision} ·{" "}
                   {version.at}
                 </summary>
+                {version.oiq && <OiqReview assessment={version.oiq} historical />}
                 <p className="break-all text-xs">Content fingerprint: {version.contentHash}</p>
                 {eligible && version.messages ? (
                   version.messages.map((m) => (
