@@ -29,7 +29,15 @@ export function parseLoginError(value: unknown): LoginErrorCode | undefined {
 export function profileLookupError(error: unknown): LoginErrorCode {
   if (error instanceof Error && error.message === "PREVIEW_DATABASE_ISOLATION_REQUIRED")
     return "preview_database_configuration";
-  const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+  // Initialization failures use errorCode; query failures use code.
+  const code =
+    error && typeof error === "object"
+      ? "code" in error
+        ? error.code
+        : "errorCode" in error
+          ? error.errorCode
+          : undefined
+      : undefined;
   if (code === "P1000") return "profile_database_authentication";
   if (typeof code === "string" && ["P1001", "P1002", "P1008", "P1017", "P2024"].includes(code))
     return "profile_database_unavailable";

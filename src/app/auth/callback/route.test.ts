@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,6 +186,14 @@ describe("Supabase auth callback", () => {
 
   it.each([
     [new Error("PREVIEW_DATABASE_ISOLATION_REQUIRED"), "preview_database_configuration"],
+    [
+      new Prisma.PrismaClientInitializationError("sensitive database credentials", "5.22.0", "P1000"),
+      "profile_database_authentication",
+    ],
+    [
+      new Prisma.PrismaClientInitializationError("sensitive database host", "5.22.0", "P1001"),
+      "profile_database_unavailable",
+    ],
     [
       { code: "P1000", message: "sensitive database credentials" },
       "profile_database_authentication",
