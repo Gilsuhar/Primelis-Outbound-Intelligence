@@ -124,7 +124,7 @@ describe("review-first personalized Draft Studio using isolated fictional eviden
     expect(run.draftStudio?.versions).toHaveLength(1);
     expect(run.research.sources).toEqual(ctx.source.research.sources);
   });
-  it.each(["HOLD", "REJECTED"] as const)(
+  it.each(["REJECTED"] as const)(
     "never generates operational drafts for %s contacts",
     async (status) => {
       const ctx = await setup();
@@ -226,16 +226,16 @@ describe("review-first personalized Draft Studio using isolated fictional eviden
     expect(read.sequence).toBeNull();
     expect(read.issues.join(" ")).not.toContain("secret fixture");
   });
-  it("rejects conflicting company evidence before a writer call", async () => {
+  it("falls back to INSIGHT_LED without using conflicting company evidence", async () => {
     const ctx = await setup();
     const source = (await ctx.store.get("actor", ctx.source.id))!;
     const version = source.version;
     source.version++;
     source.prospectResearch!.reviewIssues = ["Conflicting sources"];
     await ctx.store.change("actor", version, source);
-    await expect(ctx.engine.prepare("actor", source.id)).rejects.toThrow(
-      "RESEARCH_REVIEW_REQUIRED",
-    );
+    const draft = await ctx.engine.prepare("actor", source.id);
+    expect(draft.writingMode).toBe("INSIGHT_LED");
+    expect(draft.research.facts).toEqual([]);
     expect(ctx.model.calls).toEqual([]);
   });
   it("rejects unsupported percentages and fabricated SERP references independently of a passing model critic", async () => {
@@ -375,7 +375,7 @@ it("reuses a restrained role-relevant approach when the opportunity assessment h
   };
   await ctx.store.change("actor", version, source);
   const run = await ctx.engine.prepare("actor", source.id);
-  expect(run.draftStudio?.context.personalizationMode).toBe("ROLE_RELEVANT");
+  expect(run.draftStudio?.context.personalizationMode).toBe("EVIDENCE_LED");
   expect(run.status).toBe("RUNNING");
   expect(run.approved).toBe(false);
 });
@@ -590,4 +590,108 @@ it("preserves historical OIQ when an identical regeneration is waiting for a new
       requestKey: "cannot-approve-old-oiq",
     }),
   ).rejects.toThrow("VERSION_CONFLICT");
+});
+
+describe("draft access remains separate from sending — real policies, synthetic records", () => {
+  it.each(["EVIDENCE_LED", "INSIGHT_LED"] as const)(
+    "completes %s for HOLD with content-only approval",
+    async (mode) => {
+      const ctx = await setup();
+      const { checkWorkforceEligibility } = await import("../safety");
+      const { AuditIntegrationStore } = await import("@/test/audit-integration-store");
+      const eligibility = (actor: string, input: typeof workforceIntake, now: Date) =>
+        checkWorkforceEligibility(actor, input, now, {
+          evidence: ctx.evidence,
+          integrations: new AuditIntegrationStore(),
+        });
+      expect((await eligibility("actor", ctx.source.intake, testNow)).status).toBe("HOLD");
+      if (mode === "INSIGHT_LED") {
+        const source = (await ctx.store.get("actor", ctx.source.id))!;
+        const version = source.version++;
+        source.prospectResearch!.stages.CONTACT.status = "DATA_UNAVAILABLE";
+        source.prospectResearch!.reviewIssues = [
+          "No authorized public biography; no role assertions may be made",
+        ];
+        await ctx.store.change("actor", version, source);
+      }
+      const engine = new DraftStudioEngine({ ...ctx.deps, eligibility });
+      let run = await engine.prepare("actor", ctx.source.id);
+      for (let n = 0; n < 6 && run.status === "RUNNING"; n++)
+        run = await engine.advance("actor", run.id);
+      expect(run.status, run.issues.join("; ")).toBe("READY_FOR_REVIEW");
+      expect(run.writingMode).toBe(mode);
+      expect(run.eligibility.status).toBe("HOLD");
+      expect(run.draftAccess?.status).toBe("DRAFT_ALLOWED");
+      expect(run.sequence?.messages).toHaveLength(4);
+      expect(run.critic?.oiq?.mode).toBe(mode);
+      if (mode === "INSIGHT_LED") {
+        expect(run.research.facts).toEqual([]);
+        expect(run.critic?.oiq?.references.every((r) => r.kind === "KNOWLEDGE")).toBe(true);
+      }
+      run = await engine.mutate("actor", run.id, {
+        action: "APPROVE",
+        expectedVersion: run.version,
+        requestKey: "hold-review-only-01",
+      });
+      expect(run.draftStudio?.approval?.scope).toBe("CONTENT_REVIEW_ONLY");
+      expect(run).toMatchObject({ canSend: false, canEnroll: false, approved: false });
+      expect((await eligibility("actor", run.intake, testNow)).status).toBe("HOLD");
+    },
+  );
+  it("prepares an insight-led draft directly from synchronized intake with no research provider calls", async () => {
+    const ctx = await setup();
+    ctx.store.records.clear();
+    const run = await ctx.engine.prepareContact("actor", "42");
+    expect(run.writingMode).toBe("INSIGHT_LED");
+    expect(run.research.sources).toEqual([]);
+    expect(ctx.model.calls).toEqual([]);
+  });
+  it("temporary infrastructure failure hides content but preserves valid versions and approval for recovery", async () => {
+    const ctx = await setup();
+    let run = await finish(ctx);
+    run = await ctx.engine.mutate("actor", run.id, {
+      action: "APPROVE",
+      expectedVersion: run.version,
+      requestKey: "recovery-approval-01",
+    });
+    const saved = await ctx.store.get("actor", run.id);
+    ctx.eligibility.mockRejectedValueOnce(new Error("private database connection failure"));
+    const unavailable = await ctx.engine.read("actor", run.id);
+    expect(unavailable.sequence).toBeNull();
+    expect(unavailable.issues).toEqual(["DRAFT_CONTEXT_UNAVAILABLE"]);
+    expect(await ctx.store.get("actor", run.id)).toEqual(saved);
+    const recovered = await ctx.engine.read("actor", run.id);
+    expect(recovered.sequence).not.toBeNull();
+    expect(recovered.draftStudio?.approval).toEqual(saved!.draftStudio!.approval);
+  });
+});
+it("authoritatively missing approved product knowledge invalidates approval, unlike a transient outage", async () => {
+  const ctx = await setup();
+  const run = await finish(ctx);
+  const { NoApprovedKnowledgeError } = await import("../knowledge-agent");
+  const engine = new DraftStudioEngine({
+    ...ctx.deps,
+    knowledge: async () => {
+      throw new NoApprovedKnowledgeError();
+    },
+  });
+  const result = await engine.read("actor", run.id);
+  expect(result.sequence).toBeNull();
+  expect(result.draftStudio?.reviewStatus).toBe("INVALIDATED");
+  expect(result.issues).toContain("APPROVED_KNOWLEDGE_REQUIRED");
+});
+it("uses reviewed company evidence without requiring a public-page title match or asserting verified employment", async () => {
+  const ctx = await setup();
+  const source = (await ctx.store.get("actor", ctx.source.id))!;
+  const version = source.version++;
+  source.research.facts = source.research.facts.filter((f) => f.subject === "ACCOUNT");
+  source.prospectResearch!.stages.CONTACT.status = "DATA_UNAVAILABLE";
+  source.research.gaps.push("Employment is unverified; no person-specific claims");
+  await ctx.store.change("actor", version, source);
+  const run = await ctx.engine.prepare("actor", source.id);
+  expect(run.writingMode).toBe("EVIDENCE_LED");
+  expect(run.research.facts.every((f) => f.subject === "ACCOUNT")).toBe(true);
+  expect(run.draftStudio?.context.missingInformation.join(" ")).toContain(
+    "Employment is unverified",
+  );
 });

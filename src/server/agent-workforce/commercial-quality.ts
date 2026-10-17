@@ -9,11 +9,19 @@ export const writingQualityRubric =
   "Editorial test: would this still make sense unchanged for an unrelated company or buyer? If yes, rethink the commercial premise, not just the salutation. Use a useful observation or clearly qualified hypothesis, not a generic compliment, title recital or manufactured pain. Each touch must earn its place with a new decision, supporting perspective or respectful close; do not restate the opener or explain Signal four times. Prefer one clear low-friction request when a request is useful; do not stack a meeting, demo, calendar link and data request. A reply with a perspective or permission to share something can be enough. No mandatory CTA in the closing. Keep roughly 55–100 words when useful, and shorter when stronger; no rigid word-count test. Avoid corporate filler, overfamiliarity, fake urgency and unsupported promises. Preserve a coherent thread while varying openings and sentence rhythm. A question is not a license to smuggle an invented premise: 'Why are competitors taking your traffic?' still alleges an unverified condition.";
 
 export function strategyGroundingConcerns(
-  run: Pick<WorkforceRun, "research">,
+  run: Pick<WorkforceRun, "research"> & Partial<Pick<WorkforceRun, "writingMode">>,
   strategy: NonNullable<WorkforceRun["strategy"]>,
 ) {
-  if (strategy.angle === "NO_PITCH") return [];
+  if (strategy.angle === "NO_PITCH" || run.writingMode === "INSIGHT_LED") return [];
   const facts = run.research.facts.filter((f) => strategy.supportingFactIds.includes(f.id));
+  if (run.writingMode === "EVIDENCE_LED")
+    return facts.some(
+      (f) =>
+        f.subject === "ACCOUNT" &&
+        ["BUSINESS_MODEL", "PRODUCTS", "MARKETS", "DEVELOPMENT"].includes(f.category),
+    )
+      ? []
+      : ["Evidence-led strategy needs verified company context"];
   return facts.some(
     (f) =>
       f.subject === "ACCOUNT" &&

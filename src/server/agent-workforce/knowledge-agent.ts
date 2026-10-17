@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import "server-only";
 import {
   knowledgeRecordSchema,
@@ -7,10 +8,19 @@ import { isEligibleProof } from "@/features/proof/proof-policy";
 import type { MinimalPrismaClient } from "@/lib/prisma";
 import { WorkforceError } from "./openai";
 
+/** Authoritative empty/revoked registry differs from a database outage. */
+export class NoApprovedKnowledgeError extends WorkforceError {
+  constructor() {
+    super(
+      "MISSING_KNOWLEDGE",
+      "No externally approved, source-backed Signal product wording is available; generation is blocked",
+    );
+  }
+}
 export async function loadApprovedProductKnowledge(
   client?: MinimalPrismaClient,
 ): Promise<KnowledgeRecord[]> {
-  if (!client && !process.env.DATABASE_URL)
+  if (!client && !configuredDatabaseUrl())
     throw new WorkforceError(
       "MISSING_KNOWLEDGE",
       "Approved product knowledge database is unavailable",
@@ -120,10 +130,6 @@ export async function loadApprovedProductKnowledge(
     });
     if (parsed.success) records.push(parsed.data);
   }
-  if (!records.some((r) => r.kind === "PRODUCT"))
-    throw new WorkforceError(
-      "MISSING_KNOWLEDGE",
-      "No externally approved, source-backed Signal product wording is available; generation is blocked",
-    );
+  if (!records.some((r) => r.kind === "PRODUCT")) throw new NoApprovedKnowledgeError();
   return records;
 }

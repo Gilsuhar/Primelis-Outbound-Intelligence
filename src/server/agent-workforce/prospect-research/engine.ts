@@ -1,4 +1,5 @@
 import "server-only";
+import { draftAccessForSnapshot } from "../draft-access";
 import { z } from "zod";
 import { reusableCompanyResearch } from "../company-reuse";
 import { commercialRelevanceRubric } from "../commercial-quality";
@@ -16,10 +17,7 @@ import {
 } from "@/features/agent-workforce/gate-a-contracts";
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { PrismaEvidenceStore, type EvidenceStore } from "@/server/sales-agent/evidence-store";
-import {
-  snapshotSchema,
-  reviewEvidenceSnapshot,
-} from "@/server/services/sales-agent-collection-service";
+import { snapshotSchema } from "@/server/services/sales-agent-collection-service";
 import { PrismaWorkforceStore, digest, type WorkforceStore } from "../store";
 import { OpenAiWorkforceModel, WorkforceError, type WorkforceModel } from "../openai";
 import { researchSubject } from "../research-agents";
@@ -122,7 +120,7 @@ export class ProspectResearchEngine {
       await this.evidence.suppressionRecords(),
     ).collect(snapshot.contact, this.now());
     snapshot.observations.push(...local.observations);
-    if (reviewEvidenceSnapshot(snapshot, this.now()).plan.decision.status === "REJECTED")
+    if (!draftAccessForSnapshot(snapshot, this.now()).draftAllowed)
       throw new Error("RESEARCH_REJECTED");
     return snapshot;
   }
@@ -591,12 +589,19 @@ export class ProspectResearchEngine {
       research.opportunity = assessment;
       return;
     }
-    research.reviewIssues = validateResearch(run, this.now());
-    if (
-      research.stages.COMPANY.status !== "COMPLETE" ||
-      research.stages.CONTACT.status !== "COMPLETE"
-    )
-      research.reviewIssues.push("Company or contact research incomplete");
+    research.reviewIssues = validateResearch(run, this.now(), {
+      company: true,
+      prospect: run.research.facts.some((f) => f.subject === "PROSPECT"),
+    });
+    if (research.stages.COMPANY.status !== "COMPLETE")
+      research.reviewIssues.push("Company research incomplete");
+    if (research.stages.CONTACT.status !== "COMPLETE")
+      run.research.gaps = [
+        ...new Set([
+          ...run.research.gaps,
+          "Contact research incomplete: role and responsibilities remain unverified; no person-specific claims are permitted",
+        ]),
+      ].slice(0, 30);
     const review = await validateGroundingWithAi(run, model);
     if (
       !review.identityMatches ||

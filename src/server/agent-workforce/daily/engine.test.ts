@@ -270,3 +270,34 @@ it("cannot retry an older job while a cancelled newer worker lease is draining",
   await engine.control("actor", recent.id, "CANCEL");
   await expect(engine.control("actor", old.id, "RETRY")).rejects.toThrow("VERSION_CONFLICT");
 });
+it("exhausted Outreach synchronization remains a reported partial failure while editorial processing continues", async () => {
+  const sync = vi.fn(async (_actor: string, _run: unknown, provider: string) =>
+    provider === "OUTREACH"
+      ? { done: false, failed: true, reason: "AUTHENTICATION_FAILED" }
+      : { done: true, discovered: 1 },
+  );
+  const { engine, advance, handlers } = setup({
+    sync,
+    contact: async (_a, _r, c) => ({
+      done: true,
+      contact: {
+        ...c,
+        status: "COMPLETED",
+        stage: "REVIEW",
+        decision: "HOLD",
+        draftPrepared: true,
+      },
+    }),
+  });
+  await engine.start("actor", "missing-outreach-01", "MANUAL");
+  for (let i = 0; i < 12; i++) {
+    await engine.tick("actor");
+    advance(3600000);
+  }
+  const report = await engine.report("actor");
+  expect(report.runs[0].status).toBe("PARTIAL");
+  expect(report.runs[0].errors.some((e) => e.stage === "OUTREACH")).toBe(true);
+  expect(report.runs[0].contacts[0]).toMatchObject({ decision: "HOLD", draftPrepared: true });
+  expect(report.lastSuccessfulRunAt).toBeNull();
+  expect(handlers.intake).toHaveBeenCalled();
+});

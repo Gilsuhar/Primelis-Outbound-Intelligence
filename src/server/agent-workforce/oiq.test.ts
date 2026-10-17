@@ -36,7 +36,7 @@ describe("OIQ editorial judgments with deterministic evidence and approval safeg
     expect(oiq.references.map((r) => r.id)).toEqual(["account:business", "prospect:remit"]);
     expect(
       oiq.references.every(
-        (r) => r.url.startsWith("https://") && r.observedAt && r.messageSteps.includes(1),
+        (r) => r.url?.startsWith("https://") && r.observedAt && r.messageSteps.includes(1),
       ),
     ).toBe(true);
     expect(oiq.blockingReasons).toEqual([]);
@@ -181,4 +181,84 @@ describe("OIQ editorial judgments with deterministic evidence and approval safeg
     judgment.components.companyInsight.score = 31;
     expect(oiqJudgmentSchema.safeParse(judgment).success).toBe(false);
   });
+});
+
+function insightSetup() {
+  const { run, judgment, review } = setup();
+  run.writingMode = "INSIGHT_LED";
+  run.research.facts = [];
+  run.research.sources = [];
+  run.strategy!.supportingFactIds = [];
+  run.sequence!.strategy = run.strategy!;
+  if (run.sequence!.creativePlan) run.sequence!.creativePlan.hypotheses = [];
+  for (const m of run.sequence!.messages) {
+    m.supportingFactIds = [];
+    m.supportingObservationIds = [];
+    m.assertions = [];
+    m.approvedKnowledgeIds = [];
+  }
+  const claim = run.knowledge.find((k) => k.kind === "PRODUCT")!;
+  const message = run.sequence!.messages[0];
+  message.body = claim.text + " Would a comparison of branded-query coverage criteria be useful?";
+  message.approvedKnowledgeIds = [claim.id];
+  message.assertions = [
+    { text: claim.text, factIds: [], knowledgeIds: [claim.id], observationIds: [] },
+  ];
+  judgment.coreInsight.factIds = [];
+  judgment.coreInsight.observationIds = [];
+  judgment.companySwapTest = {
+    equallyRelevant: true,
+    reason: "Professional insight without any account research claim",
+  };
+  return { run, judgment, review };
+}
+it("insight-led OIQ scores a specific professional tradeoff without pretending company research exists", () => {
+  const { run, judgment, review } = insightSetup();
+  const result = assessOiq(run, judgment, review, testNow);
+  expect(result.score).toBe(93);
+  expect(result.mode).toBe("INSIGHT_LED");
+  expect(result.decision, result.blockingReasons.join("; ")).toBe("READY_FOR_HUMAN_REVIEW");
+  expect(result.references.length).toBeGreaterThan(0);
+  expect(result.references.every((r) => r.kind === "KNOWLEDGE" && r.observedAt === null)).toBe(
+    true,
+  );
+});
+it("insight-led generic benefits are still blocked at low editorial scores", () => {
+  const { run, judgment, review } = insightSetup();
+  judgment.components.companyInsight.score = 5;
+  judgment.components.searchRelevance.score = 5;
+  judgment.components.commercialAngle.score = 3;
+  expect(assessOiq(run, judgment, review, testNow).decision).toBe("BLOCKED");
+});
+it.each([
+  "unsupported savings",
+  "invented observed ads",
+  "missing product grounding",
+  "missing SERP reference",
+])("insight-led review blocks %s regardless of polish", (failure) => {
+  const { run, judgment, review } = insightSetup();
+  if (failure === "unsupported savings") run.sequence!.messages[0].body += " You will save 42%.";
+  if (failure === "invented observed ads")
+    run.sequence!.messages[0].body += " I saw competitor ads on your brand search.";
+  if (failure === "missing product grounding") run.sequence!.messages[0].assertions = [];
+  if (failure === "missing SERP reference") judgment.coreInsight.observationIds = ["invented-serp"];
+  const result = assessOiq(run, judgment, review, testNow);
+  expect(result.decision).toBe("BLOCKED");
+  expect(result.blockingReasons.length).toBeGreaterThan(0);
+});
+it("approved internal knowledge retains traceable registry sources without inventing public URLs", () => {
+  const { run, judgment, review } = insightSetup();
+  run.knowledge.forEach((k) => {
+    k.sourceUrls = [];
+  });
+  const result = assessOiq(run, judgment, review, testNow);
+  expect(result.decision).toBe("READY_FOR_HUMAN_REVIEW");
+  expect(
+    result.references.every(
+      (r) =>
+        r.kind === "KNOWLEDGE" &&
+        r.url === null &&
+        run.knowledge.some((k) => k.id === r.id && k.sourceIds.includes(r.sourceId)),
+    ),
+  ).toBe(true);
 });

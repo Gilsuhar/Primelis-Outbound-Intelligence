@@ -6,7 +6,7 @@ import {
   type OiqAssessment,
 } from "@/features/agent-workforce/oiq-contracts";
 import { digest } from "./store";
-import { validateResearch, validateSequence } from "./evidence-validation";
+import { validateDraftResearch, validateSequence } from "./evidence-validation";
 
 type Critic = NonNullable<WorkforceRun["critic"]>;
 const canonical = (value: unknown): unknown =>
@@ -24,6 +24,7 @@ export const oiqContentHash = (run: WorkforceRun) =>
     canonical(
       run.sequence
         ? {
+            ...(run.writingMode ? { writingMode: run.writingMode } : {}),
             prospectId: run.sequence.prospectId,
             accountDomain: run.sequence.accountDomain,
             strategy: run.sequence.strategy,
@@ -42,6 +43,7 @@ export function assessOiq(
   now: Date,
 ): OiqAssessment {
   const result = structuredClone(judgment);
+  const insightLed = run.writingMode === "INSIGHT_LED";
   const blockers = [
     ...judgment.missingCoreEvidence,
     ...judgment.unsupportedClaims,
@@ -116,9 +118,38 @@ export function assessOiq(
       messageSteps: [...steps],
     });
   }
-  const researchIssues = validateResearch(run, now);
+  if (insightLed) {
+    for (const knowledge of run.knowledge.filter((k) =>
+      messages.some(
+        (m) =>
+          m.approvedKnowledgeIds.includes(k.id) &&
+          m.assertions.some((a) => a.knowledgeIds.includes(k.id) && m.body.includes(a.text)),
+      ),
+    )) {
+      // Registry provenance is valid for approved internal documents too. Never
+      // invent a public URL or pair independently aggregated source IDs/URLs.
+      const sources = knowledge.sourceUrls.length
+        ? knowledge.sourceUrls.map((url) => ({ sourceId: knowledge.id, url }))
+        : knowledge.sourceIds.map((sourceId) => ({ sourceId, url: null }));
+      for (const source of sources)
+        references.push({
+          kind: "KNOWLEDGE",
+          id: knowledge.id,
+          ...source,
+          observedAt: null,
+          messageSteps: [...steps],
+        });
+    }
+    if (!references.some((r) => r.kind === "KNOWLEDGE"))
+      blockers.push(
+        "Core professional insight must be grounded in cited approved product knowledge",
+      );
+    if (core.factIds.length || core.observationIds.length)
+      blockers.push("Insight-led copy must not imply company research or SERP observations");
+  }
+  const researchIssues = validateDraftResearch(run, now);
   blockers.push(...researchIssues);
-  if (!companyEvidence) {
+  if (!companyEvidence && !insightLed) {
     blockers.push(
       "Provide a meaningful source-backed company insight in the draft; title-only or product-only messaging is insufficient",
     );
@@ -127,7 +158,7 @@ export function assessOiq(
       "No traceable company-specific core insight in the selected email";
   }
   if (
-    !companyEvidence ||
+    (!companyEvidence && !insightLed) ||
     researchIssues.length ||
     judgment.missingCoreEvidence.length ||
     !references.length ||
@@ -151,7 +182,8 @@ export function assessOiq(
         ),
       ),
     );
-  const weakPersonalization = judgment.companySwapTest.equallyRelevant || !companyEvidence;
+  const weakPersonalization =
+    !insightLed && (judgment.companySwapTest.equallyRelevant || !companyEvidence);
   if (weakPersonalization) {
     if (result.components.companyInsight.score > 10)
       result.components.companyInsight.reason = (
@@ -177,7 +209,7 @@ export function assessOiq(
       : score < 85
         ? "REVISE"
         : "READY_FOR_HUMAN_REVIEW";
-  if (!companyEvidence)
+  if (!companyEvidence && !insightLed)
     result.improvements.push(
       "Research a dated business model, product, market or development fact and cite the exact source behind the core insight",
     );
@@ -188,6 +220,7 @@ export function assessOiq(
   return oiqAssessmentSchema.parse({
     ...result,
     version: 1,
+    mode: run.writingMode ?? "EVIDENCE_LED",
     score,
     decision,
     weakPersonalization,

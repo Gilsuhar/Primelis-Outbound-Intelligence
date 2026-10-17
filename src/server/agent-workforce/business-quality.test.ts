@@ -185,7 +185,7 @@ describe("synthetic commercial goldens — editorial targets, not live model eva
     expect(sequences).toBe(2);
     expect(run.approved || run.canSend || run.canEnroll).toBe(false);
   });
-  it.each(["PAID_SOCIAL", "HISTORY_HOLD"] as const)(
+  it.each(["PAID_SOCIAL"] as const)(
     "never drafts %s regardless of commercial opportunity strength",
     async (kind) => {
       const f = qualityFixture(kind),

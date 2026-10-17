@@ -76,9 +76,21 @@ export async function createSupabaseServerClient(options: SupabaseCookiePersiste
   });
 }
 
-export async function resolveApplicationUser(authUser: { id: string; email?: string | null }) {
+export async function resolveApplicationUser(authUser: {
+  id: string;
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  is_anonymous?: boolean;
+}) {
   const normalizedEmail = normalizePreviewEmail(authUser.email);
-  if (!normalizedEmail) return null;
+  // Only server-verified Auth getUser() data is accepted. Never trust user_metadata.
+  if (
+    !normalizedEmail ||
+    authUser.is_anonymous ||
+    !authUser.email_confirmed_at ||
+    !Number.isFinite(Date.parse(authUser.email_confirmed_at))
+  )
+    return null;
 
   const existing = (await prisma.user.findFirst({
     where: {

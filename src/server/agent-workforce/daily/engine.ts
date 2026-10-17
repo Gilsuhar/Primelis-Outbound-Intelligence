@@ -168,6 +168,13 @@ export class DailyEngine {
             contact.attempts = run.attempts;
             run.attempts = 0;
             run.nextAttemptAt = null;
+          } else if (run.stage === "OUTREACH") {
+            // Exhausted history sync remains an error, never clearance. Continue editorial
+            // work from synchronized HubSpot intake; strict send eligibility stays HOLD.
+            run.stage = "CONTACTS";
+            delete run.syncJobId;
+            run.attempts = 0;
+            run.nextAttemptAt = null;
           } else {
             run.status = "FAILED";
             run.finishedAt = run.updatedAt;
@@ -199,7 +206,9 @@ export class DailyEngine {
           } else if (!run.contacts.some((c) => ["WAITING", "RUNNING"].includes(c.status))) {
             run.stage = "REPORT";
             run.status =
-              run.deferred || run.contacts.some((c) => c.status !== "COMPLETED")
+              run.errors.length ||
+              run.deferred ||
+              run.contacts.some((c) => c.status !== "COMPLETED")
                 ? "PARTIAL"
                 : "COMPLETED";
             run.finishedAt = run.updatedAt;

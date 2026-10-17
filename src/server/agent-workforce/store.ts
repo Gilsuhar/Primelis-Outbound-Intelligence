@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import "server-only";
 import { createHash } from "node:crypto";
 import {
@@ -74,7 +75,7 @@ export class PrismaWorkforceStore implements WorkforceStore {
   ) {}
   private async db() {
     if (this.client) return this.client;
-    if (!process.env.DATABASE_URL) throw new Error("WORKFORCE_DATABASE_UNAVAILABLE");
+    if (!configuredDatabaseUrl()) throw new Error("WORKFORCE_DATABASE_UNAVAILABLE");
     return (await import("@/lib/prisma")).prisma;
   }
   async create(actor: string, key: string, input: WorkforceIntake, now: Date) {

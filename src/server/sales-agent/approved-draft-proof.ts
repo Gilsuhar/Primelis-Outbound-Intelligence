@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import "server-only";
 import { z } from "zod";
 import { isEligibleProof } from "@/features/proof/proof-policy";
@@ -21,7 +22,7 @@ export async function verifyApprovedDraftProof(
   client?: Pick<MinimalPrismaClient, "caseStudy">,
 ) {
   if (entry.kind !== "CASE_STUDY" || !entry.caseStudyId || !entry.approvedForOutbound) return false;
-  if (!client && !process.env.DATABASE_URL) return false;
+  if (!client && !configuredDatabaseUrl()) return false;
   try {
     const db = client ?? (await import("@/lib/prisma")).prisma;
     const parsed = approvedCaseSchema.safeParse(

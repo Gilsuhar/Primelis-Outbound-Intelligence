@@ -146,6 +146,8 @@ export async function GET(request: NextRequest) {
     applicationUser = await resolveApplicationUser({
       id: user.id,
       email: normalizedEmail,
+      email_confirmed_at: user.email_confirmed_at,
+      is_anonymous: user.is_anonymous,
     });
   } catch {
     logAuthDiagnostic("warn", {

@@ -1,4 +1,5 @@
 import "server-only";
+import { checkWorkforceDraftAccess, draftAccessForSnapshot } from "../draft-access";
 import { randomUUID } from "node:crypto";
 import { recordResearchAttempt } from "./budget";
 import type { DailyConfig, DailyContact } from "@/features/agent-workforce/daily/contracts";
@@ -82,7 +83,9 @@ export function dailyHandlers(config: DailyConfig): DailyHandlers {
         const decision = reviewEvidenceSnapshot(snapshot, new Date()).plan.decision;
         return {
           id: snapshot.contact.hubspotRecordId,
-          status: decision.status === "REJECTED" ? "BLOCKED" : "WAITING",
+          status: !draftAccessForSnapshot(snapshot, new Date()).draftAllowed
+            ? "BLOCKED"
+            : "WAITING",
           stage: "VERIFY_EMAIL",
           attempts: 0,
           nextAttemptAt: null,
@@ -134,7 +137,8 @@ export function dailyHandlers(config: DailyConfig): DailyHandlers {
       if (latestDraft) await drafts.read(actor, latestDraft.id);
       if (contact.draftId && contact.draftId !== latestDraft?.id)
         await drafts.read(actor, contact.draftId);
-      if (eligibility.status === "REJECTED") {
+      const draftAccess = await checkWorkforceDraftAccess(actor, input, new Date(), evidence);
+      if (!draftAccess.draftAllowed || eligibility.status === "REJECTED") {
         contact.status = "BLOCKED";
         return { done: true, contact };
       }
@@ -256,17 +260,15 @@ export function dailyHandlers(config: DailyConfig): DailyHandlers {
           researchState.stages.REVIEW.status === "COMPLETE" &&
           !researchState.reviewIssues.length;
         if (!contact.researchCompleted) {
-          contact.status = "BLOCKED";
           contact.reasons.push(
             ...researchState.reviewIssues,
-            "Research incomplete; inspect provider stages and sources",
+            "Research limited; select the best supported review-only writing mode, never send-ready",
           );
-          return { done: true, contact };
         }
         contact.stage = "DRAFT";
         return { done: false, contact };
       }
-      if (eligibility.status !== "READY" || eligibility.blockDrafting) {
+      if (!draftAccess.draftAllowed) {
         contact.status = "BLOCKED";
         return { done: true, contact };
       }

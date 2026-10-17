@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "./preview-isolation";
 import { createRequire } from "node:module";
 
 type PrismaModelDelegate = {
@@ -22,15 +23,25 @@ export type MinimalPrismaClient = {
 
 const require = createRequire(import.meta.url);
 const prismaClientModule = require("@prisma/client") as {
-  PrismaClient: new () => MinimalPrismaClient;
+  PrismaClient: new (options?: { datasources: { db: { url: string } } }) => MinimalPrismaClient;
 };
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: MinimalPrismaClient;
 };
 
-export const prisma = globalForPrisma.prisma ?? new prismaClientModule.PrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// Lazy creation keeps build-time imports offline. The guard runs before any database operation.
+let client: MinimalPrismaClient | undefined;
+export const prisma = new Proxy({} as MinimalPrismaClient, {
+  get(_target, key) {
+    const url = configuredDatabaseUrl();
+    client ??=
+      process.env.VERCEL_ENV !== "preview" && globalForPrisma.prisma
+        ? globalForPrisma.prisma
+        : new prismaClientModule.PrismaClient(url ? { datasources: { db: { url } } } : undefined);
+    if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "preview")
+      globalForPrisma.prisma = client;
+    const value = Reflect.get(client, key);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

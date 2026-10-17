@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -49,7 +50,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
   constructor(private readonly client?: MinimalPrismaClient) {}
   private async db() {
     if (this.client) return this.client;
-    if (!process.env.DATABASE_URL) throw new Error("Evidence persistence requires DATABASE_URL");
+    if (!configuredDatabaseUrl()) throw new Error("Evidence persistence requires DATABASE_URL");
     return (await import("@/lib/prisma")).prisma;
   }
   private async append(tx: MinimalPrismaClient, actorId: string, snapshot: EvidenceSnapshot) {

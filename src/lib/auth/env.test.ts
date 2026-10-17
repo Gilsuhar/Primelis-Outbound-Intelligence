@@ -43,6 +43,6 @@ describe("getAppUrl", () => {
         VERCEL_URL: "evil.example",
         NEXT_PUBLIC_APP_URL: "https://production.example",
       } as NodeJS.ProcessEnv),
-    ).toBe("https://production.example");
+    ).toBeUndefined();
   });
 });

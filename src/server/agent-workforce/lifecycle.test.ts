@@ -250,7 +250,7 @@ describe("complete lifecycle — actual engines, fictional provider responses on
     expect(intake.records[0].runId).toBeUndefined();
     expect(ctx.model.calls).toEqual([]);
   });
-  it("keeps missing complaint authority on HOLD despite completed research and refuses drafting", async () => {
+  it("keeps missing complaint authority on HOLD while allowing review-only drafting", async () => {
     const ctx = await lifecycle("HOLD");
     expect(ctx.afterVerification.status).toBe("HOLD");
     const id = (await ctx.research.enqueue(ctx.actor, { contactId: "42" })).records[0].runId!;
@@ -258,8 +258,15 @@ describe("complete lifecycle — actual engines, fictional provider responses on
     expect((await ctx.store.get(ctx.actor, id))!.prospectResearch!.stages.REVIEW.status).toBe(
       "COMPLETE",
     );
-    await expect(ctx.drafts.prepare(ctx.actor, id)).rejects.toThrow("DRAFT_ELIGIBILITY_HOLD");
-    expect(ctx.model.calls).not.toContain("SEQUENCE");
+    let draft = await ctx.drafts.prepare(ctx.actor, id);
+    for (let n = 0; n < 6 && draft.status === "RUNNING"; n++)
+      draft = await ctx.drafts.advance(ctx.actor, draft.id);
+    expect(draft.status).toBe("READY_FOR_REVIEW");
+    expect(draft.eligibility.status).toBe("HOLD");
+    expect(draft.canSend).toBe(false);
+    expect(draft.canEnroll).toBe(false);
+    expect(draft.draftAccess?.status).toBe("DRAFT_ALLOWED");
+    expect(draft.sequence?.messages).toHaveLength(4);
   });
   it("isolates evidence and generated research between users", async () => {
     const ctx = await lifecycle();

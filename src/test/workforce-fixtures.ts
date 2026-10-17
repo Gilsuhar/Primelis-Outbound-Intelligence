@@ -255,6 +255,44 @@ export class MockWorkforceModel implements WorkforceModel {
         unsupportedAssertions: [],
         concerns: this.revise ? ["Vary the copy"] : [],
       };
+    const mode = raw as {
+      writingMode?: string;
+      personalization?: { personalizationMode?: string };
+    };
+    if (
+      mode.writingMode === "INSIGHT_LED" ||
+      mode.personalization?.personalizationMode === "INSIGHT_LED"
+    ) {
+      if (stage === "STRATEGY")
+        payload = {
+          ...(payload as NonNullable<WorkforceRun["strategy"]>),
+          supportingFactIds: [],
+          companyRationale: "No verified account research; a conditional coverage decision only",
+          prospectRationale: "CRM title is unverified context, not proof of Search ownership",
+        };
+      if (stage === "SEQUENCE") {
+        const sequence = payload as NonNullable<WorkforceRun["sequence"]>;
+        sequence.messages[0].body =
+          "When competitors are absent on a branded query, what would justify keeping the same paid coverage? Signal monitors branded search conditions. Would comparing decision criteria be useful?";
+        sequence.messages[0].supportingFactIds = [];
+        sequence.messages[0].assertions = [
+          {
+            text: "Signal monitors branded search conditions.",
+            factIds: [],
+            knowledgeIds: ["product-1"],
+            observationIds: [],
+          },
+        ];
+      }
+      if (stage === "QUALITY_REVIEW") {
+        const review = payload as { oiq: ReturnType<typeof syntheticOiqJudgment> };
+        review.oiq.coreInsight.factIds = [];
+        review.oiq.companySwapTest = {
+          equallyRelevant: true,
+          reason: "Synthetic insight-led example; no claim to account personalization",
+        };
+      }
+    }
     if (this.malformed) payload = { unexpected: true };
     return schema.parse(payload);
   }

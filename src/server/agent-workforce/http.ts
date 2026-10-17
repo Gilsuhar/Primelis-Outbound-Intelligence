@@ -46,7 +46,7 @@ export function workforceFailure(error: unknown) {
       {
         ok: false,
         message:
-          "Contact eligibility changed. Refresh the workspace and resolve HOLD reasons before editing. The draft remains unapproved. Human content approval cannot override eligibility.",
+          "Confirmed exclusion or owned-identity restriction blocks drafting. Refresh the workspace and inspect the blockers. Unknown send eligibility alone does not prevent review-only drafting.",
       },
       409,
     );
@@ -56,6 +56,7 @@ export function workforceFailure(error: unknown) {
       "RESEARCH_IDENTITY_CHANGED",
       "RESEARCH_REVIEW_REQUIRED",
       "RESEARCH_REQUIRED",
+      "DRAFT_ROLE_CONTEXT_REQUIRED",
       "APPROVED_KNOWLEDGE_REQUIRED",
       "QUALITY_REVIEW_REQUIRED",
       "VERSION_LIMIT_REACHED",
@@ -67,7 +68,7 @@ export function workforceFailure(error: unknown) {
       {
         ok: false,
         message:
-          "Draft preparation or review is blocked. Refresh eligibility, verified research and approved product knowledge, and inspect the quality/retry/version limits. Human approval cannot override these gates.",
+          "Draft preparation or review is blocked. Inspect draft access, role context, approved product knowledge and quality/retry/version limits. Human approval cannot override these gates.",
       },
       409,
     );

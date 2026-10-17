@@ -114,6 +114,8 @@ describe("Supabase auth callback", () => {
     expect(resolveApplicationUserMock).toHaveBeenCalledWith({
       id: "auth-user-id",
       email: "user@example.com",
+      email_confirmed_at: undefined,
+      is_anonymous: undefined,
     });
     expect(response.headers.get("location")).toBe("https://preview.example/sales-agent");
     expect(response.headers.get("set-cookie")).toContain("sb-access-token=access-cookie");

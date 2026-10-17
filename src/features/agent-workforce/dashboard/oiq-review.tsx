@@ -1,7 +1,8 @@
 import React from "react";
 import { oiqComponents, type OiqAssessment } from "../oiq-contracts";
 
-function safeUrl(url: string) {
+function safeUrl(url: string | null) {
+  if (!url) return undefined;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "https:" && !parsed.username && !parsed.password ? url : undefined;
@@ -53,7 +54,13 @@ export function OiqReview({
           <dl className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
             {(Object.keys(oiqComponents) as (keyof typeof oiqComponents)[]).map((key) => (
               <div key={key} className="min-w-0 break-words">
-                <dt className="font-medium">{oiqComponents[key].label}</dt>
+                <dt className="font-medium">
+                  {assessment.mode === "INSIGHT_LED" && key === "companyInsight"
+                    ? "Professional insight specificity"
+                    : assessment.mode === "INSIGHT_LED" && key === "verifiedEvidence"
+                      ? "Approved knowledge grounding and accuracy"
+                      : oiqComponents[key].label}
+                </dt>
                 <dd>
                   {assessment.components[key].score}/{oiqComponents[key].max} ·{" "}
                   {assessment.components[key].reason}
@@ -66,7 +73,10 @@ export function OiqReview({
               Core insight evidence references · {assessment.references.length}
             </summary>
             {!assessment.references.length && (
-              <p>No traceable core-insight references. Better research is required.</p>
+              <p>
+                No traceable core-insight references. Review supporting research or approved
+                knowledge.
+              </p>
             )}
             {assessment.references.map((ref, i) => (
               <p
@@ -86,7 +96,10 @@ export function OiqReview({
                 ) : (
                   ref.sourceId
                 )}{" "}
-                · observed {ref.observedAt}
+                ·{" "}
+                {ref.observedAt
+                  ? `observed ${ref.observedAt}`
+                  : "approved knowledge registry; observation date not supplied"}
               </p>
             ))}
           </details>

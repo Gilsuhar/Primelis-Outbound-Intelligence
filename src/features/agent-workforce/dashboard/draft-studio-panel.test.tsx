@@ -153,7 +153,7 @@ describe("persistent review-first studio controls", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(writeText.mock.calls[0][0]).toContain("Subject:");
   });
-  it("hides operational draft bodies and disables approval when eligibility is HOLD", async () => {
+  it("shows review-only draft content and eligibility warnings when eligibility is HOLD", async () => {
     const { prospect, run } = await fixture();
     prospect.plan.decision.status = "HOLD";
     prospect.plan.decision.reasons = ["Unverified employment"];
@@ -164,12 +164,12 @@ describe("persistent review-first studio controls", () => {
     render(<DraftStudioPanel prospect={prospect} runs={[]} />);
     await screen.findByText("Unverified employment");
     await waitFor(() => expect(screen.getByText(/Quality review: PASS/)).toBeTruthy());
-    expect(screen.queryByLabelText("Email body 1")).toBeNull();
+    expect(screen.queryByLabelText("Email body 1")).not.toBeNull();
     expect(
       (screen.getByRole("button", { name: "Approve content for review" }) as HTMLButtonElement)
         .disabled,
-    ).toBe(true);
-    expect(screen.getByText(/Development-only synthetic previews/)).toBeTruthy();
+    ).toBe(false);
+    expect(screen.getByText(/Not send-eligible/)).toBeTruthy();
   });
 });
 

@@ -78,7 +78,7 @@ describe("operational dashboard without invented records", () => {
       screen.getByRole("heading", { name: "Outreach contact history & sequence status" }),
     ).toBeTruthy();
     expect(screen.getByText(/Suggested capture \(not a finding\)/)).toBeTruthy();
-    expect(screen.getByText(/Locked\. Contact eligibility/)).toBeTruthy();
+    expect(screen.getByText(/Review-only drafting may be available/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Open draft review" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
     expect(reviewed).toHaveBeenCalledWith("42");

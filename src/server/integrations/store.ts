@@ -1,3 +1,4 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import "server-only";
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import type { MinimalPrismaClient } from "@/lib/prisma";
@@ -50,7 +51,7 @@ export class PrismaIntegrationStore implements IntegrationStore {
   constructor(private readonly client?: MinimalPrismaClient) {}
   private async db() {
     if (this.client) return this.client;
-    if (!process.env.DATABASE_URL) throw new IntegrationError("CONFIGURATION");
+    if (!configuredDatabaseUrl()) throw new IntegrationError("CONFIGURATION");
     return (await import("@/lib/prisma")).prisma;
   }
   async get(actor: string, provider: IntegrationProvider): Promise<StoredIntegration> {

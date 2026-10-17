@@ -7,6 +7,8 @@ import type { WorkforceRun, WorkforceSequence } from "../gate-a-contracts";
 const button =
   "min-h-11 rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50";
 const issueText: Record<string, string> = {
+  DRAFT_CONTEXT_UNAVAILABLE:
+    "Current dependency checks are temporarily unavailable. Content is hidden; saved versions are retained. Retry when service recovers.",
   OIQ_REVIEW_REQUIRED:
     "OIQ assessment is missing or no longer current. Regenerate and complete quality review before approval.",
   DRAFT_ELIGIBILITY_HOLD:
@@ -50,8 +52,10 @@ export function DraftStudioPanel({
   runs: RunSummary[];
 }) {
   const id = prospect.contact.hubspotRecordId;
-  const eligible = prospect.plan.decision.status === "READY";
+  const sendEligible = prospect.plan.decision.status === "READY";
+  const intakeCandidate = prospect.plan.decision.status !== "REJECTED";
   const [run, setRun] = useState<WorkforceRun | null>(null);
+  const draftAllowed = run?.draftAccess?.draftAllowed ?? intakeCandidate;
   const [edited, setEdited] = useState<WorkforceSequence["messages"]>([]);
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
@@ -78,7 +82,7 @@ export function DraftStudioPanel({
       .then(async (next) => {
         if (cancelled) return;
         accept(next);
-        if (!next && eligible && sourceReady) {
+        if (!next && sendEligible && sourceReady) {
           const prepared = await api("POST", { contactId: id });
           if (!cancelled) accept(prepared);
         }
@@ -91,10 +95,10 @@ export function DraftStudioPanel({
       cancelled = true;
       mounted.current = false;
     };
-  }, [id, eligible, sourceReady, accept]);
+  }, [id, sendEligible, sourceReady, accept]);
   const runningId = run?.status === "RUNNING" ? run.id : undefined;
   useEffect(() => {
-    if (!runningId || !eligible) return;
+    if (!runningId || !draftAllowed) return;
     const timer = setInterval(() => {
       void api("POST", { runId: runningId })
         .then(() => api("GET", undefined, id))
@@ -107,10 +111,10 @@ export function DraftStudioPanel({
         });
     }, 15000);
     return () => clearInterval(timer);
-  }, [runningId, id, eligible, accept]);
+  }, [runningId, id, draftAllowed, accept]);
   const meta = run?.draftStudio;
   const ready =
-    eligible &&
+    draftAllowed &&
     run?.status === "READY_FOR_REVIEW" &&
     meta?.qualityDecision === "PASS" &&
     run.critic?.oiq?.decision === "READY_FOR_HUMAN_REVIEW" &&
@@ -187,7 +191,7 @@ export function DraftStudioPanel({
         <h2 className="font-semibold">Draft Studio</h2>
         <button
           className={button}
-          disabled={busy || !eligible || !!runningId}
+          disabled={busy || !draftAllowed || !!runningId}
           onClick={() => void prepare()}
         >
           {runningId ? "Preparing…" : "Prepare / refresh drafts"}
@@ -197,7 +201,7 @@ export function DraftStudioPanel({
         Review-first content only. No sending, enrollment or CRM changes. Content approval never
         overrides eligibility.
       </p>
-      {eligible && !run && prospect.draftReady && prospect.draftRunId && (
+      {draftAllowed && !run && prospect.draftReady && prospect.draftRunId && (
         <Link
           className={`${button} mt-3 inline-flex items-center`}
           href={`/sales-agent/runs/${encodeURIComponent(prospect.draftRunId)}`}
@@ -205,18 +209,19 @@ export function DraftStudioPanel({
           Open draft review
         </Link>
       )}
-      {!eligible && (
+      {!sendEligible && (
         <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm">
-          <strong>Locked · {prospect.plan.decision.status}</strong>
+          <strong>Not send-eligible · {prospect.plan.decision.status}</strong>
           <p>
-            Locked. Contact eligibility, fresh research and quality checks must pass before
-            drafting.
+            Review-only drafting may be available. Unknown history, employment or research never
+            grants permission to send. Confirmed exclusions block drafting.
           </p>
           {prospect.plan.decision.reasons.map((reason, i) => (
             <p key={i}>{reason}</p>
           ))}
           <p>
-            Development-only synthetic previews do not change eligibility or authorize outreach.
+            These are real editorial drafts when a configured provider succeeds; no automatic
+            approval or outbound action is available.
           </p>
         </div>
       )}
@@ -230,14 +235,29 @@ export function DraftStudioPanel({
           {notice}
         </p>
       )}
-      {eligible && !run && (
+      {draftAllowed && !run && (
         <p className="mt-3 text-sm">
-          Draft preparation starts after source-backed research passes review. Missing optional
-          Similarweb or SERP data stays explicit; it is never fabricated.
+          The server selects evidence-led writing when research is verified, or insight-led writing
+          when research is limited. Approved Signal knowledge is required in both modes.
         </p>
       )}
       {run && (
         <>
+          <p className="mt-3 break-words rounded-xl bg-amber-50 p-3 text-sm">
+            Mode: {run.writingMode ?? "EVIDENCE_LED"} · Draft access:{" "}
+            {run.draftAccess?.status ?? "Requires current check"} · Send eligibility:{" "}
+            {sendEligible && run.eligibility.status === "READY"
+              ? "Eligible under current gates; sending disabled"
+              : "NOT SEND ELIGIBLE"}
+            . Human approval covers content only.
+            {run.writingMode === "INSIGHT_LED" &&
+              " Research-limited: professional hypotheses, no verified company observations."}
+            {run.draftAccess?.warnings.map((w) => (
+              <span className="mt-1 block" key={w}>
+                {w.replaceAll("_", " ")}
+              </span>
+            ))}
+          </p>
           <p className="mt-3 text-sm">
             Preparation: {run.status.replaceAll("_", " ")} · {run.stage.replaceAll("_", " ")}
           </p>
@@ -245,7 +265,7 @@ export function DraftStudioPanel({
             Quality review: {meta?.qualityDecision ?? "Pending"} · Human review:{" "}
             {meta?.reviewStatus.replaceAll("_", " ") ?? "Pending"}
           </p>
-          {eligible && !changed && meta?.approval && (
+          {draftAllowed && !changed && meta?.approval && (
             <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-sm">
               Content approved for review at {meta.approval.at}. Scope: this exact content version
               only. Sending remains disabled.
@@ -307,7 +327,7 @@ export function DraftStudioPanel({
               <p key={i}>Missing / limitation: {s}</p>
             ))}
           </details>
-          {eligible && meta?.reviewStatus !== "INVALIDATED" && run.sequence && (
+          {draftAllowed && meta?.reviewStatus !== "INVALIDATED" && run.sequence && (
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               {edited.map((message, index) => (
                 <article className="min-w-0 rounded-xl border border-line p-3" key={message.step}>
@@ -372,7 +392,7 @@ export function DraftStudioPanel({
               className={button}
               disabled={
                 busy ||
-                !eligible ||
+                !draftAllowed ||
                 !run.sequence ||
                 !!runningId ||
                 !changed ||
@@ -393,7 +413,7 @@ export function DraftStudioPanel({
               className={button}
               disabled={
                 busy ||
-                !eligible ||
+                !draftAllowed ||
                 !!runningId ||
                 (meta?.regenerations ?? 3) >= 3 ||
                 meta?.reviewStatus === "INVALIDATED"
@@ -406,7 +426,7 @@ export function DraftStudioPanel({
               className={button}
               disabled={
                 busy ||
-                !eligible ||
+                !draftAllowed ||
                 !!runningId ||
                 meta?.reviewStatus === "INVALIDATED" ||
                 meta?.reviewStatus === "REJECTED"
@@ -418,7 +438,7 @@ export function DraftStudioPanel({
           </div>
           <OiqReview
             assessment={run.critic?.oiq}
-            historical={changed || !eligible || meta?.reviewStatus === "INVALIDATED"}
+            historical={changed || !draftAllowed || meta?.reviewStatus === "INVALIDATED"}
           />
           {run.critic && (
             <details className="mt-4 text-sm">
@@ -447,7 +467,7 @@ export function DraftStudioPanel({
                 </summary>
                 {version.oiq && <OiqReview assessment={version.oiq} historical />}
                 <p className="break-all text-xs">Content fingerprint: {version.contentHash}</p>
-                {eligible && version.messages ? (
+                {draftAllowed && version.messages ? (
                   version.messages.map((m) => (
                     <article key={m.step} className="mt-3 text-sm">
                       <strong>

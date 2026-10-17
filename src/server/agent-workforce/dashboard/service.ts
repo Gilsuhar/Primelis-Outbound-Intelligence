@@ -1,4 +1,5 @@
 import "server-only";
+import { checkWorkforceDraftAccess } from "../draft-access";
 import { qualityReviewPassed } from "../oiq";
 import { opportunityPriority, compareOpportunityPriority } from "../opportunity-priority";
 import { researchIdentity } from "../prospect-research/engine";
@@ -21,7 +22,7 @@ import {
 import { PrismaEvidenceStore, type EvidenceStore } from "@/server/sales-agent/evidence-store";
 import { LocalSuppressionAdapter } from "@/server/sales-agent/local-suppression";
 import { PrismaWorkforceStore, type WorkforceStore } from "../store";
-import { validateResearch, validateSequence } from "../evidence-validation";
+import { validateDraftResearch, validateSequence } from "../evidence-validation";
 import { checkWorkforceEligibility } from "../safety";
 import { loadApprovedProductKnowledge } from "../knowledge-agent";
 
@@ -67,7 +68,7 @@ export function summarizeRun(run: WorkforceRun, now: Date): RunSummary {
       run.critic?.verdict === "PASS" &&
       Object.values(run.critic.checks).every(Boolean) &&
       !run.issues.length &&
-      !validateResearch(run, now).length &&
+      !validateDraftResearch(run, now).length &&
       !validateSequence(run, run.sequence).length
         ? "PENDING_HUMAN_REVIEW"
         : "HOLD",
@@ -469,8 +470,11 @@ export async function protectRunDrafts(
         ),
     );
     if (
-      run.eligibility.status !== "READY" ||
-      run.eligibility.blockDrafting ||
+      !(
+        deps.eligibility
+          ? { draftAllowed: run.eligibility.status === "READY" && !run.eligibility.blockDrafting }
+          : await checkWorkforceDraftAccess(actor, run.intake, deps.now ?? new Date())
+      ).draftAllowed ||
       summarizeRun(run, deps.now ?? new Date()).draftStatus === "HOLD" ||
       revoked
     )

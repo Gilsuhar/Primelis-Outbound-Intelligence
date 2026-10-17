@@ -1,4 +1,5 @@
 import "server-only";
+import { checkWorkforceDraftAccess } from "./draft-access";
 import { qualityReviewPassed } from "./oiq";
 import { strategyGroundingConcerns } from "./commercial-quality";
 import { BudgetError } from "./daily/budget";
@@ -15,6 +16,7 @@ import { loadApprovedProductKnowledge } from "./knowledge-agent";
 import { researchSubject, investigateBrandSearch } from "./research-agents";
 import {
   validateResearch,
+  validateDraftResearch,
   validateSequence,
   duplicatesAnotherProspect,
 } from "./evidence-validation";
@@ -29,6 +31,7 @@ import { PrismaWorkforceStore, digest, type WorkforceStore } from "./store";
 import type { SourceReader } from "./public-sources";
 export type WorkforceDependencies = {
   studioAuthorized?: boolean;
+  draftIntake?: typeof checkWorkforceDraftAccess;
   store?: WorkforceStore;
   model?: WorkforceModel;
   knowledge?: typeof loadApprovedProductKnowledge;
@@ -98,10 +101,20 @@ export class WorkforceOrchestrator {
         run.intake,
         this.now(),
       );
-      if (
-        run.eligibility.blockDrafting ||
-        (["SEQUENCE", "QUALITY_REVIEW"].includes(run.stage) && run.eligibility.status !== "READY")
-      ) {
+      run.draftAccess = this.deps.draftIntake
+        ? await this.deps.draftIntake(actor, run.intake, this.now())
+        : this.deps.eligibility
+          ? {
+              draftAllowed: !run.eligibility.blockDrafting && run.eligibility.status === "READY",
+              status:
+                run.eligibility.blockDrafting || run.eligibility.status !== "READY"
+                  ? "BLOCKED"
+                  : "DRAFT_ALLOWED",
+              blockers: run.eligibility.reasons,
+              warnings: [],
+            }
+          : await checkWorkforceDraftAccess(actor, run.intake, this.now());
+      if (!run.draftAccess.draftAllowed || run.eligibility.status === "REJECTED") {
         run.status = "INSUFFICIENT_EVIDENCE";
         run.issues = [
           "Qualification/suppression restrictions block drafting",
@@ -206,7 +219,7 @@ export class WorkforceOrchestrator {
       const strategyIssues = strategyGroundingConcerns(run, run.strategy);
       if (
         run.strategy.angle === "NO_PITCH" ||
-        !run.strategy.supportingFactIds.length ||
+        (run.writingMode !== "INSIGHT_LED" && !run.strategy.supportingFactIds.length) ||
         strategyIssues.length
       ) {
         run.status = "INSUFFICIENT_EVIDENCE";
@@ -221,7 +234,7 @@ export class WorkforceOrchestrator {
       run.contentHash = digest(run.sequence);
     } else if (stage === "QUALITY_REVIEW") {
       await this.assertKnowledgeCurrent(run);
-      const researchIssues = validateResearch(run, this.now());
+      const researchIssues = validateDraftResearch(run, this.now());
       if (researchIssues.length) {
         run.status = "RESEARCH_INCOMPLETE";
         run.issues = researchIssues;
@@ -316,8 +329,12 @@ export class WorkforceOrchestrator {
         run.intake,
         this.now(),
       );
-      if (eligibility.status !== "READY" || eligibility.blockDrafting)
-        throw new Error("DRAFT_ELIGIBILITY_HOLD");
+      const access = this.deps.draftIntake
+        ? await this.deps.draftIntake(actor, run.intake, this.now())
+        : this.deps.eligibility
+          ? { draftAllowed: eligibility.status === "READY" && !eligibility.blockDrafting }
+          : await checkWorkforceDraftAccess(actor, run.intake, this.now());
+      if (!access.draftAllowed) throw new Error("DRAFT_ELIGIBILITY_HOLD");
       run.sequence.messages = input.messages.map((message) => ({
         ...message,
         assertions:

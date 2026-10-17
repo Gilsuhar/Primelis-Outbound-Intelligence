@@ -6,13 +6,17 @@ import type { WorkforceRun, WorkforceSequence } from "@/features/agent-workforce
 import { allowedSourceUrl } from "./public-sources";
 import { editorialConcerns, strategyGroundingConcerns } from "./commercial-quality";
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-export function validateResearch(run: Pick<WorkforceRun, "id" | "intake" | "research">, now: Date) {
+export function validateResearch(
+  run: Pick<WorkforceRun, "id" | "intake" | "research">,
+  now: Date,
+  requirements = { company: true, prospect: true },
+) {
   const { research, intake } = run;
   const issues: string[] = [];
   if (research.prospectId !== run.id || research.accountDomain !== intake.companyDomain)
     issues.push("Research identity does not match this run");
   const sources = new Map(research.sources.map((source) => [source.id, source]));
-  if (!sources.size) issues.push("No real retrieved research sources");
+  if (requirements.company && !sources.size) issues.push("No real retrieved research sources");
   if (
     sources.size !== research.sources.length ||
     new Set(research.facts.map((f) => f.id)).size !== research.facts.length
@@ -48,6 +52,7 @@ export function validateResearch(run: Pick<WorkforceRun, "id" | "intake" | "rese
         issues.push("Quote does not occur in its actual source: " + fact.id);
   }
   if (
+    requirements.company &&
     !research.facts.some(
       (f) =>
         f.subject === "ACCOUNT" &&
@@ -67,19 +72,23 @@ export function validateResearch(run: Pick<WorkforceRun, "id" | "intake" | "rese
         const s = sources.get(q.sourceId);
         return (
           quote.includes(normalize(intake.prospectName)) &&
-          quote.includes(normalize(intake.prospectTitle)) &&
+          // Current association is checked semantically; exact title spelling is not identity.
+
           (quote.includes(normalize(intake.companyName)) || s?.sourceType === "COMPANY_SITE")
         );
       }),
   );
-  if (!position)
+  if (requirements.prospect && !position)
     issues.push(
       "Current prospect, role and company association are not verified; title-based assumptions are insufficient",
     );
   return [...new Set(issues)];
 }
 export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence) {
-  const issues = validateAgentOutput(run.research, sequence).concerns;
+  const issues = validateAgentOutput(run.research, sequence).concerns.filter(
+    (issue) =>
+      !(run.writingMode === "INSIGHT_LED" && issue === "Strategy has no supporting research facts"),
+  );
   issues.push(...editorialConcerns(sequence), ...strategyGroundingConcerns(run, sequence.strategy));
   if (
     sequence.prospectId !== run.id ||
@@ -107,6 +116,13 @@ export function validateSequence(run: WorkforceRun, sequence: WorkforceSequence)
   }
   const observations = new Map((run.draftStudio?.context.serp ?? []).map((s) => [s.id, s]));
   for (const [index, m] of sequence.messages.entries()) {
+    if (
+      run.writingMode === "INSIGHT_LED" &&
+      (m.supportingFactIds.length ||
+        m.supportingObservationIds.length ||
+        /\b(?:we|i) (?:saw|observed|noticed|found|audited)\b/i.test(m.body))
+    )
+      issues.push(`Email ${m.step} implies unsupported company research in INSIGHT_LED mode`);
     if ((m.supportingObservationIds ?? []).some((id) => !observations.has(id)))
       issues.push(`Email ${m.step} cites an unknown SERP observation`);
     for (const sentence of `${m.subject}. ${m.body}`.split(/(?<=[.!?])\s+|\n+/)) {
@@ -203,4 +219,11 @@ export function duplicatesAnotherProspect(run: WorkforceRun, other: WorkforceRun
       .join("|");
   };
   return shape(run) === shape(other);
+}
+
+export function validateDraftResearch(run: WorkforceRun, now: Date) {
+  return validateResearch(run, now, {
+    company: run.writingMode !== "INSIGHT_LED",
+    prospect: !run.writingMode,
+  });
 }

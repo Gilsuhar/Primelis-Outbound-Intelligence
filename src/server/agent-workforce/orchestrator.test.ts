@@ -62,18 +62,28 @@ describe("real agent orchestration with isolated provider responses", () => {
     expect((await ctx.store.get("actor-a", run.id))?.version).toBe(run.version);
   });
 
-  it("allows research but never invokes the writer on unknown-history HOLD", async () => {
+  it("permits review-only orchestration on HOLD when the independent intake policy allows drafting", async () => {
     const ctx = await setup();
     ctx.deps.eligibility.mockResolvedValue({
       status: "HOLD",
       reasons: ["Unknown Outreach history"],
       blockDrafting: false,
     });
+    ctx.engine = new WorkforceOrchestrator({
+      ...ctx.deps,
+      draftIntake: async () => ({
+        draftAllowed: true,
+        status: "DRAFT_ALLOWED",
+        blockers: [],
+        warnings: ["OUTREACH_HISTORY_INCOMPLETE"],
+      }),
+    });
     const run = await finish(ctx);
     expect(ctx.model.calls).toContain("STRATEGY");
-    expect(ctx.model.calls).not.toContain("SEQUENCE");
-    expect(run.status).toBe("INSUFFICIENT_EVIDENCE");
-    expect(run.sequence).toBeNull();
+    expect(ctx.model.calls).toContain("SEQUENCE");
+    expect(run.status).toBe("READY_FOR_REVIEW");
+    expect(run.eligibility.status).toBe("HOLD");
+    expect(run.canSend || run.canEnroll || run.approved).toBe(false);
   });
 
   it("executes research, independent grounding, strategy, original provider generation and critic with persistent pending approval", async () => {

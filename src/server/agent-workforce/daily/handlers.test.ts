@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/server/sales-agent/evidence-store", () => ({
   PrismaEvidenceStore: class {
     list = async () => mocks.raw;
+    suppressionRecords = async () => [];
     find = async (_actor: string, id: string) =>
       mocks.raw.find(
         (s) => (s as { contact: { hubspotRecordId: string } }).contact.hubspotRecordId === id,
@@ -157,23 +158,28 @@ describe("daily pipeline adapters with fictional external records", () => {
     expect(mocks.verify).toHaveBeenLastCalledWith("actor", c.id, "EMPLOYMENT", expect.any(String));
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
-  it("never drafts HOLD contacts even with reviewed research", async () => {
+  it("prepares review-only content for HOLD without changing eligibility", async () => {
     mocks.eligibility.mockResolvedValue({
       status: "HOLD",
       reasons: ["Authoritative complaints history unavailable"],
       blockDrafting: false,
     });
+    mocks.prepare.mockResolvedValue({
+      ...initialRun("actor", "insight", workforceIntake, new Date()),
+      draftStudio: { qualityDecision: null },
+    });
+    mocks.draftAdvance.mockResolvedValue({ draftStudio: { nextRetryAt: null } });
     const result = await dailyHandlers(config).contact("actor", fakeRun(), {
       ...contact("DRAFT"),
       researchCompleted: true,
       researchId: "fictional-research",
     });
     expect(result.contact).toMatchObject({
-      status: "BLOCKED",
+      status: "RUNNING",
       decision: "HOLD",
       draftPrepared: false,
     });
-    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.prepare).toHaveBeenCalled();
   });
   it("rejects suppressed prospects before any verification or research call", async () => {
     mocks.eligibility.mockResolvedValue({
@@ -186,7 +192,18 @@ describe("daily pipeline adapters with fictional external records", () => {
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
-  it("revalidates and invalidates previous drafts when eligibility changes during research", async () => {
+  it("revalidates previous drafts and blocks confirmed invalid email before research", async () => {
+    const raw = snapshot();
+    raw.observations.push({
+      ...observation("emailVerification", {
+        status: "INVALID",
+        independentlyVerified: true,
+        emailMatchesCurrentRecord: true,
+        businessEmailVerified: true,
+      }),
+      subjectEmail: raw.contact.email,
+    });
+    mocks.raw = [raw];
     const previous = initialRun(
       "actor",
       "old",
@@ -245,7 +262,8 @@ it("does not keep an exhausted research stage pending when configured retries ex
     ...contact("RESEARCH"),
     researchId: research.id,
   });
-  expect(result.contact!.status).toBe("BLOCKED");
+  expect(result.contact!.stage).toBe("DRAFT");
+  expect(result.contact!.researchCompleted).toBe(false);
   expect(mocks.researchAdvance).not.toHaveBeenCalled();
 });
 it("does not count a deferred retry as a provider research attempt", async () => {

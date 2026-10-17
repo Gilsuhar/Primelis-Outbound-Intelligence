@@ -1,9 +1,10 @@
+import { configuredDatabaseUrl } from "@/lib/preview-isolation";
 import { FixturePersistenceAdapter } from "@/server/repositories/fixture-adapter";
 import { PrismaPersistenceAdapter } from "@/server/repositories/prisma-adapter";
 import type { PersistenceRepositories } from "@/server/repositories/types";
 
 export function getPersistenceAdapter(): PersistenceRepositories {
-  const hasDatabase = Boolean(process.env.DATABASE_URL);
+  const hasDatabase = Boolean(configuredDatabaseUrl());
 
   if (hasDatabase) {
     if (process.env.NODE_ENV === "development") {

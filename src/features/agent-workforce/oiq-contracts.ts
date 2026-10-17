@@ -39,6 +39,7 @@ export const oiqJudgmentSchema = z
 export const oiqAssessmentSchema = oiqJudgmentSchema
   .extend({
     version: z.literal(1),
+    mode: z.enum(["EVIDENCE_LED", "INSIGHT_LED"]).optional(),
     score: z.number().int().min(0).max(100),
     decision: z.enum(["READY_FOR_HUMAN_REVIEW", "REVISE", "BLOCKED"]),
     weakPersonalization: z.boolean(),
@@ -47,11 +48,11 @@ export const oiqAssessmentSchema = oiqJudgmentSchema
       .array(
         z
           .object({
-            kind: z.enum(["FACT", "SERP"]),
+            kind: z.enum(["FACT", "SERP", "KNOWLEDGE"]),
             id: text,
             sourceId: text,
-            url: z.string().url(),
-            observedAt: z.string().datetime({ offset: true }),
+            url: z.string().url().nullable(),
+            observedAt: z.string().datetime({ offset: true }).nullable(),
             messageSteps: z.array(z.number().int().min(1).max(4)).max(4),
           })
           .strict(),

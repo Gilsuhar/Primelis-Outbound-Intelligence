@@ -45,3 +45,8 @@ export function selectOutreachWritingMode(input: {
     allowsSending: false,
   };
 }
+
+export function writingModeInstruction(mode?: OutreachWritingMode) {
+  if (mode !== "INSIGHT_LED") return "";
+  return "MODE OVERRIDE: INSIGHT_LED, research-limited editorial drafting. No verified company/prospect research is supplied. Treat intake title only as unverified context, never assert responsibilities or employment. Supersede company-specific/verified-role requirements in the general rubric below: a concrete branded-search decision or tradeoff, phrased conditionally or as an open question, can justify outreach without company facts. Do not imply an audit or any account observation. Use only approved product knowledge for factual claims; cite those knowledge IDs in the assertion ledger. Empty research IDs are correct. Explore original approaches and avoid generic benefits or a title recital. OIQ companyInsight means professional insight specificity (30), verifiedEvidence means grounding/accuracy in approved knowledge (25), other weights unchanged. The company-name swap test is diagnostic, not an automatic cap in this mode; generic professional insight still merits low points. Missing company/SERP evidence is a limitation, not missing core evidence unless the draft alleges an observation. In coreInsight.factIds and observationIds use only real supplied IDs; use empty lists when absent. Explicitly evaluate unsupported implications even in questions. No review score grants send eligibility. ";
+}

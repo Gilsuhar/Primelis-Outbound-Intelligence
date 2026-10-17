@@ -1,4 +1,6 @@
 import "server-only";
+import { checkWorkforceDraftAccess } from "../draft-access";
+import { selectOutreachWritingMode } from "../outreach-writing-mode";
 import { qualityReviewPassed, oiqContentHash } from "../oiq";
 import { z } from "zod";
 import { messageSchema, type WorkforceRun } from "@/features/agent-workforce/gate-a-contracts";
@@ -7,11 +9,11 @@ import { PrismaEvidenceStore, type EvidenceStore } from "@/server/sales-agent/ev
 import { isInOwnedIntakeScope } from "@/features/sales-agent/intake-scope";
 import { PrismaWorkforceStore, digest, type WorkforceStore } from "../store";
 import { checkWorkforceEligibility } from "../safety";
-import { loadApprovedProductKnowledge } from "../knowledge-agent";
+import { loadApprovedProductKnowledge, NoApprovedKnowledgeError } from "../knowledge-agent";
 import { validateResearch, validateSequence } from "../evidence-validation";
 import { WorkforceOrchestrator } from "../orchestrator";
 import { OpenAiWorkforceModel, type WorkforceModel } from "../openai";
-import { researchIdentity } from "../prospect-research/engine";
+import { ProspectResearchEngine, researchIdentity } from "../prospect-research/engine";
 const mutationSchema = z.discriminatedUnion("action", [
   z
     .object({
@@ -104,7 +106,13 @@ export class DraftStudioEngine {
       source.intake,
       this.now(),
     );
-    if (eligibility.status !== "READY" || eligibility.blockDrafting)
+    const draftAccess = await checkWorkforceDraftAccess(
+      actor,
+      source.intake,
+      this.now(),
+      this.evidence,
+    );
+    if (!draftAccess.draftAllowed || eligibility.status === "REJECTED")
       throw new Error("DRAFT_ELIGIBILITY_HOLD");
     if (
       !isInOwnedIntakeScope(snapshot.contact) ||
@@ -112,23 +120,31 @@ export class DraftStudioEngine {
       researchIdentity(snapshot) !== source.prospectResearch.identityHash
     )
       throw new Error("RESEARCH_IDENTITY_CHANGED");
-    if (
+    const evidenceReady = !(
       source.prospectResearch.status === "STALE" ||
       Date.parse(source.prospectResearch.expiresAt) <= this.now().getTime() ||
       source.prospectResearch.stages.COMPANY.status !== "COMPLETE" ||
-      source.prospectResearch.stages.CONTACT.status !== "COMPLETE" ||
       source.prospectResearch.stages.REVIEW.status !== "COMPLETE" ||
       source.prospectResearch.reviewIssues.length ||
-      validateResearch(source, this.now()).length
-    )
-      throw new Error("RESEARCH_REVIEW_REQUIRED");
+      validateResearch(source, this.now(), { company: true, prospect: false }).length
+    );
     const knowledge = await (this.deps.knowledge ?? loadApprovedProductKnowledge)();
     if (!knowledge.some((k) => k.kind === "PRODUCT"))
       throw new Error("APPROVED_KNOWLEDGE_REQUIRED");
+    const writingPlan = selectOutreachWritingMode({
+      hasVerifiedCompanyInsight: evidenceReady,
+      hasRelevantRoleContext:
+        /paid search|\bppc\b|\bsem\b|growth|performance|\bcmo\b|chief marketing|marketing|acquisition/i.test(
+          source.intake.prospectTitle,
+        ),
+      hasApprovedProductKnowledge: knowledge.some((k) => k.kind === "PRODUCT"),
+    });
+    if (!writingPlan) throw new Error("DRAFT_ROLE_CONTEXT_REQUIRED");
     const suppression = [...(await this.evidence.suppressionRecords())].sort((a, b) =>
       String(a.id).localeCompare(String(b.id)),
     );
     const dependencyHash = digest({
+      writingMode: writingPlan.mode,
       identity: snapshot.contact,
       observations: snapshot.observations,
       verification: snapshot.verification,
@@ -145,7 +161,7 @@ export class DraftStudioEngine {
         }))
         .sort((a, b) => a.id.localeCompare(b.id)),
     });
-    return { source, knowledge, dependencyHash, eligibility };
+    return { source, knowledge, dependencyHash, eligibility, draftAccess, writingPlan };
   }
   async prepare(actor: string, sourceId: string) {
     const ctx = await this.context(actor, sourceId);
@@ -171,7 +187,19 @@ export class DraftStudioEngine {
     const expected = run.version;
     run.version++;
     run.stage = "STRATEGY";
-    run.research = { ...structuredClone(ctx.source.research), prospectId: run.id };
+    run.writingMode = ctx.writingPlan.mode;
+    run.draftAccess = ctx.draftAccess;
+    run.research =
+      run.writingMode === "EVIDENCE_LED"
+        ? { ...structuredClone(ctx.source.research), prospectId: run.id }
+        : {
+            ...structuredClone(ctx.source.research),
+            prospectId: run.id,
+            facts: [],
+            sources: [],
+            assumptions: [],
+            gaps: ["Company and prospect research not verified; INSIGHT_LED hypotheses only"],
+          };
     run.knowledge = relevantKnowledge(ctx.knowledge, ctx.source);
     run.eligibility = ctx.eligibility;
     run.brandSearch.gaps =
@@ -189,17 +217,24 @@ export class DraftStudioEngine {
       reviewStatus: "PENDING",
       approval: null,
       context: {
-        serp: structuredClone(ctx.source.prospectResearch!.serp),
-        opportunity: structuredClone(ctx.source.prospectResearch!.opportunity),
+        serp:
+          run.writingMode === "EVIDENCE_LED"
+            ? structuredClone(ctx.source.prospectResearch!.serp)
+            : [],
+        opportunity:
+          run.writingMode === "EVIDENCE_LED"
+            ? structuredClone(ctx.source.prospectResearch!.opportunity)
+            : null,
         missingInformation: [
+          ...ctx.draftAccess.warnings,
+          ...(run.writingMode === "INSIGHT_LED"
+            ? ["Research-limited: no company-specific observations may be claimed"]
+            : []),
           ...ctx.source.research.gaps,
           ctx.source.prospectResearch!.similarweb.requiredAccess,
           ...run.brandSearch.gaps,
         ].slice(0, 30),
-        personalizationMode:
-          ctx.source.prospectResearch!.opportunity?.recommendedAngle === "NO_PITCH"
-            ? "ROLE_RELEVANT"
-            : "EVIDENCE_LED",
+        personalizationMode: ctx.writingPlan.mode,
       },
       versions: [],
       events: [{ at: this.now().toISOString(), actor, action: "CREATED", contentHash: null }],
@@ -216,10 +251,20 @@ export class DraftStudioEngine {
       .filter((r) => r.draftStudio && r.intake.hubspotRecordId === contactId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     if (prior) await this.read(actor, prior.id);
-    const source = runs
+    let source = runs
       .filter((r) => r.intake.hubspotRecordId === contactId && r.prospectResearch)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    if (!source) throw new Error("RESEARCH_REQUIRED");
+    if (!source) {
+      const entry = (
+        await new ProspectResearchEngine({
+          store: this.store,
+          evidence: this.evidence,
+          now: this.deps.now,
+        }).enqueue(actor, { contactId, limit: 1 })
+      ).records[0];
+      if (!entry?.runId) throw new Error(entry?.issue ?? "RESEARCH_REQUIRED");
+      source = (await this.store.get(actor, entry.runId))!;
+    }
     return this.prepare(actor, source.id);
   }
   private async invalidate(actor: string, run: WorkforceRun, reason: string) {
@@ -228,6 +273,8 @@ export class DraftStudioEngine {
     run.updatedAt = this.now().toISOString();
     run.leaseUntil = null;
     run.status = "INSUFFICIENT_EVIDENCE";
+    run.eligibility = { status: "HOLD", reasons: [reason], blockDrafting: true };
+    run.draftAccess = { draftAllowed: false, status: "BLOCKED", blockers: [reason], warnings: [] };
     const meta = run.draftStudio!;
     meta.reviewStatus = "INVALIDATED";
     meta.approval = null;
@@ -261,6 +308,8 @@ export class DraftStudioEngine {
       if (ctx.dependencyHash !== run.draftStudio.dependencyHash)
         throw new Error("DRAFT_DEPENDENCIES_CHANGED");
       if (run.draftStudio.reviewStatus === "INVALIDATED") return this.redact(run);
+      run.eligibility = ctx.eligibility;
+      run.draftAccess = ctx.draftAccess;
       const approval = run.draftStudio.approval;
       if (
         approval &&
@@ -282,17 +331,35 @@ export class DraftStudioEngine {
     } catch (error) {
       if (run.draftStudio.reviewStatus === "INVALIDATED") return this.redact(run);
       const reason =
-        error instanceof Error &&
-        [
-          "DRAFT_ELIGIBILITY_HOLD",
-          "DRAFT_DEPENDENCIES_CHANGED",
-          "RESEARCH_IDENTITY_CHANGED",
-          "RESEARCH_REVIEW_REQUIRED",
-          "APPROVED_KNOWLEDGE_REQUIRED",
-          "APPROVAL_INVALIDATED",
-        ].includes(error.message)
-          ? error.message
-          : "Current eligibility, research or approved knowledge cannot be verified";
+        error instanceof NoApprovedKnowledgeError
+          ? "APPROVED_KNOWLEDGE_REQUIRED"
+          : error instanceof Error &&
+              [
+                "DRAFT_ELIGIBILITY_HOLD",
+                "DRAFT_DEPENDENCIES_CHANGED",
+                "RESEARCH_IDENTITY_CHANGED",
+                "RESEARCH_REVIEW_REQUIRED",
+                "APPROVED_KNOWLEDGE_REQUIRED",
+                "APPROVAL_INVALIDATED",
+              ].includes(error.message)
+            ? error.message
+            : "Current eligibility, research or approved knowledge cannot be verified";
+      if (reason === "Current eligibility, research or approved knowledge cannot be verified") {
+        const view = this.redact(run);
+        view.issues = ["DRAFT_CONTEXT_UNAVAILABLE"];
+        view.eligibility = {
+          status: "HOLD",
+          reasons: ["Current checks temporarily unavailable"],
+          blockDrafting: true,
+        };
+        view.draftAccess = {
+          draftAllowed: false,
+          status: "BLOCKED",
+          blockers: ["DEPENDENCY_CHECK_UNAVAILABLE"],
+          warnings: [],
+        };
+        return view;
+      }
       return this.invalidate(actor, run, reason);
     }
   }
@@ -324,7 +391,8 @@ export class DraftStudioEngine {
     if (
       !run.draftStudio ||
       run.draftStudio.reviewStatus === "INVALIDATED" ||
-      run.status !== "RUNNING"
+      run.status !== "RUNNING" ||
+      run.issues.includes("DRAFT_CONTEXT_UNAVAILABLE")
     )
       return run;
     const meta = run.draftStudio;
@@ -377,6 +445,7 @@ export class DraftStudioEngine {
       eligibility: this.deps.eligibility,
       now: this.deps.now,
       studioAuthorized: true,
+      draftIntake: async () => (await this.context(actor, meta.sourceRunId)).draftAccess,
     });
     run = await orchestrator.advance(actor, id);
     if (run.leaseUntil) return run;
@@ -384,6 +453,7 @@ export class DraftStudioEngine {
     const completedVersion = run.version;
     const checked = await this.read(actor, id);
     if (
+      checked.issues.includes("DRAFT_CONTEXT_UNAVAILABLE") ||
       checked.draftStudio!.reviewStatus === "INVALIDATED" ||
       checked.version !== completedVersion ||
       checked.leaseUntil
@@ -454,6 +524,8 @@ export class DraftStudioEngine {
       if (receipt.requestHash !== digest(input)) throw new Error("IDEMPOTENCY_CONFLICT");
       return run;
     }
+    if (run.issues.includes("DRAFT_CONTEXT_UNAVAILABLE"))
+      throw new Error("DRAFT_CONTEXT_UNAVAILABLE");
     if (meta.reviewStatus === "INVALIDATED") throw new Error("DRAFT_ELIGIBILITY_HOLD");
     if (run.version !== input.expectedVersion || run.status === "RUNNING" || run.leaseUntil)
       throw new Error("VERSION_CONFLICT");

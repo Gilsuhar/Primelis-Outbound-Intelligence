@@ -253,7 +253,7 @@ export const draftStudioSchema = z
         serp: z.array(serpObservationSchema).max(6),
         opportunity: opportunitySchema.nullable(),
         missingInformation: z.array(text(2000)).max(30),
-        personalizationMode: z.enum(["EVIDENCE_LED", "ROLE_RELEVANT"]),
+        personalizationMode: z.enum(["EVIDENCE_LED", "INSIGHT_LED", "ROLE_RELEVANT"]),
       })
       .strict(),
     versions: z
@@ -306,6 +306,16 @@ export const runSchema = z
     inputHash: text(64),
     prospectResearch: prospectResearchSchema.optional(),
     draftStudio: draftStudioSchema.optional(),
+    writingMode: z.enum(["EVIDENCE_LED", "INSIGHT_LED"]).optional(),
+    draftAccess: z
+      .object({
+        draftAllowed: z.boolean(),
+        status: z.enum(["DRAFT_ALLOWED", "BLOCKED"]),
+        blockers: z.array(z.string()),
+        warnings: z.array(z.string()),
+      })
+      .strict()
+      .optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
     status: z.enum(runStatuses),
