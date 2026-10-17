@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { getWorkforceBuildInfo } from "@/lib/workforce-build-info";
 import { DailyOperationsPanel } from "./daily-operations-panel";
 import { DraftStudioPanel } from "./draft-studio-panel";
 import { ProspectResearchPanel } from "./prospect-research-panel";
@@ -431,6 +432,7 @@ export function DashboardView({
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("ALL");
+  const build = getWorkforceBuildInfo();
   const prospect = data?.prospects.find((p) => p.contact.hubspotRecordId === contactId);
   const filtered =
     data?.prospects.filter(
@@ -442,7 +444,7 @@ export function DashboardView({
     ) ?? [];
   if (contactId)
     return (
-      <div className="space-y-5">
+      <div className="space-y-5" data-workforce-build={build ? JSON.stringify(build) : undefined}>
         {error && <p role="alert">{error}</p>}
         {!data ? (
           <p role="status">
@@ -474,7 +476,7 @@ export function DashboardView({
       </div>
     );
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-workforce-build={build ? JSON.stringify(build) : undefined}>
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-olive">

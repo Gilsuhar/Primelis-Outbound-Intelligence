@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getWorkforceBuildInfo } from "@/lib/workforce-build-info";
 import {
   workforceActor,
   workforceBody,
@@ -14,7 +15,12 @@ export async function GET() {
   try {
     const auth = await workforceActor();
     if (auth.response) return auth.response;
-    return workforceResponse({ ok: true, data: await getWorkforceDashboard(auth.actor.id) });
+    const build = process.env.VERCEL_ENV === "preview" ? getWorkforceBuildInfo() : null;
+    return workforceResponse({
+      ok: true,
+      data: await getWorkforceDashboard(auth.actor.id),
+      ...(build ? { build } : {}),
+    });
   } catch (error) {
     return workforceFailure(error);
   }

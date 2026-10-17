@@ -11,6 +11,7 @@ import {
   fixtureProviders,
 } from "@/test/sales-agent-collection-fixtures";
 import { MemoryWorkforceStore } from "@/test/workforce-fixtures";
+import { createWorkforceBuildInfo } from "../../../../scripts/workforce-build-info";
 async function fixture() {
   const evidence = new MemoryEvidenceStore();
   await collectSalesAgentEvidence("actor", undefined, {
@@ -35,8 +36,20 @@ async function fixture() {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 describe("operational dashboard without invented records", () => {
+  it("embeds the build identity in the rendered client without changing integration controls", async () => {
+    const build = createWorkforceBuildInfo(process.cwd());
+    vi.stubEnv("NEXT_PUBLIC_WORKFORCE_BUILD_INFO", JSON.stringify(build));
+    const { container } = render(<DashboardView data={await fixture()} />);
+    expect(
+      JSON.parse(
+        container.querySelector("[data-workforce-build]")!.getAttribute("data-workforce-build")!,
+      ),
+    ).toEqual(build);
+    expect(screen.getAllByRole("button", { name: "Check access" })).toHaveLength(2);
+  });
   it("renders integration actions for a successful dashboard response without sync metadata", async () => {
     const data = await fixture();
     data.integrations = data.integrations.map((integration) => ({

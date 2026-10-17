@@ -11,6 +11,7 @@ import {
   markProspectReviewed,
 } from "@/server/agent-workforce/dashboard/service";
 import { GET, POST } from "./route";
+import { createWorkforceBuildInfo } from "../../../../../scripts/workforce-build-info";
 const request = (
   body: unknown = { action: "MARK_REVIEWED", contactId: "42" },
   origin = "https://preview.example",
@@ -33,6 +34,23 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("dashboard authentication and local-only review boundary", () => {
+  it("exposes the build identity only in authenticated Preview responses", async () => {
+    const build = createWorkforceBuildInfo(process.cwd());
+    vi.stubEnv("NEXT_PUBLIC_WORKFORCE_BUILD_INFO", JSON.stringify(build));
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await (await GET()).json()).build).toEqual(build);
+    vi.mocked(getCurrentUser).mockResolvedValue(null);
+    const unauthorized = await GET();
+    expect(unauthorized.status).toBe(401);
+    expect((await unauthorized.json()).build).toBeUndefined();
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      id: "session-actor",
+      email: "test@example.com",
+      role: "SALES_USER",
+    });
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect((await (await GET()).json()).build).toBeUndefined();
+  });
   it("authenticates before reads/writes and scopes data to the session actor", async () => {
     const response = await GET();
     expect(response.headers.get("cache-control")).toBe("no-store");
