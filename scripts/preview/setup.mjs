@@ -16,7 +16,7 @@ const fail = () => { throw new Error("PREVIEW_SETUP_CONFIGURATION_REJECTED"); };
 
 /** Separate operator-only credentials: never consumed by Next.js or installation hooks. */
 export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/migrations")), operation = "initialize") {
-  if (!["initialize", "verify"].includes(operation)) fail();
+  if (!["initialize", "verify", "verify-readonly"].includes(operation)) fail();
   const ref = env.PREVIEW_SETUP_APPROVED_PROJECT_REF;
   if (env.CI || env.GITHUB_ACTIONS) validateGitHubContext(env);
   if (env.VERCEL || env.VERCEL_ENV || env.DATABASE_URL || env.DIRECT_URL ||
@@ -25,10 +25,12 @@ export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/mi
       env.PREVIEW_SETUP_PROJECT_NAME !== "agent-workforce-preview" ||
       env.PREVIEW_SETUP_APPROVAL !== `${operation}:${ref}`) fail();
   let url;
-  try { url = new URL(env.PREVIEW_SETUP_DATABASE_URL); } catch { fail(); }
-  const direct = url.hostname === `db.${ref}.supabase.co` && url.username === "postgres";
+  if (operation === "verify-readonly" && env.PREVIEW_SETUP_DATABASE_URL) fail();
+  try { url = new URL(operation === "verify-readonly" ? env.PREVIEW_VERIFY_DATABASE_URL : env.PREVIEW_SETUP_DATABASE_URL); } catch { fail(); }
+  const role = operation === "verify-readonly" ? "recycler_preview_verify" : "postgres";
+  const direct = url.hostname === `db.${ref}.supabase.co` && url.username === role;
   const session = /^aws-[0-9]+-us-west-2\.pooler\.supabase\.com$/.test(url.hostname) &&
-    url.username === `postgres.${ref}`;
+    url.username === `${role}.${ref}`;
   if (url.protocol !== "postgresql:" || (!direct && !session) ||
       url.port !== "5432" || env.PREVIEW_SETUP_APPROVED_ENDPOINT !== `${url.hostname}:5432` ||
       url.pathname !== "/postgres" || !url.password || url.hash ||

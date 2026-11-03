@@ -24,7 +24,7 @@ export function reviewedFiles(names, read = path => readFileSync(resolve(root, p
   return { hashes, tables: [...tables, "_prisma_migrations"].sort() };
 }
 
-export async function verifyInitializedSchema(db, plan, files) {
+export async function verifyInitializedSchema(db, plan, files, restricted = false) {
   let stage = "HISTORY";
   try {
     const rows = await db.$queryRawUnsafe('SELECT migration_name, checksum, finished_at, rolled_back_at, applied_steps_count FROM public._prisma_migrations ORDER BY migration_name');
@@ -49,8 +49,19 @@ export async function verifyInitializedSchema(db, plan, files) {
       "(SELECT count(*)::int FROM pg_roles WHERE rolname='recycler_preview_app') AS runtime_roles, " +
       "(SELECT count(*)::int FROM pg_policies WHERE schemaname='public') AS policies",
     );
-    if (untouched.length !== 1 || untouched[0].auth_users !== 0 || untouched[0].runtime_roles !== 0 || untouched[0].policies !== 0)
+    if (untouched.length !== 1 || untouched[0].auth_users !== 0 || untouched[0].runtime_roles !== 0 || untouched[0].policies !== (restricted ? files.tables.length : 0))
       throw new Error("PREVIEW_SETUP_UNEXPECTED_OBJECTS");
+    if (restricted) {
+      // SELECT-only policies scoped solely to the verifier allow truthful counts under RLS.
+      // Do not treat invisible rows as evidence of an empty database.
+      const policies = await db.$queryRawUnsafe("SELECT schemaname, tablename, policyname, permissive, roles::text AS roles, cmd, qual, with_check " +
+        "FROM pg_catalog.pg_policies WHERE schemaname='public' OR (schemaname='auth' AND tablename='users') ORDER BY schemaname, tablename COLLATE \"C\"");
+      const expected = ["auth.users", ...files.tables.map(name => `public.${name}`)];
+      if (JSON.stringify(policies.map(p => `${p.schemaname}.${p.tablename}`)) !== JSON.stringify(expected) ||
+          policies.some(p => p.policyname !== "recycler_preview_verify_select" || p.permissive !== "PERMISSIVE" ||
+            p.roles !== "{recycler_preview_verify}" || p.cmd !== "SELECT" || p.qual !== "true" || p.with_check !== null))
+        throw new Error("PREVIEW_SETUP_RLS_VERIFICATION_FAILED");
+    }
     // Counts only; never select customer data. Identifiers come only from reviewed migration files.
     stage = "EMPTY_DATA";
     const counts = await db.$queryRawUnsafe(files.tables.filter(name => name !== "_prisma_migrations")

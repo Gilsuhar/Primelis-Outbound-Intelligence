@@ -6,31 +6,30 @@ import { reviewedFiles, verifyInitializedSchema } from "./verification.mjs";
 import { verificationError, verificationReport } from "./verification-errors.mjs";
 import { probeTls, tlsFailureCategory } from "./tls-probe.mjs";
 import { prismaTlsUrl } from "./tls-trust.mjs";
-import { readOnlyUrl, runSchemaDiff } from "./schema-diff.mjs";
+import { runSchemaDiff } from "./schema-diff.mjs";
 import { verifyGitHubApproval } from "./github-context.mjs";
-import { assertPreviewIdentity, identityQuery } from "./identity.mjs";
+import { verificationUrl, withReadOnlyContext } from "./read-only-context.mjs";
 
 /** Independent verification of initialized Preview. No migration dependency or write command. */
 export async function verifyPreview(env, execute, dependencies) {
-  const plan = setupPlan(env, undefined, "verify");
+  const plan = setupPlan(env, undefined, "verify-readonly");
+  const url = verificationUrl(prismaTlsUrl(env.PREVIEW_VERIFY_DATABASE_URL));
   if (!execute) return { status: "VERIFICATION_PLAN_VALIDATED", migrationCount: plan.migrations.length };
   // Published Linux migrations use the reviewed LF bytes. A local CRLF checkout must not
   // produce a false checksum mismatch against those already-applied files.
   const files = reviewedFiles(plan.migrations, path => Buffer.from(
     readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n")));
   if (env.GITHUB_ACTIONS) await dependencies.authorize(env);
-  await dependencies.probe(new URL(env.PREVIEW_SETUP_DATABASE_URL));
-  const url = prismaTlsUrl(env.PREVIEW_SETUP_DATABASE_URL);
+  await dependencies.probe(new URL(env.PREVIEW_VERIFY_DATABASE_URL));
   let db;
   try {
-    db = await dependencies.connect(readOnlyUrl(url));
-    assertPreviewIdentity(await db.$queryRawUnsafe(identityQuery));
+    db = await dependencies.connect(url);
   } catch (error) {
     await db?.$disconnect();
     throw verificationError(error, "IDENTITY");
   }
   try {
-    const verification = await verifyInitializedSchema(db, plan, files);
+    const verification = await withReadOnlyContext(db, tx => verifyInitializedSchema(tx, plan, files, true));
     await dependencies.diff(url);
     return { status: "EXISTING_SCHEMA_VERIFIED", ...verification };
   } finally { await db.$disconnect(); }

@@ -3,4 +3,4 @@ export function classifyDiff(result: {status: number | null; signal?: unknown; e
 export function runSchemaDiff(url: string, run?: (command: string, args: string[], options: {
   cwd: string; env: Record<string,string | undefined>; shell: boolean; stdio: string[];
   encoding: string; timeout: number; maxBuffer: number;
-}) => {status: number | null; signal?: unknown; error?: unknown; stderr?: unknown}, env?: Record<string,string | undefined>): Promise<void>;
+}) => {status: number | null; signal?: unknown; error?: unknown; stderr?: unknown}, env?: Record<string,string | undefined>, connect?: (url: string) => Promise<import("./read-only-context.mjs").ReadOnlyClient>): Promise<void>;

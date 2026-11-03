@@ -23,16 +23,17 @@ export function sanitizedConditions(value) {
   return Array.isArray(value) ? conditions.filter(id => value.includes(id)) : [];
 }
 
-export function failedIdentityConditions(rows) {
+export function failedIdentityConditions(rows, expectedRole = "postgres") {
+  if (!["postgres", "recycler_preview_verify"].includes(expectedRole)) return ["SESSION_USER", "EFFECTIVE_ROLE"];
   if (!Array.isArray(rows) || rows.length !== 1) return ["IDENTITY_RESULT_COUNT"];
   const row = rows[0];
   if (!row || typeof row !== "object" || Array.isArray(row)) return ["IDENTITY_ROW_SHAPE"];
   const checks = [
     ["DATABASE_NAME", row.database === "postgres"],
-    ["SESSION_USER", row.operator === "postgres"],
+    ["SESSION_USER", row.operator === expectedRole],
     ["CLUSTER_FINGERPRINT", row.fingerprint === target.clusterFingerprint],
     ["TRANSACTION_READ_ONLY", row.read_only === "on"],
-    ["EFFECTIVE_ROLE", row.effective_role === "postgres"],
+    ["EFFECTIVE_ROLE", row.effective_role === expectedRole],
     ["SESSION_ROLE_NOT_SUPERUSER", row.session_superuser === false],
     ["EFFECTIVE_ROLE_NOT_SUPERUSER", row.effective_superuser === false],
     ["DEFAULT_TRANSACTION_READ_ONLY", row.default_read_only === "on"],

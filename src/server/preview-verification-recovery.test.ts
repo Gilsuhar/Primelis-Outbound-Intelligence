@@ -10,24 +10,32 @@ import { initializePreview } from "../../scripts/preview/setup.mjs";
 import { caPath, prismaTlsUrl } from "../../scripts/preview/tls-trust.mjs";
 import { reviewedFiles } from "../../scripts/preview/verification.mjs";
 import target from "../../scripts/preview/verified-target.json";
+import { privilegeFields, verificationRole } from "../../scripts/preview/read-only-context.mjs";
 
 const env = () => ({ PREVIEW_SETUP_APPROVED_PROJECT_REF: target.projectRef, PREVIEW_SETUP_PROJECT_NAME: target.projectName,
-  PREVIEW_SETUP_APPROVAL: `verify:${target.projectRef}`, PREVIEW_SETUP_APPROVED_ENDPOINT: "aws-1-us-west-2.pooler.supabase.com:5432",
-  PREVIEW_SETUP_DATABASE_URL: `postgresql://postgres.${target.projectRef}:synthetic@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&sslaccept=strict` });
+  PREVIEW_SETUP_APPROVAL: `verify-readonly:${target.projectRef}`, PREVIEW_SETUP_APPROVED_ENDPOINT: "aws-1-us-west-2.pooler.supabase.com:5432",
+  PREVIEW_VERIFY_DATABASE_URL: `postgresql://${verificationRole}.${target.projectRef}:synthetic@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&sslaccept=strict` });
+const adminEnv = () => ({ ...env(), PREVIEW_VERIFY_DATABASE_URL: undefined,
+  PREVIEW_SETUP_DATABASE_URL: env().PREVIEW_VERIFY_DATABASE_URL.replace(verificationRole, "postgres") });
 const files = reviewedFiles(target.migrations, path => Buffer.from(readFileSync(path, "utf8").replace(/\r\n/g, "\n")));
 function fixture() {
-  const identity = [{ database: "postgres", operator: "postgres", fingerprint: target.clusterFingerprint, read_only: "on",
-    effective_role: "postgres", session_superuser: false, effective_superuser: false, default_read_only: "on" }];
+  const identity = [{ database: "postgres", operator: verificationRole, fingerprint: target.clusterFingerprint, read_only: "on",
+    effective_role: verificationRole, session_superuser: false, effective_superuser: false, default_read_only: "on" }];
+  const privileges = [Object.fromEntries(privilegeFields.map(key => [key, true]))];
   const history = target.migrations.map(migration_name => ({ migration_name, checksum: files.hashes[`prisma/migrations/${migration_name}/migration.sql`],
     finished_at: new Date(), rolled_back_at: null, applied_steps_count: 1 }));
   const tables = files.tables.map(name => ({ name, rls: true, api_access: false }));
-  const untouched = [{ auth_users: 0, runtime_roles: 0, policies: 0 }];
+  const untouched = [{ auth_users: 0, runtime_roles: 0, policies: files.tables.length }];
+  const policies = [{ schemaname: "auth", tablename: "users" }, ...files.tables.map(tablename => ({ schemaname: "public", tablename }))]
+    .map(p => ({ ...p, policyname: "recycler_preview_verify_select", permissive: "PERMISSIVE", roles: "{recycler_preview_verify}", cmd: "SELECT", qual: "true", with_check: null }));
   const counts = files.tables.filter(name => name !== "_prisma_migrations").map(() => ({ count: 0 }));
-  const db = { $queryRawUnsafe: vi.fn().mockResolvedValueOnce(identity).mockResolvedValueOnce(history)
-    .mockResolvedValueOnce(tables).mockResolvedValueOnce(untouched).mockResolvedValueOnce(counts), $disconnect: vi.fn() };
+  const query = vi.fn().mockResolvedValueOnce(identity).mockResolvedValueOnce(privileges).mockResolvedValueOnce(history)
+    .mockResolvedValueOnce(tables).mockResolvedValueOnce(untouched).mockResolvedValueOnce(policies).mockResolvedValueOnce(counts);
+  const tx = { $queryRawUnsafe: query, $executeRawUnsafe: vi.fn().mockResolvedValue(0) };
+  const db = { $queryRawUnsafe: query, $transaction: vi.fn(async (work: (value: typeof tx) => Promise<unknown>) => work(tx)), $disconnect: vi.fn() };
   const deps = { connect: vi.fn().mockResolvedValue(db), authorize: vi.fn().mockResolvedValue(undefined),
     probe: vi.fn().mockResolvedValue(undefined), diff: vi.fn().mockResolvedValue(undefined), migrate: vi.fn(), reset: vi.fn(), seed: vi.fn() };
-  return { identity, history, tables, untouched, counts, db, deps };
+  return { identity, privileges, history, tables, untouched, policies, counts, db, tx, deps };
 }
 
 describe("initialized Preview verification without writes", () => {
@@ -42,13 +50,16 @@ describe("initialized Preview verification without writes", () => {
     expect(await verifyPreview(env(), true, f.deps)).toMatchObject({ status: "EXISTING_SCHEMA_VERIFIED", migrationCount: 11, tableCount: 50 });
     for (const sql of f.db.$queryRawUnsafe.mock.calls.map(c => c[0] as string)) expect(sql).toMatch(/^SELECT /);
     const url = new URL(f.deps.connect.mock.calls[0][0]);
-    expect(url.searchParams.get("options")).toBe("-c default_transaction_read_only=on");
+    expect(url.searchParams.has("options")).toBe(false);
+    expect(f.tx.$executeRawUnsafe).toHaveBeenCalledOnce();
+    expect(f.tx.$executeRawUnsafe).toHaveBeenCalledWith("SET TRANSACTION READ ONLY");
     expect(url.searchParams.get("sslcert")).toBe(caPath);
     expect(new URL(f.deps.diff.mock.calls[0][0]).searchParams.get("sslcert")).toBe(caPath);
     for (const fn of [f.deps.migrate, f.deps.reset, f.deps.seed]) expect(fn).not.toHaveBeenCalled();
     expect(f.db.$disconnect).toHaveBeenCalledOnce();
   });
-  it.each(["missing-history", "checksum", "unfinished", "rls", "api-privileges", "auth-users", "runtime-role", "seed", "read-only", "fingerprint"])("fails closed for %s without writes", async failure => {
+  it.each(["missing-history", "checksum", "unfinished", "rls", "api-privileges", "auth-users", "runtime-role", "seed", "read-only", "fingerprint",
+    "missing-select-policy", "public-select-policy", "write-policy", "filtered-select-policy", "unexpected-policy"])("fails closed for %s without writes", async failure => {
     const f = fixture();
     if (failure === "missing-history") f.history.length = 0;
     if (failure === "checksum") f.history[0].checksum = "incorrect";
@@ -60,13 +71,18 @@ describe("initialized Preview verification without writes", () => {
     if (failure === "seed") f.counts[0].count = 1;
     if (failure === "read-only") f.identity[0].read_only = "off";
     if (failure === "fingerprint") f.identity[0].fingerprint = "wrong";
+    if (failure === "missing-select-policy") f.policies.pop();
+    if (failure === "public-select-policy") f.policies[0].roles = "{public}";
+    if (failure === "write-policy") f.policies[0].cmd = "ALL";
+    if (failure === "filtered-select-policy") f.policies[0].qual = "false";
+    if (failure === "unexpected-policy") f.untouched[0].policies += 1;
     await expect(verifyPreview(env(), true, f.deps)).rejects.toThrow(/^PREVIEW_SETUP_/);
     for (const fn of [f.deps.migrate, f.deps.reset, f.deps.seed, f.deps.diff]) expect(fn).not.toHaveBeenCalled();
     expect(f.db.$disconnect).toHaveBeenCalledOnce();
   });
   it("classifies an absent history relation without exposing query errors", async () => {
     const f = fixture();
-    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce(f.identity)
+    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce(f.identity).mockResolvedValueOnce(f.privileges)
       .mockRejectedValueOnce(Object.assign(new Error("private-value"), { code: "P2010", meta: { code: "42P01" } }));
     const error = await verifyPreview(env(), true, f.deps).catch(e => e);
     expect(verificationReport(error)).toEqual({ code: "PREVIEW_SETUP_HISTORY_MISSING", stage: "HISTORY", category: "MISSING_HISTORY" });
@@ -74,7 +90,7 @@ describe("initialized Preview verification without writes", () => {
   });
   it("retains the failing query stage and permission category", async () => {
     const f = fixture();
-    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce(f.identity).mockResolvedValueOnce(f.history)
+    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce(f.identity).mockResolvedValueOnce(f.privileges).mockResolvedValueOnce(f.history)
       .mockRejectedValueOnce(Object.assign(new Error("private-value"), { code: "P2010", meta: { code: "42501" } }));
     const error = await verifyPreview(env(), true, f.deps).catch(e => e);
     expect(verificationReport(error)).toEqual({ code: "PREVIEW_SETUP_VERIFICATION_QUERY_FAILED", stage: "TABLE_RLS", category: "PERMISSION" });
@@ -97,8 +113,8 @@ describe("initialized Preview verification without writes", () => {
   });
   it("never initializes an existing database, even with initialization approval", async () => {
     const f = fixture();
-    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce(f.identity).mockResolvedValueOnce([{ name: "_prisma_migrations" }]);
-    await expect(initializePreview({ ...env(), PREVIEW_SETUP_APPROVAL: `initialize:${target.projectRef}` }, true, f.deps)).rejects.toThrow("DATABASE_NOT_EMPTY");
+    f.db.$queryRawUnsafe.mockReset().mockResolvedValueOnce([{ ...f.identity[0], operator: "postgres" }]).mockResolvedValueOnce([{ name: "_prisma_migrations" }]);
+    await expect(initializePreview({ ...adminEnv(), PREVIEW_SETUP_APPROVAL: `initialize:${target.projectRef}` }, true, f.deps)).rejects.toThrow("DATABASE_NOT_EMPTY");
     expect(f.deps.migrate).not.toHaveBeenCalled();
   });
   it("refuses a reused verification approval as initialization approval", async () => {
@@ -138,8 +154,9 @@ describe("Prisma diff exit-code and subprocess safety", () => {
   });
   it("invokes only read-only diff, with no URL arguments, script, shadow DB or inherited credentials", async () => {
     const run = vi.fn().mockReturnValue({ status: 0 });
-    const url = prismaTlsUrl(env().PREVIEW_SETUP_DATABASE_URL);
-    await runSchemaDiff(url, run, { PATH: "safe", HOME: "excluded", OPENAI_API_KEY: "private-value", DATABASE_URL: "production" });
+    const url = prismaTlsUrl(env().PREVIEW_VERIFY_DATABASE_URL);
+    const f = fixture();
+    await runSchemaDiff(url, run, { PATH: "safe", HOME: "excluded", OPENAI_API_KEY: "private-value", DATABASE_URL: "production" }, f.deps.connect);
     expect(run).toHaveBeenCalledOnce();
     const [, args, options] = run.mock.calls[0];
     expect(args.slice(1)).toEqual(["migrate", "diff", "--from-schema-datasource", resolve("prisma/schema.prisma"), "--to-schema-datamodel", resolve("prisma/schema.prisma"), "--exit-code"]);
@@ -147,13 +164,16 @@ describe("Prisma diff exit-code and subprocess safety", () => {
     expect(options).toMatchObject({ shell: false, timeout: 60000, stdio: ["ignore", "pipe", "pipe"] });
     expect(Object.keys(options.env).sort()).toEqual(["CHECKPOINT_DISABLE", "DATABASE_URL", "DIRECT_URL", "PATH"]);
     expect(options.env.DATABASE_URL).toBe(options.env.DIRECT_URL);
-    expect(new URL(options.env.DATABASE_URL).searchParams.get("options")).toBe("-c default_transaction_read_only=on");
+    expect(new URL(options.env.DATABASE_URL).username).toBe(`${verificationRole}.${target.projectRef}`);
+    expect(new URL(options.env.DATABASE_URL).searchParams.has("options")).toBe(false);
+    expect(f.db.$transaction).toHaveBeenCalledOnce();
+    expect(f.db.$disconnect).toHaveBeenCalledOnce();
   });
   it("sanitizes synchronous process errors", async () => {
-    await expect(runSchemaDiff(prismaTlsUrl(env().PREVIEW_SETUP_DATABASE_URL), () => { throw new Error("private-value"); })).rejects.toThrow(/^PREVIEW_SETUP_DIFF_PROCESS_FAILED$/);
+    await expect(runSchemaDiff(prismaTlsUrl(env().PREVIEW_VERIFY_DATABASE_URL), () => { throw new Error("private-value"); }, {}, fixture().deps.connect)).rejects.toThrow(/^PREVIEW_SETUP_DIFF_PROCESS_FAILED$/);
   });
   it("rejects user-supplied startup options or trust-file substitution", () => {
-    const url = prismaTlsUrl(env().PREVIEW_SETUP_DATABASE_URL);
+    const url = prismaTlsUrl(env().PREVIEW_VERIFY_DATABASE_URL);
     expect(() => readOnlyUrl(`${url}&options=unsafe`)).toThrow("CONFIGURATION_REJECTED");
     const altered = new URL(url); altered.searchParams.set("sslcert", "unapproved");
     expect(() => readOnlyUrl(altered.toString())).toThrow("CONFIGURATION_REJECTED");
