@@ -1,0 +1,6 @@
+# Preserve reviewed bytes and shell/workflow fixtures on Windows checkouts.
+*.sql text eol=lf
+*.prisma text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=lf

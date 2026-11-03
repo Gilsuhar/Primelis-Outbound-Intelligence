@@ -1,3 +1,4 @@
+#requires -Version 7.0
 param([string]$Task = 'focused')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath (Split-Path $PSScriptRoot)
@@ -14,6 +15,7 @@ $env:NODE_OPTIONS='--require="' + ((Join-Path $PSScriptRoot 'offline-guard.cjs')
 $env:NEXT_TELEMETRY_DISABLED='1'
 $env:CHECKPOINT_DISABLE='1'
 $env:COREPACK_ENABLE_NETWORK='0'
+$env:NODE_PATH = (Join-Path (Get-Location) 'node_modules\.pnpm\node_modules')
 $env:AI_PROVIDER='mock'
 $env:PRISMA_QUERY_ENGINE_LIBRARY=(Resolve-Path 'node_modules/.pnpm/@prisma+engines@5.22.0/node_modules/@prisma/engines/query_engine-windows.dll.node').Path
 $env:PRISMA_SCHEMA_ENGINE_BINARY=(Resolve-Path 'node_modules/.pnpm/@prisma+engines@5.22.0/node_modules/@prisma/engines/schema-engine-windows.exe').Path
