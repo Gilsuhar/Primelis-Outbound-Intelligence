@@ -1,8 +1,45 @@
-# One-time cloud Prisma initialization (prepared locally, not executed)
+# One-time cloud Prisma initialization
+
+## Fresh attempt after configuration-only failure (not authorized for publication)
+
+Run 41654114864 registered and executed from the setup branch for commit
+`1ea5bb2f9719e774a7bd4916bd31e645bc35a239`, then stopped at `--plan` with
+`PREVIEW_SETUP_CONFIGURATION_REJECTED`. Read-only verification found no migration-history table,
+application tables, Auth users or application role. No migration ran. Preserve that published branch
+and run unchanged; do not rerun, recreate or update them.
+
+Missing TLS URL parameters reproduce this error with otherwise valid synthetic connection details.
+The operator's exact saved-value diagnosis remains to be confirmed without disclosing the URL:
+
+1. In a trusted PowerShell 7 session, run the existing offline checker:
+   `& 'C:\Users\USER\Documents\ChatGPT\New project\rc-tools\phase4h-check-private-url.ps1'`.
+   Enter the original URL only into its hidden prompt. Do not paste it into chat, command arguments,
+   a source file or logs. The original worktree remains pinned to the checker's reviewed commit.
+2. Continue with the TLS-only correction only if the output is exactly
+   `TLS_MODE_REQUIRE`, `TLS_ACCEPT_STRICT`, `QUERY_KEYS_EXACT`. Other failures require diagnosis.
+3. For the query-free original URL, append exactly `?sslmode=require&sslaccept=strict`. Preserve all
+   connection details and the existing password encoding. Do not duplicate parameters or retain extra
+   query keys. Validate the corrected candidate through the same hidden prompt; require `[]`.
+4. The operator updates only the existing **environment-scoped** `PREVIEW_SETUP_DATABASE_URL` secret
+   in `agent-workforce-preview-setup` through GitHub's secure UI. Never create a repository-scoped
+   substitute. GitHub cannot return the plaintext secret; local validation proves only the supplied
+   original/candidate copies, not the server's encrypted value. No secret update is performed here.
+5. This documentation-only child commit provides a fresh reviewed SHA without changing the workflow,
+   initializer, owner checks, TLS, database fingerprint, migration files or Vercel deployment exclusion.
+   Before publication, set `PREVIEW_SETUP_APPROVED_SHA` to this new commit and replace the environment
+   rule with exactly one Branch rule: `codex/preview-migration-txfxfrlhtvzwgluhnbpw-<new-full-sha>`.
+   Preserve the approved endpoint, secret scope, disabled reviewers and disabled administrator bypass.
+6. Complete a fresh read-only preflight, including secret metadata, exact branch absence and unchanged
+   deployment controls. Obtain separate explicit approval to publish that one new branch as Gilsuhar.
+   No push, workflow rerun, database access or deployment is authorized by this preparation.
+
+An empty offline diagnostic result is not proof of runner connectivity, password validity or trusted
+TLS. Those are checked by the unchanged guarded initializer on a separately approved first attempt.
+No application code change or relaxation of a security check is needed for a TLS-query-only defect.
 
 Workflow: `.github/workflows/preview-database-setup.yml`.
 Source snapshot: `59aaee2e23667ee333802791ba995861474d85fb` (not a Git parent).
-Publish only from the isolated `codex/cloud-publication-snapshot-20261103` branch/repository.
+Publish only the reviewed commit from the isolated clean-history preparation worktree.
 See [GH013 snapshot preparation](publication-snapshot.md); the original release history is preserved
 separately and must not be included in the replacement publication.
 Only target: `txfxfrlhtvzwgluhnbpw`, Primelis, us-west-2, with the independently verified
@@ -159,7 +196,7 @@ Local Phase 4G validation: migration-runner/setup/scanner tests 140 passed, 0 fa
 Preview/authentication security tests 184 passed, 0 failed, 0 skipped. TypeScript, ESLint, Prisma
 schema validation, Next.js production build and actionlint 1.7.12 passed. All eleven migration Git
 blobs and all thirteen reviewed manifest entries are unchanged. No database execution was performed.
-The new setup branch remains unpublished. Execution still requires approval, updating/verifying the
+The fresh replacement setup branch remains unpublished. Execution still requires approval, updating/verifying the
 GitHub environment SHA and exact Branch rule, and a final read-only preflight. Actual runner TLS,
 connectivity and GitHub workflow registration cannot be claimed verified from local mocked tests.
 
