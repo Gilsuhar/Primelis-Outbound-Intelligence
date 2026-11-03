@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { validateGitHubContext, verifyGitHubApproval } from "./github-context.mjs";
-import { probeTls } from "./tls-probe.mjs";
+import { probeTls, tlsFailureCategory } from "./tls-probe.mjs";
+import { prismaTlsUrl, verifiedCa } from "./tls-trust.mjs";
 import { reviewedFiles, verifyInitializedSchema } from "./verification.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -33,6 +34,7 @@ export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/mi
   const ordered = migrations.filter(name => /^\d{14}_[a-z0-9_]+$/.test(name)).sort();
   if (JSON.stringify(ordered) !== JSON.stringify(target.migrations)) fail();
   reviewedFiles(ordered);
+  verifiedCa();
   return { projectRef: ref, endpoint: `${url.hostname}:5432`, migrations: ordered };
 }
 
@@ -43,9 +45,10 @@ export async function initializePreview(env, execute, dependencies) {
   const files = reviewedFiles(plan.migrations);
   if (env.GITHUB_ACTIONS) await dependencies.authorize(env);
   await dependencies.probe(new URL(env.PREVIEW_SETUP_DATABASE_URL));
+  const databaseUrl = prismaTlsUrl(env.PREVIEW_SETUP_DATABASE_URL);
   // TLS endpoint plus independently observed cluster fingerprint; never trust a session GUC
   // or project name as proof of identity. A restored/replaced cluster requires fresh review.
-  const db = await dependencies.connect(env.PREVIEW_SETUP_DATABASE_URL);
+  const db = await dependencies.connect(databaseUrl);
   try {
     const identity = await db.$queryRawUnsafe(
       "SELECT current_database() AS database, session_user AS operator, " +
@@ -61,11 +64,11 @@ export async function initializePreview(env, execute, dependencies) {
     );
     // Fresh initialization only. Partial migrations require separate operator diagnosis; no retries.
     if (objects.length) throw new Error("PREVIEW_SETUP_DATABASE_NOT_EMPTY");
-    await dependencies.migrate(env.PREVIEW_SETUP_DATABASE_URL);
+    await dependencies.migrate(databaseUrl);
     // Verification failures do not undo committed migrations and must never trigger a rerun.
     try {
       const verification = await verifyInitializedSchema(db, plan, files);
-      await dependencies.diff(env.PREVIEW_SETUP_DATABASE_URL);
+      await dependencies.diff(databaseUrl);
       return { status: "SCHEMA_INITIALIZED_AND_VERIFIED", ...verification };
     } catch { throw new Error("PREVIEW_SETUP_APPLIED_VERIFICATION_FAILED"); }
   } finally { await db.$disconnect(); }
@@ -104,6 +107,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     });
     console.log(JSON.stringify(result));
   } catch (error) {
+    if (error?.message === "PREVIEW_SETUP_TLS_CONNECTIVITY_FAILED")
+      console.error(JSON.stringify({ tlsFailure: tlsFailureCategory(error) }));
     const code = /^PREVIEW_SETUP_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "PREVIEW_SETUP_FAILED";
     console.error(`${code}: stopped; inspect securely; no automatic retry.`);
     process.exitCode = 1;

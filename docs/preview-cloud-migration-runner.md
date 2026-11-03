@@ -1,6 +1,65 @@
 # One-time cloud Prisma initialization
 
-## Fresh attempt after configuration-only failure (not authorized for publication)
+## Current status: local TLS trust correction, not authorized for publication
+
+Run 41659291052 for `3a889b5dfccef93c356ec4e5199ce4e78e6b6f84` passed plan validation,
+then stopped with `PREVIEW_SETUP_TLS_CONNECTIVITY_FAILED`, before DB authentication or migrations.
+Read-only verification found zero public tables, no Prisma history, zero Auth users and no application
+role. Preserve that run and published branch; no rerun, update or recreation is permitted.
+
+On 2026-11-03, a credential-free check using Node 24.22.1 resolved the approved hostname over IPv4,
+connected to port 5432 and received the PostgreSQL SSLRequest acceptance byte. The original probe
+failed with `SELF_SIGNED_CERT_IN_CHAIN`. With the independently downloaded Supabase root CA, the
+same strict probe passed both chain and hostname validation. This demonstrates a missing trust anchor
+in the original implementation. The original runner discarded its underlying error, so its precise
+exception cannot be recovered; local success does not prove future GitHub runner connectivity.
+
+The setup-only patch includes the public CA and pins its SHA-256 X.509 fingerprint, CA flag,
+self-signature and validity period. It supplies that CA explicitly to Node TLS and, after the original
+URL passes every existing guard, appends an internal `sslcert` path for Prisma 5.22.0. The stored secret
+must still contain exactly `sslmode=require&sslaccept=strict`; do not add a trust path to the secret.
+All Prisma connections (fingerprint checks, migration and schema diff) use the same reviewed CA.
+There is no runtime certificate download or global trust-store modification. Certificate replacement
+requires review. `rejectUnauthorized: true`, original-host SNI/hostname verification and TLS >=1.2 remain.
+
+CA provenance (public certificate, no private key):
+- Official dashboard configuration: https://github.com/supabase/supabase/blob/master/apps/studio/hooks/custom-content/custom-content.json
+- HTTPS download used by that configuration: https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt
+- DER SHA-256: `807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA`
+- Valid until 2031-04-26. The filename's `prod` denotes Supabase's hosted-service CA, not a Production
+  database credential. Target identity and endpoint guards remain Preview-only.
+- Supabase trust guidance: https://supabase.com/docs/guides/platform/ssl-enforcement
+- Prisma 5.22.0 parser/root loading: https://github.com/prisma/prisma-engines/blob/5.22.0/quaint/src/connector/postgres/url.rs
+  and https://github.com/prisma/prisma-engines/blob/5.22.0/quaint/src/connector/postgres/native/mod.rs
+
+Credential-free diagnostic, manually run only when authorized:
+```sh
+node scripts/preview/diagnose-tls.mjs --system-trust
+node scripts/preview/diagnose-tls.mjs --pinned-ca
+```
+Each invocation makes at most one connection to the fixed approved public endpoint. It sends only
+the eight-byte PostgreSQL SSLRequest and TLS handshake, never a startup/authentication packet or SQL.
+No URL, password, secret or hostname argument is accepted. Output contains only fixed categories.
+The system-trust comparison retains certificate verification; it never accepts untrusted certificates.
+
+Original error coverage: all socket errors (including DNS, TCP and reset errors), socket end, the
+10-second deadline, any SSL response other than exactly `S`, TLS errors/end, unauthorized certificates,
+unacceptable protocol and hostname mismatch became the same `PREVIEW_SETUP_TLS_CONNECTIVITY_FAILED`.
+Synchronous transport errors were not consistently sanitized. The patch retains the top-level code
+and adds an allowlisted category: DNS failures, TCP refusal/unreachability/reset, separate DNS/TCP timeouts,
+SSL-response timeout/rejection, TLS timeout/handshake failure, untrusted/expired/not-yet-valid
+certificate, hostname mismatch, failed certificate authorization or rejected TLS version. Unknown
+errors remain generic, and raw exception messages, peer certificate fields and connection details
+are never emitted. Premature close and synchronous throws now fail closed with cleanup.
+
+A new reviewed commit and never-used SHA-named execution branch are necessary. After separate approval,
+update only the environment approved SHA and exact single Branch rule to that commit; keep the endpoint,
+secret, owner identity, disabled administrator bypass and Vercel exclusion unchanged. First verify the
+new metadata and branch absence. Publishing that branch would execute migrations, so do not publish it
+as a diagnostic. This local patch has not been pushed or run on GitHub. Rollback is local only; never
+force-update a published execution branch. No migration, schema or lockfile change is part of the patch.
+
+## Historical configuration correction (superseded by the TLS correction above)
 
 Run 41654114864 registered and executed from the setup branch for commit
 `1ea5bb2f9719e774a7bd4916bd31e645bc35a239`, then stopped at `--plan` with

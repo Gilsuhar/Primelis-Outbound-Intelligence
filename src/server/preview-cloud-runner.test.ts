@@ -7,6 +7,7 @@ import { initializePreview, setupPlan } from "../../scripts/preview/setup.mjs";
 import { branchPrefix, environment, repository, repositoryId, owner, ownerId, workflow, validateGitHubContext, verifyGitHubApproval } from "../../scripts/preview/github-context.mjs";
 import { reviewedFiles, verifyInitializedSchema } from "../../scripts/preview/verification.mjs";
 import { probeTls } from "../../scripts/preview/tls-probe.mjs";
+import { caPath } from "../../scripts/preview/tls-trust.mjs";
 import target from "../../scripts/preview/verified-target.json";
 
 const sha = "a".repeat(40);
@@ -243,6 +244,12 @@ describe("reviewed migrations and post-write verification", () => {
     if (fails) await expect(pending).rejects.toThrow("APPLIED_VERIFICATION_FAILED");
     else await expect(pending).resolves.toMatchObject({ status: "SCHEMA_INITIALIZED_AND_VERIFIED", migrationCount: 11 });
     expect(deps.migrate).toHaveBeenCalledOnce(); expect(deps.diff).toHaveBeenCalledOnce();
+    for (const operation of [deps.connect, deps.migrate, deps.diff]) {
+      const usedUrl = new URL(operation.mock.calls[0][0]);
+      expect(usedUrl.searchParams.get("sslcert")).toBe(caPath);
+      expect(usedUrl.searchParams.get("sslmode")).toBe("require");
+      expect(usedUrl.searchParams.get("sslaccept")).toBe("strict");
+    }
     expect(deps.migrate.mock.invocationCallOrder[0]).toBeLessThan(deps.diff.mock.invocationCallOrder[0]);
     expect(db.$disconnect).toHaveBeenCalledOnce();
   });
