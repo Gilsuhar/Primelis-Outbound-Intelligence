@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WorkflowPage, WorkflowCard } from "@/features/workflow/workflow-layout";
 import {
   eligibilityLabel,
@@ -81,6 +81,11 @@ function Candidate({ row }: { row: ReviewRow }) {
           Both 80 employees and USD 30 million revenue are mandatory. CRM observations alone do not
           verify employment or email.
         </p>
+        <p>
+          HubSpot owner: {row.qualification?.ownership?.ownerId ?? "Unknown"} · Required owner:{" "}
+          1087915602. Source: {row.qualification?.ownership?.source ?? "Missing"}; checked{" "}
+          {reviewDate(row.qualification?.ownership?.checkedAt)}.
+        </p>
         {row.profiles?.map((profile, i) => (
           <p key={i}>
             {profile.source}: owner {profile.ownerId ?? "Unknown"}; role{" "}
@@ -149,6 +154,9 @@ function Candidate({ row }: { row: ReviewRow }) {
             <p className="mt-3">{row.preparation.screenshot.instruction}</p>
             {row.preparation.emails.map((email, i) => (
               <div key={i} className="mt-3 rounded border border-line p-3">
+                <p className="mb-2 text-sm font-semibold text-amber-900">
+                  Draft only · Pending human review · Not sent
+                </p>
                 <h4 className="font-semibold">
                   {i ? "Optional follow-up" : "First email"}: {email.subject}
                 </h4>
@@ -248,9 +256,18 @@ export function RecyclerReview({
   const [status, setStatus] = useState("ALL");
   const [sort, setSort] = useState<ReviewSort>("OUTBOUND_OLDEST");
   const [selected, setSelected] = useState<string | null>(null);
+  const detailsHeading = useRef<HTMLHeadingElement>(null);
+  const detailsTrigger = useRef<HTMLButtonElement | null>(null);
   const sections = reviewSections(list);
   const visible = sortReviewRows(filterReviewRows(list.rows, query, status), sort);
   const candidate = visible.find((row) => row.id === selected);
+  const selectedCandidateId = candidate?.id;
+  useEffect(() => {
+    if (selectedCandidateId) {
+      detailsHeading.current?.focus();
+      detailsHeading.current?.scrollIntoView?.({ block: "start" });
+    }
+  }, [selectedCandidateId]);
   async function read() {
     if (busy) return;
     setBusy(true);
@@ -262,9 +279,14 @@ export function RecyclerReview({
         body: JSON.stringify({ action: "READ_FIVE", source }),
         cache: "no-store",
       });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || "Read failed.");
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok)
+        throw new Error(
+          result?.message ||
+            "Prospects could not be loaded. Try again when the connection is available.",
+        );
       setList(result.data);
+      setSelected(null);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Read failed. No automatic retry.");
     } finally {
@@ -324,6 +346,10 @@ export function RecyclerReview({
             onClick={() => {
               setList(initial);
               setError(null);
+              setQuery("");
+              setStatus("ALL");
+              setSort("OUTBOUND_OLDEST");
+              setSelected(null);
             }}
             disabled={busy}
           >
@@ -348,6 +374,11 @@ export function RecyclerReview({
         {!liveAvailable && (
           <p className="mt-2 text-sm">
             Live reads require the existing local integration operator session.
+          </p>
+        )}
+        {busy && (
+          <p role="status" className="mt-3 text-sm">
+            Reading prospects… The previous evaluation remains visible until the read completes.
           </p>
         )}
         {error && (
@@ -436,6 +467,17 @@ export function RecyclerReview({
         <p className="text-muted text-xs">
           Filters affect the displayed review. CSV exports retain the complete evaluation.
         </p>
+        {(query || status !== "ALL") && (
+          <button
+            className={button}
+            onClick={() => {
+              setQuery("");
+              setStatus("ALL");
+            }}
+          >
+            Clear filters
+          </button>
+        )}
         {!!list.issues.length && (
           <div role="status" className="mt-3 rounded bg-amber-50 p-3 text-sm">
             Collection incomplete:{" "}
@@ -447,9 +489,18 @@ export function RecyclerReview({
       <WorkflowCard>
         <h2 className="mb-3 text-xl font-semibold">Prospect review ({visible.length})</h2>
         {!visible.length ? (
-          <p>No candidates match these filters. Clear search or choose all statuses.</p>
+          <p>
+            {list.rows.length
+              ? "No candidates match these filters. Clear search or choose all statuses."
+              : "No prospects were returned. Check collection status and evidence coverage before trying again; an empty list is not clearance."}
+          </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            role="region"
+            aria-label="Scrollable prospect table"
+            tabIndex={0}
+          >
             <table className="w-full text-left text-sm" aria-label="Daily prospects">
               <thead>
                 <tr>
@@ -480,7 +531,10 @@ export function RecyclerReview({
                       <button
                         className="font-semibold underline"
                         aria-label={`Inspect ${row.name}`}
-                        onClick={() => setSelected(row.id)}
+                        onClick={(event) => {
+                          detailsTrigger.current = event.currentTarget;
+                          setSelected(row.id);
+                        }}
                       >
                         {row.name}
                       </button>
@@ -511,6 +565,10 @@ export function RecyclerReview({
                       <p className="mt-2 max-w-sm">
                         {row.decision.reasons
                           .filter((r) => r.status !== "ELIGIBLE")
+                          .sort(
+                            (a, b) =>
+                              Number(b.status === "EXCLUDED") - Number(a.status === "EXCLUDED"),
+                          )
                           .map((r) => r.message)
                           .slice(0, 2)
                           .join(" ")}
@@ -530,8 +588,16 @@ export function RecyclerReview({
       {candidate && (
         <WorkflowCard>
           <div className="mb-3 flex justify-between">
-            <h2 className="text-xl font-semibold">Prospect details</h2>
-            <button className={button} onClick={() => setSelected(null)}>
+            <h2 ref={detailsHeading} tabIndex={-1} className="text-xl font-semibold">
+              Prospect details
+            </h2>
+            <button
+              className={button}
+              onClick={() => {
+                setSelected(null);
+                detailsTrigger.current?.focus();
+              }}
+            >
               Close details
             </button>
           </div>

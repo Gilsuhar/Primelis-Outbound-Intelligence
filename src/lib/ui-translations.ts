@@ -5,6 +5,7 @@ export type UiTextKey =
   | "nav.sales"
   | "nav.admin"
   | "nav.Agent Workforce"
+  | "nav.Daily Prospect Recycler"
   | "nav.Home"
   | "nav.Signal Playbook"
   | "nav.Account Research"
@@ -179,6 +180,7 @@ const english: Record<UiTextKey, string> = {
   "nav.sales": "Sales",
   "nav.admin": "Admin",
   "nav.Agent Workforce": "Agent Workforce",
+  "nav.Daily Prospect Recycler": "Daily Prospect Recycler",
   "nav.Home": "Home",
   "nav.Signal Playbook": "Signal Playbook",
   "nav.Account Research": "Account Research",
@@ -279,12 +281,15 @@ const english: Record<UiTextKey, string> = {
   "workflow.duration": "Duration",
   "workflow.useCaseStudy": "Use relevant case study if available",
   "workflow.create.title": "Create Outreach",
-  "workflow.create.description": "Pick the account basics, generate a short first draft, then refine.",
-  "workflow.create.empty": "Generate a draft, then edit the intro, pain point, solution, and CTA before sending.",
+  "workflow.create.description":
+    "Pick the account basics, generate a short first draft, then refine.",
+  "workflow.create.empty":
+    "Generate a draft, then edit the intro, pain point, solution, and CTA before sending.",
   "workflow.sequence.title": "Build Sequence",
   "workflow.sequence.description":
     "Build a short sequence from the same quick brief, without starting from a blank page.",
-  "workflow.sequence.empty": "Build a sequence, then edit each subject, body, and CTA before copying.",
+  "workflow.sequence.empty":
+    "Build a sequence, then edit each subject, body, and CTA before copying.",
   "workflow.reply.title": "Reply to Prospect",
   "workflow.reply.description":
     "Paste the reply, choose the buyer role and tone, then generate a careful response.",
@@ -295,7 +300,8 @@ const english: Record<UiTextKey, string> = {
     "Ask one specific question and get a safe recommendation from approved Signal context.",
   "workflow.brain.questionLabel": "What do you want to know?",
   "workflow.brain.answerMode": "Answer mode",
-  "workflow.brain.empty": "Choose a question, add context only if needed, and the answer will appear here.",
+  "workflow.brain.empty":
+    "Choose a question, add context only if needed, and the answer will appear here.",
   "account.title": "Account Research",
   "account.description":
     "Fill only what you know, then get a fit decision, recommended angle, and next action.",
@@ -367,6 +373,7 @@ const french: Record<UiTextKey, string> = {
   "nav.sales": "Vente",
   "nav.admin": "Admin",
   "nav.Agent Workforce": "Agent Workforce",
+  "nav.Daily Prospect Recycler": "Revue quotidienne des prospects",
   "nav.Home": "Accueil",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Recherche compte",
@@ -399,12 +406,12 @@ const french: Record<UiTextKey, string> = {
   "home.buildSequence.title": "Créer une séquence",
   "home.buildSequence.description": "Préparer une courte séquence avec un angle clair.",
   "home.replyToProspect.title": "Répondre au prospect",
-  "home.replyToProspect.description":
-    "Répondre à un message prospect avec une réponse sourcée.",
+  "home.replyToProspect.description": "Répondre à un message prospect avec une réponse sourcée.",
   "home.doNotContact.title": "Vérifier Ne pas contacter",
   "home.doNotContact.description": "Vérifier les comptes à exclure avant tout outreach.",
   "home.askSignalBrain.title": "Demander à Signal Brain",
-  "home.askSignalBrain.description": "Poser une question précise et obtenir une recommandation sûre.",
+  "home.askSignalBrain.description":
+    "Poser une question précise et obtenir une recommandation sûre.",
   "home.adminShortcuts": "Raccourcis admin",
   "home.openTool": "Ouvrir",
   "workflow.eyebrow": "Workflow vente",
@@ -468,22 +475,28 @@ const french: Record<UiTextKey, string> = {
   "workflow.duration": "Durée",
   "workflow.useCaseStudy": "Utiliser une étude de cas pertinente si disponible",
   "workflow.create.title": "Créer un message",
-  "workflow.create.description": "Choisissez les bases du compte, générez un premier draft court, puis ajustez.",
-  "workflow.create.empty": "Générez un draft, puis modifiez l'intro, le pain point, la solution et le CTA.",
+  "workflow.create.description":
+    "Choisissez les bases du compte, générez un premier draft court, puis ajustez.",
+  "workflow.create.empty":
+    "Générez un draft, puis modifiez l'intro, le pain point, la solution et le CTA.",
   "workflow.sequence.title": "Créer une séquence",
-  "workflow.sequence.description": "Créez une courte séquence depuis le même brief, sans repartir de zéro.",
+  "workflow.sequence.description":
+    "Créez une courte séquence depuis le même brief, sans repartir de zéro.",
   "workflow.sequence.empty": "Créez une séquence, puis modifiez chaque objet, corps et CTA.",
   "workflow.reply.title": "Répondre au prospect",
-  "workflow.reply.description": "Collez le message, choisissez le rôle et le ton, puis générez une réponse.",
+  "workflow.reply.description":
+    "Collez le message, choisissez le rôle et le ton, puis générez une réponse.",
   "workflow.reply.placeholder": "Collez ici le message du prospect.",
   "workflow.reply.empty": "Collez le message du prospect et générez une réponse modifiable.",
   "workflow.brain.title": "Demander à Signal Brain",
   "workflow.brain.description": "Posez une question précise et obtenez une recommandation sûre.",
   "workflow.brain.questionLabel": "Que voulez-vous savoir ?",
   "workflow.brain.answerMode": "Mode de réponse",
-  "workflow.brain.empty": "Choisissez une question, ajoutez du contexte seulement si besoin, puis la réponse apparaîtra ici.",
+  "workflow.brain.empty":
+    "Choisissez une question, ajoutez du contexte seulement si besoin, puis la réponse apparaîtra ici.",
   "account.title": "Recherche compte",
-  "account.description": "Renseignez uniquement ce que vous savez, puis obtenez le fit, l'angle et l'action suivante.",
+  "account.description":
+    "Renseignez uniquement ce que vous savez, puis obtenez le fit, l'angle et l'action suivante.",
   "account.step1": "Étape 1 : bases du compte",
   "account.step2": "Étape 2 : signaux search et organisation",
   "account.step3": "Étape 3 : suppression",
@@ -497,12 +510,14 @@ const french: Record<UiTextKey, string> = {
   "account.assess": "Qualifier le compte",
   "playbook.eyebrow": "Playbook Signal",
   "playbook.title": "Comprendre le produit. Choisir les bons comptes. Garder un message clair.",
-  "playbook.description": "Guide interne concis pour apprendre Signal sur le marché US, qualifier les comptes et rester prudent avec les preuves.",
+  "playbook.description":
+    "Guide interne concis pour apprendre Signal sur le marché US, qualifier les comptes et rester prudent avec les preuves.",
   "playbook.learn.title": "Ce que Signal aide à décider",
   "playbook.learn.description": "Utilisez les vérités produit approuvées pour les claims factuels.",
   "playbook.learn.details": "Trois scénarios et limites de sécurité",
   "playbook.icp.title": "ICP Signal approuvé v1",
-  "playbook.icp.description": "Un bon compte possède généralement plusieurs signaux. La taille seule ne qualifie pas.",
+  "playbook.icp.description":
+    "Un bon compte possède généralement plusieurs signaux. La taille seule ne qualifie pas.",
   "playbook.industries.title": "Prioriser les segments prouvés",
   "playbook.personas.title": "Cibler l'ownership, pas seulement le titre",
   "playbook.transition.title": "Ajustements pratiques pour le marché US",
@@ -549,6 +564,7 @@ const portuguese: Record<UiTextKey, string> = {
   "nav.sales": "Vendas",
   "nav.admin": "Admin",
   "nav.Agent Workforce": "Agent Workforce",
+  "nav.Daily Prospect Recycler": "Revisão diária de prospects",
   "nav.Home": "Início",
   "nav.Signal Playbook": "Playbook Signal",
   "nav.Account Research": "Pesquisa de conta",
@@ -637,20 +653,23 @@ const portuguese: Record<UiTextKey, string> = {
   "workflow.duration": "Duração",
   "workflow.useCaseStudy": "Usar case relevante se disponível",
   "workflow.create.title": "Criar mensagem",
-  "workflow.create.description": "Escolha os dados básicos, gere um primeiro rascunho curto e refine.",
+  "workflow.create.description":
+    "Escolha os dados básicos, gere um primeiro rascunho curto e refine.",
   "workflow.create.empty": "Gere um rascunho e edite intro, dor, solução e CTA antes de enviar.",
   "workflow.sequence.title": "Criar sequência",
   "workflow.sequence.description": "Crie uma sequência curta do mesmo brief, sem começar do zero.",
   "workflow.sequence.empty": "Crie uma sequência e edite assunto, corpo e CTA antes de copiar.",
   "workflow.reply.title": "Responder prospect",
-  "workflow.reply.description": "Cole a mensagem, escolha função e tom, depois gere uma resposta cuidadosa.",
+  "workflow.reply.description":
+    "Cole a mensagem, escolha função e tom, depois gere uma resposta cuidadosa.",
   "workflow.reply.placeholder": "Cole aqui a mensagem do prospect.",
   "workflow.reply.empty": "Cole a mensagem do prospect e gere uma resposta editável.",
   "workflow.brain.title": "Perguntar ao Signal Brain",
   "workflow.brain.description": "Faça uma pergunta específica e receba uma recomendação segura.",
   "workflow.brain.questionLabel": "O que você quer saber?",
   "workflow.brain.answerMode": "Modo de resposta",
-  "workflow.brain.empty": "Escolha uma pergunta, adicione contexto só se necessário, e a resposta aparecerá aqui.",
+  "workflow.brain.empty":
+    "Escolha uma pergunta, adicione contexto só se necessário, e a resposta aparecerá aqui.",
   "account.title": "Pesquisa de conta",
   "account.description": "Preencha só o que sabe e receba fit, ângulo e próxima ação.",
   "account.step1": "Etapa 1: dados da conta",
@@ -666,12 +685,14 @@ const portuguese: Record<UiTextKey, string> = {
   "account.assess": "Avaliar conta",
   "playbook.eyebrow": "Playbook Signal",
   "playbook.title": "Aprenda o produto. Escolha as contas certas. Mantenha a mensagem clara.",
-  "playbook.description": "Guia interno conciso para aprender Signal no mercado dos EUA, qualificar contas e usar evidências com cuidado.",
+  "playbook.description":
+    "Guia interno conciso para aprender Signal no mercado dos EUA, qualificar contas e usar evidências com cuidado.",
   "playbook.learn.title": "O que Signal ajuda as equipes a decidir",
   "playbook.learn.description": "Use verdades de produto aprovadas para afirmações factuais.",
   "playbook.learn.details": "Três cenários e limites de segurança",
   "playbook.icp.title": "ICP Signal aprovado v1",
-  "playbook.icp.description": "Uma boa conta normalmente tem vários sinais. Tamanho sozinho não qualifica.",
+  "playbook.icp.description":
+    "Uma boa conta normalmente tem vários sinais. Tamanho sozinho não qualifica.",
   "playbook.industries.title": "Priorizar segmentos comprovados",
   "playbook.personas.title": "Mirar ownership, não só senioridade",
   "playbook.transition.title": "Ajustes práticos para outreach nos EUA",
@@ -705,5 +726,5 @@ export function translateUi(key: UiTextKey, language: OutputLanguage) {
 }
 
 export function translateNavigationLabel(label: string, language: OutputLanguage) {
-  return translateUi(`nav.${label}` as UiTextKey, language);
+  return translateUi(`nav.${label}` as UiTextKey, language) ?? label;
 }

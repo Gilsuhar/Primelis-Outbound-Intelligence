@@ -35,6 +35,8 @@ switch ($Task) {
   'serial' { & node node_modules/vitest/vitest.mjs run --maxWorkers=1 --minWorkers=1 *> $log }
   'parallel' { & node node_modules/vitest/vitest.mjs run --maxWorkers=4 --minWorkers=1 *> $log }
   'security' { & node node_modules/vitest/vitest.mjs run src/lib/auth src/lib/supabase src/lib/preview-policy.test.ts src/lib/preview-isolation.test.ts src/server/preview-boundaries.test.ts src/test/publication-secret-patterns.test.ts --maxWorkers=4 --minWorkers=1 *> $log }
+  'acceptance' { & node node_modules/vitest/vitest.mjs run src/features/prospect-recycler/review-client.test.tsx src/components/app-shell.test.tsx src/lib/navigation.test.ts src/lib/auth src/lib/supabase src/lib/preview-policy.test.ts src/lib/preview-isolation.test.ts src/server/preview-boundaries.test.ts src/test/publication-secret-patterns.test.ts --maxWorkers=4 --minWorkers=1 *> $log }
+  'acceptance-browser' { & node validation/recycler-browser.mjs *> $log }
   'types' { & node node_modules/typescript/bin/tsc --noEmit --incremental false *> $log }
   'lint' { & node node_modules/eslint/bin/eslint.js . *> $log }
   'build' { & node node_modules/next/dist/bin/next build *> $log }
