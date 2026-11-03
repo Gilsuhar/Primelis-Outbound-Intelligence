@@ -1,5 +1,8 @@
 # Verification role audit — Phase 4P
 
+The [Phase 4Q administrative audit plan](preview-administrative-audit.md) supersedes this provisioning
+proposal as the recommended next step. Preserve this blocked proposal for history; do not execute it.
+
 Decision: **NO-GO for provisioning**. This is a local proposal, not an executed database change.
 Target: dedicated `agent-workforce-preview`, `txfxfrlhtvzwgluhnbpw`, Primelis, us-west-2.
 

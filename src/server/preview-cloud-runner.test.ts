@@ -297,8 +297,8 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
   expect(doc.on).toEqual({ push: { branches: [`${branchPrefix}*`] } });
   expect(doc.permissions).toEqual({ contents: "read", actions: "read" });
   expect(doc.concurrency["cancel-in-progress"]).toBe(false);
-  const job = doc.jobs.diagnose;
-  expect(Object.keys(doc.jobs)).toEqual(["diagnose"]);
+  const job = doc.jobs.audit;
+  expect(Object.keys(doc.jobs)).toEqual(["audit"]);
   expect(job.environment).toBe(environment); expect(job["timeout-minutes"]).toBe(15);
   expect(job.if).toContain("github.run_attempt == 1");
   expect(job.if).toContain(`github.ref == format('refs/heads/${branchPrefix}{0}', github.sha)`);
@@ -324,8 +324,9 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
   }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
-    "node scripts/preview/diagnose-identity.mjs --diagnose-identity"]);
-  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("verify:txfxfrlhtvzwgluhnbpw");
+    "node scripts/preview/audit-admin.mjs --plan", "node scripts/preview/audit-admin.mjs --audit-with-prisma-diff"]);
+  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("audit-admin:txfxfrlhtvzwgluhnbpw");
+  expect(secretSteps[0].env.PREVIEW_ADMIN_DIFF_APPROVAL).toBe("privileged-read-only-prisma-diff");
   expect(steps[2].run).toContain("pnpm install --frozen-lockfile --ignore-scripts");
   // Dependency preparation has no database secret and cannot invoke a database operation.
   expect(steps[2].run.trim().split("\n")).toEqual([

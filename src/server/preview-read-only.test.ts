@@ -119,9 +119,11 @@ describe("unexecuted restricted-role SQL proposal", () => {
     expect((sql.match(/CREATE POLICY recycler_preview_verify_select/g) ?? [])).toHaveLength(51);
     expect((sql.match(/AS PERMISSIVE FOR SELECT TO recycler_preview_verify USING \(true\)/g) ?? [])).toHaveLength(51);
   });
-  it("preserves both published workflows: this local workflow still cannot provision or verify", () => {
+  it("limits the local administrative audit workflow to explicit verification without provisioning", () => {
     const workflow = readFileSync(".github/workflows/preview-database-setup.yml", "utf8");
-    expect(workflow).toContain("node scripts/preview/diagnose-identity.mjs --diagnose-identity");
-    expect(workflow).not.toMatch(/verify-only\.mjs|verification-role|migrate deploy|db push|psql/);
+    expect(workflow).toContain("node scripts/preview/audit-admin.mjs --plan");
+    expect(workflow).toContain("node scripts/preview/audit-admin.mjs --audit-with-prisma-diff");
+    expect(workflow).toContain("PREVIEW_ADMIN_DIFF_APPROVAL: privileged-read-only-prisma-diff");
+    expect(workflow).not.toMatch(/verify-only\.mjs|verification-role|migrate deploy|migrate reset|db push|psql/);
   });
 });

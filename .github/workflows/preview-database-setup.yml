@@ -1,8 +1,8 @@
-name: One-time Preview identity diagnostic
+name: One-time Preview administrative schema audit
 
 on:
-  # Retain the deployment-excluded namespace; this revision sends only the fixed identity SELECT.
-  # Only the owner's deliberate creation of the SHA-named branch may authorize the diagnostic.
+  # Retain the deployment-excluded namespace; no initialization or schema writes.
+  # Only the owner's deliberate creation of the SHA-named branch may authorize this audit.
   # Ordinary branch pushes, updates, tags, PRs, schedules and reruns cannot authorize this job.
   push:
     branches:
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  diagnose:
+  audit:
     if: >-
       github.event_name == 'push' &&
       github.repository == 'Gilsuhar/Primelis-Outbound-Intelligence' &&
@@ -60,7 +60,7 @@ jobs:
           npm install --global pnpm@9.12.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
           node node_modules/prisma/build/index.js generate
-      - name: Validate owner authorization and TLS; diagnose identity with one SELECT
+      - name: Audit existing schema with read-only queries and explicitly approved privileged Prisma diff
         env:
           PREVIEW_SETUP_DATABASE_URL: ${{ secrets.PREVIEW_SETUP_DATABASE_URL }}
           PREVIEW_SETUP_APPROVED_ENDPOINT: ${{ vars.PREVIEW_SETUP_APPROVED_ENDPOINT }}
@@ -72,11 +72,13 @@ jobs:
           PREVIEW_SETUP_ENVIRONMENT: agent-workforce-preview-setup
           PREVIEW_SETUP_PROJECT_NAME: agent-workforce-preview
           PREVIEW_SETUP_APPROVED_PROJECT_REF: txfxfrlhtvzwgluhnbpw
-          PREVIEW_SETUP_APPROVAL: verify:txfxfrlhtvzwgluhnbpw
+          PREVIEW_SETUP_APPROVAL: audit-admin:txfxfrlhtvzwgluhnbpw
+          PREVIEW_ADMIN_DIFF_APPROVAL: privileged-read-only-prisma-diff
           GITHUB_TOKEN: ${{ github.token }}
           ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
           ACTIONS_RUNNER_DEBUG: ${{ secrets.ACTIONS_RUNNER_DEBUG }}
           CHECKPOINT_DISABLE: '1'
           NEXT_TELEMETRY_DISABLED: '1'
         run: |
-          node scripts/preview/diagnose-identity.mjs --diagnose-identity
+          node scripts/preview/audit-admin.mjs --plan
+          node scripts/preview/audit-admin.mjs --audit-with-prisma-diff
