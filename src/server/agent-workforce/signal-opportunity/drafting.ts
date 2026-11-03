@@ -85,17 +85,28 @@ export function draftSignalOpportunity(input: DraftInput) {
   const products = input.products.filter(permittedDraftProduct);
   if (!products.length || insights.length !== 3) throw new Error("SIGNAL_DRAFT_BRIEF_INCOMPLETE");
   if (!search || !serp) throw new Error("SIGNAL_DRAFT_EVIDENCE_MISSING");
-  const same = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+  const same = (left: string, right: string) =>
+    left.trim().toLowerCase() === right.trim().toLowerCase();
   const brandHost = search.companyDomain.toLowerCase().replace(/^www\./, "");
-  if (!same(search.keyword, target.query) || !same(serp.query, target.query) ||
-      search.country !== target.country || serp.country !== target.country ||
-      search.device !== target.device || serp.device !== target.device ||
-      !same(serp.location, target.location) || serp.brandAdvertising !== "OBSERVED" ||
-      !serp.ads.some(ad => {
-        try { const host = new URL(ad.url).hostname.toLowerCase().replace(/^www\./, "");
-          return host === brandHost || host.endsWith("." + brandHost);
-        } catch { return false; }
-      })) throw new Error("SIGNAL_DRAFT_BRAND_SCOPE_MISMATCH");
+  if (
+    !same(search.keyword, target.query) ||
+    !same(serp.query, target.query) ||
+    search.country !== target.country ||
+    serp.country !== target.country ||
+    search.device !== target.device ||
+    serp.device !== target.device ||
+    !same(serp.location, target.location) ||
+    serp.brandAdvertising !== "OBSERVED" ||
+    !serp.ads.some((ad) => {
+      try {
+        const host = new URL(ad.url).hostname.toLowerCase().replace(/^www\./, "");
+        return host === brandHost || host.endsWith("." + brandHost);
+      } catch {
+        return false;
+      }
+    })
+  )
+    throw new Error("SIGNAL_DRAFT_BRAND_SCOPE_MISMATCH");
   const visibility = products.find((p) => /monitor/i.test(p.text)) ?? products[0];
   const bidding = products.find((p) => /bid|paus|coverage/i.test(p.text));
   const executive = /\bcmo\b|chief marketing officer/i.test(contact.title);
@@ -124,14 +135,22 @@ export function draftSignalOpportunity(input: DraftInput) {
   const brief = {
     observation,
     searchSource: {
-      provider: search.provider, recordId: search.recordId, sourceUrl: search.sourceUrl,
-      country: search.country, device: search.device,
-      periodStart: search.periodStart, periodEnd: search.periodEnd, retrievedAt: search.retrievedAt,
-      visitsDefinition: search.visitsDefinition, shareDefinition: search.shareDefinition,
-      classificationBasis: search.classificationBasis, excerpt: search.excerpt,
+      provider: search.provider,
+      recordId: search.recordId,
+      sourceUrl: search.sourceUrl,
+      country: search.country,
+      device: search.device,
+      periodStart: search.periodStart,
+      periodEnd: search.periodEnd,
+      retrievedAt: search.retrievedAt,
+      visitsDefinition: search.visitsDefinition,
+      shareDefinition: search.shareDefinition,
+      classificationBasis: search.classificationBasis,
+      excerpt: search.excerpt,
       limitations: [...search.limitations],
       attributionRequired: search.attributionRequired ?? true,
-      disclosure: "Third-party estimated visits, not spend, conversions or first-party Google Ads analytics. Disclose Similarweb and the exact scope when asked.",
+      disclosure:
+        "Third-party estimated visits, not spend, conversions or first-party Google Ads analytics. Disclose Similarweb and the exact scope when asked.",
     },
     recipientRationale: `${contact.title}. ${contact.reason}`,
     decisionGap: `Hypothesis to discuss, not a diagnosed account problem: ${decisionGap}`,
@@ -151,11 +170,20 @@ export function draftSignalOpportunity(input: DraftInput) {
     ],
     screenshotRecommendation: {
       status: "MATCHED_OBSERVATION_ONLY",
-      companyDomain: search.companyDomain, query: target.query, observedAt: serp.observedAt,
+      companyDomain: search.companyDomain,
+      query: target.query,
+      observedAt: serp.observedAt,
       sourceUrl: serp.sourceUrl,
-      instruction: "Request an authorized screenshot matching this exact brand/query/market/device and observation. No image is attached or independently authenticated by this brief.",
+      instruction:
+        "Request an authorized screenshot matching this exact brand/query/market/device and observation. No image is attached or independently authenticated by this brief.",
     },
-    workflow: { research: "GROUNDED_UPSTREAM", drafting: "GENERATED", humanReview: "PENDING", sending: "NOT_APPROVED", enrollment: "NOT_APPROVED" },
+    workflow: {
+      research: "GROUNDED_UPSTREAM",
+      drafting: "GENERATED",
+      humanReview: "PENDING",
+      sending: "NOT_APPROVED",
+      enrollment: "NOT_APPROVED",
+    },
   };
   const message = (
     subject: string,
@@ -173,13 +201,13 @@ export function draftSignalOpportunity(input: DraftInput) {
       `${company}'s brand bids`,
       [
         observation + attribution,
-        decisionGap,
+        mechanism + " " + decisionGap,
         executive
-          ? "Is this a question your search team is already working on?"
-          : "How are you making that call today?",
+          ? "Worth a quick look with your search team?"
+          : "Worth checking where CPCs could be lower?",
       ],
       [insights[1].factId],
-      [],
+      [bidding?.id ?? visibility.id],
     ),
     message(
       "Who else shows up?",
@@ -200,7 +228,6 @@ export function draftSignalOpportunity(input: DraftInput) {
       "One query, one controlled test",
       [
         `For "${target.query}", could lower bids when competition eases preserve conversions? That's worth testing, not assuming.`,
-        mechanism,
         "We could start with one branded query, compare against a control, and agree when to restore the original bids if conversions fall.",
         "Would 15 minutes to discuss reducing branded CPC with a controlled test be useful?",
       ],

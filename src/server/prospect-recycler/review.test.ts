@@ -262,11 +262,18 @@ describe("Recycler review and documented Outreach semantics", () => {
       receipt.employerDomain = hub.prospect.employerDomain!;
     }
     for (const check of [...proof.history!, ...proof.sequences!]) {
-      if (check.system === "HUBSPOT") { check.status = "COMPLETE"; check.recordIds = [hub.prospect.record.id]; }
+      if (check.system === "HUBSPOT") {
+        check.status = "COMPLETE";
+        check.recordIds = [hub.prospect.record.id];
+      }
     }
     for (const check of proof.suppressions!) {
-      if (check.source === "HUBSPOT") { check.status = "COMPLETE"; check.recordIds = [hub.prospect.record.id]; }
-      if (check.source === "LOCAL") check.recordIds.push(JSON.stringify(["HUBSPOT", hub.prospect.record.id]));
+      if (check.source === "HUBSPOT") {
+        check.status = "COMPLETE";
+        check.recordIds = [hub.prospect.record.id];
+      }
+      if (check.source === "LOCAL")
+        check.recordIds.push(JSON.stringify(["HUBSPOT", hub.prospect.record.id]));
     }
     const options = {
       readers: { HUBSPOT: reader("HUBSPOT", [hub]), OUTREACH: reader("OUTREACH", [s]) },
@@ -285,7 +292,7 @@ describe("Recycler review and documented Outreach semantics", () => {
     const list = await recyclerReviewDemo();
     const csv = reviewCsv(list, "REVIEW");
     expect(csv).toContain('"HOLD"');
-    expect(csv).toContain('"EXCLUDED"');
+    expect(csv).toContain('"DISQUALIFIED"');
     expect(csv).toContain('"DELIVERED"');
     expect(csv).toContain("2026-05-20T09:00:00.000Z");
     expect(csv).toContain("HISTORY_AUTHORITY_UNPROVEN");
