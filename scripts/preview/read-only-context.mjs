@@ -26,12 +26,16 @@ export const privilegeQuery = `SELECT
   NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class c WHERE c.relkind='S' AND has_sequence_privilege(current_user,c.oid,'USAGE,UPDATE')) AS no_sequence_writes,
   NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege(current_user,p.oid,'EXECUTE')) AS no_user_functions,
+  has_column_privilege(current_user,'auth.users','id','SELECT') AND
+    NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid='auth.users'::regclass AND a.attnum>0 AND NOT a.attisdropped
+      AND a.attname<>'id' AND has_column_privilege(current_user,a.attrelid,a.attnum,'SELECT')) AS auth_id_only,
+  (SELECT attnotnull FROM pg_catalog.pg_attribute WHERE attrelid='auth.users'::regclass AND attname='id' AND attnum>0 AND NOT attisdropped) AS auth_id_not_null,
   current_setting('row_security')='on' AS row_security_on
 FROM pg_catalog.pg_roles r WHERE r.rolname=current_user`.replace(/\n/g, " ");
 
 export const privilegeFields = Object.freeze(["restricted_role", "no_memberships", "login_defaults", "no_database_override",
   "no_database_writes", "no_schema_writes", "no_database_ownership", "no_relation_ownership", "no_function_ownership",
-  "no_owned_objects", "no_table_writes", "no_sequence_writes", "no_user_functions", "row_security_on"]);
+  "no_owned_objects", "no_table_writes", "no_sequence_writes", "no_user_functions", "auth_id_only", "auth_id_not_null", "row_security_on"]);
 
 export function assertVerificationPrivileges(rows) {
   if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || privilegeFields.some(key => rows[0][key] !== true)) reject();

@@ -36,7 +36,9 @@ export async function verifyInitializedSchema(db, plan, files, restricted = fals
     const tables = await db.$queryRawUnsafe(
       "SELECT c.relname AS name, c.relrowsecurity AS rls, " +
       "(has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') OR " +
-      "has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')) AS api_access " +
+      "has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') OR " +
+      "has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES') OR " +
+      "has_any_column_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')) AS api_access " +
       "FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace " +
       "WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname COLLATE \"C\"",
     );
@@ -45,7 +47,7 @@ export async function verifyInitializedSchema(db, plan, files, restricted = fals
       throw new Error("PREVIEW_SETUP_RLS_VERIFICATION_FAILED");
     stage = "UNEXPECTED_OBJECTS";
     const untouched = await db.$queryRawUnsafe(
-      "SELECT (SELECT count(*)::int FROM auth.users) AS auth_users, " +
+      "SELECT (SELECT count(id)::int FROM auth.users) AS auth_users, " +
       "(SELECT count(*)::int FROM pg_roles WHERE rolname='recycler_preview_app') AS runtime_roles, " +
       "(SELECT count(*)::int FROM pg_policies WHERE schemaname='public') AS policies",
     );

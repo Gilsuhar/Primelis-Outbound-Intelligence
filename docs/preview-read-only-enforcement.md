@@ -1,5 +1,10 @@
 # Read-only enforcement correction (Phase 4O)
 
+Historical implementation report. The subsequent [Phase 4P audit](preview-verification-role-audit.md)
+supersedes the unverified grant assumptions and provisioning steps below: live grant-authority and
+PUBLIC-routine blockers were confirmed. Do not execute the role proposal. Auth SELECT is now ID-only,
+and PUBLIC CREATE is checked rather than revoked; PUBLIC TEMP revocation remains proposed.
+
 Local implementation only. No database or GitHub settings have been changed. Do not rerun initialization,
 the diagnostic run 41717191903, or any previously published branch. The eleven migrations, Prisma model,
 lockfile, target fingerprint, CA, workflow and Vercel exclusion are unchanged.
