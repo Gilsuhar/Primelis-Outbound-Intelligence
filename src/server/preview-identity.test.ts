@@ -6,6 +6,7 @@ import { assertPreviewIdentity, failedIdentityConditions, identityQuery } from "
 import { diagnoseIdentity, diagnosticConditions } from "../../scripts/preview/diagnose-identity.mjs";
 import { verificationError, verificationReport } from "../../scripts/preview/verification-errors.mjs";
 import { caPath } from "../../scripts/preview/tls-trust.mjs";
+import { branchPrefix, environment, repository, repositoryId, owner, ownerId, workflow } from "../../scripts/preview/github-context.mjs";
 import target from "../../scripts/preview/verified-target.json";
 
 const identity = () => ({ database: "postgres", operator: "postgres", effective_role: "postgres",
@@ -14,6 +15,17 @@ const identity = () => ({ database: "postgres", operator: "postgres", effective_
 const env = () => ({ PREVIEW_SETUP_APPROVED_PROJECT_REF: target.projectRef, PREVIEW_SETUP_PROJECT_NAME: target.projectName,
   PREVIEW_SETUP_APPROVAL: `verify:${target.projectRef}`, PREVIEW_SETUP_APPROVED_ENDPOINT: "aws-1-us-west-2.pooler.supabase.com:5432",
   PREVIEW_SETUP_DATABASE_URL: `postgresql://postgres.${target.projectRef}:synthetic@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&sslaccept=strict` });
+const cloudEnv = () => {
+  const sha = "a".repeat(40), ref = `refs/heads/${branchPrefix}${sha}`;
+  return { ...env(), CI: "true", GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: repository,
+    GITHUB_REPOSITORY_ID: repositoryId, GITHUB_REPOSITORY_OWNER_ID: ownerId, GITHUB_ACTOR: owner,
+    GITHUB_ACTOR_ID: ownerId, GITHUB_TRIGGERING_ACTOR: owner, GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_EVENT_NAME: "push", GITHUB_REF_TYPE: "branch", GITHUB_REF: ref, GITHUB_SHA: sha,
+    GITHUB_WORKFLOW_SHA: sha, GITHUB_WORKFLOW_REF: `${repository}/${workflow}@${ref}`,
+    PREVIEW_SETUP_APPROVED_SHA: sha, PREVIEW_SETUP_ENVIRONMENT: environment,
+    PREVIEW_SETUP_PUSH_CREATED: "true", PREVIEW_SETUP_PUSH_DELETED: "false", PREVIEW_SETUP_PUSH_FORCED: "false",
+    PREVIEW_SETUP_PUSH_BEFORE: "0".repeat(40) };
+};
 function fixture(rows: unknown[] = [identity()]) {
   const db = { $queryRawUnsafe: vi.fn().mockResolvedValue(rows), $disconnect: vi.fn().mockResolvedValue(undefined) };
   const deps = { connect: vi.fn().mockResolvedValue(db), authorize: vi.fn().mockResolvedValue(undefined),
@@ -75,6 +87,32 @@ describe("fixed Preview identity assertions", () => {
 });
 
 describe("identity-only secure diagnostic", () => {
+  it("performs cloud authorization before TLS and the single SELECT, then stops", async () => {
+    const f = fixture(), input = cloudEnv();
+    expect(await diagnoseIdentity(input, f.deps)).toEqual([]);
+    expect(f.deps.authorize).toHaveBeenCalledOnce(); expect(f.deps.authorize).toHaveBeenCalledWith(input);
+    expect(f.deps.authorize.mock.invocationCallOrder[0]).toBeLessThan(f.deps.probe.mock.invocationCallOrder[0]);
+    expect(f.deps.probe.mock.invocationCallOrder[0]).toBeLessThan(f.deps.connect.mock.invocationCallOrder[0]);
+    expect(f.db.$queryRawUnsafe.mock.calls).toEqual([[identityQuery]]);
+    expect(f.db.$disconnect).toHaveBeenCalledOnce();
+    for (const fn of [f.deps.migrate, f.deps.reset, f.deps.seed, f.deps.diff]) expect(fn).not.toHaveBeenCalled();
+  });
+  it("stops before any TLS or database request when saved cloud approval is rejected", async () => {
+    const f = fixture();
+    f.deps.authorize.mockRejectedValue(new Error("PREVIEW_SETUP_GITHUB_APPROVAL_REJECTED"));
+    const error = await diagnoseIdentity(cloudEnv(), f.deps).catch(e => e);
+    expect(diagnosticConditions(error)).toEqual(["PREVIEW_SETUP_GITHUB_APPROVAL_REJECTED"]);
+    expect(f.deps.probe).not.toHaveBeenCalled(); expect(f.deps.connect).not.toHaveBeenCalled();
+    expect(f.db.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+  it("importing the diagnostic and shared planner cannot invoke the initializer CLI", () => {
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval",
+      "await import('./scripts/preview/diagnose-identity.mjs'); await import('./scripts/preview/setup.mjs');"], {
+      encoding: "utf8", timeout: 10000,
+      env: { NODE_ENV: "test", PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, NODE_OPTIONS: process.env.NODE_OPTIONS },
+    });
+    expect(result.status).toBe(0); expect(result.stdout).toBe(""); expect(result.stderr).toBe("");
+  });
   it("uses one fixed SELECT and the same strict CA/read-only configuration", async () => {
     const f = fixture(); expect(await diagnoseIdentity(env(), f.deps)).toEqual([]);
     expect(f.db.$queryRawUnsafe.mock.calls).toEqual([[identityQuery]]);

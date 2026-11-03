@@ -2,9 +2,9 @@
 
 ## Database initialized: initialization is closed
 
-Current revision: the existing workflow is **verification-only**, with no initialization command.
-Use [model alignment and verification execution](preview-schema-alignment.md) for the new owner-authorized
-branch procedure. The initialization instructions below are historical and must not be executed.
+Current revision (Phase 4N): the existing workflow is **identity-diagnostic only**.
+Use [the single-probe procedure](preview-identity-probe.md). Historical initialization and full-verification
+commands below are not authorized by this revision.
 
 Run 41693631072 applied all 11 migrations to the dedicated Preview project, then failed during
 post-migration verification. The database is not empty. Do not rerun any initialization workflow,

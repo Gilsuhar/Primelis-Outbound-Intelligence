@@ -297,8 +297,8 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
   expect(doc.on).toEqual({ push: { branches: [`${branchPrefix}*`] } });
   expect(doc.permissions).toEqual({ contents: "read", actions: "read" });
   expect(doc.concurrency["cancel-in-progress"]).toBe(false);
-  const job = doc.jobs.verify;
-  expect(Object.keys(doc.jobs)).toEqual(["verify"]);
+  const job = doc.jobs.diagnose;
+  expect(Object.keys(doc.jobs)).toEqual(["diagnose"]);
   expect(job.environment).toBe(environment); expect(job["timeout-minutes"]).toBe(15);
   expect(job.if).toContain("github.run_attempt == 1");
   expect(job.if).toContain(`github.ref == format('refs/heads/${branchPrefix}{0}', github.sha)`);
@@ -313,6 +313,8 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     `github.event.sender.id == ${ownerId}`, "github.event.sender.type == 'User'",
   ]) expect(job.if).toContain(predicate);
   const steps = job.steps;
+  expect(steps).toHaveLength(4);
+  expect(doc.env).toBeUndefined(); expect(job.env).toBeUndefined();
   for (const step of steps.filter((value: { uses?: string }) => value.uses)) expect(step.uses).toMatch(/@[a-f0-9]{40}$/);
   expect(steps[0].with["persist-credentials"]).toBe(false);
   expect(steps[0].with.ref).toBe("${{ github.sha }}");
@@ -322,10 +324,17 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
   }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
-    "node scripts/preview/verify-only.mjs --plan", "node scripts/preview/verify-only.mjs --verify-only"]);
+    "node scripts/preview/diagnose-identity.mjs --diagnose-identity"]);
   expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("verify:txfxfrlhtvzwgluhnbpw");
   expect(steps[2].run).toContain("pnpm install --frozen-lockfile --ignore-scripts");
-  expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
+  // Dependency preparation has no database secret and cannot invoke a database operation.
+  expect(steps[2].run.trim().split("\n")).toEqual([
+    "node --input-type=module -e \"import {readFileSync} from 'node:fs'; import {reviewedFiles} from './scripts/preview/verification.mjs'; reviewedFiles(JSON.parse(readFileSync('scripts/preview/verified-target.json')).migrations);\"",
+    "npm install --global pnpm@9.12.0 --ignore-scripts",
+    "pnpm install --frozen-lockfile --ignore-scripts",
+    "node node_modules/prisma/build/index.js generate",
+  ]);
+  expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|verify-only\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
 });
 
 it("disables native Git deployments only for the dedicated setup branch namespace", () => {
