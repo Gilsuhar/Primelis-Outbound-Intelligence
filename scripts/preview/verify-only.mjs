@@ -8,7 +8,7 @@ import { probeTls, tlsFailureCategory } from "./tls-probe.mjs";
 import { prismaTlsUrl } from "./tls-trust.mjs";
 import { readOnlyUrl, runSchemaDiff } from "./schema-diff.mjs";
 import { verifyGitHubApproval } from "./github-context.mjs";
-const target = JSON.parse(readFileSync(new URL("./verified-target.json", import.meta.url), "utf8"));
+import { assertPreviewIdentity, identityQuery } from "./identity.mjs";
 
 /** Independent verification of initialized Preview. No migration dependency or write command. */
 export async function verifyPreview(env, execute, dependencies) {
@@ -24,12 +24,7 @@ export async function verifyPreview(env, execute, dependencies) {
   let db;
   try {
     db = await dependencies.connect(readOnlyUrl(url));
-    const identity = await db.$queryRawUnsafe("SELECT current_database()::text AS database, session_user::text AS operator, " +
-      "pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(system_identifier::text, 'UTF8')), 'hex') AS fingerprint, " +
-      "current_setting('transaction_read_only') AS read_only FROM pg_catalog.pg_control_system()");
-    if (identity.length !== 1 || identity[0].database !== "postgres" || identity[0].operator !== "postgres" ||
-        identity[0].fingerprint !== target.clusterFingerprint || identity[0].read_only !== "on")
-      throw new Error("PREVIEW_SETUP_TARGET_REJECTED");
+    assertPreviewIdentity(await db.$queryRawUnsafe(identityQuery));
   } catch (error) {
     await db?.$disconnect();
     throw verificationError(error, "IDENTITY");

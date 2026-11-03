@@ -1,17 +1,21 @@
+import { sanitizedConditions } from "./identity.mjs";
 const codes = new Set([
   "PREVIEW_SETUP_HISTORY_VERIFICATION_FAILED", "PREVIEW_SETUP_HISTORY_MISSING",
   "PREVIEW_SETUP_RLS_VERIFICATION_FAILED", "PREVIEW_SETUP_UNEXPECTED_OBJECTS", "PREVIEW_SETUP_UNEXPECTED_DATA",
   "PREVIEW_SETUP_SCHEMA_DRIFT", "PREVIEW_SETUP_DIFF_COMMAND_FAILED", "PREVIEW_SETUP_DIFF_TIMEOUT",
   "PREVIEW_SETUP_DIFF_PROCESS_FAILED", "PREVIEW_SETUP_VERIFICATION_QUERY_FAILED", "PREVIEW_SETUP_TARGET_REJECTED",
+  "PREVIEW_SETUP_READ_ONLY_REJECTED",
 ]);
 const categories = new Set(["CHECK_FAILED", "SCHEMA_DRIFT", "COMMAND_ERROR", "PROCESS_ERROR", "TIMEOUT",
   "AUTHENTICATION", "CONNECTIVITY", "PERMISSION", "TLS", "CONFIGURATION", "MISSING_HISTORY", "QUERY_ERROR"]);
-const stages = new Set(["IDENTITY", "HISTORY", "TABLE_RLS", "UNEXPECTED_OBJECTS", "EMPTY_DATA", "SCHEMA_DIFF", "UNKNOWN"]);
+const stages = new Set(["IDENTITY", "READ_ONLY", "HISTORY", "TABLE_RLS", "UNEXPECTED_OBJECTS", "EMPTY_DATA", "SCHEMA_DIFF", "UNKNOWN"]);
 export function verificationReport(error) {
+  const failedConditions = sanitizedConditions(error?.failedConditions);
   return {
     code: codes.has(error?.message) ? error.message : "PREVIEW_SETUP_VERIFICATION_QUERY_FAILED",
     stage: stages.has(error?.stage) ? error.stage : "UNKNOWN",
     category: categories.has(error?.category) ? error.category : "QUERY_ERROR",
+    ...(failedConditions.length ? { failedConditions } : {}),
   };
 }
 export function verificationError(error, stage) {
@@ -23,5 +27,8 @@ export function verificationError(error, stage) {
   if (error?.meta?.code === "42501") category = "PERMISSION";
   if (stage === "HISTORY" && error?.meta?.code === "42P01") { code = "PREVIEW_SETUP_HISTORY_MISSING"; category = "MISSING_HISTORY"; }
   if (categories.has(error?.category)) category = error.category;
-  return Object.assign(new Error(code), { stage: stages.has(stage) ? stage : "UNKNOWN", category });
+  const failedConditions = sanitizedConditions(error?.failedConditions);
+  const effectiveStage = code === "PREVIEW_SETUP_READ_ONLY_REJECTED" && stage === "IDENTITY" ? "READ_ONLY" : stage;
+  return Object.assign(new Error(code), { stage: stages.has(effectiveStage) ? effectiveStage : "UNKNOWN", category,
+    ...(failedConditions.length ? { failedConditions } : {}) });
 }

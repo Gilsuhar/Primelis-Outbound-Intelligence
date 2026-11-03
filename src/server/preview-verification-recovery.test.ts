@@ -16,7 +16,8 @@ const env = () => ({ PREVIEW_SETUP_APPROVED_PROJECT_REF: target.projectRef, PREV
   PREVIEW_SETUP_DATABASE_URL: `postgresql://postgres.${target.projectRef}:synthetic@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&sslaccept=strict` });
 const files = reviewedFiles(target.migrations, path => Buffer.from(readFileSync(path, "utf8").replace(/\r\n/g, "\n")));
 function fixture() {
-  const identity = [{ database: "postgres", operator: "postgres", fingerprint: target.clusterFingerprint, read_only: "on" }];
+  const identity = [{ database: "postgres", operator: "postgres", fingerprint: target.clusterFingerprint, read_only: "on",
+    effective_role: "postgres", session_superuser: false, effective_superuser: false, default_read_only: "on" }];
   const history = target.migrations.map(migration_name => ({ migration_name, checksum: files.hashes[`prisma/migrations/${migration_name}/migration.sql`],
     finished_at: new Date(), rolled_back_at: null, applied_steps_count: 1 }));
   const tables = files.tables.map(name => ({ name, rls: true, api_access: false }));
