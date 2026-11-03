@@ -1,5 +1,13 @@
 # One-time cloud Prisma initialization
 
+## Database initialized: initialization is closed
+
+Run 41693631072 applied all 11 migrations to the dedicated Preview project, then failed during
+post-migration verification. The database is not empty. Do not rerun any initialization workflow,
+recreate/update a setup branch, or use the historical publication procedures below for this database.
+See [verification recovery](preview-verification-recovery.md) for the independent read-only procedure,
+confirmed catalog/model differences and remaining approval requirements. No schema change is authorized.
+
 ## Phase 4J: final TLS-corrected execution candidate
 
 This preparation commit is a documentation-only child of

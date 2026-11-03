@@ -6,6 +6,8 @@ import { validateGitHubContext, verifyGitHubApproval } from "./github-context.mj
 import { probeTls, tlsFailureCategory } from "./tls-probe.mjs";
 import { prismaTlsUrl, verifiedCa } from "./tls-trust.mjs";
 import { reviewedFiles, verifyInitializedSchema } from "./verification.mjs";
+import { runSchemaDiff } from "./schema-diff.mjs";
+import { verificationReport } from "./verification-errors.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const target = JSON.parse(readFileSync(new URL("./verified-target.json", import.meta.url), "utf8"));
@@ -13,14 +15,15 @@ const legacy = ["ofxqdwpyqbvskrcfpdmx", "mfxqiyidmdppvdzeboke"];
 const fail = () => { throw new Error("PREVIEW_SETUP_CONFIGURATION_REJECTED"); };
 
 /** Separate operator-only credentials: never consumed by Next.js or installation hooks. */
-export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/migrations"))) {
+export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/migrations")), operation = "initialize") {
+  if (!["initialize", "verify"].includes(operation)) fail();
   const ref = env.PREVIEW_SETUP_APPROVED_PROJECT_REF;
   if (env.CI || env.GITHUB_ACTIONS) validateGitHubContext(env);
   if (env.VERCEL || env.VERCEL_ENV || env.DATABASE_URL || env.DIRECT_URL ||
       env.NODE_TLS_REJECT_UNAUTHORIZED === "0" ||
       !ref || ref !== target.projectRef || legacy.includes(ref) ||
       env.PREVIEW_SETUP_PROJECT_NAME !== "agent-workforce-preview" ||
-      env.PREVIEW_SETUP_APPROVAL !== `initialize:${ref}`) fail();
+      env.PREVIEW_SETUP_APPROVAL !== `${operation}:${ref}`) fail();
   let url;
   try { url = new URL(env.PREVIEW_SETUP_DATABASE_URL); } catch { fail(); }
   const direct = url.hostname === `db.${ref}.supabase.co` && url.username === "postgres";
@@ -70,7 +73,9 @@ export async function initializePreview(env, execute, dependencies) {
       const verification = await verifyInitializedSchema(db, plan, files);
       await dependencies.diff(databaseUrl);
       return { status: "SCHEMA_INITIALIZED_AND_VERIFIED", ...verification };
-    } catch { throw new Error("PREVIEW_SETUP_APPLIED_VERIFICATION_FAILED"); }
+    } catch (error) {
+      throw Object.assign(new Error("PREVIEW_SETUP_APPLIED_VERIFICATION_FAILED"), { verification: verificationReport(error) });
+    }
   } finally { await db.$disconnect(); }
 }
 
@@ -94,19 +99,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           { cwd: root, env: { ...childEnv, DATABASE_URL: url, DIRECT_URL: url, CHECKPOINT_DISABLE: "1" }, stdio: "ignore" });
         if (child.status !== 0) throw new Error("PREVIEW_SETUP_MIGRATION_FAILED_POSSIBLY_PARTIAL");
       },
-      diff: async url => {
-        const childEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
-          ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP"].includes(key)));
-        const child = spawnSync(process.execPath,
-          [resolve(root, "node_modules/prisma/build/index.js"), "migrate", "diff",
-            "--from-schema-datasource", resolve(root, "prisma/schema.prisma"),
-            "--to-schema-datamodel", resolve(root, "prisma/schema.prisma"), "--exit-code"],
-          { cwd: root, env: { ...childEnv, DATABASE_URL: url, DIRECT_URL: url, CHECKPOINT_DISABLE: "1" }, stdio: "ignore" });
-        if (child.status !== 0) throw new Error("PREVIEW_SETUP_SCHEMA_DIFF_FAILED");
-      },
+      diff: runSchemaDiff,
     });
     console.log(JSON.stringify(result));
   } catch (error) {
+    if (error?.message === "PREVIEW_SETUP_APPLIED_VERIFICATION_FAILED")
+      console.error(JSON.stringify({ verification: error.verification }));
     if (error?.message === "PREVIEW_SETUP_TLS_CONNECTIVITY_FAILED")
       console.error(JSON.stringify({ tlsFailure: tlsFailureCategory(error) }));
     const code = /^PREVIEW_SETUP_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "PREVIEW_SETUP_FAILED";
