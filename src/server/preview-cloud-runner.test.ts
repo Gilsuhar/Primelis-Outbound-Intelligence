@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
 import { initializePreview, setupPlan } from "../../scripts/preview/setup.mjs";
-import { tagPrefix, environment, repository, repositoryId, owner, ownerId, workflow, validateGitHubContext, verifyGitHubApproval } from "../../scripts/preview/github-context.mjs";
+import { branchPrefix, environment, repository, repositoryId, owner, ownerId, workflow, validateGitHubContext, verifyGitHubApproval } from "../../scripts/preview/github-context.mjs";
 import { reviewedFiles, verifyInitializedSchema } from "../../scripts/preview/verification.mjs";
 import { probeTls } from "../../scripts/preview/tls-probe.mjs";
 import target from "../../scripts/preview/verified-target.json";
@@ -15,8 +15,10 @@ const local = () => ({ PREVIEW_SETUP_APPROVED_PROJECT_REF: target.projectRef,
   PREVIEW_SETUP_APPROVED_ENDPOINT: `db.${target.projectRef}.supabase.co:5432`,
   PREVIEW_SETUP_DATABASE_URL: `postgresql://postgres:synthetic@db.${target.projectRef}.supabase.co:5432/postgres?sslmode=require&sslaccept=strict` });
 const cloud = () => ({ ...local(), CI: "true", GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: repository,
-  GITHUB_REF: `refs/tags/${tagPrefix}${sha}`, GITHUB_EVENT_NAME: "push", GITHUB_RUN_ATTEMPT: "1",
-  GITHUB_WORKFLOW_REF: `${repository}/${workflow}@refs/tags/${tagPrefix}${sha}`, GITHUB_SHA: sha,
+  GITHUB_REF: `refs/heads/${branchPrefix}${sha}`, GITHUB_EVENT_NAME: "push", GITHUB_RUN_ATTEMPT: "1",
+  GITHUB_REF_TYPE: "branch", PREVIEW_SETUP_PUSH_CREATED: "true", PREVIEW_SETUP_PUSH_DELETED: "false",
+  PREVIEW_SETUP_PUSH_FORCED: "false", PREVIEW_SETUP_PUSH_BEFORE: "0".repeat(40),
+  GITHUB_WORKFLOW_REF: `${repository}/${workflow}@refs/heads/${branchPrefix}${sha}`, GITHUB_SHA: sha,
   GITHUB_WORKFLOW_SHA: sha, PREVIEW_SETUP_APPROVED_SHA: sha, PREVIEW_SETUP_ENVIRONMENT: environment,
   GITHUB_REPOSITORY_ID: repositoryId, GITHUB_REPOSITORY_OWNER_ID: ownerId,
   GITHUB_RUN_ID: "123", GITHUB_ACTOR: owner, GITHUB_ACTOR_ID: ownerId,
@@ -38,12 +40,12 @@ function dependencies() {
 function approvalData() {
   const actor = () => ({ login: owner, id: Number(ownerId), type: "User" });
   return {
-    run: { id: 123, event: "push", run_attempt: 1, head_sha: sha, actor: actor(), triggering_actor: actor(),
+    run: { id: 123, event: "push", run_attempt: 1, head_sha: sha, head_branch: `${branchPrefix}${sha}`, actor: actor(), triggering_actor: actor(),
       repository: { id: Number(repositoryId), full_name: repository, fork: false, owner: actor() } },
     config: { name: environment, id: 42, can_admins_bypass: false,
       protection_rules: [],
       deployment_branch_policy: { custom_branch_policies: true, protected_branches: false } },
-    policies: { total_count: 1, branch_policies: [{ name: `${tagPrefix}${sha}`, type: "tag" }] },
+    policies: { total_count: 1, branch_policies: [{ name: `${branchPrefix}${sha}`, type: "branch" }] },
   };
 }
 function approvalRequest(data = approvalData()) {
@@ -54,7 +56,7 @@ function approvalRequest(data = approvalData()) {
 afterEach(() => vi.useRealTimers());
 
 describe("one-time cloud initialization context", () => {
-  it("accepts only the exact deliberately published setup tag and approved SHA", () => {
+  it("accepts only the exact deliberately created setup branch and approved SHA", () => {
     expect(() => validateGitHubContext(cloud())).not.toThrow();
     expect(setupPlan(cloud()).migrations).toHaveLength(11);
   });
@@ -62,14 +64,20 @@ describe("one-time cloud initialization context", () => {
     { CI: "true", GITHUB_ACTIONS: "" }, { GITHUB_REPOSITORY: "other/repo" },
     { GITHUB_REF: "refs/heads/main" }, { GITHUB_EVENT_NAME: "workflow_dispatch" },
     { GITHUB_REF: "refs/heads/codex/cloud-release-candidate-20261102-192938" },
-    { GITHUB_REF: `refs/heads/${tagPrefix}${sha}` },
-    { GITHUB_REF: `refs/tags/${tagPrefix}${"b".repeat(40)}` },
-    { GITHUB_REF: `refs/tags/${tagPrefix}${sha}-extra` },
+    { GITHUB_REF: `refs/tags/${branchPrefix}${sha}` },
+    { GITHUB_REF: `refs/heads/${branchPrefix}${"b".repeat(40)}` },
+    { GITHUB_REF: `refs/heads/${branchPrefix}${sha}-extra` },
+    { GITHUB_REF: "refs/tags/agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-b4654a87cb6ad106137b884a002db23af71039ed" },
+    { GITHUB_REF_TYPE: "tag" }, { GITHUB_REF_TYPE: "" },
+    { PREVIEW_SETUP_PUSH_CREATED: "false" }, { PREVIEW_SETUP_PUSH_CREATED: "" },
+    { PREVIEW_SETUP_PUSH_DELETED: "true" }, { PREVIEW_SETUP_PUSH_DELETED: "" },
+    { PREVIEW_SETUP_PUSH_FORCED: "true" }, { PREVIEW_SETUP_PUSH_FORCED: "" },
+    { PREVIEW_SETUP_PUSH_BEFORE: sha }, { PREVIEW_SETUP_PUSH_BEFORE: "" },
     { GITHUB_REF: `refs/tags/agent-workforce-preview-setup-mfxqiyidmdppvdzeboke-${sha}` },
     { PREVIEW_SETUP_APPROVED_SHA: "b".repeat(40) },
     // The preserved original release must never authorize the replacement publication.
     { PREVIEW_SETUP_APPROVED_SHA: "59aaee2e23667ee333802791ba995861474d85fb" },
-    { GITHUB_REF: `refs/tags/${tagPrefix}59aaee2e23667ee333802791ba995861474d85fb` },
+    { GITHUB_REF: `refs/heads/${branchPrefix}59aaee2e23667ee333802791ba995861474d85fb` },
     { GITHUB_EVENT_NAME: "pull_request_target" }, { GITHUB_RUN_ATTEMPT: "2" },
     { GITHUB_WORKFLOW_REF: "other" }, { GITHUB_WORKFLOW_SHA: "b".repeat(40) },
     { PREVIEW_SETUP_APPROVED_SHA: "" }, { PREVIEW_SETUP_ENVIRONMENT: "production" },
@@ -114,7 +122,7 @@ describe("one-time cloud initialization context", () => {
 });
 
 describe("server-side approval evidence", () => {
-  it("accepts owner initiation without reviewers, checking live run identity and exact tag via read-only APIs", async () => {
+  it("accepts owner initiation without reviewers, checking live run identity and exact branch via read-only APIs", async () => {
     const request = approvalRequest();
     await verifyGitHubApproval(cloud(), request);
     expect(request).toHaveBeenCalledTimes(3);
@@ -125,12 +133,12 @@ describe("server-side approval evidence", () => {
       expect(options.method).toBeUndefined(); expect(options.redirect).toBe("error");
     }
   });
-  it.each(["bypass", "wrong-tag", "branch-policy", "extra-policy", "wrong-environment"])(
+  it.each(["bypass", "wrong-branch", "tag-policy", "extra-policy", "wrong-environment"])(
     "rejects %s", async failure => {
       const data = approvalData();
       if (failure === "bypass") data.config.can_admins_bypass = true;
-      if (failure === "wrong-tag") data.policies.branch_policies[0].name = "*";
-      if (failure === "branch-policy") data.policies.branch_policies[0].type = "branch";
+      if (failure === "wrong-branch") data.policies.branch_policies[0].name = "*";
+      if (failure === "tag-policy") data.policies.branch_policies[0].type = "tag";
       if (failure === "extra-policy") data.policies.total_count = 2;
       if (failure === "wrong-environment") data.config.name = "production";
       const request = approvalRequest(data);
@@ -139,7 +147,7 @@ describe("server-side approval evidence", () => {
   );
   it.each(["actor-id", "actor-name", "bot", "triggering-id", "triggering-name", "triggering-bot",
     "repository-id", "repository-name", "fork", "transferred-owner", "owner-name", "owner-type",
-    "run-id", "sha", "event", "retry", "missing-actor"])("rejects authoritative run mismatch %s before TLS or database IO", async failure => {
+    "run-id", "sha", "branch", "event", "retry", "missing-actor"])("rejects authoritative run mismatch %s before TLS or database IO", async failure => {
     const data = approvalData();
     if (failure === "actor-id") data.run.actor.id = 12345;
     if (failure === "actor-name") data.run.actor.login = "collaborator";
@@ -155,6 +163,7 @@ describe("server-side approval evidence", () => {
     if (failure === "owner-type") data.run.repository.owner.type = "Organization";
     if (failure === "run-id") data.run.id = 124;
     if (failure === "sha") data.run.head_sha = "b".repeat(40);
+    if (failure === "branch") data.run.head_branch = "main";
     if (failure === "event") data.run.event = "workflow_dispatch";
     if (failure === "retry") data.run.run_attempt = 2;
     if (failure === "missing-actor") Object.assign(data.run, { actor: undefined });
@@ -273,19 +282,21 @@ describe("TLS probe without credentials", () => {
   });
 });
 
-it("workflow accepts only setup-tag publication, is environment-gated, SHA-pinned and secret-scoped", () => {
+it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinned and secret-scoped", () => {
   // Use the YAML parser already present in ESLint's frozen dependency tree; no new dependency.
   const require = createRequire(import.meta.url);
   const yaml = createRequire(require.resolve("eslint/package.json"))("js-yaml");
   const doc = yaml.load(readFileSync(workflow, "utf8"));
-  expect(doc.on).toEqual({ push: { tags: [`${tagPrefix}*`] } });
+  expect(doc.on).toEqual({ push: { branches: [`${branchPrefix}*`] } });
   expect(doc.permissions).toEqual({ contents: "read", actions: "read" });
   expect(doc.concurrency["cancel-in-progress"]).toBe(false);
   const job = doc.jobs.initialize;
   expect(Object.keys(doc.jobs)).toEqual(["initialize"]);
   expect(job.environment).toBe(environment); expect(job["timeout-minutes"]).toBe(15);
   expect(job.if).toContain("github.run_attempt == 1");
-  expect(job.if).toContain(`github.ref == format('refs/tags/${tagPrefix}{0}', github.sha)`);
+  expect(job.if).toContain(`github.ref == format('refs/heads/${branchPrefix}{0}', github.sha)`);
+  expect(job.if).toContain("github.ref_type == 'branch'");
+  expect(job.if).toContain(`github.event.before == '${"0".repeat(40)}'`);
   expect(job.if).toContain("github.event.created == true");
   expect(job.if).toContain("github.event.deleted == false");
   expect(job.if).toContain("github.event.forced == false");
@@ -300,8 +311,28 @@ it("workflow accepts only setup-tag publication, is environment-gated, SHA-pinne
   expect(steps[0].with.ref).toBe("${{ github.sha }}");
   const secretSteps = steps.filter((step: { env?: Record<string, string> }) => step.env?.PREVIEW_SETUP_DATABASE_URL);
   expect(secretSteps).toHaveLength(1); expect(secretSteps[0]).toBe(steps.at(-1));
+  for (const field of ["created", "deleted", "forced", "before"]) {
+    expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
+  }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
     "node scripts/preview/setup.mjs --plan", "node scripts/preview/setup.mjs --execute-approved-initialization"]);
   expect(steps[2].run).toContain("pnpm install --frozen-lockfile --ignore-scripts");
   expect(readFileSync(workflow, "utf8")).not.toMatch(/migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
+});
+
+it("disables native Git deployments only for the dedicated setup branch namespace", () => {
+  // Vercel uses minimatch; reuse ESLint's frozen dependency, without adding a package.
+  const require = createRequire(import.meta.url);
+  const match = createRequire(require.resolve("eslint/package.json"))("minimatch");
+  const config = JSON.parse(readFileSync("vercel.json", "utf8"));
+  expect(config).toEqual({ $schema: "https://openapi.vercel.sh/vercel.json",
+    git: { deploymentEnabled: { [`${branchPrefix}*`]: false } } });
+  const rules = Object.entries(config.git.deploymentEnabled);
+  const enabled = (branch: string) => {
+    const matching = rules.filter(([pattern]) => match(branch, pattern));
+    return matching.length === 0 || matching.some(([, value]) => value === true);
+  };
+  expect(enabled(`${branchPrefix}${sha}`)).toBe(false);
+  for (const branch of ["main", "feature/agent-workforce-foundation", "codex/cloud-publication-snapshot-20261103", "other/setup"])
+    expect(enabled(branch)).toBe(true);
 });

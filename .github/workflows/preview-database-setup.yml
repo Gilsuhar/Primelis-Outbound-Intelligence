@@ -1,11 +1,11 @@
 name: One-time Preview Prisma initialization
 
 on:
-  # The verified owner's deliberate setup-tag publication authorizes this one-time operation.
-  # No branch push, PR, schedule or default-branch registration is involved.
+  # Only the owner's deliberate creation of the SHA-named setup branch may initialize Preview.
+  # Ordinary branch pushes, updates, tags, PRs, schedules and reruns cannot authorize this job.
   push:
-    tags:
-      - 'agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-*'
+    branches:
+      - 'codex/preview-migration-txfxfrlhtvzwgluhnbpw-*'
 
 permissions:
   contents: read
@@ -27,11 +27,13 @@ jobs:
       github.triggering_actor == 'Gilsuhar' &&
       github.event.sender.id == 79252537 &&
       github.event.sender.type == 'User' &&
-      github.ref == format('refs/tags/agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-{0}', github.sha) &&
+      github.ref_type == 'branch' &&
+      github.ref == format('refs/heads/codex/preview-migration-txfxfrlhtvzwgluhnbpw-{0}', github.sha) &&
       github.run_attempt == 1 &&
       github.event.created == true &&
       github.event.deleted == false &&
-      github.event.forced == false
+      github.event.forced == false &&
+      github.event.before == '0000000000000000000000000000000000000000'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: agent-workforce-preview-setup
@@ -62,6 +64,10 @@ jobs:
           PREVIEW_SETUP_DATABASE_URL: ${{ secrets.PREVIEW_SETUP_DATABASE_URL }}
           PREVIEW_SETUP_APPROVED_ENDPOINT: ${{ vars.PREVIEW_SETUP_APPROVED_ENDPOINT }}
           PREVIEW_SETUP_APPROVED_SHA: ${{ vars.PREVIEW_SETUP_APPROVED_SHA }}
+          PREVIEW_SETUP_PUSH_CREATED: ${{ github.event.created }}
+          PREVIEW_SETUP_PUSH_DELETED: ${{ github.event.deleted }}
+          PREVIEW_SETUP_PUSH_FORCED: ${{ github.event.forced }}
+          PREVIEW_SETUP_PUSH_BEFORE: ${{ github.event.before }}
           PREVIEW_SETUP_ENVIRONMENT: agent-workforce-preview-setup
           PREVIEW_SETUP_PROJECT_NAME: agent-workforce-preview
           PREVIEW_SETUP_APPROVED_PROJECT_REF: txfxfrlhtvzwgluhnbpw

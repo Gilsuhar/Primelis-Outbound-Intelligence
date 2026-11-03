@@ -1,6 +1,6 @@
 # Publication snapshot after GH013
 
-This candidate is a new, isolated Git repository and a single root commit. It preserves the tracked
+The initial clean candidate was an isolated Git repository with a single root commit. It preserves the tracked
 application tree from validated source commit `59aaee2e23667ee333802791ba995861474d85fb`, with the
 reviewed fixture/scanning/documentation and test synchronization changes described here. It has no parent, alternate object
 store, inherited references or copied Git history. The original repository, release branch, commits
@@ -25,27 +25,16 @@ patterns that previously escaped the default scan, without suppressing test file
 GitHub's proprietary detector cannot be reproduced completely offline; push protection remains enabled.
 
 Only publish from this isolated repository. This root snapshot does not preserve Git ancestry for
-merging into main; any later main integration requires a separate review. A tag-only publication
-updates no branch and performs no force push. Never publish the preserved original history.
+merging into main; any later main integration requires a separate review. The original tag-only publication updated no branch and performed no force push.
+The subsequent setup-branch patch is a child of that clean root and preserves the published tag. Never publish the preserved original history.
 
-## Migration authorization update (not performed locally)
+## Current migration authorization (Phase 4G, not published)
 
-Use this repository's final reviewed `git rev-parse HEAD` as `<replacement-sha>`. In the existing
-`agent-workforce-preview-setup` GitHub environment, replace `PREVIEW_SETUP_APPROVED_SHA` with that SHA
-and replace the deployment policy with exactly one Tag rule:
-`agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-<replacement-sha>`.
-Remove the old rule; keep reviewers disabled and administrator bypass disabled. Keep the existing
-environment-scoped setup secret and `aws-1-us-west-2.pooler.supabase.com:5432` endpoint unchanged.
-No credentials need to be copied or rotated for these synthetic fixtures.
-
-The workflow and initializer bind the tag, checked-out SHA, workflow SHA and approved environment
-SHA to one identical commit. Owner ID `79252537` and repository ID `1299364799` remain pinned.
-The old workflow/history is absent from this repository. A replacement tag pointing at an old SHA,
-or a stale approved environment SHA, is rejected by the existing exact-match guards. Ordinary branch
-pushes, other actors and retries remain denied. All eleven original Prisma migrations, schema,
-lockfile, target fingerprint, strict TLS checks and post-migration verification are unchanged.
-
-After separate approval and final read-only preflight, publish only the replacement SHA/tag using
-the owner's authenticated identity and the single refspec in the cloud migration runbook. Do not
-reuse the rejected tag, approve a secret-scanning bypass, or assume a clean local scan guarantees
-GitHub acceptance. Tag publication authorizes execution automatically after the guarded preflight.
+The tag-only root publication registered no Actions run. Follow the updated
+[one-time setup-branch runbook](preview-cloud-migration-runner.md) for the child commit.
+Set PREVIEW_SETUP_APPROVED_SHA to the final reviewed child SHA and replace the environment's old
+Tag rule with exactly one Branch rule: codex/preview-migration-txfxfrlhtvzwgluhnbpw-<full-reviewed-sha>.
+Keep the existing environment secret, approved endpoint and administrator-bypass prohibition.
+The original published tag must not move or be recreated. No original rejected history is reintroduced.
+The branch trigger and Vercel Git exclusion require separate publication approval and final preflight.
+All eleven migration files, schema, lockfile and target fingerprint remain unchanged.

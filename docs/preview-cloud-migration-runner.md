@@ -8,16 +8,16 @@ separately and must not be included in the replacement publication.
 Only target: `txfxfrlhtvzwgluhnbpw`, Primelis, us-west-2, with the independently verified
 cluster fingerprint in `scripts/preview/verified-target.json`. No migration SQL was rewritten.
 
-## Chosen execution method: explicit owner-only setup-tag publication
+## Chosen execution method: explicit owner-only setup-branch creation
 
-Publish only a new lightweight tag pointing to the reviewed release-candidate commit:
-`agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-<full-reviewed-sha>`.
+Create only a new dedicated branch pointing to the reviewed release-candidate commit:
+`codex/preview-migration-txfxfrlhtvzwgluhnbpw-<full-reviewed-sha>`.
 The repository owner must personally initiate the push using their own authenticated GitHub account.
-**Publishing this exact tag is approval to execute the migrations immediately after preflight.**
+**Creating this exact branch is approval to execute the migrations immediately after preflight.**
 There is no second reviewer or subsequent approval click. Do not publish it as a connectivity test.
 Ordinary branch pushes, pull requests, schedules and workflow reruns cannot initialize the database.
-The tag must encode the exact approved commit and target, and its environment policy must match
-that exact tag, not a wildcard. Use the final reviewed replacement snapshot SHA, not the source SHA.
+The branch must encode the exact approved commit and target, and its environment policy must match
+that exact branch, not a wildcard. Use the final reviewed replacement snapshot SHA, not the source SHA.
 
 The owner is pinned to GitHub user **Gilsuhar**, numeric ID **79252537**, and the repository to
 ID **1299364799** (verified through GitHub metadata). Before starting the job or exposing its
@@ -25,7 +25,7 @@ environment secret, the job condition requires these repository/owner IDs, the o
 and login, the same triggering actor, and a push-event sender with the owner's ID and User type.
 The guarded initializer then reads GitHub's actual run metadata and checks its actor and triggering
 actor IDs/types, repository ID/current owner, event, attempt and SHA. Missing or contradictory
-metadata fails closed before TLS/database access. Commit author names/emails and tag text do not
+metadata fails closed before TLS/database access. Commit author names/emails and branch text do not
 authenticate the publisher. No collaborator, bot, fork, transferred repository or rerun is accepted.
 
 Use the owner's personal authenticated Git connection, not a shared credential, deploy key, GitHub
@@ -34,18 +34,30 @@ human was physically at the keyboard or protect against compromised owner creden
 and administrators who can modify trusted code/environment settings remain within the trust boundary.
 No new service, identity provider, paid plan or personal token inside the workflow is required.
 
-GitHub loads a push-triggered workflow from the pushed ref. Unlike workflow_dispatch, this does not
-require registering the workflow on main. No branch is pushed and no main change is necessary.
-The read-only check found no `.github/workflows` directory on main, and the Actions UI showed its
-initial workflow setup page. No existing dispatcher is required.
+The published root snapshot b4654a87cb6ad106137b884a002db23af71039ed and its existing setup tag
+remain unchanged. GitHub registered zero workflows/runs for that tag. No workflow validation error
+was available; the exact discovery failure remains unproven. This child commit uses a supported
+branch-push trigger, without a main change or a new cloud runner. Registration is not claimed tested.
 
-Vercel's native Git integration deploys branch pushes; tag/release deployment requires additional
-automation. This workflow contains no Vercel command or deployment credential. A tag-only push
-therefore avoids the native branch deployment trigger. The latest read-only check found no repository
-webhooks, no configured Actions workflows, no Vercel project webhooks, and only the standard Vercel
-and ChatGPT Codex Connector GitHub Apps. Recheck if configuration changes before publication;
-do not publish if a custom tag deployment consumer is introduced or remains unverified.
-Do not push the release branch as part of this operation or assume its Preview is isolated.
+## Vercel deployment exclusion
+
+Root vercel.json sets git.deploymentEnabled to false only for
+codex/preview-migration-txfxfrlhtvzwgluhnbpw-*. Vercel documents this as disabling native Git-triggered
+deployments for matching branches. Other branches remain enabled by default; no Production behavior
+or project setting is changed. The tests use minimatch to check the setup branch and unaffected branches.
+
+An Ignored Build Step is NOT an equivalent safeguard: it executes after entering BUILDING; exit 0
+cancels an already-created deployment, while exit 1 builds. It can still consume deployment quotas.
+No ignoreCommand override is added. Merely adding any vercel.json is not a deployment exclusion.
+
+The Git filter does not block a manual CLI/API deployment, Deploy Hook, or independent automation.
+Read-only checks on 2026-11-03 confirmed the linked repository, an empty Root Directory setting
+(repository root), Ignored Build Step = Automatic, and no Deploy Hooks. Repository webhooks and
+registered Actions workflows were both zero; Vercel project webhooks/integration configurations
+were empty. These checks support the native Git exclusion, not a live test of a future push.
+Before publication, verify the linked project uses repository-root configuration, inspect its saved
+Ignored Build Step and any custom deployment triggers, and stop if deployment suppression is uncertain.
+Do not perform a live push to test suppression. No Vercel setting is changed by this patch.
 
 ## Required GitHub configuration (not created by this change)
 
@@ -53,10 +65,10 @@ Update the existing environment **agent-workforce-preview-setup** only after app
 
 | Setting | Required configuration |
 | --- | --- |
-| Required reviewers | Disabled; the authenticated owner's exact-tag push is the explicit authorization |
+| Required reviewers | Disabled; the authenticated owner's exact-branch push is the explicit authorization |
 | Prevent self-review | Not applicable without a reviewer rule; no independent approval dependency |
 | Administrator bypass | Disabled |
-| Deployment branches and tags | Custom policy: exactly `agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-<full-reviewed-sha>`, **tag** type; no other rules or wildcards |
+| Deployment branches and tags | Custom policy: exactly `codex/preview-migration-txfxfrlhtvzwgluhnbpw-<full-reviewed-sha>`, **branch** type; no other rules or wildcards |
 | Environment secret `PREVIEW_SETUP_DATABASE_URL` | Only the dedicated Preview administrator connection, supplied through GitHub's secure secret UI |
 | Environment variable `PREVIEW_SETUP_APPROVED_ENDPOINT` | Exact verified host:5432 from this project's Connect panel; no password or URL |
 | Environment variable `PREVIEW_SETUP_APPROVED_SHA` | Full reviewed commit SHA containing the final workflow and guards, not the old base commit |
@@ -66,14 +78,14 @@ to substitute for a missing environment secret. Verify its environment scope adm
 publication. No Production connection, provider secret, Supabase management token or service-role key
 is required. The temporary `github.token` has only contents:read and actions:read. The launcher checks
 the current run's owner identity and commit, the environment's administrator-bypass setting and exact
-tag policy using read-only GitHub REST requests. Unknown,
+branch policy using read-only GitHub REST requests. Unknown,
 unavailable or contradictory metadata stops execution before database authentication.
 
 The repository is public, personally owned by Gilsuhar, with main as default branch. This mechanism
-uses standard Actions actor contexts, read-only run APIs and an environment with an exact tag policy;
+uses standard Actions actor contexts, read-only run APIs and an environment with an exact branch policy;
 it does not require an Enterprise approval feature. Before replacement publication, reverify that
 reviewers remain disabled and administrator bypass remains disabled. Replace the old SHA and old
-tag policy with this snapshot's final reviewed commit. Do not leave both tag rules.
+Tag policy with this child commit's final reviewed SHA and exact Branch policy. Do not leave both rules.
 The endpoint variable was verified as `aws-1-us-west-2.pooler.supabase.com:5432`; the setup secret's
 existence was checked by metadata only. No secret value has been read or changed.
 
@@ -108,29 +120,32 @@ pooler hostname must still match the approved endpoint at execution; the format 
 
 1. Review and commit this local snapshot on `codex/cloud-publication-snapshot-20261103`, then
    separately approve publication and execution. Confirm a clean worktree, the exact final commit,
-   the destination repository and no custom tag deployment consumer as described above. Publication
+   the destination repository and verified Vercel deployment exclusion as described above. Publication
    exposes that commit and its reachable history in this public repository: repeat the publication
    secret/private-data scan before pushing. Preserve the original worktree and recovery archive.
-2. Configure and verify the environment above with the exact final SHA/tag, confirm runner
+2. Configure and verify the environment above with the exact final SHA/branch, confirm runner
    minutes/billing policy, approve the
    actual session-pooler endpoint or direct IPv6 path, and inject only the dedicated Preview secret.
    No credentials should be copied through chat, source files, dispatch inputs or command arguments.
-3. After explicit approval, publish **only** the exact reviewed SHA to the new tag. Use the verified
+3. After explicit approval, publish **only** the exact reviewed SHA to the new branch. Use the verified
    remote repository URL and this single refspec; do not use --all, --tags, --follow-tags or --force.
    This must be issued as Gilsuhar using the owner's own authenticated Git identity. It requires
    no Windows database connection or local credential setup. The prepared local commit must first
    be published; GitHub cannot execute unpublished local files.
 
    ```text
-   git -c push.followTags=false push https://github.com/Gilsuhar/Primelis-Outbound-Intelligence.git <reviewed-full-sha>:refs/tags/agent-workforce-preview-setup-txfxfrlhtvzwgluhnbpw-<reviewed-full-sha>
+   git -c push.followTags=false push https://github.com/Gilsuhar/Primelis-Outbound-Intelligence.git <reviewed-full-sha>:refs/heads/codex/preview-migration-txfxfrlhtvzwgluhnbpw-<reviewed-full-sha>
    ```
 
-   No force update or existing-tag reuse is allowed. A normal branch push cannot trigger this job.
+   No force update or existing-branch reuse is allowed. Verify the remote branch is absent first. A normal branch push cannot trigger this job.
    The workflow job rejects noncreation, deletion and forced events; its script independently
-   verifies the exact tag, SHA, workflow revision, owner identity and environment policy before database access.
-4. Monitor the run in the repository Actions page. No additional approval is expected; the tag push
+   verifies the exact branch, SHA, workflow revision, owner identity and environment policy before database access.
+   Both boundaries require creation=true, deletion=false, forced=false and the all-zero before SHA.
+   The script receives these flags only from the pinned workflow GitHub event context and also verifies
+   the authoritative run head_branch. Missing flags are rejected before any external calls.
+4. Monitor the run in the repository Actions page. No additional approval is expected; the branch creation
    already authorized execution. Do not use administrator bypass or debug logging. If identity,
-   endpoint, TLS, fingerprint or any other check fails, stop; do not rerun or recreate the tag.
+   endpoint, TLS, fingerprint or any other check fails, stop; do not rerun or recreate the branch.
 5. The job checks out exactly github.sha with checkout credentials disabled. Pinned actions and Node,
    pnpm 9.12.0 and the frozen lockfile are used. Dependency lifecycle scripts are disabled; only Prisma
    client generation runs explicitly, before the database secret is injected. No build, seed or worker.
@@ -139,6 +154,14 @@ pooler hostname must still match the approved endpoint at execution; the format 
    requires an empty application schema and applies the eleven original files through Prisma 5.22.0.
 
 ## Verification and failure handling
+
+Local Phase 4G validation: migration-runner/setup/scanner tests 140 passed, 0 failed, 0 skipped;
+Preview/authentication security tests 184 passed, 0 failed, 0 skipped. TypeScript, ESLint, Prisma
+schema validation, Next.js production build and actionlint 1.7.12 passed. All eleven migration Git
+blobs and all thirteen reviewed manifest entries are unchanged. No database execution was performed.
+The new setup branch remains unpublished. Execution still requires approval, updating/verifying the
+GitHub environment SHA and exact Branch rule, and a final read-only preflight. Actual runner TLS,
+connectivity and GitHub workflow registration cannot be claimed verified from local mocked tests.
 
 The reviewed manifest pins SHA-256 of LF-normalized SQL, Prisma schema and lockfile. Applied migration
 checksums are compared against the **actual bytes** of each checked-out file, matching Prisma's
@@ -163,10 +186,10 @@ records are not logged or uploaded. No diagnostic artifacts/cache are uploaded w
 - `SCHEMA_INITIALIZED_AND_VERIFIED`: all checks completed successfully.
 
 Concurrent jobs are serialized without cancelling an in-flight run. GitHub rerun attempts are
-rejected; recreating the tag is prohibited operationally, and a fresh event still fails the nonempty
+rejected; recreating the branch is prohibited operationally, and a fresh event still fails the nonempty
 schema check after a successful/partial initialization. The 15-minute timeout can interrupt a run;
 treat that as potentially partial. If failure occurs, stop and inspect; do not create a replacement
-tag or run without a fresh review and explicit authorization. After verified completion, separately
+branch or run without a fresh review and explicit authorization. After verified completion, separately
 remove the environment setup secret/disable this
 one-time workflow. No role activation, Auth setup or application deployment is authorized here.
 
@@ -178,6 +201,7 @@ one-time workflow. No role activation, Auth setup or application deployment is a
 - [GitHub push and tag workflow triggers](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
 - [Environment protection and plan limits](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 - [Vercel Git integration](https://vercel.com/docs/git)
-- [Vercel tag/release deployment requires automation](https://vercel.com/kb/guide/can-you-deploy-based-on-tags-releases-on-vercel)
+- [Vercel branch deployment exclusions](https://vercel.com/docs/project-configuration/git-configuration)
+- [Ignored Build Step behavior](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)
 - [Supabase Prisma/session pooler connections](https://supabase.com/docs/guides/database/prisma)
 - [Supabase database connectivity](https://supabase.com/docs/guides/database/connecting-to-postgres)
