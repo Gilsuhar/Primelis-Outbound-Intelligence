@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "enabled": false,
+  "profile": "GITHUB_ACTIONS_SIMULATED",
+  "repository": "Gilsuhar/agentworkforce-ci-acceptance",
+  "repositoryId": "1426200737",
+  "ownerId": "79252537",
+  "ref": "refs/heads/main",
+  "cohort": "pilot-20261019",
+  "actor": "ci-fixture-pilot-20261019",
+  "database": {
+    "projectId": "snowy-art-90934943",
+    "branchId": "br-empty-breeze-b51o9q71",
+    "host": "ep-green-silence-b5lbunar.c-7.us-east-2.aws.neon.tech",
+    "name": "ci_acceptance_pilot",
+    "role": "ci_acceptance_app",
+    "policySha256": "02541f5342fe33b832016e17dad9c15be10af046300446dd63c3fcc62dc265cd"
+  },
+  "approvedAt": null,
+  "expiresAt": null,
+  "approvalId": null,
+  "evidence": {
+    "privateRepository": "github-private-api-20261020",
+    "noVercelIntegration": "github-apps-hooks-20261020",
+    "actionsPaidUsageBlocked": "github-actions-zero-budget-20261020",
+    "isolatedDatabaseAndGrants": "neon-rls-rollback-20261020"
+  },
+  "setupManualInterventions": null,
+  "limits": {
+    "jobs": 3,
+    "infrastructureOverageUsd": 0,
+    "aiEnabled": false,
+    "dailyUsd": 1,
+    "monthlyUsd": 5,
+    "concurrent": 1,
+    "retries": 0,
+    "outbound": false,
+    "maxRunMinutes": 15
+  }
+}

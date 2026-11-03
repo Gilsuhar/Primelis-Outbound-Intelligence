@@ -1,0 +1,820 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  SALES_USER
+  KNOWLEDGE_ADMIN
+}
+
+enum ApprovalStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+  RESTRICTED
+  ARCHIVED
+  REJECTED
+}
+
+enum KnowledgeType {
+  PRODUCT_TRUTH
+  ICP
+  PERSONA
+  MESSAGE_EXAMPLE
+  PROSPECT_QUESTION
+  OBJECTION
+  COMPETITOR
+  COMPETITOR_CLAIM
+  CASE_STUDY
+  SEQUENCE
+  SOURCE_DOCUMENT
+  CLAIM
+  KNOWLEDGE_SUBMISSION
+  REVIEW_DECISION
+  INTERACTION_OUTCOME
+}
+
+enum SourceType {
+  INTERNAL_DOCUMENT
+  CUSTOMER_CONVERSATION
+  SALES_CALL
+  EMAIL_THREAD
+  WEBSITE
+  RESEARCH_NOTE
+  OTHER
+}
+
+enum Channel {
+  EMAIL
+  LINKEDIN
+  CALL
+  INTERNAL
+}
+
+enum ReviewDecisionType {
+  SUBMITTED
+  APPROVED
+  RESTRICTED
+  REJECTED
+  ARCHIVED
+  RETURNED_TO_REVIEW
+  EDITED
+}
+
+enum InteractionOutcomeType {
+  POSITIVE_REPLY
+  OBJECTION
+  MEETING_BOOKED
+  NOT_A_FIT
+  NO_RESPONSE
+  OTHER
+}
+
+enum MetricDirection {
+  INCREASE
+  DECREASE
+  NEUTRAL
+  UNKNOWN
+}
+
+enum CaseStudyUsageScope {
+  INTERNAL_ONLY
+  SALES_REPLY_ONLY
+  EMAIL_AND_LINKEDIN
+  DECK_ONLY
+  PUBLIC_MARKETING
+}
+
+enum GeneratedDraftStatus {
+  DRAFT
+  SUBMITTED_FOR_REVIEW
+  ARCHIVED
+}
+
+enum ProspectStatus {
+  NEW
+  CONTEXT_READY
+  INTELLIGENCE_READY
+  SEQUENCE_DRAFT
+  SEQUENCE_APPROVED
+}
+
+enum ProspectSourceType {
+  MANUAL_PASTE
+  LINKEDIN_PROFILE
+  LINKEDIN_POST
+  SERP_EVIDENCE
+  MANUAL_NOTE
+  FILE_IMPORT
+  ACCOUNT_RESEARCH
+}
+
+enum ExtractedFactCategory {
+  PROSPECT
+  COMPANY
+  LINKEDIN
+  SERP
+  NOTE
+}
+
+model User {
+  integrationStates IntegrationState[]
+  integrationAuditEvents IntegrationAuditEvent[]
+  id                  String                @id @default(cuid())
+  authUserId          String?               @unique
+  email               String                @unique
+  name                String?
+  role                UserRole              @default(SALES_USER)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  submissions         KnowledgeSubmission[] @relation("SubmissionAuthor")
+  reviewDecisions     ReviewDecision[]      @relation("ReviewDecisionActor")
+  ownedClaims         Claim[]               @relation("ClaimReviewOwner")
+  reviewedKnowledge   KnowledgeItem[]       @relation("KnowledgeItemReviewOwner")
+  reviewedSources     SourceDocument[]      @relation("SourceDocumentReviewOwner")
+  reviewedCaseStudies CaseStudy[]           @relation("CaseStudyReviewOwner")
+  interactionOutcomes InteractionOutcome[]
+  generatedDrafts     GeneratedDraft[]
+  draftVersions       DraftVersion[]
+  accountAssessments  AccountAssessment[]
+  suppressionImports  SuppressionImportBatch[]
+  suppressionAudits   SuppressionAudit[]
+  websiteResearchRuns WebsiteResearchRun[]
+  companyEnrichmentRuns CompanyEnrichmentRun[]
+  providerSyncAudits    ProviderSyncAudit[]
+  prospects              Prospect[]
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  knowledgeItems KnowledgeItem[]
+  claims         Claim[]
+}
+
+model KnowledgeItem {
+  id                String                @id @default(cuid())
+  type              KnowledgeType
+  title             String
+  summary           String?
+  body              String?
+  approvalStatus    ApprovalStatus        @default(DRAFT)
+  approvedWording   String?
+  productScope      String                @default("Signal")
+  productId         String?
+  channels          Channel[]
+  usageRestrictions String?
+  internalNotes     String?
+  reviewOwnerId     String?
+  lastReviewedAt    DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  product           Product?              @relation(fields: [productId], references: [id])
+  reviewOwner       User?                 @relation("KnowledgeItemReviewOwner", fields: [reviewOwnerId], references: [id])
+  industries        Industry[]            @relation("KnowledgeItemIndustries")
+  personas          Persona[]             @relation("KnowledgeItemPersonas")
+  claims            Claim[]               @relation("KnowledgeItemClaims")
+  sources           SourceDocument[]      @relation("KnowledgeItemSources")
+  submissions       KnowledgeSubmission[]
+  reviewHistory     ReviewDecision[]
+  messageExample    MessageExample?
+  prospectQuestion  ProspectQuestion?
+  objection         Objection?
+  competitorClaim   CompetitorClaim?
+
+  @@index([approvalStatus])
+  @@index([type])
+  @@index([productScope])
+  @@index([productId])
+  @@index([reviewOwnerId])
+}
+
+model Industry {
+  id             String                @id @default(cuid())
+  name           String                @unique
+  createdAt      DateTime              @default(now())
+  knowledgeItems KnowledgeItem[]       @relation("KnowledgeItemIndustries")
+  claims         Claim[]               @relation("ClaimIndustries")
+  caseStudies    CaseStudy[]           @relation("CaseStudyIndustries")
+  submissions    KnowledgeSubmission[] @relation("SubmissionIndustries")
+}
+
+model Persona {
+  id             String                @id @default(cuid())
+  name           String                @unique
+  createdAt      DateTime              @default(now())
+  knowledgeItems KnowledgeItem[]       @relation("KnowledgeItemPersonas")
+  claims         Claim[]               @relation("ClaimPersonas")
+  caseStudies    CaseStudy[]           @relation("CaseStudyPersonas")
+  submissions    KnowledgeSubmission[] @relation("SubmissionPersonas")
+}
+
+model Competitor {
+  id             String                @id @default(cuid())
+  name           String                @unique
+  description    String?
+  approvalStatus ApprovalStatus        @default(DRAFT)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  claims         CompetitorClaim[]
+  submissions    KnowledgeSubmission[] @relation("SubmissionCompetitors")
+}
+
+model SourceDocument {
+  id             String                @id @default(cuid())
+  title          String
+  sourceType     SourceType
+  externalUrl    String?
+  fileReference  String?
+  sourceDate     DateTime?
+  description    String?
+  approvedWording String?
+  usageRestrictions String?
+  internalNotes  String?
+  reviewOwnerId  String?
+  lastReviewedAt DateTime?
+  approvalStatus ApprovalStatus        @default(NEEDS_REVIEW)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  reviewOwner    User?                 @relation("SourceDocumentReviewOwner", fields: [reviewOwnerId], references: [id])
+  claims         Claim[]               @relation("ClaimSources")
+  knowledgeItems KnowledgeItem[]       @relation("KnowledgeItemSources")
+  caseStudies    CaseStudy[]           @relation("CaseStudySources")
+  submissions    KnowledgeSubmission[] @relation("SubmissionSources")
+  reviewHistory  ReviewDecision[]
+
+  @@index([reviewOwnerId])
+}
+
+model Claim {
+  id                String           @id @default(cuid())
+  exactText         String
+  approvedWording   String?
+  approvalStatus    ApprovalStatus   @default(DRAFT)
+  productId         String?
+  sourceDate        DateTime?
+  allowedChannels   Channel[]
+  usageRestrictions String?
+  reviewOwnerId     String?
+  lastReviewedAt    DateTime?
+  internalNotes     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  product           Product?         @relation(fields: [productId], references: [id])
+  reviewOwner       User?            @relation("ClaimReviewOwner", fields: [reviewOwnerId], references: [id])
+  sources           SourceDocument[] @relation("ClaimSources")
+  industries        Industry[]       @relation("ClaimIndustries")
+  personas          Persona[]        @relation("ClaimPersonas")
+  knowledgeItems    KnowledgeItem[]  @relation("KnowledgeItemClaims")
+  reviewHistory     ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([reviewOwnerId])
+  @@index([productId])
+}
+
+model CompetitorClaim {
+  id                String         @id @default(cuid())
+  competitorId      String
+  knowledgeItemId   String?        @unique
+  exactText         String
+  approvedWording   String?
+  approvalStatus    ApprovalStatus @default(DRAFT)
+  usageRestrictions String?
+  internalNotes     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  competitor        Competitor     @relation(fields: [competitorId], references: [id])
+  knowledgeItem     KnowledgeItem? @relation(fields: [knowledgeItemId], references: [id])
+
+  @@index([approvalStatus])
+  @@index([competitorId])
+}
+
+model MessageExample {
+  id              String         @id @default(cuid())
+  knowledgeItemId String         @unique
+  title           String
+  body            String
+  channel         Channel
+  approvalStatus  ApprovalStatus @default(DRAFT)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  knowledgeItem   KnowledgeItem  @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+
+  @@index([approvalStatus])
+}
+
+model ProspectQuestion {
+  id              String         @id @default(cuid())
+  knowledgeItemId String         @unique
+  question        String
+  answer          String?
+  approvalStatus  ApprovalStatus @default(DRAFT)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  knowledgeItem   KnowledgeItem  @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+
+  @@index([approvalStatus])
+}
+
+model Objection {
+  id              String         @id @default(cuid())
+  knowledgeItemId String         @unique
+  objection       String
+  response        String?
+  approvalStatus  ApprovalStatus @default(DRAFT)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  knowledgeItem   KnowledgeItem  @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+
+  @@index([approvalStatus])
+}
+
+model CaseStudy {
+  id                      String            @id @default(cuid())
+  companyName             String
+  title                   String
+  geographyOrMarkets      String?
+  businessModel           String?
+  initialProblem          String?
+  signalApproach          String?
+  activationDuration      String?
+  campaignTypes           String[]
+  bestFitObjections       String[]
+  approvedExternalWording String?
+  approvalStatus          ApprovalStatus    @default(DRAFT)
+  usageScope              CaseStudyUsageScope?
+  usageRestrictions       String?
+  internalNotes           String?
+  reviewOwnerId           String?
+  lastReviewedAt          DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  reviewOwner             User?             @relation("CaseStudyReviewOwner", fields: [reviewOwnerId], references: [id])
+  industries              Industry[]        @relation("CaseStudyIndustries")
+  bestFitPersonas         Persona[]         @relation("CaseStudyPersonas")
+  sources                 SourceDocument[]  @relation("CaseStudySources")
+  metrics                 CaseStudyMetric[]
+  reviewHistory           ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([reviewOwnerId])
+  @@index([usageScope])
+}
+
+model CaseStudyMetric {
+  id              String          @id @default(cuid())
+  caseStudyId     String
+  metricName      String
+  value           String
+  unit            String?
+  direction       MetricDirection @default(UNKNOWN)
+  comparison      String?
+  timePeriod      String?
+  approvedWording String?
+  createdAt       DateTime        @default(now())
+  caseStudy       CaseStudy       @relation(fields: [caseStudyId], references: [id], onDelete: Cascade)
+}
+
+model Sequence {
+  id                String         @id @default(cuid())
+  title             String
+  description       String?
+  approvalStatus    ApprovalStatus @default(DRAFT)
+  usageRestrictions String?
+  internalNotes     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  steps             SequenceStep[]
+}
+
+model SequenceStep {
+  id         String   @id @default(cuid())
+  sequenceId String
+  stepNumber Int
+  channel    Channel
+  purpose    String
+  body       String
+  createdAt  DateTime @default(now())
+  sequence   Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, stepNumber])
+}
+
+model KnowledgeSubmission {
+  id              String           @id @default(cuid())
+  authorId        String
+  knowledgeItemId String?
+  title           String
+  submittedText   String
+  suggestedType   KnowledgeType
+  approvalStatus  ApprovalStatus   @default(DRAFT)
+  sourceNotes     String?
+  sourceTitle     String?
+  sourceType      SourceType?
+  externalUrl     String?
+  fileReference   String?
+  channels        Channel[]
+  originType      String           @default("MANUAL")
+  originDraftId   String?
+  originWorkflow  String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  author          User             @relation("SubmissionAuthor", fields: [authorId], references: [id])
+  knowledgeItem   KnowledgeItem?   @relation(fields: [knowledgeItemId], references: [id])
+  sources         SourceDocument[] @relation("SubmissionSources")
+  industries      Industry[]       @relation("SubmissionIndustries")
+  personas        Persona[]        @relation("SubmissionPersonas")
+  competitors     Competitor[]     @relation("SubmissionCompetitors")
+  reviewHistory   ReviewDecision[]
+
+  @@index([approvalStatus])
+  @@index([authorId])
+}
+
+model ReviewDecision {
+  id                    String               @id @default(cuid())
+  actorId               String
+  decisionType          ReviewDecisionType
+  action                String?
+  fromStatus            ApprovalStatus?
+  toStatus              ApprovalStatus?
+  reason                String?
+  internalNote          String?
+  notes                 String?
+  createdAt             DateTime             @default(now())
+  knowledgeItemId       String?
+  claimId               String?
+  knowledgeSubmissionId String?
+  sourceDocumentId      String?
+  caseStudyId           String?
+  actor                 User                 @relation("ReviewDecisionActor", fields: [actorId], references: [id])
+  knowledgeItem         KnowledgeItem?       @relation(fields: [knowledgeItemId], references: [id])
+  claim                 Claim?               @relation(fields: [claimId], references: [id])
+  knowledgeSubmission   KnowledgeSubmission? @relation(fields: [knowledgeSubmissionId], references: [id])
+  sourceDocument        SourceDocument?      @relation(fields: [sourceDocumentId], references: [id])
+  caseStudy             CaseStudy?           @relation(fields: [caseStudyId], references: [id])
+
+  @@index([actorId])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model InteractionOutcome {
+  id          String                 @id @default(cuid())
+  userId      String
+  outcomeType InteractionOutcomeType
+  channel     Channel
+  summary     String
+  notes       String?
+  createdAt   DateTime               @default(now())
+  user        User                   @relation(fields: [userId], references: [id])
+}
+
+model GeneratedDraft {
+  id                    String               @id @default(cuid())
+  userId                String
+  prospectId            String?
+  workflow              String
+  promptSnapshot        String?
+  inputSnapshot         Json?
+  draftContent          String
+  alternativeContent    String?
+  retrievedKnowledgeIds String[]
+  sourceIds             String[]
+  providerName          String?
+  modelName             String?
+  draftStatus           GeneratedDraftStatus @default(DRAFT)
+  submittedKnowledgeId  String?
+  submittedAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  user                  User                 @relation(fields: [userId], references: [id])
+  prospect              Prospect?            @relation(fields: [prospectId], references: [id])
+  versions              DraftVersion[]
+
+  @@index([userId])
+  @@index([prospectId])
+  @@index([workflow])
+  @@index([draftStatus])
+}
+
+model Prospect {
+  id            String           @id @default(cuid())
+  userId        String
+  firstName     String?
+  lastName      String?
+  fullName      String?
+  email         String?
+  jobTitle      String?
+  companyName   String?
+  companyDomain String?
+  linkedinUrl   String?
+  status        ProspectStatus   @default(NEW)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  user          User             @relation(fields: [userId], references: [id])
+  sources       ProspectSource[]
+  facts         ProspectFact[]  @relation("ProspectFacts")
+  generatedDrafts GeneratedDraft[]
+
+  @@index([userId])
+  @@index([userId, email])
+  @@index([userId, linkedinUrl])
+  @@index([userId, fullName, companyDomain])
+  @@index([userId, fullName, companyName])
+}
+
+model ProspectSource {
+  id          String             @id @default(cuid())
+  prospectId  String
+  type        ProspectSourceType @default(MANUAL_PASTE)
+  rawContent  String
+  sourceLabel String?
+  sourceUrl   String?
+  createdAt   DateTime           @default(now())
+  prospect    Prospect           @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  facts       ProspectFact[]    @relation("ProspectSourceFacts")
+
+  @@unique([id, prospectId])
+  @@index([prospectId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([sourceLabel, createdAt])
+}
+
+model ProspectFact {
+  id         String                @id @default(cuid())
+  prospectId String
+  sourceId   String
+  value      String
+  category   ExtractedFactCategory
+  createdAt  DateTime              @default(now())
+  prospect   Prospect              @relation("ProspectFacts", fields: [prospectId], references: [id], onDelete: Cascade)
+  source     ProspectSource        @relation("ProspectSourceFacts", fields: [sourceId, prospectId], references: [id, prospectId], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([sourceId])
+  @@index([category])
+}
+
+model DraftVersion {
+  id                    String         @id @default(cuid())
+  generatedDraftId      String
+  draftFamilyId         String
+  parentVersionId       String?
+  versionNumber         Int
+  workflow              String
+  actionType            String
+  refinementCommand     String?
+  userInstruction       String?
+  generatedContent      String
+  alternativeContent    String?
+  sourceReferences      Json?
+  knowledgeReferences   String[]
+  providerName          String
+  modelName             String
+  providerStatus        String
+  safetyFlags           Json?
+  createdBy             String
+  createdAt             DateTime       @default(now())
+  isCurrent             Boolean        @default(false)
+  isPreferred           Boolean        @default(false)
+  manualEdit            Boolean        @default(false)
+  generatedDraft        GeneratedDraft @relation(fields: [generatedDraftId], references: [id], onDelete: Cascade)
+  creator               User           @relation(fields: [createdBy], references: [id])
+
+  @@index([generatedDraftId])
+  @@index([draftFamilyId])
+  @@index([workflow])
+  @@index([createdBy])
+  @@index([isCurrent])
+}
+
+model AccountAssessment {
+  id                    String   @id @default(cuid())
+  userId                String
+  companyName           String
+  domain                String?
+  inputSnapshot         Json
+  factStatuses          Json
+  qualificationResult   String
+  confidence            String
+  verifiedSignals       String[]
+  assumptions           String[]
+  missingInformation    String[]
+  suppressionResult     Json
+  personaRecommendation Json
+  angleRecommendation   Json
+  recommendedNextAction String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([companyName])
+  @@index([domain])
+  @@index([qualificationResult])
+}
+
+model SuppressionRecord {
+  id              String             @id @default(cuid())
+  companyName     String
+  normalizedName  String
+  domain          String?
+  normalizedDomain String?
+  status          String
+  accountOwner    String?
+  reason          String?
+  source          String?
+  lastContactDate DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  audits          SuppressionAudit[]
+
+  @@index([normalizedName])
+  @@index([normalizedDomain])
+  @@index([status])
+}
+
+model SuppressionImportBatch {
+  id             String             @id @default(cuid())
+  importerId     String
+  sourceFilename String
+  mode           String
+  summary        Json
+  createdAt      DateTime           @default(now())
+  importer       User               @relation(fields: [importerId], references: [id])
+  audits         SuppressionAudit[]
+
+  @@index([importerId])
+  @@index([createdAt])
+}
+
+model SuppressionAudit {
+  id                  String                 @id @default(cuid())
+  suppressionRecordId String
+  importBatchId       String?
+  importerId          String
+  action              String
+  previousValue       Json?
+  newValue            Json
+  sourceFilename      String?
+  createdAt           DateTime               @default(now())
+  suppressionRecord   SuppressionRecord      @relation(fields: [suppressionRecordId], references: [id])
+  importBatch         SuppressionImportBatch? @relation(fields: [importBatchId], references: [id])
+  importer            User                   @relation(fields: [importerId], references: [id])
+
+  @@index([suppressionRecordId])
+  @@index([importBatchId])
+  @@index([importerId])
+  @@index([createdAt])
+}
+
+model WebsiteResearchRun {
+  id               String   @id @default(cuid())
+  userId           String
+  companyName      String
+  normalizedDomain String
+  researchStatus   String
+  requestedUrls    String[]
+  fetchedUrls      String[]
+  failedUrls       String[]
+  findings         Json
+  acceptedFindings Json?
+  rejectedFindings Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([normalizedDomain])
+  @@index([researchStatus])
+}
+
+model CompanyEnrichmentRun {
+  id                String                    @id @default(cuid())
+  userId            String
+  companyName       String?
+  normalizedDomain  String
+  provider          String
+  status            String
+  requestedAt       DateTime                  @default(now())
+  completedAt       DateTime?
+  failureCategory   String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  user              User                      @relation(fields: [userId], references: [id])
+  companyFindings   CompanyEnrichmentFinding[]
+  contactFindings   ContactEnrichmentResult[]
+  audits            ProviderSyncAudit[]
+
+  @@index([userId])
+  @@index([normalizedDomain])
+  @@index([provider])
+  @@index([status])
+}
+
+model CompanyEnrichmentFinding {
+  id               String               @id @default(cuid())
+  enrichmentRunId  String
+  normalizedField  String
+  value            String
+  status           String
+  provider         String
+  fieldOrigin      String
+  retrievedAt      DateTime
+  confidence       String?
+  sourceUrl        String?
+  reviewStatus     String               @default("PENDING")
+  reviewerId       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  enrichmentRun    CompanyEnrichmentRun @relation(fields: [enrichmentRunId], references: [id], onDelete: Cascade)
+
+  @@index([enrichmentRunId])
+  @@index([normalizedField])
+  @@index([reviewStatus])
+}
+
+model ContactEnrichmentResult {
+  id                  String               @id @default(cuid())
+  enrichmentRunId     String
+  fullName            String
+  professionalTitle   String
+  companyName         String
+  companyDomain       String
+  countryOrRegion     String?
+  department          String?
+  seniority           String?
+  personaTier         String
+  personaCategory     String
+  professionalProfileUrl String?
+  businessEmail       String?
+  businessEmailStatus String?
+  provider            String
+  retrievedAt         DateTime
+  relevanceState      String
+  reviewStatus        String               @default("PENDING")
+  reviewerId          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  enrichmentRun       CompanyEnrichmentRun @relation(fields: [enrichmentRunId], references: [id], onDelete: Cascade)
+
+  @@index([enrichmentRunId])
+  @@index([companyDomain])
+  @@index([personaTier])
+  @@index([reviewStatus])
+}
+
+model ProviderSyncAudit {
+  id               String               @id @default(cuid())
+  enrichmentRunId  String?
+  providerOperation String
+  recordCount      Int
+  status           String
+  userId           String
+  createdAt        DateTime             @default(now())
+  enrichmentRun    CompanyEnrichmentRun? @relation(fields: [enrichmentRunId], references: [id])
+  user             User                 @relation(fields: [userId], references: [id])
+
+  @@index([enrichmentRunId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Dedicated server-only integration state. Never included in draft/prospect listing APIs.
+model IntegrationState {
+  userId     String
+  provider   String
+  state      Json
+  secret     String?
+  version    Int       @default(1)
+  leaseOwner String?
+  leaseUntil DateTime?
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, provider])
+}
+
+model IntegrationAuditEvent {
+  id        String   @id
+  userId    String
+  provider  String
+  event     Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, createdAt])
+}

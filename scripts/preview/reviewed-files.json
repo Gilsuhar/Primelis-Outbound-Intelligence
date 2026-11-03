@@ -1,0 +1,15 @@
+{
+  "pnpm-lock.yaml": "5f90d08bf5035811dc009ea189c01b370189042e3bde09fb93d78da96738fecf",
+  "prisma/schema.prisma": "43d1d52cb7871c2d3ef5269df174a71e31d5c3aed62158d23ea903c2faa7c667",
+  "prisma/migrations/20260712152700_initial_postgresql_foundation/migration.sql": "a0a931cdc216186149526de3e1d37466724174352263d718b330bc14d7e9661d",
+  "prisma/migrations/20260713000100_imported_signal_review_workflow/migration.sql": "ebc407790217b312f5c8e23d13ba3d6678494757eb270998256b2cfc1564a1e0",
+  "prisma/migrations/20260713000200_reply_to_prospect_drafts/migration.sql": "71b0d9757f9cebc7d9df4a6af93072718a6bf708071031d4cecd1172d018e385",
+  "prisma/migrations/20260713000300_account_assessments/migration.sql": "df2939a1a10f55eac311b266b2a07681411f70c682eb2a1beb6f2f52c98ccf81",
+  "prisma/migrations/20260713000400_connected_research_foundation/migration.sql": "bb5a3d6714f914cba79b963f561858ef0ff9760973ed395a39d876f9f4b59162",
+  "prisma/migrations/20260713000500_company_contact_provider_foundation/migration.sql": "8c5698e635ab5ee236cef7585d97b645fbfb2cf883072330e5096ab964773b57",
+  "prisma/migrations/20260713000600_real_ai_provider_draft_versions/migration.sql": "5085ed0c81d812de47498c6d0afb78fd3b15ce84fd358ebf7b61384fe3f8cd22",
+  "prisma/migrations/20260713000700_private_preview_auth/migration.sql": "2bf390d7aa5c91ffdf95152b43634552ca0204924176f539018877b256666cba",
+  "prisma/migrations/20260823000100_prospect_memory_phase_1/migration.sql": "665ac74aa7e8722a65a88051190ddc2e5da1a4ea89e6b83a0cdcf64745d91eae",
+  "prisma/migrations/20261016000000_read_only_integration_sync/migration.sql": "000664e36cdd18a1ed350efb7445f19b210f47ec10208eebb964d8336d2c1ff0",
+  "prisma/migrations/20261017130000_restrict_application_data_api/migration.sql": "50da5758109ffd4d55a9c9903eeaa1c9062246a16047e09bda69c938b171a0f3"
+}

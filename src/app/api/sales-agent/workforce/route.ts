@@ -1,0 +1,40 @@
+import { previewApiDenied } from "@/lib/preview-policy.mjs";
+import { protectRunDrafts } from "@/server/agent-workforce/dashboard/service";
+import { WorkforceOrchestrator } from "@/server/agent-workforce/orchestrator";
+import {
+  workforceActor,
+  workforceBody,
+  workforceFailure,
+  workforceResponse,
+} from "@/server/agent-workforce/http";
+export const runtime = "nodejs";
+export async function GET() {
+  const denied = previewApiDenied();
+  if (denied) return denied;
+  try {
+    const auth = await workforceActor();
+    if (auth.response) return auth.response;
+    const runs = await new WorkforceOrchestrator().store.list(auth.actor.id);
+    return workforceResponse({
+      ok: true,
+      runs: await Promise.all(runs.map((run) => protectRunDrafts(auth.actor.id, run))),
+    });
+  } catch (error) {
+    return workforceFailure(error);
+  }
+}
+export async function POST(request: Request) {
+  const denied = previewApiDenied();
+  if (denied) return denied;
+  try {
+    const auth = await workforceActor(request, true);
+    if (auth.response) return auth.response;
+    const run = await new WorkforceOrchestrator().start(
+      auth.actor.id,
+      await workforceBody(request),
+    );
+    return workforceResponse({ ok: true, run }, 202);
+  } catch (error) {
+    return workforceFailure(error);
+  }
+}

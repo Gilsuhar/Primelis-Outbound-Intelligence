@@ -1,0 +1,664 @@
+import React from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/app/ask-signal-brain/actions", () => ({
+  askSignalBrainAction: vi.fn(),
+}));
+
+vi.mock("@/app/account-status/actions", () => ({
+  checkAccountStatusAction: vi.fn(async () => ({
+    ok: true,
+    data: {
+      status: "CLEAR",
+      canGenerate: true,
+      confidence: "LOW",
+      matches: [],
+      warnings: [],
+      nextActions: [],
+    },
+  })),
+}));
+
+vi.mock("@/app/build-sequence/actions", () => ({
+  enrichLinkedInProspectAction: vi.fn(),
+  generateBuildSequenceAction: vi.fn(),
+  pushSequenceToHubSpotAction: vi.fn(),
+}));
+
+vi.mock("@/app/create-outreach/actions", () => ({
+  generateCreateOutreachAction: vi.fn(),
+}));
+
+vi.mock("@/app/reply-to-prospect/actions", () => ({
+  generateReplyToProspectAction: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/action-actor", () => ({
+  withAuthenticatedCreator: vi.fn(),
+  withAuthenticatedReviewActor: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+
+vi.mock("@/features/draft-refinement/draft-refinement-panel", () => ({
+  DraftRefinementPanel: () => <div data-testid="draft-refinement-panel" />,
+}));
+
+import { AskSignalBrainClient } from "@/features/ask-signal-brain/ask-signal-brain-client";
+import {
+  enrichLinkedInProspectAction,
+  generateBuildSequenceAction,
+  pushSequenceToHubSpotAction,
+} from "@/app/build-sequence/actions";
+import {
+  __buildSequenceVariantTest,
+  BuildSequenceClient,
+} from "@/features/build-sequence/build-sequence-client";
+import type { BuildSequenceResult, SequenceStep } from "@/features/build-sequence/types";
+import { CreateOutreachClient } from "@/features/create-outreach/create-outreach-client";
+import { ReplyToProspectClient } from "@/features/reply-to-prospect/reply-to-prospect-client";
+import { AccountResearchClient } from "@/features/account-research/account-research-client";
+
+(globalThis as typeof globalThis & { React: typeof React }).React = React;
+
+let fetchMock: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  fetchMock = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    }),
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  vi.mocked(generateBuildSequenceAction).mockResolvedValue({
+    ok: false,
+    code: "VALIDATION_ERROR",
+    message: "Test-visible generation failure.",
+  });
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
+
+function latestBuildSequencePayload() {
+  const init = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+  return JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+}
+
+function mockBuildSequenceApiResponse(response: unknown) {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => response,
+  });
+}
+
+function buildSequenceResult(overrides: Partial<BuildSequenceResult> = {}): BuildSequenceResult {
+  return {
+    draftId: "draft-test",
+    overallStrategy: "Build a concise paid-search sequence.",
+    selectedAngle: "BRANDED_SEARCH_EFFICIENCY",
+    angleRationale: "The account context points to branded-search efficiency.",
+    personaEmphasis: {
+      persona: "PAID_SEARCH_LEADER",
+      emphasis: "operational control",
+      rationale: "Keep it practical and tied to campaign decisions.",
+    },
+    prospectIntelligence: {
+      prospectName: "Morgan Lee",
+      companyName: "Cisco",
+      jobTitle: "Director of Paid Search",
+      persona: "PAID_SEARCH",
+      relevantFacts: [],
+      selectedInsights: [],
+      contextInterpretation: {
+        currentCompany: "Cisco",
+        currentRole: "Director of Paid Search",
+        currentResponsibilities: [],
+        currentPrioritiesOrInterests: [],
+        currentToolsOrChannels: [],
+        historicalExperience: [],
+        historicalCompanies: [],
+        credibilitySignals: [],
+        personalBackground: [],
+        commercialSignals: [],
+        uncertainFacts: [],
+        rejectedHistoricalProjections: [],
+      },
+      companyContext: [],
+      likelyPriorities: [],
+      serpScenario: "UNKNOWN",
+      serpEvidence: {
+        keywords: [],
+        soloKeywords: [],
+        contestedKeywords: [],
+        competitors: [],
+        observations: [],
+        structuredKeywords: [],
+      },
+      primaryAngle: "Brand efficiency",
+      confidence: { prospect: "MEDIUM", serp: "LOW" },
+    },
+    messageStrategy: {
+      prospectInsight: "Paid-search leader at Cisco.",
+      businessQuestion: "Where does live competition change branded bidding?",
+      productGap: "Google Ads does not make live SERP competition obvious.",
+      primaryAngle: "Brand efficiency",
+      relevantCapability: "Live SERP monitoring",
+      whyThisShouldResonate: "It maps to paid-search operations.",
+      openingStyle: "BUSINESS_QUESTION",
+      sequenceNarrative: [
+        {
+          step: 1,
+          objective: "Open relevance",
+          newInformation: "Prospect context",
+          ctaIntent: "Discovery",
+        },
+        {
+          step: 2,
+          objective: "Frame problem",
+          newInformation: "Auction changes",
+          ctaIntent: "Assess process",
+        },
+        {
+          step: 3,
+          objective: "Explain method",
+          newInformation: "Signal capability",
+          ctaIntent: "Invite review",
+        },
+        { step: 4, objective: "Proof", newInformation: "Approved proof", ctaIntent: "Soft CTA" },
+      ],
+      confidence: "MEDIUM",
+      selectedGoldStandardExampleIds: [],
+    },
+    selectedGoldStandardExamples: [],
+    detectedAccountSignals: [],
+    steps: [],
+    claimsUsed: [],
+    safetyNotes: [],
+    knowledgeLimitations: [],
+    sequenceLength: 4,
+    overallDuration: "12 business days",
+    recordsUsed: [],
+    sourceReferences: [],
+    provider: {
+      providerName: "deterministic-development",
+      modelName: "deterministic",
+      deterministic: true,
+    },
+    ...overrides,
+  };
+}
+
+describe("Sales workflow UI", () => {
+  it("keeps Create Outreach focused on a quick brief", () => {
+    render(<CreateOutreachClient />);
+
+    expect(screen.getByRole("heading", { name: "Quick brief" })).toBeTruthy();
+    expect(screen.getByText("Company")).toBeTruthy();
+    expect(screen.getByText("Buyer role")).toBeTruthy();
+    expect(screen.getByText("Fit / ICP")).toBeTruthy();
+    expect(screen.getByText("Industry")).toBeTruthy();
+    expect(screen.getByText("Reason for outreach")).toBeTruthy();
+    expect(screen.getByText("Tone")).toBeTruthy();
+    expect(screen.getByText("Email length")).toBeTruthy();
+    expect(screen.getByText("Use relevant case study if available")).toBeTruthy();
+    expect(screen.getByText("Advanced optional details").closest("details")?.open).toBe(false);
+  });
+
+  it("infers website/domain from the company name", () => {
+    render(<CreateOutreachClient />);
+
+    fireEvent.change(screen.getByLabelText("Company"), { target: { value: "Nike" } });
+    expect((screen.getByLabelText("Website") as HTMLInputElement).value).toBe("nike.com");
+  });
+
+  it("keeps Build Sequence focused on Prospect Intelligence inputs", () => {
+    render(<BuildSequenceClient />);
+
+    expect(screen.getByRole("heading", { name: "Prospect Intelligence" })).toBeTruthy();
+    expect(screen.getByText("LinkedIn profile URL")).toBeTruthy();
+    expect(screen.getByText("Prospect Context")).toBeTruthy();
+    expect(screen.getByText("SERP Evidence")).toBeTruthy();
+    expect(screen.getByText("Company")).toBeTruthy();
+    expect(screen.getByText("Buyer role")).toBeTruthy();
+    expect(screen.getByText("Fit / ICP")).toBeTruthy();
+    expect(screen.getByText("Industry")).toBeTruthy();
+    expect(screen.getByText("Reason for outreach")).toBeTruthy();
+    expect(screen.getByText("Steps")).toBeTruthy();
+    expect(screen.getByText("Tone")).toBeTruthy();
+    expect(screen.getByText("Duration")).toBeTruthy();
+    expect(screen.getByText("Edit extracted details").closest("details")?.open).toBe(false);
+    expect(document.querySelector("form")?.noValidate).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('input[name="companyName"]')?.required).toBe(
+      false,
+    );
+  });
+
+  it("propagates edits to the first subject and keeps all follow-ups in that thread", async () => {
+    const steps: SequenceStep[] = [1, 2, 3, 4].map((stepNumber) => ({
+      stepNumber,
+      channel: "EMAIL",
+      delay: `Day ${stepNumber}`,
+      purpose: "FIRST_TOUCH_RELEVANCE",
+      channelRationale: "Email",
+      subjectLine: "Acme visibility",
+      messageBody: "Draft message body",
+      cta: "",
+      claimsUsed: [],
+      sourceIds: [],
+      approvalStatus: "PENDING_HUMAN_APPROVAL",
+    }));
+    mockBuildSequenceApiResponse({ ok: true, data: buildSequenceResult({ steps }) });
+    render(<BuildSequenceClient />);
+    fireEvent.change(
+      document.querySelector<HTMLTextAreaElement>('textarea[name="rawProspectContext"]')!,
+      {
+        target: { value: "Sam leads paid search at Acme." },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+    await waitFor(() => expect(screen.getByLabelText("Email 1 subject")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Email 1 subject"), {
+      target: { value: "Acme measurement" },
+    });
+    for (const stepNumber of [2, 3, 4]) {
+      const subject = screen.getByLabelText(`Email ${stepNumber} subject`) as HTMLInputElement;
+      expect(subject.value).toBe("Re: Acme measurement");
+      expect(subject.readOnly).toBe(true);
+    }
+  });
+
+  it("keeps Build Sequence screenshot context optional and tucked into advanced details", () => {
+    render(<BuildSequenceClient />);
+
+    const advanced = screen.getByText("Edit extracted details").closest("details");
+    expect(advanced?.open).toBe(false);
+
+    fireEvent.click(screen.getByText("Edit extracted details"));
+    expect(screen.getByText("Google SERP screenshot available")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Google SERP screenshot available"));
+    expect(screen.getByLabelText("Screenshot context")).toBeTruthy();
+    expect(screen.getByLabelText("Google SERP screenshot URL")).toBeTruthy();
+    expect(
+      screen.getByLabelText(/I manually verified this prospect Google SERP screenshot/),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("What the screenshot shows")).toBeTruthy();
+    expect(screen.getByLabelText("Brand keyword")).toBeTruthy();
+  });
+
+  it("submits Build Sequence from Prospect Context only and renders action errors", async () => {
+    mockBuildSequenceApiResponse({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: {
+        value:
+          "Chris\nRemofirst\nmanaged over $50M in paid media\ninterested in AI / automation for paid search\nGoogle Ads live SERP competition context",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    expect(
+      screen.getByText("Understanding prospect... Building strategy... Generating sequence..."),
+    ).toBeTruthy();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/build-sequence/generate");
+    expect(latestBuildSequencePayload()).toEqual(
+      expect.objectContaining({
+        companyName: "",
+        accountStatusOverride: false,
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("Test-visible generation failure.")).toBeTruthy());
+  });
+
+  it("falls back to the server action when the Build Sequence API fetch fails", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+    vi.mocked(generateBuildSequenceAction).mockResolvedValueOnce({
+      ok: true,
+      data: buildSequenceResult(),
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: {
+        value:
+          "Morgan Lee\nDirector of Paid Search at Cisco\nOwns paid search across several markets.",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(generateBuildSequenceAction).toHaveBeenCalledTimes(1));
+    expect(generateBuildSequenceAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prospectContext: expect.stringContaining("Director of Paid Search"),
+      }),
+    );
+    expect(screen.queryByText("Failed to fetch")).toBeFalsy();
+    await waitFor(() =>
+      expect(screen.getByText("Build a concise paid-search sequence.")).toBeTruthy(),
+    );
+  });
+
+  it("does not submit Build Sequence from a LinkedIn URL alone", async () => {
+    render(<BuildSequenceClient />);
+
+    const linkedinUrl = document.querySelector<HTMLInputElement>(
+      'input[name="linkedinProfileUrl"]',
+    );
+    expect(linkedinUrl).toBeTruthy();
+    fireEvent.change(linkedinUrl!, {
+      target: { value: "https://www.linkedin.com/in/chris-example/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "Complete these fields first: Prospect Context text; a LinkedIn URL alone cannot be read automatically yet.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("keeps the LinkedIn URL out of pasted prospect context sent to copy generation", async () => {
+    mockBuildSequenceApiResponse({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Test-visible generation failure.",
+    });
+    render(<BuildSequenceClient />);
+
+    const linkedinUrl = document.querySelector<HTMLInputElement>(
+      'input[name="linkedinProfileUrl"]',
+    );
+    expect(linkedinUrl).toBeTruthy();
+    fireEvent.change(linkedinUrl!, {
+      target: { value: "https://www.linkedin.com/in/chris-example/" },
+    });
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    expect(prospectContext).toBeTruthy();
+    fireEvent.change(prospectContext!, {
+      target: { value: "Chris from Remofirst manages paid search and AI automation." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(latestBuildSequencePayload()).toEqual(
+      expect.objectContaining({
+        rawProspectContext: "Chris from Remofirst manages paid search and AI automation.",
+        prospectContext: "Chris from Remofirst manages paid search and AI automation.",
+      }),
+    );
+  });
+
+  it("hands an enriched first name to sequence generation", async () => {
+    vi.mocked(enrichLinkedInProspectAction).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        linkedinUrl: "https://www.linkedin.com/in/amit-arora/",
+        record: {
+          success: true,
+          first_name: "Amit",
+          full_name: "Amit Arora",
+          company_name: "StoneX",
+          job_title: "Global Head Of Paid Search",
+        },
+        preview: null,
+        rawProspectContext: "Name: Amit Arora\nTitle: Global Head Of Paid Search\nCompany: StoneX",
+        provider: "GETLEADS",
+      },
+    });
+    render(<BuildSequenceClient />);
+
+    fireEvent.change(
+      document.querySelector<HTMLInputElement>('input[name="linkedinProfileUrl"]')!,
+      {
+        target: { value: "https://www.linkedin.com/in/amit-arora/" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fetch profile" }));
+    await waitFor(() =>
+      expect(
+        document.querySelector<HTMLInputElement>('input[name="contactFirstName"]')?.value,
+      ).toBe("Amit"),
+    );
+
+    const generateButton = await screen.findByRole("button", {
+      name: "Generate intelligence & sequence",
+    });
+    fireEvent.click(generateButton);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(latestBuildSequencePayload()).toEqual(
+      expect.objectContaining({ contactFirstName: "Amit" }),
+    );
+  });
+
+  it("renders existing-activity warnings after successful Build Sequence generation", async () => {
+    mockBuildSequenceApiResponse({
+      ok: true,
+      data: buildSequenceResult({
+        safetyNotes: [
+          "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
+        ],
+      }),
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Existing ownership or recent outreach activity found for Cisco. Review this before sending or pushing to CRM.",
+        ),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("pushes Build Sequence to HubSpot with the extracted company when manual company is empty", async () => {
+    mockBuildSequenceApiResponse({
+      ok: true,
+      data: buildSequenceResult(),
+    });
+    vi.mocked(pushSequenceToHubSpotAction).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        companyId: "company-1",
+        noteId: "note-1",
+        taskId: "task-1",
+        companyUrl: "https://app.hubspot.com/contacts/0/company/company-1",
+      },
+    });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Send to HubSpot" }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send to HubSpot" }));
+
+    await waitFor(() => expect(pushSequenceToHubSpotAction).toHaveBeenCalledTimes(1));
+    expect(pushSequenceToHubSpotAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyName: "Cisco",
+      }),
+    );
+  });
+
+  it("lets Build Sequence generation continue after a client-status confirmation", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: false,
+          code: "ACCOUNT_STATUS_BLOCKED",
+          message:
+            "This company is already marked as a Primelis client. Normal prospecting should not continue.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          data: buildSequenceResult({
+            safetyNotes: [
+              "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
+            ],
+          }),
+        }),
+      });
+    render(<BuildSequenceClient />);
+
+    const prospectContext = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="rawProspectContext"]',
+    );
+    fireEvent.change(prospectContext!, {
+      target: { value: "Morgan Lee\nCisco\nDirector of Paid Search" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("I checked this, generate draft anyway")).toBeTruthy(),
+    );
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual(
+      expect.objectContaining({ accountStatusOverride: false }),
+    );
+
+    fireEvent.click(screen.getByText("I checked this, generate draft anyway"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate intelligence & sequence" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual(
+      expect.objectContaining({ accountStatusOverride: true }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Existing Primelis client status found for Cisco. Review before sending or pushing to CRM.",
+        ),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("gives Build Sequence Generate buttons materially different local variants", () => {
+    const step: SequenceStep = {
+      stepNumber: 1,
+      channel: "EMAIL",
+      delay: "Day 0",
+      purpose: "FIRST_TOUCH_RELEVANCE",
+      channelRationale: "Email is selected.",
+      subjectLine: "Nike paid brand question",
+      messageBody:
+        "Hi there,\n\nI had Nike on my list because branded search can look healthy in reports.",
+      cta: "Do you already track this today?",
+      claimsUsed: [],
+      sourceIds: [],
+    };
+
+    const bodyVariants = __buildSequenceVariantTest.bodyVariants(step, "Nike");
+    const ctaVariants = __buildSequenceVariantTest.ctaVariants(step);
+    const subjectVariants = __buildSequenceVariantTest.subjectVariants(step, "Nike");
+
+    expect(bodyVariants).not.toContain(step.messageBody);
+    expect(ctaVariants).not.toContain(step.cta);
+    expect(subjectVariants).not.toContain(step.subjectLine);
+    expect(bodyVariants.join(" ")).toMatch(/captured the click|nobody else is bidding/i);
+    expect(new Set(ctaVariants).size).toBe(ctaVariants.length);
+    expect(__buildSequenceVariantTest.variantIndex(-1, bodyVariants.length)).toBe(0);
+  });
+
+  it("formats Build Sequence copy-all from canonical steps exactly once", () => {
+    const steps: SequenceStep[] = [1, 2, 3, 4].map((stepNumber) => ({
+      stepNumber,
+      channel: "EMAIL",
+      delay:
+        stepNumber === 1 ? "Day 0" : stepNumber === 4 ? "Final touch" : `Day ${stepNumber * 3}`,
+      purpose:
+        stepNumber === 1
+          ? "FIRST_TOUCH_RELEVANCE"
+          : stepNumber === 2
+            ? "PROBLEM_FRAMING"
+            : stepNumber === 3
+              ? "METHODOLOGY_DIFFERENTIATION"
+              : "BREAKUP_CLOSE_LOOP",
+      channelRationale: "Email is selected.",
+      subjectLine: `Subject ${stepNumber}`,
+      messageBody: `Body ${stepNumber}`,
+      cta: `CTA ${stepNumber}?`,
+      claimsUsed: [`Claim ${stepNumber}`],
+      sourceIds: [`source-${stepNumber}`],
+    }));
+
+    const copied = __buildSequenceVariantTest.buildFullSequenceText(steps);
+
+    expect(copied.match(/Email 1 - Day 0/g)).toHaveLength(1);
+    expect(copied.match(/Email 2 - Day 6/g)).toHaveLength(1);
+    expect(copied.match(/Email 3 - Day 9/g)).toHaveLength(1);
+    expect(copied.match(/Email 4 - Final touch/g)).toHaveLength(1);
+    expect(copied).toContain("Subject: Subject 1");
+    expect(copied).not.toContain("Subject: Subject 2");
+    expect(copied).not.toContain("Subject: Subject 3");
+    expect(copied).not.toContain("Subject: Subject 4");
+    expect(copied).not.toMatch(/claimsUsed|sourceIds|channelRationale|overallStrategy/i);
+  });
+
+  it("infers domains in Account Research and explains the result", () => {
+    render(<AccountResearchClient />);
+
+    fireEvent.change(screen.getByLabelText("Company name"), { target: { value: "Nike" } });
+    expect((screen.getByLabelText("Company domain") as HTMLInputElement).value).toBe("nike.com");
+    expect(screen.getByText(/You will see the fit decision/i)).toBeTruthy();
+    expect(screen.queryByText("User provided")).toBeNull();
+  });
+
+  it("keeps Reply and Brain advanced context closed by default", () => {
+    render(<ReplyToProspectClient />);
+    expect(screen.getByRole("heading", { name: "Quick reply brief" })).toBeTruthy();
+    expect(screen.getByText("Advanced optional context").closest("details")?.open).toBe(false);
+
+    render(<AskSignalBrainClient />);
+    expect(screen.getByRole("heading", { name: "Quick question" })).toBeTruthy();
+    expect(screen.getByText("Advanced account context").closest("details")?.open).toBe(false);
+  });
+});

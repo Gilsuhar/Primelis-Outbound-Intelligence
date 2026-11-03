@@ -1,0 +1,265 @@
+import "server-only";
+import { isPreviewRestricted } from "../preview-policy.mjs";
+import {
+  localDevelopmentConfig,
+  localDevelopmentSession,
+  localDevelopmentCookie,
+  localDevelopmentUser,
+} from "./local-development";
+
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { createServerClient } from "@supabase/ssr";
+
+import type { UserRole } from "@/features/knowledge/types";
+import { prisma } from "@/lib/prisma";
+import {
+  persistSupabaseCookies,
+  type SupabaseCookiePersistenceOptions,
+  type SupabaseCookieToSet,
+} from "@/lib/auth/cookie-persistence";
+import { getAppUrl, getSupabaseAuthConfig } from "@/lib/auth/env";
+import {
+  canAccessRoute,
+  type AuthenticatedUser,
+  normalizePreviewEmail,
+  type PublicUser,
+  publicUserFromAuthenticatedUser,
+} from "@/lib/private-preview-auth";
+
+type LocalProfile = {
+  id: string;
+  authUserId?: string | null;
+  email: string;
+  name?: string | null;
+  role?: string | null;
+};
+
+const authLookupTimeoutMs = 1500;
+const applicationProfileLookupTimeoutMs = 8000;
+
+function normalizeRole(role: string | null | undefined): UserRole {
+  return role === "KNOWLEDGE_ADMIN" ? "KNOWLEDGE_ADMIN" : "SALES_USER";
+}
+
+function isSupabaseAuthCookieName(name: string) {
+  if (isPreviewRestricted()) {
+    const config = getSupabaseAuthConfig();
+    if (!config) return false;
+    const ref = new URL(config.url).hostname.split(".")[0];
+    return new RegExp(`^sb-${ref}-auth-token(?:\\.\\d+)?$`).test(name);
+  }
+  return name.startsWith("sb-") && (name.includes("auth-token") || name.includes("access-token"));
+}
+
+async function hasSupabaseAuthCookie() {
+  const cookieStore = await cookies();
+  return cookieStore.getAll().some((cookie) => isSupabaseAuthCookieName(cookie.name));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+export async function createSupabaseServerClient(options: SupabaseCookiePersistenceOptions = {}) {
+  const config = getSupabaseAuthConfig();
+  if (!config) return null;
+
+  const cookieStore = await cookies();
+
+  return createServerClient(config.url, config.anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll().filter(cookie => !isPreviewRestricted() ||
+          isSupabaseAuthCookieName(cookie.name) ||
+          cookie.name === `sb-${new URL(config.url).hostname.split(".")[0]}-auth-token-code-verifier`);
+      },
+      setAll(cookiesToSet: SupabaseCookieToSet[]) {
+        persistSupabaseCookies(cookieStore, cookiesToSet, options);
+      },
+    },
+  });
+}
+
+export async function resolveApplicationUser(authUser: {
+  id: string;
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  is_anonymous?: boolean;
+}) {
+  const normalizedEmail = normalizePreviewEmail(authUser.email);
+  // Only server-verified Auth getUser() data is accepted. Never trust user_metadata.
+  if (
+    !normalizedEmail ||
+    authUser.is_anonymous ||
+    !authUser.email_confirmed_at ||
+    !Number.isFinite(Date.parse(authUser.email_confirmed_at))
+  )
+    return null;
+
+  const existing = (await prisma.user.findFirst({
+    where: {
+      OR: [
+        { authUserId: authUser.id },
+        { email: { equals: normalizedEmail, mode: "insensitive" } },
+      ],
+    },
+    select: {
+      id: true,
+      authUserId: true,
+      email: true,
+      name: true,
+      role: true,
+    },
+  })) as LocalProfile | null;
+
+  if (!existing || (existing.authUserId && existing.authUserId !== authUser.id)) return null;
+
+  // Preview users must be provisioned and bound explicitly; login never binds by email or writes.
+  if (isPreviewRestricted() &&
+      (existing.authUserId !== authUser.id || existing.email !== normalizedEmail ||
+        !["SALES_USER", "KNOWLEDGE_ADMIN"].includes(existing.role ?? ""))) return null;
+
+  if (!existing.authUserId) {
+    return (await prisma.user.update({
+      where: { id: existing.id, authUserId: null },
+      data: { authUserId: authUser.id, email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    })) as LocalProfile;
+  }
+
+  if (existing.email !== normalizedEmail) {
+    return (await prisma.user.update({
+      where: { id: existing.id },
+      data: { email: normalizedEmail },
+      select: {
+        id: true,
+        authUserId: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    })) as LocalProfile;
+  }
+
+  return existing;
+}
+
+export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+  if (localDevelopmentConfig()) {
+    const localCookies = await cookies();
+    const localHeaders = await headers();
+    if (
+      !localDevelopmentSession(
+        localHeaders.get("host"),
+        localCookies.get(localDevelopmentCookie)?.value,
+      )
+    )
+      return null;
+    const profile = await prisma.user.findFirst({
+      where: { id: localDevelopmentUser.id, email: localDevelopmentUser.email, role: "SALES_USER" },
+    });
+    return profile ? { ...localDevelopmentUser } : null;
+  }
+  if (!(await hasSupabaseAuthCookie())) return null;
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+
+  const authResult = await withTimeout(supabase.auth.getUser(), authLookupTimeoutMs).catch(() => null);
+  if (!authResult) return null;
+
+  const {
+    data: { user },
+    error,
+  } = authResult;
+
+  if (error || !user) return null;
+
+  const profile = await withTimeout(
+    resolveApplicationUser(user),
+    applicationProfileLookupTimeoutMs,
+  );
+  if (!profile) return null;
+
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name ?? undefined,
+    role: normalizeRole(profile.role),
+  };
+}
+
+export async function getSupabaseAuthUser() {
+  if (!(await hasSupabaseAuthCookie())) return null;
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+
+  const authResult = await withTimeout(supabase.auth.getUser(), authLookupTimeoutMs).catch(() => null);
+  if (!authResult) return null;
+
+  const {
+    data: { user },
+    error,
+  } = authResult;
+
+  return error ? null : user;
+}
+
+export async function requireCurrentUser(): Promise<AuthenticatedUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireRole(role: UserRole): Promise<AuthenticatedUser> {
+  const user = await requireCurrentUser();
+  if (user.role !== role) redirect("/");
+  return user;
+}
+
+export async function requireRouteAccess(pathname: string) {
+  const user = await requireCurrentUser();
+  if (!canAccessRoute(pathname, user.role)) redirect("/");
+  return user;
+}
+
+export async function getPublicUser(): Promise<PublicUser | null> {
+  const user = await getCurrentUser();
+  return user ? publicUserFromAuthenticatedUser(user) : null;
+}
+
+export async function getRequestOrigin() {
+  const headerStore = await headers();
+  const host = headerStore.get("host");
+  // Use the exact preview deployment host, not a branch alias, so recovery
+  // links and PKCE cookies return to the same deployment.
+  if (
+    process.env.VERCEL_ENV === "preview" &&
+    host &&
+    (host === process.env.VERCEL_URL || host === process.env.VERCEL_BRANCH_URL) &&
+    /^[a-z0-9][a-z0-9.-]*\.vercel\.app$/i.test(host)
+  ) {
+    return `https://${host}`;
+  }
+  const configured = getAppUrl();
+  if (configured) return configured;
+  const proto = headerStore.get("x-forwarded-proto") === "https" ? "https" : "http";
+  return host ? `${proto}://${host}` : "http://localhost:3000";
+}

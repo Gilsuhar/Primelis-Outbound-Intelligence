@@ -1,0 +1,416 @@
+[
+  {
+    "company": "Simulated Acme",
+    "report": {
+      "version": 1,
+      "mode": "SIMULATED",
+      "eligibility": "Eligible",
+      "blockers": [],
+      "insights": [
+        {
+          "factId": "account:signal-1",
+          "statement": "acme.example: 12000 estimated paid search visits; US, desktop, 2026-09-18 to 2026-10-18.",
+          "sourceIds": [
+            "web:d9acab20cd9bc27ca315"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:d9acab20cd9bc27ca315",
+              "text": "acme.example: 12000 estimated paid search visits; US, desktop, 2026-09-18 to 2026-10-18."
+            }
+          ]
+        },
+        {
+          "factId": "account:signal-2",
+          "statement": "acme.example: 62% estimated branded share of paid search visits; branded keyword \"Simulated Acme\"; US, desktop, 2026-09-18 to 2026-10-18.",
+          "sourceIds": [
+            "web:d9acab20cd9bc27ca315"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:d9acab20cd9bc27ca315",
+              "text": "acme.example: 62% estimated branded share of paid search visits; branded keyword \"Simulated Acme\"; US, desktop, 2026-09-18 to 2026-10-18."
+            }
+          ]
+        },
+        {
+          "factId": "account:signal-3",
+          "statement": "For \"Simulated Acme\" in New York,New York,United States (US, desktop) at 2026-10-19T12:00:00.000Z, brand advertising was OBSERVED; other advertiser domains: other-advertiser.example. This single snapshot does not establish competitor identity, persistent absence, CPC, CTR, CVR or incrementality.",
+          "sourceIds": [
+            "web:61a99239e21877d77179"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:61a99239e21877d77179",
+              "text": "{\"query\":\"Simulated Acme\",\"location\":\"New York,New York,United States\",\"country\":\"US\",\"device\":\"desktop\",\"observedAt\":\"2026-10-19T12:00:00.000Z\",\"brandAdvertising\":\"OBSERVED\",\"otherAdvertiserDomains\":[\"other-advertiser.example\"]}"
+            }
+          ]
+        }
+      ],
+      "hypothesis": "Hypothesis only: monitor this branded query across locations and times, then test whether pausing ads or reducing CPC when conditions permit preserves performance. First-party CTR, CVR and a controlled incrementality assessment are required; these observations prove no savings or unnecessary spend.",
+      "provenSavings": null,
+      "contact": {
+        "name": "Alex Example (fictional)",
+        "title": "Head of Paid Search",
+        "reason": "SIMULATED independent current employment, explicit Paid Search remit, validated email, owned ICP, suppression and four-calendar-month history clearance; no real person qualified.",
+        "sourceUrl": "https://professional.example/simulated-verification"
+      },
+      "judgement": {
+        "factualCoverage": 100,
+        "opportunityCoverage": 80,
+        "reasons": [
+          "Coverage rubric, not probability of savings: 40 search evidence + 20 approved product context + 20 strict contact clearance; remaining 20 requires first-party performance and controlled incrementality evidence.",
+          "Similarweb is estimated traffic, not ad spend or wasted spend. A different advertiser is not automatically a competitor. A single SERP capture cannot prove persistent absence.",
+          "Human approval is required; a quality score cannot change factual acceptance, eligibility, sending or enrollment.",
+          "Semantic writing review is recorded separately when available; absence is not approval. Review tone, implication, relevance and progression before human approval; coverage scores do not certify editorial quality."
+        ],
+        "missingDataActions": [
+          "Capture or monitor the exact query, location, device and timestamp repeatedly; retain screenshots through an authorized collector.",
+          "Obtain authorized first-party CTR/CVR and controlled incrementality evidence before estimating savings."
+        ]
+      },
+      "emails": [
+        {
+          "subject": "Simulated Acme: when to defend the brand click",
+          "body": "Hi Alex,\n\nSimilarweb estimates 62% of Simulated Acme's US desktop paid-search visits came from brand terms between 18 Sept and 18 Oct 2026.\n\nThat raises a useful bidding question: when does your brand ad need to defend the click, and when could a lower bid do the same job?\n\nHow are you making that call today?\n\nGil",
+          "factIds": [
+            "account:signal-2"
+          ],
+          "knowledgeIds": []
+        },
+        {
+          "subject": "Who appears on \"Simulated Acme\"?",
+          "body": "Hi Alex,\n\nA 19 Oct 2026 desktop check in New York for \"Simulated Acme\" showed your ad alongside another advertiser.\n\nI'd look at when other advertisers appear and whether your coverage changes with them.\n\nSignal monitors branded Google search conditions and competitor presence.\n\nWould a view of when that query is quiet or contested help your team?\n\nGil",
+          "factIds": [
+            "account:signal-3"
+          ],
+          "knowledgeIds": [
+            "simulated-product-approval"
+          ]
+        },
+        {
+          "subject": "A focused test for \"Simulated Acme\"",
+          "body": "Hi Alex,\n\nFor \"Simulated Acme\", I'd test whether brand bids can follow competition without giving up conversions.\n\nSignal can lower bids or pause ads where configured, then restore coverage when competition returns.\n\nI'd start with one query, a control and clear conversion guardrails before changing anything more broadly.\n\nWould a short test outline be useful?\n\nGil",
+          "factIds": [
+            "account:signal-3"
+          ],
+          "knowledgeIds": [
+            "simulated-bidding-approval"
+          ]
+        },
+        {
+          "subject": "Leave the Simulated Acme brand-bidding question here?",
+          "body": "Hi Alex,\n\nI'll leave the Simulated Acme brand-bidding question here.\n\nIf adjusting bids around changing competition is already covered, no need to revisit it. If it's still a manual call, I'd be happy to compare approaches.\n\nGil",
+          "factIds": [
+            "account:signal-2",
+            "account:signal-3"
+          ],
+          "knowledgeIds": []
+        }
+      ],
+      "approved": false,
+      "canSend": false,
+      "canEnroll": false
+    },
+    "sources": [
+      {
+        "id": "web:d9acab20cd9bc27ca315",
+        "url": "https://exports.example/simulated-search",
+        "title": "Authorized Similarweb export: estimates, not account actuals",
+        "observedAt": "2026-10-19T12:00:00.000Z",
+        "excerpt": "Simulated Acme\nacme.example: 12000 estimated paid search visits; US, desktop, 2026-09-18 to 2026-10-18.\nacme.example: 62% estimated branded share of paid search visits; branded keyword \"Simulated Acme\"; US, desktop, 2026-09-18 to 2026-10-18.\nEstimated paid search visits to this domain in the specified country, device and period\nEstimated visits from branded paid keywords divided by all estimated paid search visits, multiplied by 100\nSynthetic exact brand keyword classification, not a provider observation.\nSIMULATED licensed export. Estimates are not ad spend, account analytics or proven savings.",
+        "sourceType": "AUTHORIZED_PROVIDER"
+      },
+      {
+        "id": "web:61a99239e21877d77179",
+        "url": "https://www.google.com/search?q=Simulated%20Acme",
+        "title": "Dated branded Google SERP observation",
+        "observedAt": "2026-10-19T12:00:00.000Z",
+        "excerpt": "{\"company\":\"Simulated Acme\",\"observation\":{\"query\":\"Simulated Acme\",\"location\":\"New York,New York,United States\",\"country\":\"US\",\"device\":\"desktop\",\"observedAt\":\"2026-10-19T12:00:00.000Z\",\"brandAdvertising\":\"OBSERVED\",\"otherAdvertiserDomains\":[\"other-advertiser.example\"]},\"ads\":[{\"title\":\"Synthetic brand ad\",\"url\":\"https://acme.example/\"},{\"title\":\"Synthetic other advertiser\",\"url\":\"https://other-advertiser.example/\"}],\"limitation\":\"SIMULATED snapshot; other advertiser is not a verified competitor; no performance or savings measurements.\"}",
+        "sourceType": "AUTHORIZED_PROVIDER"
+      }
+    ],
+    "audit": {
+      "version": 1,
+      "status": "ACCEPTED",
+      "identityMatches": true,
+      "reasonCodes": [],
+      "reviewer": {
+        "supportedCandidateIds": [
+          "candidate-1",
+          "candidate-2",
+          "candidate-3"
+        ],
+        "rejectedCandidateIds": [],
+        "supportedCount": 3,
+        "rejectedCount": 0,
+        "unknownSupportedCount": 0,
+        "unknownRejectedCount": 0,
+        "concernCount": 0,
+        "concernCodes": [],
+        "concerns": []
+      },
+      "candidates": [
+        {
+          "candidateId": "candidate-1",
+          "factId": "account:signal-1",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "SUPPORTED",
+          "statementOmitted": "ACCEPTED_FINDING_REFERENCE",
+          "sourceIds": [
+            "web:d9acab20cd9bc27ca315"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:d9acab20cd9bc27ca315",
+              "exactMatch": true,
+              "textOmitted": "ACCEPTED_FINDING_REFERENCE"
+            }
+          ]
+        },
+        {
+          "candidateId": "candidate-2",
+          "factId": "account:signal-2",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "SUPPORTED",
+          "statementOmitted": "ACCEPTED_FINDING_REFERENCE",
+          "sourceIds": [
+            "web:d9acab20cd9bc27ca315"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:d9acab20cd9bc27ca315",
+              "exactMatch": true,
+              "textOmitted": "ACCEPTED_FINDING_REFERENCE"
+            }
+          ]
+        },
+        {
+          "candidateId": "candidate-3",
+          "factId": "account:signal-3",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "SUPPORTED",
+          "statementOmitted": "ACCEPTED_FINDING_REFERENCE",
+          "sourceIds": [
+            "web:61a99239e21877d77179"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:61a99239e21877d77179",
+              "exactMatch": true,
+              "textOmitted": "ACCEPTED_FINDING_REFERENCE"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "company": "Simulated Birch",
+    "report": {
+      "version": 1,
+      "mode": "SIMULATED",
+      "eligibility": "HOLD",
+      "blockers": [
+        "SIGNAL_EXACT_EVIDENCE_AND_INDEPENDENT_GROUNDING_REQUIRED"
+      ],
+      "insights": [],
+      "hypothesis": null,
+      "provenSavings": null,
+      "contact": {
+        "name": "Alex Example (fictional)",
+        "title": "Head of Paid Search",
+        "reason": "SIMULATED independent current employment, explicit Paid Search remit, validated email, owned ICP, suppression and four-calendar-month history clearance; no real person qualified.",
+        "sourceUrl": "https://professional.example/simulated-verification"
+      },
+      "judgement": {
+        "factualCoverage": 0,
+        "opportunityCoverage": 40,
+        "reasons": [
+          "Coverage rubric, not probability of savings: 40 search evidence + 20 approved product context + 20 strict contact clearance; remaining 20 requires first-party performance and controlled incrementality evidence.",
+          "Similarweb is estimated traffic, not ad spend or wasted spend. A different advertiser is not automatically a competitor. A single SERP capture cannot prove persistent absence.",
+          "Human approval is required; a quality score cannot change factual acceptance, eligibility, sending or enrollment.",
+          "Semantic writing review is recorded separately when available; absence is not approval. Review tone, implication, relevance and progression before human approval; coverage scores do not certify editorial quality."
+        ],
+        "missingDataActions": [
+          "SIGNAL_EXACT_EVIDENCE_AND_INDEPENDENT_GROUNDING_REQUIRED",
+          "Capture or monitor the exact query, location, device and timestamp repeatedly; retain screenshots through an authorized collector.",
+          "Obtain authorized first-party CTR/CVR and controlled incrementality evidence before estimating savings."
+        ]
+      },
+      "emails": [],
+      "approved": false,
+      "canSend": false,
+      "canEnroll": false
+    },
+    "sources": [
+      {
+        "id": "web:aba98d05516417eddaa8",
+        "url": "https://exports.example/simulated-search",
+        "title": "Authorized Similarweb export: estimates, not account actuals",
+        "observedAt": "2026-10-19T12:00:00.000Z",
+        "excerpt": "Simulated Birch\nbirch.example: 12000 estimated paid search visits; US, desktop, 2026-09-18 to 2026-10-18.\nbirch.example: 62% estimated branded share of paid search visits; branded keyword \"Simulated Birch\"; US, desktop, 2026-09-18 to 2026-10-18.\nEstimated paid search visits to this domain in the specified country, device and period\nEstimated visits from branded paid keywords divided by all estimated paid search visits, multiplied by 100\nSynthetic exact brand keyword classification, not a provider observation.\nSIMULATED licensed export. Estimates are not ad spend, account analytics or proven savings.",
+        "sourceType": "AUTHORIZED_PROVIDER"
+      },
+      {
+        "id": "web:7604e65113b83e34921e",
+        "url": "https://www.google.com/search?q=Simulated%20Birch",
+        "title": "Dated branded Google SERP observation",
+        "observedAt": "2026-10-19T12:00:00.000Z",
+        "excerpt": "{\"company\":\"Simulated Birch\",\"observation\":{\"query\":\"Simulated Birch\",\"location\":\"New York,New York,United States\",\"country\":\"US\",\"device\":\"desktop\",\"observedAt\":\"2026-10-19T12:00:00.000Z\",\"brandAdvertising\":\"OBSERVED\",\"otherAdvertiserDomains\":[\"other-advertiser.example\"]},\"ads\":[{\"title\":\"Synthetic brand ad\",\"url\":\"https://birch.example/\"},{\"title\":\"Synthetic other advertiser\",\"url\":\"https://other-advertiser.example/\"}],\"limitation\":\"SIMULATED snapshot; other advertiser is not a verified competitor; no performance or savings measurements.\"}",
+        "sourceType": "AUTHORIZED_PROVIDER"
+      }
+    ],
+    "audit": {
+      "version": 1,
+      "status": "REJECTED",
+      "identityMatches": true,
+      "reasonCodes": [
+        "REVIEWER_CONCERNS",
+        "REJECTED_FACTS",
+        "SUPPORTED_COUNT_MISMATCH",
+        "SUPPORTED_ID_COVERAGE_MISMATCH",
+        "MISSING_SUPPORTED_IDS"
+      ],
+      "reviewer": {
+        "supportedCandidateIds": [
+          "candidate-2",
+          "candidate-3"
+        ],
+        "rejectedCandidateIds": [
+          "candidate-1"
+        ],
+        "supportedCount": 2,
+        "rejectedCount": 1,
+        "unknownSupportedCount": 0,
+        "unknownRejectedCount": 0,
+        "concernCount": 1,
+        "concernCodes": [
+          "NUMERIC_OR_PERIOD_CONTEXT"
+        ],
+        "concerns": [
+          {
+            "severity": "BLOCKING",
+            "code": "NUMERIC_OR_PERIOD_CONTEXT",
+            "scope": "FACT",
+            "candidateIds": [
+              "candidate-1"
+            ],
+            "sourceIds": [
+              "web:aba98d05516417eddaa8"
+            ],
+            "attributionOmitted": false,
+            "reason": "Simulated independent reviewer cannot corroborate the estimate's provider methodology; hold the candidate, never force acceptance."
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "candidateId": "candidate-1",
+          "factId": "account:signal-1",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "REJECTED",
+          "statementOmitted": "SENSITIVE_CONTENT",
+          "sourceIds": [
+            "web:aba98d05516417eddaa8"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:aba98d05516417eddaa8",
+              "exactMatch": true,
+              "textOmitted": "SENSITIVE_CONTENT"
+            }
+          ]
+        },
+        {
+          "candidateId": "candidate-2",
+          "factId": "account:signal-2",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "SUPPORTED",
+          "statementOmitted": "SENSITIVE_CONTENT",
+          "sourceIds": [
+            "web:aba98d05516417eddaa8"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:aba98d05516417eddaa8",
+              "exactMatch": true,
+              "textOmitted": "SENSITIVE_CONTENT"
+            }
+          ]
+        },
+        {
+          "candidateId": "candidate-3",
+          "factId": "account:signal-3",
+          "verified": false,
+          "deterministicChecks": "PASSED",
+          "reviewerDecision": "SUPPORTED",
+          "statementOmitted": "SENSITIVE_CONTENT",
+          "sourceIds": [
+            "web:7604e65113b83e34921e"
+          ],
+          "quotes": [
+            {
+              "sourceId": "web:7604e65113b83e34921e",
+              "exactMatch": true,
+              "textOmitted": "SENSITIVE_CONTENT"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "company": "Simulated Cedar",
+    "report": {
+      "version": 1,
+      "mode": "SIMULATED",
+      "eligibility": "HOLD",
+      "blockers": [
+        "SIMULATED_DISCONNECTED_INTEGRATIONS: licensed search, contact and SERP inputs unavailable",
+        "SIMILARWEB_AUTHORIZED_PAID_SEARCH_BRANDED_EXPORT_REQUIRED",
+        "DATED_LOCATION_SPECIFIC_BRANDED_SERP_REQUIRED",
+        "CONTACT_VERIFICATION_AND_COMPLETE_OUTBOUND_HISTORY_UNAVAILABLE",
+        "HUMAN_APPROVED_SOURCE_BACKED_SIGNAL_PRODUCT_KNOWLEDGE_REQUIRED",
+        "VERIFIED_PAID_SEARCH_CONTACT_AND_ALL_ELIGIBILITY_GATES_REQUIRED",
+        "SIGNAL_EXACT_EVIDENCE_AND_INDEPENDENT_GROUNDING_REQUIRED"
+      ],
+      "insights": [],
+      "hypothesis": null,
+      "provenSavings": null,
+      "contact": null,
+      "judgement": {
+        "factualCoverage": 0,
+        "opportunityCoverage": 0,
+        "reasons": [
+          "Coverage rubric, not probability of savings: 40 search evidence + 20 approved product context + 20 strict contact clearance; remaining 20 requires first-party performance and controlled incrementality evidence.",
+          "Similarweb is estimated traffic, not ad spend or wasted spend. A different advertiser is not automatically a competitor. A single SERP capture cannot prove persistent absence.",
+          "Human approval is required; a quality score cannot change factual acceptance, eligibility, sending or enrollment.",
+          "Semantic writing review is recorded separately when available; absence is not approval. Review tone, implication, relevance and progression before human approval; coverage scores do not certify editorial quality."
+        ],
+        "missingDataActions": [
+          "SIMULATED_DISCONNECTED_INTEGRATIONS: licensed search, contact and SERP inputs unavailable",
+          "SIMILARWEB_AUTHORIZED_PAID_SEARCH_BRANDED_EXPORT_REQUIRED",
+          "DATED_LOCATION_SPECIFIC_BRANDED_SERP_REQUIRED",
+          "CONTACT_VERIFICATION_AND_COMPLETE_OUTBOUND_HISTORY_UNAVAILABLE",
+          "HUMAN_APPROVED_SOURCE_BACKED_SIGNAL_PRODUCT_KNOWLEDGE_REQUIRED",
+          "VERIFIED_PAID_SEARCH_CONTACT_AND_ALL_ELIGIBILITY_GATES_REQUIRED",
+          "SIGNAL_EXACT_EVIDENCE_AND_INDEPENDENT_GROUNDING_REQUIRED",
+          "Capture or monitor the exact query, location, device and timestamp repeatedly; retain screenshots through an authorized collector.",
+          "Obtain authorized first-party CTR/CVR and controlled incrementality evidence before estimating savings."
+        ]
+      },
+      "emails": [],
+      "approved": false,
+      "canSend": false,
+      "canEnroll": false
+    },
+    "sources": [],
+    "audit": null
+  }
+]

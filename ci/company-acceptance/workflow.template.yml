@@ -1,0 +1,68 @@
+# TEMPLATE ONLY. Not under .github/workflows; cannot execute from this location.
+# Separate approval required to publish into a NEW PRIVATE, Vercel-disconnected repository.
+name: finite-company-acceptance
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 7,19 * * *"
+permissions:
+  contents: read
+concurrency:
+  group: finite-company-acceptance
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    if: >-
+      vars.CI_ACCEPTANCE_ENABLED == 'true' &&
+      vars.CI_APPROVAL_SHA256 != '' &&
+      github.event.repository.private == true &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number <= 14 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - name: Reject disabled or expired approval before dependencies
+        env:
+          CI_APPROVAL_SHA256: ${{ vars.CI_APPROVAL_SHA256 }}
+        run: |
+          node -e 'const fs=require("node:fs"),c=require("node:crypto"); const raw=fs.readFileSync("ci/company-acceptance/approval.json","utf8"),a=JSON.parse(raw); if(a.enabled!==true || Date.parse(a.expiresAt)<=Date.now() || c.createHash("sha256").update(raw).digest("hex")!==process.env.CI_APPROVAL_SHA256) process.exit(1);'
+      - name: Install reviewed dependencies without runtime secrets
+        run: |
+          npm install --global pnpm@9.12.0
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec prisma generate
+          node scripts/build-company-ci.mjs
+      - name: Run exactly one bounded acceptance phase
+        env:
+          CI_ACCEPTANCE_ENABLED: "true"
+          CI_ACCEPTANCE_MODE: SIMULATED
+          CI_APPROVAL_SHA256: ${{ vars.CI_APPROVAL_SHA256 }}
+          CI_DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          node outputs/company-ci/worker.cjs
+          result=$?
+          set -e
+          if [ "$result" -eq 73 ]; then
+            echo 'Expected interruption recorded. A fresh scheduled run must resume.' >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$result" -ne 0 ]; then
+            exit "$result"
+          fi
+      - name: Private report only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: simulated-company-acceptance-${{ github.run_id }}
+          path: |
+            outputs/company-ci/QUALITY_RELIABILITY_REPORT.md
+            outputs/company-ci/results.json
+          if-no-files-found: ignore
+          retention-days: 7
+          include-hidden-files: false

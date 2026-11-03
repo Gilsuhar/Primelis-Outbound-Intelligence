@@ -1,0 +1,21 @@
+{
+  "projectRef": "txfxfrlhtvzwgluhnbpw",
+  "organizationId": "ernouvntcojrxlahtbcr",
+  "projectName": "agent-workforce-preview",
+  "region": "us-west-2",
+  "verifiedAt": "2026-11-03",
+  "clusterFingerprint": "a1073520e0b51853abdb5566448e35fd46a0be545c51b046e9ed98ab78ac843f",
+  "migrations": [
+    "20260712152700_initial_postgresql_foundation",
+    "20260713000100_imported_signal_review_workflow",
+    "20260713000200_reply_to_prospect_drafts",
+    "20260713000300_account_assessments",
+    "20260713000400_connected_research_foundation",
+    "20260713000500_company_contact_provider_foundation",
+    "20260713000600_real_ai_provider_draft_versions",
+    "20260713000700_private_preview_auth",
+    "20260823000100_prospect_memory_phase_1",
+    "20261016000000_read_only_integration_sync",
+    "20261017130000_restrict_application_data_api"
+  ]
+}

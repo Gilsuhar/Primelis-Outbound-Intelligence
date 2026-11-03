@@ -1,0 +1,18 @@
+// REVIEW TEMPLATE ONLY: not loaded by Neon or the application.
+// User-supplied target, awaiting authenticated verification:
+// org-shy-brook-84467702 / snowy-art-90934943.
+// Do not activate until the exact existing branch ID and isolation are verified.
+import { defineConfig } from "@neon/config/v1";
+
+const reviewedBranchId: string = "UNVERIFIED";
+
+export default defineConfig({
+  // Postgres already exists. No Auth, Data API, Functions, triggers,
+  // Object Storage, AI Gateway, Realtime or compute changes are requested.
+  branch: (branch) => {
+    if (reviewedBranchId === "UNVERIFIED" || !branch.exists || branch.id !== reviewedBranchId) {
+      throw new Error("CI_NEON_BRANCH_NOT_VERIFIED");
+    }
+    return {};
+  },
+});

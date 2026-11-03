@@ -1,0 +1,93 @@
+import { previewApiDenied } from "@/lib/preview-policy.mjs";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { getCurrentUser } from "@/lib/auth/server";
+import { workforceSameOrigin } from "@/server/agent-workforce/request-origin";
+import {
+  collectSalesAgentEvidence,
+  getSalesAgentDailyReview,
+} from "@/server/services/sales-agent-collection-service";
+
+export const runtime = "nodejs";
+export const maxDuration = 120;
+const collectionInput = z
+  .object({
+    window: z.enum(["TODAY", "PAST_YEAR"]).optional(),
+    after: z
+      .string()
+      .regex(/^\d{1,4}$/)
+      .refine((value) => Number(value) <= 9900)
+      .optional(),
+  })
+  .strict();
+const respond = (body: unknown, status: number) =>
+  NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
+export async function GET() {
+  const denied = previewApiDenied();
+  if (denied) return denied;
+  try {
+    const actor = await getCurrentUser();
+    if (!actor)
+      return respond(
+        { ok: false, code: "UNAUTHENTICATED", message: "Sign in to review evidence" },
+        401,
+      );
+    const result = await getSalesAgentDailyReview(actor.id);
+    return respond(result, result.ok ? 200 : 503);
+  } catch {
+    return respond(
+      { ok: false, code: "SERVER_ERROR", message: "Evidence review is unavailable" },
+      500,
+    );
+  }
+}
+export async function POST(request: Request) {
+  const denied = previewApiDenied();
+  if (denied) return denied;
+  try {
+    const actor = await getCurrentUser();
+    if (!actor)
+      return respond(
+        { ok: false, code: "UNAUTHENTICATED", message: "Sign in to collect evidence" },
+        401,
+      );
+    if (process.env.VERCEL_ENV === "production")
+      return respond(
+        { ok: false, message: "Collection writes are disabled in Production; use Preview" },
+        403,
+      );
+    if (actor.id !== process.env.INTEGRATION_OPERATOR_USER_ID)
+      return respond(
+        { ok: false, message: "Collection requires the configured integration operator" },
+        403,
+      );
+    // CSRF protection for cookie-authenticated collection writes to local evidence storage.
+    if (!workforceSameOrigin(request)) return respond({ ok: false, code: "FORBIDDEN" }, 403);
+    let input: z.infer<typeof collectionInput>;
+    try {
+      const text = await request.text();
+      if (text.length > 1000) return respond({ ok: false, code: "PAYLOAD_TOO_LARGE" }, 413);
+      input = collectionInput.parse(JSON.parse(text));
+    } catch {
+      return respond(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "Expected an optional HubSpot page cursor only",
+        },
+        400,
+      );
+    }
+    const result = await collectSalesAgentEvidence(actor.id, input.after, {
+      intakeWindow: input.window,
+    });
+    return respond(result, result.ok ? 200 : 503);
+  } catch {
+    return respond(
+      { ok: false, code: "SERVER_ERROR", message: "Evidence collection is unavailable" },
+      500,
+    );
+  }
+}

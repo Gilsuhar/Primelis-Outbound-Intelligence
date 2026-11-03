@@ -1,0 +1,964 @@
+import type {
+  BuildSequenceInput,
+  ProspectContextInterpretation,
+  ProspectContextItem,
+  ProspectIntelligence,
+  SelectedProspectInsight,
+  SequenceKeywordEvidence,
+  SequenceKnowledgeRecord,
+} from "./types";
+
+function compact(value?: string) {
+  return value?.replace(/\s+/g, " ").trim();
+}
+
+function lines(value?: string) {
+  return (value ?? "")
+    .split(/\r?\n|[;•]/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function normalize(value?: string) {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function stripSourceLabel(value: string) {
+  return value
+    .replace(/^\s*(?:about|linkedin|notes?|prospect|company|serp|role|title|context|keywords?|important|current|historical|previous|past|former|background)\s*:\s*/i, "")
+    .trim();
+}
+
+function cleanUiArtifactText(value?: string) {
+  return compact(
+    value
+      ?.replace(/\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/gi, "")
+      .replace(/\s+([,.;:])/g, "$1"),
+  );
+}
+
+function isRoleOrSeniorityFragment(value?: string) {
+  const normalized = normalize(value);
+  if (!normalized) return false;
+  const roleWords = new Set([
+    "head",
+    "senior",
+    "paid",
+    "director",
+    "manager",
+    "vp",
+    "vice",
+    "president",
+    "lead",
+    "growth",
+    "performance",
+    "search",
+    "marketing",
+    "acquisition",
+    "demand",
+    "ppc",
+    "sem",
+  ]);
+  const tokens = normalized.split(" ").filter(Boolean);
+  return tokens.length > 0 && tokens.every((token) => roleWords.has(token));
+}
+
+function sentenceFragments(value?: string, max = 4) {
+  return unique(lines(value).flatMap((line) => line.split(/(?<=[.!?])\s+/).map(stripSourceLabel))).slice(0, max);
+}
+
+function isLinkedInUiLabel(value: string) {
+  return /^(about|activity|experience|education|licenses|certifications|skills|interests|posts|comments|reactions|show all|contact info|followers|connections|message|follow|connect|more)$/i.test(
+    value.trim(),
+  );
+}
+
+function isTenureMetadata(value: string) {
+  const text = value.trim();
+  return (
+    /^(full-time|part-time|contract|self-employed|freelance|internship)\b/i.test(text) ||
+    /^\d+\s*(?:yrs?|years?|mos?|months?)\b/i.test(text) ||
+    /^[a-z -]+ · \d+\s*(?:yrs?|years?|mos?|months?)/i.test(text) ||
+    /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{4}\s*[-–]\s*(present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{4})\s*·\s*\d+\s*(?:yrs?|years?|mos?|months?)/i.test(text)
+  );
+}
+
+function isLikelyRoleLine(value: string) {
+  const text = value.trim();
+  if (!text || text.length > 90) return false;
+  if (isLinkedInUiLabel(text) || isTenureMetadata(text)) return false;
+  if (/[.!?]/.test(text)) return false;
+  return /\b(?:ppc|paid search|sem|performance|growth|marketing|media|acquisition|demand|ecommerce|e-commerce|digital)\b/i.test(text) &&
+    /\b(?:lead|manager|director|head|vp|vice president|specialist|strategist|analyst|team lead|consultant)\b/i.test(text);
+}
+
+function isLikelyLocationText(value?: string) {
+  const normalized = normalize(value);
+  if (!normalized) return false;
+  return (
+    /\b(?:metropolitan area|greater [a-z ]+ area|united states|united kingdom|israel|canada|germany|france|spain|italy|netherlands|australia)\b/i.test(
+      value ?? "",
+    ) ||
+    /^(?:atlanta|new york|los angeles|san francisco|london|paris|berlin|tel aviv|toronto|chicago|boston|miami|austin|seattle)\s+(?:metropolitan\s+area|area)$/i.test(
+      value ?? "",
+    )
+  );
+}
+
+function cleanCompanyCandidate(value?: string) {
+  const cleaned = cleanUiArtifactText(value);
+  if (!cleaned) return undefined;
+  if (isLikelyLocationText(cleaned)) return undefined;
+  if (isLikelyRoleLine(cleaned)) return undefined;
+  return cleaned;
+}
+
+function isLikelyPersonNameLine(value: string) {
+  const text = value.trim();
+  if (!text || text.length > 80) return false;
+  if (isLinkedInUiLabel(text) || isTenureMetadata(text)) return false;
+  if (isRoleOrSeniorityFragment(text)) return false;
+  if (isLikelyRoleLine(text)) return false;
+  if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/i.test(text)) return false;
+  return /^[A-Z][a-z' -]{1,30}(?:\s+[A-Z][a-z' -]{1,40}){0,3}$/.test(text);
+}
+
+function isUsableProspectFact(fact: string) {
+  const normalized = fact.trim().toLowerCase();
+  if (!normalized) return false;
+  if (isRoleOrSeniorityFragment(fact)) return false;
+  if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/)?\.?$/.test(normalized)) {
+    return false;
+  }
+  if (isLinkedInUiLabel(fact) || isTenureMetadata(fact)) {
+    return false;
+  }
+  if (isLikelyPersonNameLine(fact)) {
+    return false;
+  }
+  if (isLikelyRoleLine(fact)) {
+    return false;
+  }
+  if (
+    /^[A-Z][A-Za-z0-9&'. -]{2,80}$/.test(fact.trim()) &&
+    !/[0-9$]|\b(?:has|work|works|worked|working|manage|manages|managed|managing|build|built|led|owns|runs|responsible|hands-on|focused|reviewing|expanded|testing|joined|promoted|posted|post|documents|documenting|improve|improves|improving|measurement|teams?)\b/i.test(fact)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function prospectFacts(value?: string, max = 5) {
+  return sentenceFragments(value, max).filter(isUsableProspectFact).slice(0, max);
+}
+
+function includesAny(value: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(value));
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(5, value));
+}
+
+function isLikelyRawHeadline(fact: string) {
+  const text = fact.trim();
+  if (!text.includes("|") && !/[·•]/.test(text)) return false;
+  if (!/\b(?:google ads|microsoft ads|paid search|ppc|sem|performance|growth|marketing|programmatic|display)\b/i.test(text)) {
+    return false;
+  }
+  return !/\b(?:manag(?:e|es|ing)|responsible|owns|leads|optimis(?:e|es|ing|ation)|optimiz(?:e|es|ing|ation)|reporting|strategy|across)\b/i.test(text);
+}
+
+function isLowValuePersonalHistory(fact: string) {
+  return /\b(?:wanted to be|doctor|chemistry|forensic|diploma|degree|qualification|moved to|london at|anchoring)\b/i.test(
+    fact,
+  );
+}
+
+export function isCompleteProspectInsight(value: string) {
+  const text = cleanUiArtifactText(stripSourceLabel(value)) ?? "";
+  const normalized = normalize(text);
+  const wordTotal = text.split(/\s+/).length;
+  const hasCompactCommercialSignal = /\b(?:paid[- ]search|google ads|microsoft ads|sa360|cpc|serp|pipeline|profitability|business outcomes|reporting|campaign|efficien|automation|ai)\b/i.test(text);
+  if (!text || wordTotal < (hasCompactCommercialSignal ? 3 : 4)) return false;
+  if (/[,:;/-]\s*$/.test(text)) return false;
+  if (/\b(?:and|or|with|covering|including|across|for|of|in|paid)\s*$/i.test(text)) return false;
+  if (/\b(?:view verification|company logo|profile photo|linkedin premium|logo|svg|avatar)\b/i.test(text)) return false;
+  if (/[|·•]/.test(text) && !/\b(?:manag|own|lead|run|responsib|focused|optimis|optimiz|reporting|strategy)\b/i.test(text)) {
+    return false;
+  }
+  if (/^(?:in[- ]depth knowledge|deep knowledge|expertise|skilled|proficient|experienced)\b/i.test(text)) {
+    return false;
+  }
+  if (/^(?:paid|programmatic|digital|performance|search|media|marketing)\b/i.test(text) && !/\b(?:manag|own|lead|run|responsib|focused|worked|optimis|optimiz|reporting)\b/i.test(text)) {
+    return false;
+  }
+  if (/^(?:knowledge|experience|skills?)\s+(?:of|in|with)\b/i.test(text)) {
+    return false;
+  }
+  return /\b(?:i|my|you|your|has|have|is|are|was|were|posted|documents|improve|improves|improving|reviewing|expanded|testing|manage|manages|managed|managing|own|owns|owned|lead|leads|led|run|runs|worked|works|focused|responsible|optimis|optimiz|reporting|strategy|campaign|google ads|microsoft ads|sa360|profitability|business outcomes|pipeline|efficien|automation|ai)\b/i.test(
+    normalized,
+  );
+}
+
+function isBareRoleCompanyFact(fact: string) {
+  const text = fact.trim();
+  if (text.length > 120) return false;
+  if (
+    /\b(?:recently\s+joined|joined|promoted\s+to)\b/i.test(text) &&
+    /\b(?:as|to)\s+[A-Z][A-Za-z/&' -]{1,80}\.?$/i.test(text) &&
+    !/\b(?:manag|own|leads|leading|run|responsib|campaign|reporting|optimis|optimiz|focused|improving)\b/i.test(text)
+  ) {
+    return true;
+  }
+  return text.split(/\s+/).length <= 8 &&
+    /\b(?:cmo|founder|head|lead|manager|director|vp|coordinator|specialist|strategist|analyst|ppc|paid search|growth|performance)\b/i.test(text) &&
+    /(?:\s@|\sat\s+)[A-Za-z0-9&' -]{2,80}\.?$/i.test(text) &&
+    !/\b(?:manag|own|leads|leading|run|responsib|campaign|reporting|optimis|optimiz|focused|improving)\b/i.test(text);
+}
+
+function currentSectionText(input: BuildSequenceInput) {
+  const raw = input.prospectContext ?? "";
+  const currentMatch = raw.match(/\bcurrent\s*:\s*([\s\S]*?)(?:\n\s*(?:historical|previous|past|former|background)\s*:|$)/i);
+  return currentMatch?.[1]?.trim();
+}
+
+function historicalSectionText(input: BuildSequenceInput) {
+  const raw = input.prospectContext ?? "";
+  const historicalMatch = raw.match(/\b(?:historical|previous|past|former|background)\s*:\s*([\s\S]*)/i);
+  return historicalMatch?.[1]?.trim();
+}
+
+function isHistoricalContextLine(value: string) {
+  return /\b(?:previously|previous|former|past|prior|historical|earlier|before|during tenure|tenure at|years? at|\d+\s+years?\s+at)\b/i.test(
+    value,
+  );
+}
+
+function nonHistoricalLines(value?: string) {
+  return lines(value).filter((line) => !isHistoricalContextLine(line));
+}
+
+function cleanCompanyFromRoleMatch(value?: string) {
+  return cleanCompanyCandidate(
+    value
+      ?.replace(/\s*\|.*$/g, "")
+      .replace(/\s+(?:since|from|as of|starting|started|joined in)\b.*$/i, "")
+      .replace(/\s+\(?\d{4}\s*(?:[-–]\s*(?:present|now|\d{4}))?\)?$/i, "")
+      .replace(/[.]+$/g, "")
+      .trim(),
+  );
+}
+
+function isLikelyParsedRole(value?: string) {
+  const text = value?.trim();
+  if (!text || text.length > 90) return false;
+  if (isLikelyLocationText(text) || isTenureMetadata(text)) return false;
+  return /\b(?:cmo|chief marketing|founder|head|lead|manager|director|vp|vice president|coordinator|specialist|strategist|analyst|ppc|paid search|growth|performance marketing|demand generation|acquisition)\b/i.test(
+    text,
+  );
+}
+
+function companyFromRoleLine(value?: string) {
+  const candidates = nonHistoricalLines(value);
+  const joinedCompany = candidates
+    .map((line) => line.match(/\brecently\s+joined\s+([A-Z][A-Za-z0-9&' -]{1,80})\s+as\b/i)?.[1])
+    .find((company): company is string => Boolean(company));
+  if (joinedCompany) return cleanCompanyFromRoleMatch(joinedCompany);
+  const text = candidates.find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ??
+    (value && candidates.length === 0 && !isHistoricalContextLine(value) ? compact(value) : undefined);
+  if (!text) return undefined;
+  const match = text.match(/\b(?:[A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+([A-Z][A-Za-z0-9&' -]{1,80}?)(?:\s*\||$|[.,;])/);
+  return cleanCompanyFromRoleMatch(match?.[1]);
+}
+
+function roleFromRoleLine(value?: string) {
+  const candidates = nonHistoricalLines(value);
+  const raw = compact(candidates.join("\n"));
+  const promoted = raw?.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  if (promoted) return compact(promoted);
+  const joinedAs = raw?.match(/\brecently\s+joined\s+[A-Z][A-Za-z0-9&' -]{1,80}\s+as\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;])/i)?.[1];
+  if (joinedAs) return compact(joinedAs);
+  const text = candidates.find((line) => /(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}/.test(line)) ?? raw;
+  if (!text) return undefined;
+  const beforePipe = text.includes("|") ? compact(text.split("|")[0]) : undefined;
+  if (beforePipe && !/(?:@|\bat\b)/i.test(beforePipe) && isLikelyRoleLine(beforePipe)) {
+    return beforePipe;
+  }
+  const match = text.match(/\b([A-Za-z][A-Za-z/&' .-]{1,120})\s+(?:@|\bat\b)\s+[A-Z][A-Za-z0-9&' -]{1,80}(?:\s*\||$|[.,;])/);
+  const role = compact(match?.[1]?.replace(/\s*\|.*$/g, ""));
+  if (!role) return undefined;
+  if (/^(?:current(?:ly)?|now)\s+(?:leading|managing|running|owning|working|focused)\b/i.test(role)) {
+    return undefined;
+  }
+  return isLikelyParsedRole(role) ? role : undefined;
+}
+
+function companyMentions(value: string) {
+  return unique(
+    Array.from(value.matchAll(/\b(?:at|@)\s+([A-Za-z0-9][A-Za-z0-9&'. -]{1,80})(?:$|[.,;\n])/g))
+      .map((match) => compact(match[1]))
+      .filter((item): item is string => Boolean(item))
+      .map((item) =>
+        item
+          .replace(/\s+(?:for|where|while|during|as)\b.*$/i, "")
+          .replace(/\s+(?:led|built|managed|managing|launched|scaled|grew|owned|ran|drove)\b.*$/i, "")
+          .replace(/\s+\d+\s*(?:yrs?|years?)\b.*$/i, "")
+          .replace(/[.]+$/g, "")
+          .trim(),
+      ),
+  );
+}
+
+function temporalStatusForText(text: string, input: BuildSequenceInput) {
+  const historicalText = historicalSectionText(input);
+  const currentText = currentSectionText(input);
+  if (historicalText && historicalText.includes(text)) return "HISTORICAL" as const;
+  if (currentText && currentText.includes(text)) return "CURRENT" as const;
+  if (isHistoricalContextLine(text)) {
+    return "HISTORICAL" as const;
+  }
+  if (/\b(?:current|currently|now works|works at|today|present|recently joined|promoted to|@)\b/i.test(text)) {
+    return "CURRENT" as const;
+  }
+  return "UNKNOWN" as const;
+}
+
+function relevanceScopeForText(
+  text: string,
+  temporalStatus: ProspectContextItem["temporalStatus"],
+) {
+  if (isLowValuePersonalHistory(text)) return "PERSONAL" as const;
+  if (temporalStatus === "HISTORICAL") return "HISTORICAL_BACKGROUND" as const;
+  if (/\b(?:company|market|industry|b2b|saas|ecommerce|retail|account)\b/i.test(text)) {
+    return "CURRENT_COMPANY" as const;
+  }
+  if (/\b(?:role|responsib|manag|lead|own|run|hands-on|campaign|reporting|optimis|optimiz|improving|reviewing|testing|automation|paid|growth|demand|performance)\b/i.test(text)) {
+    return "CURRENT_ROLE" as const;
+  }
+  return "GENERAL" as const;
+}
+
+function contextItem(
+  text: string,
+  input: BuildSequenceInput,
+  fallbackStatus?: ProspectContextItem["temporalStatus"],
+): ProspectContextItem {
+  const status = fallbackStatus ?? temporalStatusForText(text, input);
+  return {
+    text,
+    sourceText: text,
+    groundingReference: text,
+    confidence: status === "UNKNOWN" ? "MEDIUM" : "HIGH",
+    temporalStatus: status,
+    relevanceScope: relevanceScopeForText(text, status),
+  };
+}
+
+function currentCompanyFor(input: BuildSequenceInput) {
+  const currentText = currentSectionText(input);
+  return (
+    cleanCompanyCandidate(companyFromRoleLine(currentText)) ??
+    cleanCompanyCandidate(input.companyName) ??
+    cleanCompanyCandidate(companyFromRoleLine(input.prospectContext))
+  );
+}
+
+function promotedRole(value?: string) {
+  return lines(value)
+    .map((line) => line.match(/\bpromoted\s+to\s+([A-Z][A-Za-z/&' -]{1,80})(?:$|[.,;!])/i)?.[1])
+    .find((role): role is string => Boolean(role));
+}
+
+function currentRoleFor(input: BuildSequenceInput) {
+  const currentText = currentSectionText(input);
+  return roleFromRoleLine(currentText) ?? roleFromRoleLine(input.prospectContext) ?? promotedRole(input.prospectContext) ?? inferJobTitle(input);
+}
+
+export function interpretProspectContext(
+  input: BuildSequenceInput,
+  facts: string[],
+): ProspectContextInterpretation {
+  const currentCompany = currentCompanyFor(input);
+  const currentRole = currentRoleFor(input);
+  const rawLines = lines(input.prospectContext);
+  const historicalText = historicalSectionText(input) ?? "";
+  const historicalCompanies = unique([
+    ...companyMentions(historicalText),
+    ...rawLines
+      .filter((line) => temporalStatusForText(line, input) === "HISTORICAL")
+      .flatMap(companyMentions),
+  ]).filter((company) => normalize(company) !== normalize(currentCompany));
+  const historicalRawItems = rawLines
+    .filter((line) => temporalStatusForText(line, input) === "HISTORICAL")
+    .filter((line) => !/^(?:historical|previous|past|former|background)\s*:?\s*$/i.test(line));
+  const interpretedFacts = facts.map((fact) => contextItem(fact, input));
+  const personalRawItems = rawLines
+    .filter(isLowValuePersonalHistory)
+    .map((line) => contextItem(stripSourceLabel(line), input, "HISTORICAL"));
+  const currentResponsibilities = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      item.relevanceScope === "CURRENT_ROLE" &&
+      /\b(?:manag|lead|own|run|responsib|hands-on|campaign|optimis|optimiz|improving|reviewing|testing|reporting|strategy|paid|growth|demand|performance)\b/i.test(item.text),
+  );
+  const currentPrioritiesOrInterests = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      /\b(?:focused|interest|priority|exploring|improving|efficien|automation|ai|scale|growth|measurement|analytical|data-driven)\b/i.test(item.text),
+  );
+  const currentToolsOrChannels = interpretedFacts.filter(
+    (item) =>
+      item.temporalStatus !== "HISTORICAL" &&
+      /\b(?:google ads|microsoft ads|sa360|bing|paid search|display|youtube|programmatic|marketing automation|serp|cpc)\b/i.test(item.text),
+  );
+  const historicalExperience = [
+    ...interpretedFacts.filter((item) => item.temporalStatus === "HISTORICAL"),
+    ...historicalRawItems.map((line) => contextItem(stripSourceLabel(line), input, "HISTORICAL")),
+  ];
+  const personalBackground = [
+    ...interpretedFacts.filter((item) => item.relevanceScope === "PERSONAL"),
+    ...personalRawItems,
+  ];
+  const credibilitySignals = historicalExperience.filter((item) =>
+    /\b(?:built|led|managed|scaled|launched|grew|enterprise|demand|growth|performance|marketing)\b/i.test(item.text),
+  );
+  const commercialSignals = interpretedFacts.filter(
+    (item) => item.relevanceScope !== "PERSONAL" && item.temporalStatus !== "HISTORICAL",
+  );
+  const uncertainFacts = interpretedFacts.filter((item) => item.temporalStatus === "UNKNOWN");
+  const rejectedHistoricalProjections = historicalExperience
+    .filter((item) =>
+      /\b(?:agency|accounts?|international|markets?|budget|tool|stack|team|managed|expansion)\b/i.test(item.text),
+    )
+    .map((item) => `Historical context was kept supporting-only: ${item.text}`);
+
+  return {
+    currentCompany,
+    currentRole,
+    currentResponsibilities,
+    currentPrioritiesOrInterests,
+    currentToolsOrChannels,
+    historicalExperience,
+    historicalCompanies: historicalCompanies.map((company) =>
+      contextItem(company, input, "HISTORICAL"),
+    ),
+    credibilitySignals,
+    personalBackground,
+    commercialSignals,
+    uncertainFacts,
+    rejectedHistoricalProjections,
+  };
+}
+
+function rankCommercialFact(
+  fact: string,
+  input: BuildSequenceInput,
+  index: number,
+  interpretation?: ProspectContextInterpretation,
+) {
+  const normalized = normalize(fact);
+  const interpretedItem =
+    interpretation?.commercialSignals.find((item) => item.text === fact) ??
+    interpretation?.historicalExperience.find((item) => item.text === fact) ??
+    interpretation?.personalBackground.find((item) => item.text === fact) ??
+    interpretation?.uncertainFacts.find((item) => item.text === fact);
+  const responsibilityPatterns = [
+    /\bmanag(?:e|es|ing|ed)\b/i,
+    /\bresponsible\b/i,
+    /\bowns?\b/i,
+    /\bleads?\b/i,
+    /\bhands-on\b/i,
+    /\bexpanded\b/i,
+    /\bfocused\b/i,
+    /\bimproving\b/i,
+    /\btesting\b/i,
+    /\breviewing\b/i,
+    /\bruns?\b/i,
+    /\boptimis(?:e|es|ing|ation)\b/i,
+    /\boptimiz(?:e|es|ing|ation)\b/i,
+    /\breporting\b/i,
+    /\bstrategy\b/i,
+  ];
+  const signalPatterns = [
+    /\bpaid[- ]search\b/i,
+    /\bbranded search\b/i,
+    /\bgoogle ads\b/i,
+    /\bmicrosoft ads\b/i,
+    /\bsa360\b/i,
+    /\bbing\b/i,
+    /\bserp\b/i,
+    /\bcpc\b/i,
+    /\bbid(?:s|ding)?\b/i,
+    /\bperformance reporting\b/i,
+    /\bpipeline\b/i,
+    /\bconversion\b/i,
+    /\bprogrammatic\b/i,
+    /\bdisplay\b/i,
+    /\byoutube\b/i,
+  ];
+  const businessQuestionPatterns = [
+    /\bacross\b/i,
+    /\bcampaign/i,
+    /\bmarket/i,
+    /\befficien/i,
+    /\bautomation\b/i,
+    /\bai\b/i,
+    /\bbudget\b/i,
+    /\bpipeline\b/i,
+    /\bconversion\b/i,
+    /\bdemand\b/i,
+    /\bscale\b/i,
+    /\bexpan/i,
+    /\breporting\b/i,
+  ];
+  const seniorityPatterns = [/\bhead\b/i, /\bdirector\b/i, /\blead\b/i, /\bmanager\b/i, /\bcoordinator\b/i, /\bvp\b/i];
+  const genericPatterns = [
+    /^performance marketer\b/i,
+    /^head of\b/i,
+    /^senior\b/i,
+    /^paid[- ]search\b/i,
+    /^ppc\b/i,
+    /\bpassionate about\b/i,
+    /\bcareer in public\b/i,
+    /\bdocumenting\b/i,
+  ];
+  const metadataPatterns = [/^about\b/i, /^experience\b/i, /^education\b/i, /^skills\b/i, /^full-time\b/i];
+
+  let relevanceToSignal = includesAny(fact, signalPatterns) ? 4 : 1;
+  let specificity = /\b(?:google ads|microsoft ads|sa360|youtube|programmatic|\$|\d|markets?|countries|competitor|serp|cpc)\b/i.test(fact)
+    ? 4
+    : fact.split(/\s+/).length >= 7
+      ? 3
+      : 1;
+  let commercialUsefulness = includesAny(fact, responsibilityPatterns) ? 4 : 1;
+  let conversationalUsefulness = includesAny(fact, businessQuestionPatterns) ? 4 : 2;
+
+  if (includesAny(fact, seniorityPatterns)) commercialUsefulness += 0.5;
+  if (/\b(?:google ads|microsoft ads|sa360)\b/i.test(fact)) relevanceToSignal += 1;
+  if (/\b(?:optimis|optimiz|reporting|strategy)\b/i.test(fact)) conversationalUsefulness += 0.5;
+  if (/\bdocument(?:s|ing)?\b[^.]{0,80}\bcareer\b[^.]{0,80}\bpublic\b/i.test(fact)) {
+    specificity += 1;
+    commercialUsefulness += 1;
+    conversationalUsefulness += 1.5;
+  }
+  if (normalize(input.contactRole).split(" ").some((token) => token.length > 4 && normalized.includes(token))) {
+    commercialUsefulness += 0.5;
+  }
+
+  if (isLikelyRawHeadline(fact)) {
+    relevanceToSignal -= 1.5;
+    specificity -= 1.5;
+    commercialUsefulness -= 2;
+    conversationalUsefulness -= 1.5;
+  }
+  if (isLikelyRoleLine(fact)) {
+    relevanceToSignal -= 1;
+    specificity -= 2;
+    commercialUsefulness -= 2;
+    conversationalUsefulness -= 2;
+  }
+  if (isBareRoleCompanyFact(fact)) {
+    relevanceToSignal -= 1;
+    specificity -= 1.5;
+    commercialUsefulness -= 2;
+    conversationalUsefulness -= 2;
+  }
+  if (includesAny(fact, genericPatterns)) {
+    commercialUsefulness -= 1;
+    conversationalUsefulness -= 1;
+  }
+  if (includesAny(fact, metadataPatterns) || isLowValuePersonalHistory(fact)) {
+    relevanceToSignal -= 2;
+    specificity -= 1;
+    commercialUsefulness -= 2;
+    conversationalUsefulness -= 2;
+  }
+  if (interpretedItem?.temporalStatus === "CURRENT") {
+    commercialUsefulness += 1;
+    conversationalUsefulness += 0.5;
+  }
+  if (interpretedItem?.relevanceScope === "CURRENT_ROLE") {
+    commercialUsefulness += 1;
+  }
+  if (interpretedItem?.temporalStatus === "HISTORICAL") {
+    commercialUsefulness -= 1.25;
+    conversationalUsefulness -= 0.5;
+  }
+  if (interpretedItem?.relevanceScope === "PERSONAL") {
+    relevanceToSignal -= 1;
+    commercialUsefulness -= 1.5;
+  }
+
+  const scores = {
+    relevanceToSignal: clampScore(relevanceToSignal),
+    specificity: clampScore(specificity),
+    commercialUsefulness: clampScore(commercialUsefulness),
+    conversationalUsefulness: clampScore(conversationalUsefulness),
+  };
+  const total =
+    scores.relevanceToSignal * 0.3 +
+    scores.commercialUsefulness * 0.3 +
+    scores.specificity * 0.2 +
+    scores.conversationalUsefulness * 0.2 -
+    index * 0.02;
+  return { ...scores, total };
+}
+
+function reasonForSelectedInsight(fact: string) {
+  const reasons = [];
+  if (/\b(?:google ads|microsoft ads|sa360|bing|paid search|cpc|serp)\b/i.test(fact)) {
+    reasons.push("directly relevant to paid-search decisions");
+  }
+  if (/\b(?:manag(?:e|es|ing|ed)|hands-on|responsible|owns?|leads?|optimis|optimiz|reporting|strategy)\b/i.test(fact)) {
+    reasons.push("describes an actual responsibility");
+  }
+  if (/\b(?:across|markets?|countries|budget|efficien|automation|ai|programmatic|display|youtube)\b/i.test(fact)) {
+    reasons.push("can support a real business question");
+  }
+  return reasons.length > 0 ? reasons.join("; ") : "best available role/company context without inventing personalization";
+}
+
+export function rankProspectInsights(
+  facts: string[],
+  input: BuildSequenceInput,
+  interpretation?: ProspectContextInterpretation,
+  max = 3,
+): SelectedProspectInsight[] {
+  return facts
+    .map((fact, index) => {
+      const score = rankCommercialFact(fact, input, index, interpretation);
+      const interpretedItem =
+        interpretation?.commercialSignals.find((item) => item.text === fact) ??
+        interpretation?.historicalExperience.find((item) => item.text === fact) ??
+        interpretation?.personalBackground.find((item) => item.text === fact) ??
+        interpretation?.uncertainFacts.find((item) => item.text === fact);
+      const confidence: SelectedProspectInsight["confidence"] =
+        score.total >= 3.6 ? "HIGH" : score.total >= 2 ? "MEDIUM" : "LOW";
+      return {
+        factId: `prospect-fact-${index + 1}`,
+        groundingReference: fact,
+        text: fact,
+        temporalStatus: interpretedItem?.temporalStatus,
+        relevanceScope: interpretedItem?.relevanceScope,
+        relevanceToSignal: score.relevanceToSignal,
+        specificity: score.specificity,
+        commercialUsefulness: score.commercialUsefulness,
+        conversationalUsefulness: score.conversationalUsefulness,
+        confidence,
+        reasonSelected: reasonForSelectedInsight(fact),
+        total: score.total,
+      };
+    })
+    .filter((insight) =>
+      insight.confidence !== "LOW" &&
+      !isLikelyRawHeadline(insight.text) &&
+      !isBareRoleCompanyFact(insight.text) &&
+      isCompleteProspectInsight(insight.text) &&
+      insight.temporalStatus !== "HISTORICAL" &&
+      insight.relevanceScope !== "PERSONAL"
+    )
+    .sort((a, b) => b.total - a.total)
+    .slice(0, max)
+    .map((insight) => ({
+      factId: insight.factId,
+      groundingReference: insight.groundingReference,
+      text: insight.text,
+      temporalStatus: insight.temporalStatus,
+      relevanceScope: insight.relevanceScope,
+      relevanceToSignal: insight.relevanceToSignal,
+      specificity: insight.specificity,
+      commercialUsefulness: insight.commercialUsefulness,
+      conversationalUsefulness: insight.conversationalUsefulness,
+      confidence: insight.confidence,
+      reasonSelected: insight.reasonSelected,
+    }));
+}
+
+function inferPersona(input: BuildSequenceInput): ProspectIntelligence["persona"] {
+  const text = `${input.contactRole} ${input.prospectContext ?? ""}`.toLowerCase();
+  if (/paid search|sem|ppc|google ads|search marketing/.test(text)) return "PAID_SEARCH";
+  if (/growth|pipeline|revenue|conversion|experiment/.test(text)) return "GROWTH";
+  if (/performance|demand gen|acquisition|media buying|paid media/.test(text)) return "PERFORMANCE";
+  if (/ecommerce|e-commerce|commerce|marketplace|retail/.test(text)) return "ECOMMERCE";
+  if (/cmo|chief marketing|vp marketing|head of marketing|marketing director/.test(text)) {
+    return "MARKETING_LEADERSHIP";
+  }
+  return "OTHER";
+}
+
+function inferSeniority(input: BuildSequenceInput) {
+  const text = `${input.contactRole} ${input.prospectContext ?? ""}`.toLowerCase();
+  if (/\b(chief|cmo|founder|co-founder|president)\b/.test(text)) return "C-level";
+  if (/\bvp|vice president\b/.test(text)) return "VP";
+  if (/\bhead|director\b/.test(text)) return "Director or Head";
+  if (/\bmanager|lead\b/.test(text)) return "Manager or Lead";
+  return undefined;
+}
+
+function inferProspectName(input: BuildSequenceInput) {
+  if (input.contactFirstName && !isRoleOrSeniorityFragment(input.contactFirstName)) return input.contactFirstName;
+  const match = input.prospectContext?.match(/\b(?:name|prospect)\s*[:\-]\s*([A-Z][a-z]+)\b/);
+  if (match?.[1] && !isRoleOrSeniorityFragment(match[1])) return match[1];
+  const nameLine = lines(input.prospectContext).find(isLikelyPersonNameLine);
+  return nameLine?.split(/\s+/)[0];
+}
+
+function inferJobTitle(input: BuildSequenceInput) {
+  const suppliedRole = compact(input.contactRole);
+  if (suppliedRole && suppliedRole !== "Head of Performance Marketing") {
+    return suppliedRole;
+  }
+  return nonHistoricalLines(input.prospectContext).find(isLikelyRoleLine) ?? suppliedRole;
+}
+
+function keywordFromLine(line: string) {
+  return line
+    .replace(/\s+-\s+competitors?\s*(?:visible|present|appeared)?\s*:?\s*[A-Za-z0-9&'. -]+$/i, "")
+    .replace(/\s+-\s+[A-Z][A-Za-z0-9&'. -]+\s+(?:appeared|visible)$/i, "")
+    .replace(/\b(brand bidding alone|brand alone|competitor visible|competitors visible|competitor appeared|alone|contested|visible|checked)\b/gi, "")
+    .replace(/\s+[—-]\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isUsableKeyword(keyword: string) {
+  const normalized = keyword.toLowerCase();
+  if (!keyword.trim()) return false;
+  if (keyword.length > 100) return false;
+  if (/^(all|all keywords?|all kws?|all brand keywords?|all terms?)$/i.test(keyword)) return false;
+  if (/\bkws?\b|\bbi+d+ing\b|\bbidding\b|\ball\s+(?:keywords?|kws?|terms?)\b|\bno\s+(?:verified\s+)?(?:serp|keyword|keywords?|evidence|screenshot)\b/i.test(normalized)) {
+    return false;
+  }
+  return /[a-z0-9]/i.test(keyword);
+}
+
+function companyEvidenceTokens(input: BuildSequenceInput) {
+  const companyTokens = input.companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s.-]/g, " ")
+    .split(/\s+|[.-]/)
+    .filter((token) => token.length > 2);
+  const domainTokens = (input.companyWebsite ?? "")
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split(/[./-]/)
+    .filter((token) => token.length > 2);
+  return unique([...companyTokens, ...domainTokens]).filter(
+    (token) => !/^(com|net|org|inc|ltd|llc|group|global|the)$/.test(token),
+  );
+}
+
+function keywordMatchesCompany(input: BuildSequenceInput, term: string) {
+  const tokens = companyEvidenceTokens(input);
+  if (tokens.length === 0) return true;
+  const normalizedTerm = term.toLowerCase();
+  return tokens.some((token) => normalizedTerm.includes(token));
+}
+
+function structuredKeywordEvidence(input: BuildSequenceInput): SequenceKeywordEvidence[] {
+  const structured: SequenceKeywordEvidence[] = [];
+  for (const keyword of input.keywords ?? []) {
+    const term = compact(keyword.term);
+    if (
+      !term ||
+      (keyword.status !== "solo" && keyword.status !== "contested") ||
+      !isUsableKeyword(term) ||
+      !keywordMatchesCompany(input, term)
+    ) {
+      continue;
+    }
+    structured.push({
+      term,
+      status: keyword.status,
+      competitor: compact(keyword.competitor),
+      note: compact(keyword.note),
+    });
+  }
+  return structured.slice(0, 5);
+}
+
+function parseSerpEvidence(input: BuildSequenceInput) {
+  const structuredKeywords = structuredKeywordEvidence(input);
+  const rawLines = [
+    ...lines(input.serpEvidence),
+    input.brandKeyword ? `${input.brandKeyword} ${input.screenshotShows ?? ""}` : "",
+    input.screenshotShows ?? "",
+  ].filter((line) => Boolean(line) && !/\b(?:no|without|none|not)\s+(?:verified\s+)?(?:serp|keyword|keywords?|evidence|screenshot)\b/i.test(line));
+  const soloKeywords: string[] = [];
+  const contestedKeywords: string[] = [];
+  const keywords: string[] = [];
+  const competitors: string[] = [];
+  const observations = unique(rawLines);
+  const allText = rawLines.join(" ").toLowerCase();
+
+  for (const keyword of structuredKeywords) {
+    keywords.push(keyword.term);
+    if (keyword.status === "solo") {
+      soloKeywords.push(keyword.term);
+    }
+    if (keyword.status === "contested") {
+      contestedKeywords.push(keyword.term);
+      if (keyword.competitor) {
+        competitors.push(keyword.competitor);
+      }
+    }
+    observations.push(
+      [
+        keyword.term,
+        keyword.status === "solo" ? "solo branded auction" : "contested branded auction",
+        keyword.competitor ? `competitor: ${keyword.competitor}` : "",
+        keyword.note ?? "",
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    );
+  }
+
+  for (const line of rawLines) {
+    if (/\b(?:no|without|none|not)\s+(?:verified\s+)?(?:serp|keyword|keywords?|evidence|screenshot)\b/i.test(line)) {
+      continue;
+    }
+    const normalized = line.toLowerCase();
+    const keyword = keywordFromLine(line);
+    if (isUsableKeyword(keyword) && !/^brand was alone|no other advertiser/.test(normalized)) {
+      keywords.push(keyword);
+    }
+    if (/alone|only advertiser|no other advertiser|without visible competition|solo/.test(normalized)) {
+      if (isUsableKeyword(keyword)) soloKeywords.push(keyword);
+    }
+    if (/competitor|contested|another advertiser|other advertiser/.test(normalized)) {
+      if (isUsableKeyword(keyword) && !/no other advertiser|without visible competition/.test(normalized)) {
+        contestedKeywords.push(keyword);
+      }
+      const afterCompetitor = line.match(/competitors?\s*(?:visible|present|:|-)?\s*([A-Za-z0-9, &.-]+)/i)?.[1];
+      if (afterCompetitor) {
+        competitors.push(
+          ...afterCompetitor
+            .split(/,| and | & /)
+            .map((item) => item.replace(/\s+(?:appeared|visible)\b.*$/i, "").trim())
+            .filter(Boolean),
+        );
+      }
+      const dashCompetitor = line.match(/\s+-\s+competitor\s+([A-Z][A-Za-z0-9&'. -]+?)(?:\s+(?:appeared|visible))?$/i)?.[1];
+      if (dashCompetitor) {
+        competitors.push(dashCompetitor.trim());
+      }
+    }
+  }
+
+  if (/brand was alone on all|alone on all|all \d+/.test(allText)) {
+    soloKeywords.push(...keywords);
+  }
+
+  return {
+    keywords: unique(keywords),
+    soloKeywords: unique(soloKeywords),
+    contestedKeywords: unique(contestedKeywords),
+    competitors: unique(competitors).slice(0, 6),
+    observations,
+    structuredKeywords,
+  };
+}
+
+function classifySerpScenario(
+  evidence: ProspectIntelligence["serpEvidence"],
+): ProspectIntelligence["serpScenario"] {
+  if (evidence.soloKeywords.length > 0 && evidence.contestedKeywords.length > 0) return "MIXED";
+  if (evidence.contestedKeywords.length > 0) return "CONTESTED";
+  if (evidence.soloKeywords.length > 0) return "SOLO";
+  if (evidence.observations.some((observation) => /alone on all|brand was alone/i.test(observation))) {
+    return "SOLO";
+  }
+  if (
+    evidence.observations.some((observation) =>
+      /\b(?:alone|solo)\b/i.test(observation) &&
+      /\ball\s+(?:keywords?|kws?|terms?)\b/i.test(observation),
+    )
+  ) {
+    return "SOLO";
+  }
+  return "UNKNOWN";
+}
+
+function prioritiesFor(persona: ProspectIntelligence["persona"], scenario: ProspectIntelligence["serpScenario"]) {
+  const personaPriorities: Record<ProspectIntelligence["persona"], string[]> = {
+    PAID_SEARCH: ["CPC control", "auction pressure", "SERP visibility", "coverage"],
+    PERFORMANCE: ["efficiency", "conversion quality", "traffic stability", "bid adjustments"],
+    GROWTH: ["growth efficiency", "pipeline quality", "incrementality", "conversion impact"],
+    ECOMMERCE: ["order efficiency", "traffic quality", "market coverage", "brand demand"],
+    MARKETING_LEADERSHIP: ["spend efficiency", "scale", "performance stability", "business impact"],
+    OTHER: ["visibility", "branded CPC efficiency", "safe measurement"],
+  };
+  const scenarioPriority: Record<ProspectIntelligence["serpScenario"], string> = {
+    SOLO: "identify solo periods without claiming waste",
+    CONTESTED: "defend efficiently without defaulting to highest CPC",
+    MIXED: "treat different branded auctions differently",
+    UNKNOWN: "understand how competition changes before making claims",
+  };
+  return unique([scenarioPriority[scenario], ...personaPriorities[persona]]).slice(0, 5);
+}
+
+function angleFor(scenario: ProspectIntelligence["serpScenario"], persona: ProspectIntelligence["persona"]) {
+  if (scenario === "SOLO") return "Solo branded-search periods should be measured before bids change.";
+  if (scenario === "CONTESTED") return "Teams need to know the minimum defensive CPC when competitors appear.";
+  if (scenario === "MIXED") return "Branded bids should change by auction condition instead of one static rule.";
+  if (persona === "GROWTH") return "Growth teams need visibility into branded CPC efficiency before judging incrementality.";
+  return "Live branded-search competition should be visible before paid coverage changes.";
+}
+
+function recommendedProof(records: SequenceKnowledgeRecord[]) {
+  return records.find((record) => record.type === "CASE_STUDY")?.approvedText;
+}
+
+export function buildProspectIntelligence(
+  input: BuildSequenceInput,
+  records: SequenceKnowledgeRecord[] = [],
+): ProspectIntelligence {
+  const persona = inferPersona(input);
+  const serpEvidence = parseSerpEvidence(input);
+  const serpScenario = classifySerpScenario(serpEvidence);
+  const contextFacts = prospectFacts(input.prospectContext, 8);
+  const contextInterpretation = interpretProspectContext(input, contextFacts);
+  const selectedInsights = rankProspectInsights(contextFacts, input, contextInterpretation);
+  const companyFacts = unique(
+    [
+      compact(input.companyContext),
+      compact(input.industry),
+      compact(input.geographyOrMarkets),
+      compact(input.paidSearchContext),
+    ].filter((value): value is string => Boolean(value)),
+  );
+
+  return {
+    prospectName: inferProspectName(input),
+    companyName: contextInterpretation.currentCompany ?? cleanCompanyCandidate(input.companyName),
+    jobTitle: contextInterpretation.currentRole ?? inferJobTitle(input),
+    seniority: inferSeniority(input),
+    persona,
+    relevantFacts: contextFacts,
+    selectedInsights,
+    contextInterpretation,
+    companyContext: companyFacts,
+    likelyPriorities: prioritiesFor(persona, serpScenario),
+    serpScenario,
+    serpEvidence,
+    primaryAngle: angleFor(serpScenario, persona),
+    secondaryAngle:
+      serpScenario === "UNKNOWN" ? "Keep the first email as a visibility question." : undefined,
+    recommendedProofPoint: recommendedProof(records),
+    confidence: {
+      prospect: contextFacts.length >= 2 || input.contactRole ? "MEDIUM" : "LOW",
+      serp: serpEvidence.soloKeywords.length + serpEvidence.contestedKeywords.length >= 2
+        ? "HIGH"
+        : serpScenario === "UNKNOWN"
+          ? "LOW"
+          : "MEDIUM",
+    },
+  };
+}

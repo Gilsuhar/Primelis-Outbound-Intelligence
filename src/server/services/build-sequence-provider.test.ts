@@ -1,0 +1,1211 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { buildProspectIntelligence } from "@/features/build-sequence/prospect-intelligence";
+import { selectGoldStandardExamples } from "@/features/build-sequence/gold-standard-examples";
+import { planMessageStrategy } from "@/features/build-sequence/strategy-planner";
+import type { BuildSequenceInput } from "@/features/build-sequence/types";
+
+import { createBuildSequenceAiProvider } from "./build-sequence-provider";
+
+const input: BuildSequenceInput = {
+  companyName: "Nike",
+  companyWebsite: "nike.com",
+  contactRole: "VP Performance Marketing",
+  industry: "Fashion and Luxury",
+  companyContext: "Strong fit - confirmed",
+  observedTrigger: "Validate branded-search activity",
+  primaryChannel: "EMAIL",
+  sequenceLength: 4,
+  desiredTone: "DIRECT",
+  desiredOverallDuration: "10 business days",
+  creatorId: "seed-sales-user",
+};
+
+const records = [
+  {
+    id: "truth-1",
+    title: "Signal product truth",
+    type: "PRODUCT_TRUTH" as const,
+    approvedText:
+      "Signal evaluates paid and organic brand search together to support efficient decisions.",
+    channels: ["EMAIL" as const, "INTERNAL" as const],
+    sourceIds: ["source-1"],
+    sourceTitles: ["Approved source"],
+    sourceDates: ["2026-01-01"],
+  },
+];
+
+function generation(generationInput = input) {
+  const prospectIntelligence = buildProspectIntelligence(generationInput, records);
+  const messageStrategy = planMessageStrategy({
+    input: generationInput,
+    intelligence: prospectIntelligence,
+    records,
+  });
+  return {
+    overallStrategy: "Fallback strategy.",
+    selectedAngle: "BRANDED_SEARCH_EFFICIENCY" as const,
+    angleRationale: "Fallback rationale.",
+    personaEmphasis: {
+      persona: "Performance Marketing",
+      emphasis: "efficiency" as const,
+      rationale: "Owns paid brand.",
+    },
+    prospectIntelligence,
+    messageStrategy,
+    selectedGoldStandardExamples: selectGoldStandardExamples({
+      intelligence: prospectIntelligence,
+      primaryAngle: messageStrategy.primaryAngle,
+    }).filter((example) => messageStrategy.selectedGoldStandardExampleIds.includes(example.id)),
+    detectedAccountSignals: [],
+    safetyNotes: [],
+    knowledgeLimitations: [],
+  };
+}
+
+function responseStep(subjectLine: string, messageBody: string) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      output_text: JSON.stringify({
+        sequenceSteps: [
+          {
+            subjectLine,
+            messageBody,
+            cta: "ignored by hybrid renderer",
+          },
+        ],
+        sourceReferences: ["source-1"],
+        factualClaimsUsed: [],
+        uncertaintyNotes: [],
+        safetyFlags: [],
+      }),
+    }),
+  } as Response;
+}
+
+function renderedStepWordCount(step: {
+  subjectLine?: string;
+  connectionRequest?: string;
+  imagePlaceholder?: string;
+  messageBody: string;
+  cta: string;
+}) {
+  return [
+    step.subjectLine,
+    step.connectionRequest,
+    step.imagePlaceholder,
+    step.messageBody,
+    step.cta,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+describe("Build Sequence OpenAI provider", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const forbiddenDemoCopy =
+    /Hi there|LinkedIn URL|Prospect Context|focus at|The Account|this account|As a Senior Manager|defend demand and ease pressure|That is the practical benchmark|higher CAC|demand leakage|unexpected rivals/i;
+
+  async function deterministicSequenceFor(demoInput: BuildSequenceInput) {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+    return provider.generate({
+      input: demoInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(demoInput),
+    });
+  }
+
+  it("keeps the KAYAK regression structured, progressive, and free of recycled planner copy", async () => {
+    const kayakInput: BuildSequenceInput = {
+      ...input,
+      companyName: "KAYAK",
+      companyWebsite: "kayak.com",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      geographyOrMarkets: "Multiple markets",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager\nWorks across channels and markets.",
+    };
+    const result = await deterministicSequenceFor(kayakInput);
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(forbiddenDemoCopy);
+    expect(result.messageStrategy.prospectBrief?.verifiedFacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "company", value: "KAYAK" }),
+        expect.objectContaining({ field: "role", value: "Senior Manager" }),
+      ]),
+    );
+    expect(result.steps[0].messageBody).toContain("KAYAK");
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|competition drops/i);
+    expect(result.steps[3].messageBody).toMatch(/priority right now/i);
+    expect(result.steps[3].messageBody).not.toMatch(
+      /kind of paid-brand efficiency|practical benchmark/i,
+    );
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
+    expect(
+      result.steps.every(
+        (step) =>
+          (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <= 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks the SoSafe raw-profile leak, unsupported impact, and double asks", async () => {
+    const soSafeInput: BuildSequenceInput = {
+      ...input,
+      companyName: "SoSafe",
+      companyWebsite: "sosafe-awareness.com",
+      contactFirstName: "Darren",
+      contactRole: "Senior Growth Marketing Manager",
+      prospectContext:
+        "LinkedIn URL: Darren Goldstein Darren Goldstein Senior Growth Marketing Manager focus at SoSafe.",
+    };
+    const result = await deterministicSequenceFor(soSafeInput);
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(forbiddenDemoCopy);
+    expect(rendered).not.toMatch(/Darren Goldstein Darren Goldstein/i);
+    expect(
+      result.steps.every(
+        (step) =>
+          (step.messageBody.match(/\?/g) ?? []).length + (step.cta.match(/\?/g) ?? []).length <= 1,
+      ),
+    ).toBe(true);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/competition drops|competition returns/i);
+  });
+
+  it("keeps the Amit StoneX sequence on the shared safe progression", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "StoneX",
+      companyWebsite: "stonex.com",
+      contactFirstName: "Amit",
+      contactRole: "Global Head Of Paid Search",
+      geographyOrMarkets: "Global markets",
+      prospectContext: "Amit Arora\nGlobal Head Of Paid Search\nCompany: StoneX",
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toMatch(
+      /for your Global Head Of Paid Search remit|Hi Amit,\s*\n\nAmit,|competitor-present|lone-bidder|query sets|defend demand and ease pressure|missed conversions|avoidable CPC increases|higher CAC|demand leakage/i,
+    );
+    expect(result.steps[0].messageBody).toMatch(/StoneX.*across markets/i);
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(result.steps[2].messageBody).not.toMatch(/lowest CPC|another advertiser appears/i);
+    expect(result.steps[3].messageBody).toBe(
+      "Hi Amit,\n\nNot sure if this is a priority right now.",
+    );
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
+  });
+
+  it("keeps in-house agency-partnership context grounded when SERP evidence is unknown", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "McAfee",
+      companyWebsite: "mcafee.com",
+      contactFirstName: undefined,
+      contactRole: "Global Paid Search Sr. Manager",
+      geographyOrMarkets: "Europe and the United States",
+      prospectContext: [
+        "Global Paid Search Sr.",
+        "Performance Marketing leader with 18+ years of international experience driving growth through data, experimentation, and innovation.",
+        "Based in northern Spain, works remotely as a Global Paid Search Senior Manager at McAfee, collaborating with international teams across Europe and the United States.",
+        "Leads global Paid Search strategy for the Consumer Business in partnership with an international marketing agency.",
+      ].join("\n"),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("McAfee branded search visibility");
+    expect(rendered).not.toMatch(
+      /managed accounts|accounts your team manages|McAfee's branded queries often shift|contested and uncontested|competition drops|lowest CPC|brand auction is quiet/i,
+    );
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+  });
+
+  it("turns PPC and ROI profile context into a sharper safe sequence", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "Zooplus",
+      companyWebsite: "zooplus.com",
+      contactFirstName: "Marzena",
+      contactRole: "Online Marketing Manager",
+      prospectContext: [
+        "Marzena Czernek",
+        "Online Marketing Manager with 10+ years in digital marketing and 4 years of team management.",
+        "Expert in high-budget PPC campaigns, data-driven decisions, and ROI maximization.",
+        "Skilled in A/B testing, budget planning, and performance optimization.",
+      ].join("\n"),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.messageStrategy.prospectInsight).toMatch(/high-budget PPC|ROI|A\/B testing/i);
+    expect(result.steps[0].messageBody).toMatch(/high-budget PPC|ROI|A\/B testing/i);
+    expect(result.steps[0].messageBody).not.toMatch(/^Hi Marzena,\s+Quick question on Zooplus/i);
+    expect(result.steps[1].messageBody).toMatch(/Google SERP visibility check/i);
+    expect(result.steps[2].messageBody).toMatch(/live search-page coverage/i);
+    expect(rendered).not.toMatch(/contested and uncontested|competition drops|lowest CPC/i);
+  });
+
+  it("omits the greeting naturally when first name cannot be resolved", async () => {
+    const result = await deterministicSequenceFor({
+      ...input,
+      companyName: "KAYAK",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager",
+    });
+
+    expect(result.steps.every((step) => !/^Hi\b/i.test(step.messageBody))).toBe(true);
+    expect(JSON.stringify(result.steps)).not.toContain("Hi there");
+  });
+
+  it("does not collapse distinct usable role and company context into near-identical first halves", async () => {
+    const kayak = await deterministicSequenceFor({
+      ...input,
+      companyName: "KAYAK",
+      contactFirstName: undefined,
+      contactRole: "Senior Manager",
+      geographyOrMarkets: "Multiple markets",
+      prospectContext: "Company: KAYAK\nRole: Senior Manager\nWorks across channels and markets.",
+    });
+    const soSafe = await deterministicSequenceFor({
+      ...input,
+      companyName: "SoSafe",
+      contactFirstName: "Darren",
+      contactRole: "Senior Growth Marketing Manager",
+      prospectContext: "Darren Goldstein\nSenior Growth Marketing Manager\nCompany: SoSafe",
+    });
+    const normalize = (value: string) =>
+      new Set(
+        value
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]/g, " ")
+          .split(/\s+/)
+          .filter((word) => word.length > 3),
+      );
+    const kayakWords = normalize(
+      kayak.steps
+        .slice(0, 2)
+        .map((step) => step.messageBody)
+        .join(" "),
+    );
+    const soSafeWords = normalize(
+      soSafe.steps
+        .slice(0, 2)
+        .map((step) => step.messageBody)
+        .join(" "),
+    );
+    const overlap = [...kayakWords].filter((word) => soSafeWords.has(word)).length;
+    const similarity = overlap / Math.min(kayakWords.size, soSafeWords.size);
+
+    expect(similarity).toBeLessThan(0.9);
+    expect(kayak.steps[0].messageBody).toMatch(/across markets/i);
+    expect(soSafe.steps[0].messageBody).toMatch(/when competition changes/i);
+  });
+
+  it("keeps the deterministic rendered sequence even when OpenAI returns full steps", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          primaryContent: "Sequence rewritten.",
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid brand decision",
+              messageBody: "AI step one: a sharp Nike-specific paid-brand decision.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "Re: organic demand",
+              messageBody: "AI step two: a new angle on organic demand and unnecessary spend.",
+              cta: "Is this visible in your reporting?",
+            },
+            {
+              subjectLine: "Re: competitor presence",
+              messageBody: "AI step three: competitor presence, lower bids, and restored coverage.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
+              subjectLine: "Closing the loop",
+              messageBody: "AI step four: a low-pressure close without repeating the opener.",
+              cta: "Should I close the loop here?",
+            },
+          ],
+          sourceReferences: ["source-1"],
+          factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
+          uncertaintyNotes: [],
+          safetyFlags: [],
+          changeSummary: "Use a sharper four-step sequence.",
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[0].messageBody).not.toContain("keep this to one narrow");
+    expect(result.steps[1].imagePlaceholder).toBeUndefined();
+    expect(result.steps[1].imageContextNote).toContain("outside the email body");
+    expect(result.steps[2].messageBody).toContain("current Google Ads setup");
+    expect(JSON.stringify(result.steps)).not.toMatch(
+      /hard part is not seeing|harder branded-search question|scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
+    );
+    expect(JSON.stringify(result.steps)).not.toContain("Our tech");
+    expect(result.steps[2].messageBody).not.toContain("Crocs, AppsFlyer, and MyHeritage");
+    expect(result.steps[2].messageBody).not.toContain("40-60%");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
+    expect(JSON.stringify(result.steps)).not.toContain("AI step one");
+    expect(result.overallStrategy).toContain("Strategy planner");
+    const [, requestInit] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse(String(requestInit?.body));
+    expect(body.max_output_tokens).toBeGreaterThanOrEqual(3000);
+  });
+
+  it("uses ranked commercial insight instead of raw LinkedIn headline in the first touch", async () => {
+    const tanviInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Hush",
+      companyWebsite: "hush-uk.com",
+      contactFirstName: "Tanvi",
+      contactRole: "Paid Search Coordinator",
+      prospectContext: [
+        "Tanvi Mhatre",
+        "Performance Marketer | Google Ads · Microsoft Ads · Programmatic · Display | Documenting & building my career in public",
+        "Paid Search Coordinator",
+        "Hush",
+        "Now works at Hush managing paid search, display, YouTube, and programmatic campaigns across Google Ads, Microsoft Ads, and SA360.",
+        "Hands-on across campaign strategy, optimisation, and performance reporting.",
+        "Wanted to be a doctor.",
+        "Chemistry degree.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: tanviInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(tanviInput),
+    });
+
+    expect(result.steps[0].messageBody).toMatch(
+      /Google Ads|Microsoft Ads|SA360|optimisation|performance reporting/i,
+    );
+    expect(result.steps[0].messageBody).not.toMatch(/^Hi Tanvi,\s+I saw that/i);
+    expect(result.steps[0].messageBody).not.toMatch(/Performance Marketer \|/i);
+    expect(result.steps[0].messageBody).not.toMatch(/wanted to be a doctor|chemistry/i);
+  });
+
+  it("targets the current company instead of historical employers in sequence copy", async () => {
+    const shacharInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Buildots",
+      companyWebsite: "buildots.com",
+      contactFirstName: "Shachar",
+      contactRole: "CMO",
+      prospectContext: [
+        "Shachar Radin Shomrat",
+        "Current:",
+        "CMO @ Buildots",
+        "B2B SaaS, performance-driven growth marketing, paid search, marketing automation, demand generation, data-driven and analytical.",
+        "Historical:",
+        "5 years at McCann Erickson agency managing client accounts.",
+        "Built demand generation at Voxbone.",
+        "During tenure as CMO at myThings led performance marketing.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: shacharInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(shacharInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toContain("Buildots");
+    expect(rendered).not.toMatch(/McCann Erickson SERP visibility|McCann branded search/i);
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+    expect(rendered).toMatch(/Buildots|CMO|B2B SaaS|performance-driven growth/i);
+  });
+
+  it("rewrites first-person prospect profile text and strips UI artifacts from prospect-facing copy", async () => {
+    const firstPersonInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Iterable logo",
+      companyWebsite: "iterable.com",
+      contactFirstName: "Luis",
+      contactRole: "Senior Paid Search Manager",
+      prospectContext: [
+        "Luis Rivera",
+        "Current:",
+        "Senior Paid Search Manager at Iterable logo",
+        "I specialise in managing and optimising high-budget Google Ads campaigns.",
+        "I manage paid search across Google Ads and Microsoft Ads.",
+        "My focus is on aligning media investment with real business outcomes - not just platform metrics.",
+        "I've worked with enterprise media budgets and profitability reporting.",
+        "Historical:",
+        "Previously worked at an agency managing client accounts.",
+        "View verification",
+        "svg",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: firstPersonInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(firstPersonInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("Iterable branded search visibility");
+    expect(rendered).not.toMatch(/\b(?:Iterable logo|logo|svg|View verification)\b/i);
+    expect(rendered).not.toMatch(
+      /\bGiven I specialise\b|\bI specialise\b|\bI manage\b|\bMy focus\b|\bI've worked\b/i,
+    );
+    expect(rendered).toMatch(
+      /you specialise|you manage|your focus on profitability and business outcomes|you've worked/i,
+    );
+    expect(rendered).toMatch(/Google Ads|Microsoft Ads|profitability|business outcomes/i);
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+    expect(rendered).not.toMatch(
+      /Without account-specific auction evidence|Without account-specific SERP evidence/i,
+    );
+    expect(result.overallStrategy).not.toContain(
+      "Understand minute-by-minute branded-search competition before changing coverage.",
+    );
+  });
+
+  it("falls back to a clean role and company opener when prospect insights are malformed fragments", async () => {
+    const fragmentInput: BuildSequenceInput = {
+      ...input,
+      companyName: "SearchPilot logo",
+      companyWebsite: "searchpilot.com",
+      contactFirstName: "Ari",
+      contactRole: "Paid Media Lead",
+      prospectContext: [
+        "Ari Cohen",
+        "Current:",
+        "Paid Media Lead at SearchPilot logo",
+        "In-depth knowledge of the paid digital media channels covering programmatic, paid,",
+        "Expertise in Google Ads, Microsoft Ads,",
+        "Skills: programmatic, paid,",
+        "Historical:",
+        "Previously worked at an agency managing client accounts.",
+        "svg",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: fragmentInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(fragmentInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("SearchPilot branded search visibility");
+    expect(result.steps[0].messageBody).toContain("Quick question on SearchPilot's branded search");
+    expect(rendered).not.toMatch(
+      /Given In-depth knowledge|Given Expertise|programmatic, paid,|Skills:|logo|svg/i,
+    );
+    expect(rendered).not.toMatch(
+      /Without account-specific|Based on the available evidence|cannot confirm/i,
+    );
+    expect(rendered).not.toContain(
+      "Understand minute-by-minute branded-search competition before changing coverage.",
+    );
+    expect(rendered).not.toMatch(/accounts your team manages/i);
+  });
+
+  it("does not repeat the company when the role already includes it", async () => {
+    const ibmInput: BuildSequenceInput = {
+      ...input,
+      companyName: "IBM",
+      companyWebsite: "ibm.com",
+      contactFirstName: "Kevin",
+      contactRole: "Global Paid Search Lead at IBM",
+      prospectContext: "Kevin\nGlobal Paid Search Lead at IBM\nIBM",
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: ibmInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(ibmInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("Quick question on IBM's branded search");
+    expect(result.steps[0].messageBody.match(/\?/g) ?? []).toHaveLength(0);
+    expect(rendered).not.toMatch(/at IBM role at IBM|at IBM at IBM|keep this to one narrow/i);
+    expect(rendered).not.toMatch(
+      /scope at|cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
+    );
+    expect(result.steps[0].messageBody).not.toContain("The practical question is:");
+  });
+
+  it("uses the actual company from a noisy LinkedIn headline instead of The Account", async () => {
+    const headlineInput: BuildSequenceInput = {
+      ...input,
+      companyName: "",
+      companyWebsite: "",
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      prospectContext:
+        "Director Performance Marketing & Acquisition @ Shine | SaaS & Fintech Growth Leader",
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: headlineInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(headlineInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("Shine branded search visibility");
+    expect(result.steps[0].messageBody).toContain(
+      "Quick question on how Shine handles branded search",
+    );
+    expect(rendered).not.toMatch(/The Account|the account|scope at|SaaS & Fintech Growth Leader/i);
+  });
+
+  it("does not use a LinkedIn location as the account name", async () => {
+    const locationInput: BuildSequenceInput = {
+      ...input,
+      companyName: "",
+      companyWebsite: "",
+      contactFirstName: "Ruby",
+      contactRole: "",
+      prospectContext:
+        "Ruby\nPaid Search Analyst | Analytics-Driven PPC & Growth Optimization at Atlanta Metropolitan Area",
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: locationInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(locationInput),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].subjectLine).toBe("branded search visibility");
+    expect(result.steps[0].messageBody).toContain("Quick question on branded search");
+    expect(rendered).not.toMatch(
+      /Atlanta Metropolitan Area|The Account|the account|Analytics-Driven PPC/i,
+    );
+  });
+
+  it("keeps unknown-SERP steps distinct without internal disclaimer language", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(input),
+    });
+    const stepTwo = result.steps[1].messageBody;
+    const stepThree = result.steps[2].messageBody;
+
+    expect(stepTwo).toMatch(/Google SERP visibility check/i);
+    expect(stepThree).toMatch(/visibility check|decision quality|current Google Ads setup/i);
+    expect(`${stepTwo} ${stepThree}`).not.toMatch(
+      /cleaner rule|operational value is|live market pressure|one static rule|sit alongside/i,
+    );
+    expect(stepThree).not.toMatch(
+      /Without account-specific|Based on the available evidence|cannot confirm/i,
+    );
+    expect(stepThree).not.toBe(stepTwo);
+  });
+
+  it("keeps deterministic fallback steps under the final sequence word limit", async () => {
+    const managedAccountInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Americaneagle",
+      companyWebsite: "americaneagle.com",
+      contactFirstName: "Mia",
+      contactRole: "PPC Team Lead",
+      prospectContext: [
+        "Mia was promoted to PPC Team Lead.",
+        "Current: PPC Team Lead at Americaneagle.",
+        "Manages multiple client accounts across Google Ads and Microsoft Ads.",
+        "Focused on branded-search efficiency, campaign optimisation, and performance reporting.",
+      ].join("\n"),
+    };
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "deterministic",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const result = await provider.generate({
+      input: managedAccountInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(managedAccountInput),
+    });
+
+    expect(result.steps.map(renderedStepWordCount)).toEqual(
+      result.steps.map(() => expect.any(Number)),
+    );
+    expect(result.steps.every((step) => renderedStepWordCount(step) <= 110)).toBe(true);
+  });
+
+  it("accepts OpenAI schema without letting model text replace rendered steps", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand control",
+              messageBody: "AI-only step one with a fresh paid-brand angle.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "Re: organic demand",
+              messageBody: "AI-only step two with a separate organic-demand angle.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Re: brand coverage",
+              messageBody: "AI-only step three with a mechanism note.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "AI-only step four with a calm final note.",
+              cta: "Should I leave this here?",
+            },
+          ],
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
+    expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
+    expect(JSON.stringify(result.steps)).not.toContain("AI-only step one");
+    expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
+  });
+
+  it("accepts validated hybrid rewrites step by step", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        responseStep(
+          "nike brand coverage",
+          "Hi there,\n\nNike's branded search may be worth one narrow look.\n\nA campaign can look healthy while the brand auction is quiet.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      );
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Nike's branded search may be worth");
+    expect(result.steps[1].approvalStatus).toBe("HOLD");
+    expect(result.safetyNotes.join(" ")).toContain("AI rewriting is disabled");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+  });
+
+  it("accepts natural prospect-led hybrid copy without treating sentence starters as invented entities", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        responseStep(
+          "Branded search across managed accounts!",
+          "Hi there,\n\nCongrats on your promotion to VP Performance Marketing.\n\nNike's branded search may be worth one narrow look.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "Paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      );
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion");
+    expect(result.safetyNotes).toContain("Hybrid rewrite accepted for step 1.");
+  });
+
+  it("rejects weak AI rewrites with malformed personalization, internal caveats, and sentence fragments", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    const attempts = new Map<string, number>();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const payload = JSON.parse(String((init as RequestInit).body));
+      const requestText = JSON.parse(payload.input[0].content[0].text);
+      const currentDraft = JSON.parse(requestText.currentDraft);
+      const key = currentDraft.subject ?? currentDraft.body.slice(0, 24);
+      const attempt = attempts.get(key) ?? 0;
+      attempts.set(key, attempt + 1);
+      if (/Nike branded search visibility/i.test(key)) {
+        return attempt === 0
+          ? responseStep(
+              "brand visibility",
+              "Hi there,\n\nGiven In-depth knowledge of the paid digital media channels covering programmatic, paid,\n\nI wanted to ask one narrow branded-search question.",
+            )
+          : responseStep(
+              "brand visibility",
+              "Hi there,\n\nQuick question for your Performance Marketing remit at Nike, I wanted to ask one branded-search question.\n\nHow do you decide when branded bids should change?",
+            );
+      }
+      if (/Signal and branded CPC/i.test(key)) {
+        return responseStep(
+          "re: fragment",
+          "Hi there,\n\nUnderstand minute-by-minute branded-search competition before changing coverage.",
+        );
+      }
+      if (/practical paid-brand example/i.test(key)) {
+        return responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        );
+      }
+      return responseStep(
+        "re: mechanism",
+        "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+      );
+    });
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(rendered).not.toMatch(
+      /Given In-depth knowledge|programmatic, paid,|Understand minute-by-minute|Without account-specific|hard part is not seeing|harder branded-search question/i,
+    );
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 3");
+  });
+
+  it("falls back only the step whose hybrid rewrite uses an unrecognized entity", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        responseStep(
+          "gong brand coverage",
+          "Hi there,\n\nGong has a paid-brand issue worth checking.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: brand auctions",
+          "Hi there,\n\nNike can face two different branded auctions.\n\nSome moments need coverage, and quieter moments may need less pressure.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "re: paid brand control",
+          "Hi there,\n\nFor Nike, the useful part is seeing when the auction changes.\n\nSignal works alongside Google Ads without rebuilding campaigns.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "paid-brand example",
+          "Hi there,\n\nAppsFlyer cut branded spend 29% with qualified lead volume up 25% in the first 30 days.\n\nThat is a useful benchmark for paid coverage decisions.",
+        ),
+      )
+      .mockResolvedValueOnce(
+        responseStep(
+          "gong brand coverage",
+          "Hi there,\n\nGong has a paid-brand issue worth checking.",
+        ),
+      );
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].approvalStatus).toBe("HOLD");
+    expect(result.steps[1].messageBody).not.toContain(
+      "Nike can face two different branded auctions",
+    );
+    expect(JSON.stringify(result.steps)).not.toContain("Gong");
+    expect(result.safetyNotes.join(" ")).toContain("Hybrid rewrite fell back for step 1");
+  });
+
+  it("does not fall back when OpenAI returns string safety flags", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand process",
+              messageBody: "AI step one with a process question about paid brand decisions.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "One evidence-led follow-up",
+              messageBody: "AI step two with distinct evidence-led context and no invented proof.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Re: competitor presence",
+              messageBody: "AI step three with a brief mechanism explanation.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "AI step four with a brief low-pressure close for the sequence.",
+              cta: "Should I leave this here?",
+            },
+          ],
+          sourceReferences: ["source-1"],
+          factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
+          uncertaintyNotes: [],
+          safetyFlags: ["The output contains an unsupported claim"],
+          changeSummary: "Use the OpenAI sequence despite normalized safety flags.",
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.overallStrategy).toContain("Strategy planner");
+    expect(result.safetyNotes.join(" ")).not.toContain("Deterministic fallback was used");
+    expect(JSON.stringify(result.steps)).not.toContain("The output contains an unsupported claim");
+  });
+
+  it("uses only the selected approved case-study proof when one is supplied", async () => {
+    const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
+    const result = await provider.generate({
+      input,
+      records: [
+        ...records,
+        {
+          id: "proof-1",
+          title: "Dior approved proof",
+          type: "CASE_STUDY",
+          approvalStatus: "APPROVED",
+          approvedText:
+            "Case study: Dior. Ad cost decreased by 54% while performance stayed stable.",
+          channels: ["EMAIL", "LINKEDIN"],
+          sourceIds: ["source-2"],
+          sourceTitles: ["Dior source"],
+          sourceDates: ["2026-01-02"],
+        },
+      ],
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[2].messageBody).toContain("current Google Ads setup");
+    expect(result.steps[3].messageBody).not.toContain("Dior");
+    expect(result.steps[2].messageBody).toContain("Dior");
+    expect(result.steps[2].messageBody).toContain("54%");
+    expect(result.steps[3].messageBody).not.toContain("AppsFlyer");
+    expect(result.steps[2].messageBody).not.toContain("MyHeritage");
+  });
+
+  it("keeps domain-only facts, tenure metadata, and raw all-keyword notes out of rendered copy", async () => {
+    const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
+    const americaneagleInput: BuildSequenceInput = {
+      ...input,
+      companyName: "Americaneagle",
+      companyWebsite: "americaneagle.com",
+      contactFirstName: undefined,
+      contactRole: "Head of Performance Marketing",
+      companyContext: "Digital agency managing multiple client accounts",
+      observedTrigger: "Promotion to PPC Team Lead",
+      prospectContext: "Mia Johnson\nPPC Team Lead\nAmericaneagle.com.\nFull-time · 3 yrs 3 mos.",
+      serpEvidence: "solo brand moments on all kws biiding",
+      brandKeyword: undefined,
+    };
+    const result = await provider.generate({
+      input: americaneagleInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        ...generation(),
+        prospectIntelligence: buildProspectIntelligence(americaneagleInput, records),
+      },
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(rendered).not.toContain("Americaneagle.com");
+    expect(rendered).not.toContain("Full-time");
+    expect(rendered).not.toContain("3 yrs 3 mos");
+    expect(rendered).not.toContain("I noticed this about Americaneagle: PPC Team Lead");
+    expect(rendered).not.toMatch(/kws|biiding/i);
+    expect(rendered).not.toContain("Evidence first, logo second");
+    expect(rendered).not.toContain("That is the practical benchmark");
+    expect(rendered).not.toContain("250 brands");
+    expect(rendered).not.toContain("35-60%");
+    expect(result.steps[0].subjectLine).toBe("branded search across managed accounts");
+    expect(result.steps[0].messageBody).toContain("Hi Mia");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
+    expect(result.steps[2].messageBody).toContain("live search-page coverage");
+    expect(rendered).not.toContain("{{! Insert screenshot }}");
+    expect(result.steps[0].messageBody).toContain("across multiple accounts");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].messageBody).not.toContain("branded-search spend");
+  });
+
+  it("turns raw promotion posts into a concise congratulations opener", async () => {
+    const provider = createBuildSequenceAiProvider({} as NodeJS.ProcessEnv);
+    const americaneagleInput: BuildSequenceInput = {
+      ...input,
+      companyName: "American Eagle",
+      companyWebsite: "americaneagle.com",
+      contactFirstName: "Mia",
+      contactRole: "PPC Team Lead",
+      companyContext: "Digital agency managing multiple client accounts",
+      observedTrigger: "Promotion to PPC Team Lead",
+      prospectContext:
+        "Mia Johnson\nI’m excited to share that I’ve been promoted to PPC Team Lead at Americaneagle.com!",
+      serpEvidence: "solo brand moments",
+      brandKeyword: "American Eagle baggy",
+    };
+    const result = await provider.generate({
+      input: americaneagleInput,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: {
+        ...generation(),
+        prospectIntelligence: buildProspectIntelligence(americaneagleInput, records),
+      },
+    });
+    const rendered = JSON.stringify(result.steps);
+
+    expect(result.steps[0].messageBody).toContain("Hi Mia");
+    expect(result.steps[0].messageBody).toContain("Congrats on your promotion to PPC Team Lead");
+    expect(rendered).not.toContain("I noticed this about American Eagle: I’m excited");
+  });
+
+  it("ignores leading Step headers from OpenAI body fields", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "gpt-test",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        output_text: JSON.stringify({
+          sequenceSteps: [
+            {
+              subjectLine: "Nike paid-brand process",
+              messageBody: "Step 1 - Day 0\nAI step one after the duplicated model heading.",
+              cta: "How do you decide this today?",
+            },
+            {
+              subjectLine: "One evidence-led follow-up",
+              messageBody: "Step 2 - Day 3\nAI step two after the duplicated model heading.",
+              cta: "Is this visible in reporting?",
+            },
+            {
+              subjectLine: "Re: competitor presence",
+              messageBody: "Step 3 - Day 6\nAI step three after the duplicated model heading.",
+              cta: "Worth a brief walkthrough?",
+            },
+            {
+              subjectLine: "Close the loop",
+              messageBody: "Step 4 - Final touch\nAI step four after the duplicated model heading.",
+              cta: "Should I leave this here?",
+            },
+          ],
+          sourceReferences: ["source-1"],
+          factualClaimsUsed: ["Signal evaluates paid and organic brand search together."],
+          uncertaintyNotes: [],
+          safetyFlags: [],
+          changeSummary: "Use cleaned OpenAI sequence steps.",
+        }),
+      }),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.steps[0].messageBody).toContain("Quick question on Nike's branded search");
+    expect(result.steps[1].messageBody).toContain("Google SERP visibility check");
+    expect(result.steps[1].messageBody).not.toContain("Google Ads reports performance");
+    expect(result.steps[2].messageBody).toContain("current Google Ads setup");
+    expect(result.steps[3].messageBody).toContain("priority right now");
+    expect(JSON.stringify(result.steps)).not.toContain("AppsFlyer");
+    expect(result.steps[3].cta).toBe("Happy to share more if useful.");
+    expect(JSON.stringify(result.steps)).not.toContain("duplicated model heading");
+  });
+
+  it("shows a specific fallback reason when OpenAI rejects the model", async () => {
+    const provider = createBuildSequenceAiProvider({
+      AI_PROVIDER: "openai",
+      OPENAI_API_KEY: "sk-test",
+      OPENAI_MODEL: "missing-model",
+    } as unknown as NodeJS.ProcessEnv);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    } as Response);
+
+    const result = await provider.generate({
+      input,
+      records,
+      sourceReferences: [{ id: "source-1", title: "Approved source" }],
+      generation: generation(),
+    });
+
+    expect(result.safetyNotes.join(" ")).toContain("OpenAI model was not found");
+  });
+});

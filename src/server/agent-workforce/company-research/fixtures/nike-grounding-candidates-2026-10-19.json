@@ -1,0 +1,145 @@
+{
+  "provenance": "Saved public Nike excerpts and six unverified candidate statements from 2026-10-19. Original concern prose is unavailable. New reviewer responses and missing fact metadata in tests are simulated, never recovered live approval.",
+  "at": "2026-10-19T12:31:39.378Z",
+  "input": {
+    "companyName": "NIke",
+    "companyDomain": "nike.com"
+  },
+  "sources": [
+    {
+      "id": "web:b695de94c15f46810afa",
+      "url": "https://investors.nike.com/",
+      "title": "NIKE, Inc. (NKE) :: Investor Relations",
+      "observedAt": "2026-10-19T12:31:29.720Z",
+      "excerpt": "NIKE, Inc. (NKE) :: Investor Relations Skip to main content Skip to footer Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Stock Information Investor Relations News & Events Press Releases IR Calendar Email Alerts Newsroom Company Info Who We Are Annual Reports & Proxy Contacts FAQ Executive Team Financial Info Financial Results Income Statement Balance Sheet Cash Flow Stock Info Quote & Chart Historical Data Stock Split History Dividends SEC Filings All SEC Filings Annual Reports Quarterly Reports Section 16 Filings Corporate Responsibility Governance Board of Directors Board Committees Governance Documents Public Policy and Political Engagement Stock Information Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Investor Relations Nike is a SPORT COMPANY Latest News View All Press Releases Oct 1, 2026 NIKE, Inc. Reports Fiscal 2027 First Quarter Results Sep 16, 2026 Alexandre Arnault Joins NIKE, Inc. Board of Directors Aug 28, 2026 NIKE, Inc. Announces First Quarter Fiscal 2027 Earnings and Conference Call View All Press Releases Latest Financial Results Q1 2027 Quarter Ended Aug 31, 2026 Earnings Release Earnings Release Q1 2027 HTML &raquo; Earnings Webcast Earnings Webcast Q1 2027 Audio &raquo; Webcast Transcript Earnings Webcast Q1 2027 Transcript PDF &raquo; Earnings Webcast Q1 2027 Transcript HTML &raquo; Financial Schedules & Key Financial Metrics Financial Schedules & Key Financial Metrics Q1 2027 PDF &raquo; 10-Q 10-Q Q1 2027 HTML &raquo; Download Raw XBRL Zip Files of 10-Q Q1 2027 &raquo; Revenues for NIKE, Inc. were $11.2 billion. $11.2B EBIT, Total NIKE Inc. $907M Diluted earnings per share was $0.48. $0.48 Source: Q1 2027 Earnings Press Release For complete information regarding our financials, see our SEC filings Recent Event Oct 1, 2026 2:00 pm PDT Q1 FY27 NIKE Inc., Earnings Call View All Events Meet NIKE A Global Athletic Market Leader NIKE, Inc., based near Beaverton, Oregon, is the world's leading designer, marketer and distributor of authentic athletic footwear, apparel, equipment and accessories for a wide variety of sports and fitness activities. Converse, a wholly-owned NIKE, Inc. subsidiary brand, designs, markets and distributes athletic lifestyle footwear, apparel and accessories. View Board of Directors NIKE at a Glance Employees 73,000 U.S. Retail Stores 347 Non-U.S. Retail Stores 641 Number of countries where we serve consumers ~190 As of May 31, 2026 • 10-K 2026 Email Alerts Stay informed and receive company updates straight to your inbox. Sign Up for Email Alerts email Email Alerts location_city Company Profile contact_page Contacts Magazine Mission Company Newsroom Resources Get Help Investors Privacy Policy Disclaimer Sitemap Accessibility Statement &copy; 2026 NIKE, Inc. All Rights Reserved. Market Data copyright &copy; 2026 QuoteMedia . Data delayed 15 minutes unless otherwise indicated (view delay times for all exchanges). RT =Real-Time, EOD =End of Day, PD =Previous Day. Market Data powered by QuoteMedia . Terms of Use .",
+      "sourceType": "PUBLIC_WEB"
+    },
+    {
+      "id": "web:9adf3bc67d56534f51b2",
+      "url": "https://investors.nike.com/company-information/annual-reports-proxy",
+      "title": "Annual Reports &amp; Proxy :: NIKE, Inc. (NKE)",
+      "observedAt": "2026-10-19T12:31:29.999Z",
+      "excerpt": "Annual Reports & Proxy :: NIKE, Inc. (NKE) Skip to main content Skip to section navigation Skip to footer Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Stock Information Investor Relations News & Events Press Releases IR Calendar Email Alerts Newsroom Company Info Who We Are Annual Reports & Proxy Contacts FAQ Executive Team Financial Info Financial Results Income Statement Balance Sheet Cash Flow Stock Info Quote & Chart Historical Data Stock Split History Dividends SEC Filings All SEC Filings Annual Reports Quarterly Reports Section 16 Filings Corporate Responsibility Governance Board of Directors Board Committees Governance Documents Public Policy and Political Engagement Stock Information Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Annual Reports & Proxy Company Info Company Info Who We Are Annual Reports & Proxy Contacts FAQ Executive Team 2026 2026 Annual Report 2026 Proxy Statement Previous Reports 2025 Annual Report 2025 Proxy Statement 2024 Annual Report 2024 Proxy Statement 2023 Annual Report 2023 Proxy Statement 2022 Annual Report 2021 Annual Report 2020 Annual Report 2019 Annual Report 2018 Annual Report 2018 Proxy Statement 2017 Annual Report 2017 Proxy Statement 2016 Annual Report 2016 Proxy Statement 2015 Annual Report 2015 Proxy Statement 2014 Annual Report 2014 Proxy Statement 2013 Annual Report 2013 Proxy Statement 2012 Annual Report 2012 Proxy Statement 2011 Annual Report 2011 Proxy Statement 2010 Annual Report 2010 Proxy Statement 2009 Annual Report 2009 Proxy Statement 2008 Annual Report 2008 Proxy Statement 2007 Annual Report 2007 Proxy Statement 2006 Annual Report 2006 Proxy Statement 2005 Annual Report 2005 Proxy Statement 2004 Annual Report 2004 Proxy Statement 2003 Annual Report 2003 Proxy Statement 2002 Annual Report 2002 Proxy Statement 2001 Annual Report 2001 Proxy Statement 2000 Annual Report 1999 Annual Report 1998 Annual Report 1997 Annual Report 1996 Annual Report 1995 Annual Report 1994 Annual Report 1993 Annual Report 1992 Annual Report 1991 Annual Report 1990 Annual Report 1989 Annual Report 1988 Annual Report 1987 Annual Report 1986 Annual Report 1985 Annual Report 1984 Annual Report 1983 Annual Report 1982 Annual Report 1981 Annual Report email Email Alerts location_city Company Profile contact_page Contacts Magazine Mission Company Newsroom Resources Get Help Investors Privacy Policy Disclaimer Sitemap Accessibility Statement &copy; 2026 NIKE, Inc. All Rights Reserved. Market Data copyright &copy; 2026 QuoteMedia . Data delayed 15 minutes unless otherwise indicated (view delay times for all exchanges). RT =Real-Time, EOD =End of Day, PD =Previous Day. Market Data powered by QuoteMedia . Terms of Use .",
+      "sourceType": "PUBLIC_WEB"
+    },
+    {
+      "id": "web:9ed8f01319e04fd1005f",
+      "url": "https://investors.nike.com/sec-filings/annual-reports",
+      "title": "Annual Reports :: NIKE, Inc. (NKE)",
+      "observedAt": "2026-10-19T12:31:30.267Z",
+      "excerpt": "Annual Reports :: NIKE, Inc. (NKE) Skip to main content Skip to section navigation Skip to footer Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Stock Information Investor Relations News & Events Press Releases IR Calendar Email Alerts Newsroom Company Info Who We Are Annual Reports & Proxy Contacts FAQ Executive Team Financial Info Financial Results Income Statement Balance Sheet Cash Flow Stock Info Quote & Chart Historical Data Stock Split History Dividends SEC Filings All SEC Filings Annual Reports Quarterly Reports Section 16 Filings Corporate Responsibility Governance Board of Directors Board Committees Governance Documents Public Policy and Political Engagement Stock Information Shop Nike.com » Shop Converse.com » Visit About.Nike.com » Annual Reports SEC Filings SEC Filings All SEC Filings Annual Reports Quarterly Reports Section 16 Filings Filter SEC filings Filing Type View All 10-K 10-K/A 10-K405 ARS Year View All 2026 2025 2024 2023 2022 2021 2020 2019 2018 2017 2016 2015 2014 2013 2012 2011 2010 2009 2008 2007 2006 2005 2004 2003 2002 2001 2000 1999 1998 1997 1996 1995 SEC Filings Date Form Description XBRL Pages 07/22/26 ARS Form ARS: Annual Report to Security Holders 196 07/15/26 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 117 07/24/25 ARS Form ARS: Annual Report to Security Holders 212 07/17/25 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 110 07/31/24 ARS Form ARS: Annual Report to Security Holders 187 07/25/24 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 139 07/28/23 ARS Form ARS: Annual Report to Security Holders 188 07/20/23 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 107 07/21/22 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 108 07/20/21 10-K Form 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] 109 rss_feed Filing RSS Page 1 Page 2 Page 3 Page 4 Next Page arrow_forward Select a page Page 1 Page 2 Page 3 Page 4 email Email Alerts location_city Company Profile contact_page Contacts Magazine Mission Company Newsroom Resources Get Help Investors Privacy Policy Disclaimer Sitemap Accessibility Statement &copy; 2026 NIKE, Inc. All Rights Reserved. Market Data copyright &copy; 2026 QuoteMedia . Data delayed 15 minutes unless otherwise indicated (view delay times for all exchanges). RT =Real-Time, EOD =End of Day, PD =Previous Day. Market Data powered by QuoteMedia . Terms of Use .",
+      "sourceType": "PUBLIC_WEB"
+    }
+  ],
+  "candidates": [
+    {
+      "factId": "account:1",
+      "statement": "NIKE, Inc. is an athletic goods company that designs, markets, and distributes athletic footwear, apparel, equipment, and accessories for sports and fitness activities.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "NIKE, Inc., based near Beaverton, Oregon, is the world's leading designer, marketer and distributor of authentic athletic footwear, apparel, equipment and accessories for a wide variety of sports and fitness activities."
+        }
+      ]
+    },
+    {
+      "factId": "account:2",
+      "statement": "Converse is a wholly-owned NIKE, Inc. subsidiary brand that designs, markets, and distributes athletic lifestyle footwear, apparel, and accessories.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "Converse, a wholly-owned NIKE, Inc. subsidiary brand, designs, markets and distributes athletic lifestyle footwear, apparel and accessories."
+        }
+      ]
+    },
+    {
+      "factId": "account:3",
+      "statement": "NIKE serves consumers in approximately 190 countries.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "Number of countries where we serve consumers ~190"
+        }
+      ]
+    },
+    {
+      "factId": "account:4",
+      "statement": "NIKE reported 73,000 employees as of May 31, 2026.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "Employees 73,000"
+        },
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "As of May 31, 2026 • 10-K 2026"
+        }
+      ]
+    },
+    {
+      "factId": "account:5",
+      "statement": "NIKE reported quarterly revenue of $11.2 billion for Q1 fiscal 2027 ended August 31, 2026.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "Quarter Ended Aug 31, 2026"
+        },
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "Revenues for NIKE, Inc. were $11.2 billion."
+        }
+      ]
+    },
+    {
+      "factId": "account:6",
+      "statement": "NIKE's investor relations website is investors.nike.com.",
+      "sourceIds": [
+        "web:b695de94c15f46810afa",
+        "web:9adf3bc67d56534f51b2",
+        "web:9ed8f01319e04fd1005f"
+      ],
+      "quotes": [
+        {
+          "sourceId": "web:b695de94c15f46810afa",
+          "text": "NIKE, Inc. (NKE) :: Investor Relations"
+        },
+        {
+          "sourceId": "web:9adf3bc67d56534f51b2",
+          "text": "Annual Reports & Proxy :: NIKE, Inc. (NKE)"
+        },
+        {
+          "sourceId": "web:9ed8f01319e04fd1005f",
+          "text": "Annual Reports :: NIKE, Inc. (NKE)"
+        }
+      ]
+    }
+  ],
+  "historicalReview": {
+    "identityMatches": true,
+    "supportedCount": 6,
+    "rejectedCount": 0,
+    "concernCount": 2,
+    "reasonCodes": [
+      "REVIEWER_CONCERNS"
+    ],
+    "concernCodes": [
+      "QUOTE_OR_SOURCE_SUPPORT",
+      "IDENTITY"
+    ]
+  }
+}

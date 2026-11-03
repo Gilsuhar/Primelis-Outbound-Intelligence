@@ -1,0 +1,161 @@
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/auth/server", () => ({ getCurrentUser: vi.fn() }));
+vi.mock("@/server/sales-agent/evidence-store", () => {
+  let snapshots: import("@/server/sales-agent/evidence-store").EvidenceSnapshot[] = [];
+  return {
+    PrismaEvidenceStore: class {
+      async save(
+        _actor: string,
+        next: import("@/server/sales-agent/evidence-store").EvidenceSnapshot[],
+      ) {
+        snapshots = next;
+      }
+      async list() {
+        return snapshots;
+      }
+      async suppressionRecords() {
+        return [];
+      }
+    },
+  };
+});
+import { getCurrentUser } from "@/lib/auth/server";
+import { GET, POST } from "./route";
+import { collectionNow } from "@/test/sales-agent-collection-fixtures";
+import { NextRequest } from "next/server";
+
+const request = (body: unknown, origin: string = "https://app.example.com") =>
+  new Request("https://app.example.com/api/sales-agent/evidence", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json", ...(origin ? { Origin: origin } : {}) },
+  });
+
+describe("authenticated evidence collection/review API", () => {
+  beforeEach(() => {
+    vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "sales-user");
+    vi.useFakeTimers();
+    vi.setSystemTime(collectionNow);
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      id: "sales-user",
+      email: "sales@example.com",
+      role: "SALES_USER",
+    });
+    vi.stubEnv("HUBSPOT_PRIVATE_APP_TOKEN", "fixture-token");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects another approved user before reading the operator CRM", async () => {
+    vi.stubEnv("INTEGRATION_OPERATOR_USER_ID", "another-user");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(request({}))).status).toBe(403);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("blocks missing-Origin and Production collection before external reads", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(request({}, ""))).status).toBe(403);
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect((await POST(request({}))).status).toBe(403);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("authenticates before any provider request or evidence access", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(null);
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    expect((await POST(request({}))).status).toBe(401);
+    expect((await GET()).status).toBe(401);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("runs the real HubSpot adapter, normalization, storage and planner on fixture HTTP responses", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      const path = String(url);
+      if (path.endsWith("/search"))
+        return Response.json({
+          results: [{ id: "42", properties: { hubspot_owner_id: "1087915602" } }],
+        });
+      return Response.json({
+        id: "42",
+        properties: {
+          hubspot_owner_id: "1087915602",
+          createdate: "2026-10-15T01:00:00.000Z",
+          firstname: "Fixture",
+          jobtitle: "Director of PPC",
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const response = await POST(request({}));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.data.rows[0].plan.decision.status).toBe("HOLD");
+    expect(body.data.rows[0].plan.decision.reasons).toContain("Outreach history incomplete");
+    const saved = await GET();
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).data.rows[0].contact.hubspotRecordId).toBe("42");
+    expect(
+      fetcher.mock.calls.every(
+        ([url, init]) => init?.method === (String(url).endsWith("/search") ? "POST" : "GET"),
+      ),
+    ).toBe(true);
+  });
+  it.each([{ ownerId: "other" }, { actorId: "admin" }, { evidence: [] }, { after: "../admin" }])(
+    "rejects unauthorized owner/actor/evidence overrides: %j",
+    async (body) => {
+      expect((await POST(request(body))).status).toBe(400);
+    },
+  );
+  it("rejects cross-origin collection requests", async () => {
+    expect((await POST(request({}, "https://foreign.example.com"))).status).toBe(403);
+  });
+  it("accepts authenticated HTTPS loopback collection despite Next URL normalization", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("LOCAL_DEV_LOGIN", "true");
+    vi.stubEnv("LOCAL_DEV_HTTPS", "true");
+    vi.stubEnv("LOCAL_DEV_SESSION_TOKEN", "fictional-local-origin-session-test-only");
+    vi.stubEnv("DATABASE_URL", "postgresql://local@localhost:5432/agent_workforce_test");
+    for (const key of ["VERCEL", "VERCEL_ENV", "NEXT_PUBLIC_VERCEL_ENV"]) vi.stubEnv(key, "");
+    const fetcher = vi.fn(async () => Response.json({ results: [] }));
+    vi.stubGlobal("fetch", fetcher);
+    const make = (origin: string | null, host = "127.0.0.1:3000", proto = "https") =>
+      new NextRequest(`https://${host}/api/sales-agent/evidence`, {
+        method: "POST",
+        body: "{}",
+        headers: {
+          host,
+          ...(origin === null ? {} : { origin }),
+          "x-forwarded-host": host,
+          "x-forwarded-proto": proto,
+        },
+      });
+    const valid = make("https://127.0.0.1:3000");
+    expect(new URL(valid.url).hostname).toBe("localhost");
+    expect((await POST(valid)).status).toBe(200);
+    expect((await POST(make("https://localhost:3000", "localhost:3000"))).status).toBe(200);
+    fetcher.mockClear();
+    for (const origin of [null, "null", "https://localhost:3000", "https://evil.example"])
+      expect((await POST(make(origin))).status).toBe(403);
+    expect((await POST(make("https://127.0.0.1:3000", "127.0.0.1:3000", "http"))).status).toBe(403);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("reports missing integration configuration without inserting fixtures", async () => {
+    vi.stubEnv("HUBSPOT_PRIVATE_APP_TOKEN", "");
+    const response = await POST(request({}));
+    expect(response.status).toBe(503);
+    expect((await response.json()).code).toBe("NOT_CONFIGURED");
+  });
+  it("returns safe errors for authentication failures", async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(new Error("secret auth failure"));
+    const response = await POST(request({}));
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain("secret auth failure");
+  });
+});
