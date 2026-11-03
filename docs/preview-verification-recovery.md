@@ -1,5 +1,10 @@
 # Preview post-migration verification recovery
 
+Historical Phase 4K findings below. Phase 4L aligns the model with the applied migration semantics and
+converts the new candidate's workflow to verification-only; see [current procedure](preview-schema-alignment.md).
+Published initialization branches remain unchanged. The earlier statement below that the current workflow
+still initializes applies only to commit `3341eea6ef9d0d6bd081f930432edd824db6c5bc`.
+
 Target: `txfxfrlhtvzwgluhnbpw` only. Published initialization commit:
 `812e1c474531c8d17304745c56783aaf59199825`. Failed run: 41693631072.
 The 11 migrations are already applied; no initialization, retry, reset or seed is permitted.

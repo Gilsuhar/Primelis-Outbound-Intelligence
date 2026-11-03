@@ -1,6 +1,6 @@
 {
   "pnpm-lock.yaml": "5f90d08bf5035811dc009ea189c01b370189042e3bde09fb93d78da96738fecf",
-  "prisma/schema.prisma": "43d1d52cb7871c2d3ef5269df174a71e31d5c3aed62158d23ea903c2faa7c667",
+  "prisma/schema.prisma": "3cedc9195df1336d083b6053269a4375a72d2cc4ce9155d48357bb991a6fc124",
   "prisma/migrations/20260712152700_initial_postgresql_foundation/migration.sql": "a0a931cdc216186149526de3e1d37466724174352263d718b330bc14d7e9661d",
   "prisma/migrations/20260713000100_imported_signal_review_workflow/migration.sql": "ebc407790217b312f5c8e23d13ba3d6678494757eb270998256b2cfc1564a1e0",
   "prisma/migrations/20260713000200_reply_to_prospect_drafts/migration.sql": "71b0d9757f9cebc7d9df4a6af93072718a6bf708071031d4cecd1172d018e385",

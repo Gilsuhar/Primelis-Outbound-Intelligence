@@ -80,7 +80,7 @@ describe("initialized Preview verification without writes", () => {
     expect(f.deps.diff).not.toHaveBeenCalled(); expect(f.deps.migrate).not.toHaveBeenCalled();
     expect(f.db.$disconnect).toHaveBeenCalledOnce();
   });
-  it.each([["--execute-approved-initialization"], ["--reset"], ["--verify-only", "--seed"]])("rejects unsafe verification CLI arguments %j before I/O", args => {
+  it.each([["--execute-approved-initialization"], ["--reset"], ["--verify-only", "--seed"]].map(args => ({ args })))("rejects unsafe verification CLI arguments $args before I/O", ({ args }) => {
     const result = spawnSync(process.execPath, [resolve("scripts/preview/verify-only.mjs"), ...args], {
       encoding: "utf8", timeout: 10000,
       env: { NODE_ENV: "test", PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, NODE_OPTIONS: process.env.NODE_OPTIONS },
