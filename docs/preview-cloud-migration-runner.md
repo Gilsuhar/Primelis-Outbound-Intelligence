@@ -1,5 +1,42 @@
 # One-time cloud Prisma initialization
 
+## Phase 4J: final TLS-corrected execution candidate
+
+This preparation commit is a documentation-only child of
+`4bcc72f4532b86e61e6d29f05384146d37407914`; it retains that reviewed TLS implementation without
+runtime changes. Use the full SHA of this preparation commit for the next approval. Its exact
+execution branch is `codex/preview-migration-txfxfrlhtvzwgluhnbpw-<full-preparation-commit-sha>`.
+Preparing a local branch is not authorization to push it or execute migrations.
+
+Reverification on 2026-11-03 confirmed that the checked-in CA matches the official dashboard download,
+with the fingerprint recorded below and validity from 2021-04-28 through 2031-04-26. The Node probe
+passes that PEM as `ca`. The guarded initializer supplies the same file through Prisma's `sslcert`
+parameter to its verification client, migration subprocess and schema-diff subprocess, retaining
+`sslmode=require&sslaccept=strict`. Prisma 5.22.0 loads it as a root certificate; Node and Prisma use
+different TLS implementations, so this is the same explicit trust anchor, not a claim that their
+platform trust stores are identical. No real Prisma authentication or migration was exercised here.
+The prior Node 24.22.1 strict TLS handshake passed without changing the approved endpoint.
+
+Required operator changes after candidate review, only in `agent-workforce-preview-setup`:
+1. Set `PREVIEW_SETUP_APPROVED_SHA` to the full preparation commit SHA.
+2. Replace the old deployment rule with exactly one **Branch** rule matching the execution branch
+   above. Leave no old Branch rules or Tag rules.
+3. Retain `PREVIEW_SETUP_APPROVED_ENDPOINT=aws-1-us-west-2.pooler.supabase.com:5432` and the existing
+   environment-scoped `PREVIEW_SETUP_DATABASE_URL`. Do not change credentials or append `sslcert`
+   to the stored URL; that parameter is generated internally from the pinned local file.
+4. Keep required reviewers and administrator bypass disabled, with custom branch policies enabled.
+5. Obtain a fresh read-only preflight and separate explicit publication approval. Verify the owner is
+   Gilsuhar (79252537), the exact commit/worktree, the branch is absent remotely, and all saved metadata.
+
+Only the approved owner creating the exact SHA-named branch for the first time can authorize the job.
+Repository identity, commit, before-SHA, creation/update/force-push/rerun checks, project fingerprint,
+strict TLS, migration checksums and Vercel Git deployment exclusion are unchanged. All 11 migration
+SQL files, Prisma schema and frozen dependency lockfile are unchanged. Preserve runs 41654114864 and
+41659291052 and both previously published branches; never rerun or update them. Runner connectivity,
+database authentication/privileges, unchanged live fingerprint/empty schema, migration completion and
+post-migration checks remain execution-time requirements. A failure requires diagnosis and separate
+approval, never an automatic retry, reset, seed or role/Auth provisioning.
+
 ## Current status: local TLS trust correction, not authorized for publication
 
 Run 41659291052 for `3a889b5dfccef93c356ec4e5199ce4e78e6b6f84` passed plan validation,
