@@ -18,6 +18,16 @@ export type Prospect = {
   email?: string;
   employerDomain?: string;
   mappedOutreachId?: string;
+  profile?: {
+    source: RecyclerSystem;
+    observedAt: string;
+    ownerId: string | null;
+    title: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+    assignedAt?: string | null;
+    company?: { id: string; name: string | null; employees: number | null; annualRevenue: number | null; currency: "UNKNOWN" };
+  };
 };
 export type Snapshot = {
   prospect: Prospect;
@@ -27,6 +37,7 @@ export type Snapshot = {
   sequences: RecyclerInput["sequences"][number];
   historyTraversal: Coverage;
   issues: ReadIssue[];
+  engagement?: { id: string; kind: "OPEN" | "REPLY"; at: string; source: "OUTREACH" }[];
 };
 export interface Reader {
   system: RecyclerSystem;

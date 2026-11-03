@@ -128,7 +128,9 @@ export function toRecyclerInput(
   const input: RecyclerInput = {
     candidateId: records.map(recordKey).sort().join("+"),
     identity: {
-      resolution: group.resolution,
+      resolution: group.snapshots.some(snapshot => snapshot.issues.some(issue =>
+        ["BOUNCE_CLASSIFICATION_UNKNOWN", "UNSUBSCRIBE_TIMESTAMP_INVALID", "COMPLAINT_TIMESTAMP_INVALID"].includes(issue.code)))
+        ? "UNRESOLVED" : group.resolution,
       records,
       ...(first.email ? { email: first.email } : {}),
       ...(first.employerDomain ? { employerDomain: first.employerDomain } : {}),
@@ -354,6 +356,8 @@ export async function collectRecycler(options: {
     candidates: inputs.map((input, i) => ({
       input,
       displayName: groups[i].snapshots[0].prospect.fullName,
+      profiles: groups[i].snapshots.flatMap(s => s.prospect.profile ? [s.prospect.profile] : []),
+      engagement: groups[i].snapshots.flatMap(s => s.engagement ?? []),
       historyTraversal: groups[i].snapshots.map((s) => ({
         record: s.prospect.record,
         status: s.historyTraversal,

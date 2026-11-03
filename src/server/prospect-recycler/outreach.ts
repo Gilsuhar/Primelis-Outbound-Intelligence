@@ -53,6 +53,9 @@ export class OutreachRecyclerReader implements Reader {
         .filter((v) => typeof v === "string")
         .join(" "),
       emails,
+      profile: { source: this.system, observedAt: this.asOf, ownerId: related(item, "owner") ?? null,
+        title: typeof item.attributes.title === "string" ? item.attributes.title : null,
+        createdAt: eventTime(item.attributes.createdAt), updatedAt: eventTime(item.attributes.updatedAt) },
       ...(emails.length === 1 ? { email: emails[0] } : {}),
     };
   }
@@ -130,6 +133,13 @@ export class OutreachRecyclerReader implements Reader {
     );
     for (const mailing of mailings.items) {
       const attrs = mailing.attributes;
+      for (const [field, kind] of [["openedAt", "OPEN"], ["repliedAt", "REPLY"]] as const) {
+        if (attrs[field] == null) continue;
+        const at = eventTime(attrs[field]);
+        if (at && timestamp(at)! <= timestamp(this.asOf)!)
+          (snapshot.engagement ??= []).push({ id: `mailing:${mailing.id}:${field}`, kind, at, source: "OUTREACH" });
+        else snapshot.issues.push({ code: "ENGAGEMENT_TIMESTAMP_INVALID", resource: "mailings" });
+      }
       if (!("deliveredAt" in attrs)) {
         mailings.status = "PARTIAL";
         snapshot.issues.push({ code: "EMAIL_EVENT_UNKNOWN", resource: "mailings" });

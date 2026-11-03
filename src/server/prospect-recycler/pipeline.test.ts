@@ -54,7 +54,7 @@ function setup(
     firstname: "Morgan",
     lastname: "Tester",
     email: "morgan@example.com",
-    hubspot_owner_id: "42",
+    hubspot_owner_id: "1087915602",
     createdate: "2000-01-01T00:00:00Z",
     hs_email_optout: "false",
     hs_email_hard_bounce_reason: null,
@@ -99,7 +99,7 @@ function setup(
   });
   const readers = createRecyclerReaders({
     asOf: now,
-    hubspotOwnerId: "42",
+    hubspotOwnerId: "1087915602",
     hubspotToken: async () => "fictional-hubspot",
     outreachTokens: { access },
     outreachIdProperty: extra.mapping === false ? undefined : "outreach_id",
@@ -182,7 +182,7 @@ describe("Recycler provider pipeline", () => {
     const search = fetcher.mock.calls.find(([u]) => String(u).includes("contacts/search"))!;
     const body = JSON.parse(String(search[1]?.body));
     expect(body.filterGroups[0].filters).toEqual([
-      { propertyName: "hubspot_owner_id", operator: "EQ", value: "42" },
+      { propertyName: "hubspot_owner_id", operator: "EQ", value: "1087915602" },
     ]);
   });
   it("reads Outreach-only prospects when HubSpot is absent without claiming HubSpot absence", async () => {
@@ -503,7 +503,7 @@ describe("suppression, sequence and trusted evidence mapping", () => {
               firstname: "Morgan",
               lastname: "Tester",
               email: "morgan@example.com",
-              hubspot_owner_id: "42",
+              hubspot_owner_id: "1087915602",
               outreach_id: "7",
               hs_email_hard_bounce_reason: "UNKNOWN_USER",
             }),
@@ -630,7 +630,7 @@ describe("existing credential flow remains read-only", () => {
     const { fetcher } = setup();
     const readers = createRecyclerReaders({
       asOf: now,
-      hubspotOwnerId: "42",
+      hubspotOwnerId: "1087915602",
       hubspotToken: async () => "fictional",
       outreachTokens: tokens,
       fetcher,

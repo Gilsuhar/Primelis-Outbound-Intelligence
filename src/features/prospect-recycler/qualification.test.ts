@@ -49,8 +49,28 @@ describe("complete Recycler qualification", () => {
   it("holds Outreach-only even with claimed ownership receipts", () => {
     const f = qualifiedFixture(); f.input.identity.records = [{ system: "OUTREACH", id: "synthetic" }]; expect(evaluate(f).status).toBe("HOLD");
   });
-  it.each([{ coverage: "PARTIAL" }, { activeConflict: null }, { activeConflict: true }])("holds incomplete/conflicting opportunities", patch => {
+  it.each([{ coverage: "PARTIAL" }, { activeConflict: null }])("holds incomplete/conflicting opportunities", patch => {
     const f = qualifiedFixture(); Object.assign(f.qualification.opportunities!, patch); expect(evaluate(f).status).toBe("HOLD");
+  });
+  it("disqualifies a confirmed active opportunity but holds stale negative qualification", () => {
+    const f = qualifiedFixture(); f.qualification.opportunities!.activeConflict = true;
+    expect(evaluate(f).status).toBe("EXCLUDED");
+    f.qualification.opportunities!.checkedAt = "2020-01-01T00:00:00Z";
+    expect(evaluate(f).status).toBe("HOLD");
+  });
+  it.each(["ownership", "company", "responsibility"] as const)("never disqualifies using stale or untrusted %s", kind => {
+    for (const patch of [{ authoritative: false }, { checkedAt: "2020-01-01T00:00:00Z" }]) {
+      const f = qualifiedFixture(); Object.assign(f.qualification[kind]!, patch);
+      if (kind === "ownership") f.qualification.ownership!.ownerId = "other";
+      if (kind === "company") f.qualification.company!.employees = 1;
+      if (kind === "responsibility") f.qualification.responsibility!.paidSocialOnly = true;
+      expect(evaluate(f).status).toBe("HOLD");
+    }
+  });
+  it("holds contradictory Paid Social-only titles and Search receipts", () => {
+    const f = qualifiedFixture(); f.qualification.responsibility!.title = "Director of Paid Social";
+    expect(evaluate(f).reasons.map(r => r.code)).toContain("ROLE_EVIDENCE_CONFLICT");
+    expect(evaluate(f).status).toBe("HOLD");
   });
   it.each(["Boring green", "HubSpot", "Surfe", "manual"])("rejects %s as independent validation", provider => {
     const f = qualifiedFixture(); f.input.emailVerification!.providerId = provider; expect(evaluate(f).status).toBe("HOLD");
