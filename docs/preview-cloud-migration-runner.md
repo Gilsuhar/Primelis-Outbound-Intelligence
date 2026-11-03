@@ -8,18 +8,21 @@ Run 41654114864 registered and executed from the setup branch for commit
 application tables, Auth users or application role. No migration ran. Preserve that published branch
 and run unchanged; do not rerun, recreate or update them.
 
-Missing TLS URL parameters reproduce this error with otherwise valid synthetic connection details.
-The operator's exact saved-value diagnosis remains to be confirmed without disclosing the URL:
+The operator subsequently reported only `APPROVED_ENDPOINT_MATCH` for the original URL, then
+confirmed the corrected Session Pooler URL passed the offline checker with `[]`. Missing TLS query
+parameters were an earlier hypothesis, not the confirmed sole defect. The approved endpoint remains
+`aws-1-us-west-2.pooler.supabase.com:5432`. No URL or credential value was disclosed or read.
+The corrected local copy is validated; its presence in the GitHub secret is not independently verified.
 
 1. In a trusted PowerShell 7 session, run the existing offline checker:
    `& 'C:\Users\USER\Documents\ChatGPT\New project\rc-tools\phase4h-check-private-url.ps1'`.
    Enter the original URL only into its hidden prompt. Do not paste it into chat, command arguments,
    a source file or logs. The original worktree remains pinned to the checker's reviewed commit.
-2. Continue with the TLS-only correction only if the output is exactly
-   `TLS_MODE_REQUIRE`, `TLS_ACCEPT_STRICT`, `QUERY_KEYS_EXACT`. Other failures require diagnosis.
-3. For the query-free original URL, append exactly `?sslmode=require&sslaccept=strict`. Preserve all
-   connection details and the existing password encoding. Do not duplicate parameters or retain extra
-   query keys. Validate the corrected candidate through the same hidden prompt; require `[]`.
+2. Use only the operator-validated corrected Session Pooler URL for this dedicated project. Keep its
+   correct tenant, endpoint, port, database and password encoding. Its query already passes the strict
+   checks for exactly `sslmode=require` and `sslaccept=strict`; do not append these parameters again.
+3. The required offline result is `[]` (reported by the operator). If the candidate URL is edited again,
+   repeat the hidden-input check and require `[]` before updating the environment secret.
 4. The operator updates only the existing **environment-scoped** `PREVIEW_SETUP_DATABASE_URL` secret
    in `agent-workforce-preview-setup` through GitHub's secure UI. Never create a repository-scoped
    substitute. GitHub cannot return the plaintext secret; local validation proves only the supplied
@@ -35,7 +38,7 @@ The operator's exact saved-value diagnosis remains to be confirmed without discl
 
 An empty offline diagnostic result is not proof of runner connectivity, password validity or trusted
 TLS. Those are checked by the unchanged guarded initializer on a separately approved first attempt.
-No application code change or relaxation of a security check is needed for a TLS-query-only defect.
+No application code change or relaxation of a security check is needed for this configuration correction.
 
 Workflow: `.github/workflows/preview-database-setup.yml`.
 Source snapshot: `59aaee2e23667ee333802791ba995861474d85fb` (not a Git parent).
