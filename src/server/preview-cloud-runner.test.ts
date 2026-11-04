@@ -342,22 +342,29 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
   expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|verify-only\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
 });
 
-it("allows only main and the approved application Preview while excluding setup branches", () => {
+it("disables bootstrap and setup Git deployments while preserving main", () => {
   // Vercel uses minimatch; reuse ESLint's frozen dependency, without adding a package.
   const require = createRequire(import.meta.url);
   const match = createRequire(require.resolve("eslint/package.json"))("minimatch");
   const config = JSON.parse(readFileSync("vercel.json", "utf8"));
   expect(config).toEqual({ $schema: "https://openapi.vercel.sh/vercel.json",
     git: { deploymentEnabled: { "**": false, main: true,
-      "codex/isolated-recycler-preview-20261104": true, [`${branchPrefix}*`]: false } } });
+      "codex/isolated-recycler-preview-20261104": false, [`${branchPrefix}*`]: false } } });
   const rules = Object.entries(config.git.deploymentEnabled);
   const enabled = (branch: string) => {
     const matching = rules.filter(([pattern]) => match(branch, pattern));
     return matching.length === 0 || matching.some(([, value]) => value === true);
   };
   expect(enabled(`${branchPrefix}${sha}`)).toBe(false);
-  for (const branch of ["main", "codex/isolated-recycler-preview-20261104"])
-    expect(enabled(branch)).toBe(true);
-  for (const branch of ["feature/agent-workforce-foundation", "codex/cloud-publication-snapshot-20261103", "other/setup", "unapproved", "codex/isolated-recycler-preview-20261104-extra"])
+  expect(enabled("main")).toBe(true);
+  for (const branch of ["codex/isolated-recycler-preview-20261104", "feature/agent-workforce-foundation", "recovery/four-email-engine", "feature/signal-sales-copilot", "codex/cloud-publication-snapshot-20261103", "other/setup", "unapproved", "codex/isolated-recycler-preview-20261104-extra", "main/extra"])
     expect(enabled(branch)).toBe(false);
+  // No matching true rule may override either explicit bootstrap denial.
+  for (const branch of ["codex/isolated-recycler-preview-20261104", `${branchPrefix}${sha}`])
+    expect(rules.filter(([pattern, value]) => value === true && match(branch, pattern))).toEqual([]);
+  // Inspect the actual workflow filter, not just the intended branch naming convention.
+  const filters = [...readFileSync(workflow, "utf8").matchAll(/^      - '([^']+)'$/gm)]
+    .map((entry) => entry[1]);
+  expect(filters).toEqual([`${branchPrefix}*`]);
+  expect(filters.some((pattern) => match("codex/isolated-recycler-preview-20261104", pattern))).toBe(false);
 });

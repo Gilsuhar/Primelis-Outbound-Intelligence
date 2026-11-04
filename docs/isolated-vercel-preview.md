@@ -1,5 +1,11 @@
 # Isolated authenticated Recycler Preview
 
+> Historical preparation record for b7c1819, not the current execution procedure.
+> The owner's 2026-11-05 decision prohibits shared Preview scope cleanup and keeps
+> the application branch deployment-disabled. Do not execute the cleanup or
+> deployment-enabling steps below. The current procedure and replacement staging
+> matrix are in [preview-bootstrap.md](preview-bootstrap.md).
+
 Prepared 2026-11-04. Local candidate: `codex/isolated-recycler-preview-20261104`, based on
 `c57a00aaede5f98d3391634e2f94998f36cb91a8`. No cloud settings are changed by this document.
 
