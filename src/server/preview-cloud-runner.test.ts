@@ -342,19 +342,22 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
   expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|verify-only\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
 });
 
-it("disables native Git deployments only for the dedicated setup branch namespace", () => {
+it("allows only main and the approved application Preview while excluding setup branches", () => {
   // Vercel uses minimatch; reuse ESLint's frozen dependency, without adding a package.
   const require = createRequire(import.meta.url);
   const match = createRequire(require.resolve("eslint/package.json"))("minimatch");
   const config = JSON.parse(readFileSync("vercel.json", "utf8"));
   expect(config).toEqual({ $schema: "https://openapi.vercel.sh/vercel.json",
-    git: { deploymentEnabled: { [`${branchPrefix}*`]: false } } });
+    git: { deploymentEnabled: { "**": false, main: true,
+      "codex/isolated-recycler-preview-20261104": true, [`${branchPrefix}*`]: false } } });
   const rules = Object.entries(config.git.deploymentEnabled);
   const enabled = (branch: string) => {
     const matching = rules.filter(([pattern]) => match(branch, pattern));
     return matching.length === 0 || matching.some(([, value]) => value === true);
   };
   expect(enabled(`${branchPrefix}${sha}`)).toBe(false);
-  for (const branch of ["main", "feature/agent-workforce-foundation", "codex/cloud-publication-snapshot-20261103", "other/setup"])
+  for (const branch of ["main", "codex/isolated-recycler-preview-20261104"])
     expect(enabled(branch)).toBe(true);
+  for (const branch of ["feature/agent-workforce-foundation", "codex/cloud-publication-snapshot-20261103", "other/setup", "unapproved", "codex/isolated-recycler-preview-20261104-extra"])
+    expect(enabled(branch)).toBe(false);
 });

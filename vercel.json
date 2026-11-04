@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "codex/isolated-recycler-preview-20261104": true,
       "codex/preview-migration-txfxfrlhtvzwgluhnbpw-*": false
     }
   }
