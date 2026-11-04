@@ -77,8 +77,9 @@ BEGIN
       AND a.attnum>0 AND NOT a.attisdropped
       AND has_column_privilege('recycler_preview_app',a.attrelid,a.attnum,'SELECT WITH GRANT OPTION'))
     -- Sequence functions can take regclass/OID arguments; reject sequence ACLs unconditionally.
-    OR EXISTS (SELECT 1 FROM pg_class c WHERE c.relkind='S'
-      AND has_sequence_privilege('recycler_preview_app',c.oid,'USAGE,SELECT,UPDATE'))
+    -- WHERE predicates have no evaluation order; CASE keeps non-sequence OIDs out.
+    OR EXISTS (SELECT 1 FROM pg_class c WHERE CASE WHEN c.relkind='S'
+      THEN has_sequence_privilege('recycler_preview_app',c.oid,'USAGE,SELECT,UPDATE') ELSE false END)
     OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname NOT IN ('pg_catalog','information_schema')
         AND has_schema_privilege('recycler_preview_app',n.oid,'USAGE')

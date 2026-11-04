@@ -77,7 +77,7 @@ export function runtimeAuditSql(after = false) {
       AND NOT has_database_privilege('recycler_preview_app','postgres','CREATE,TEMPORARY,CONNECT WITH GRANT OPTION')
       AND NOT EXISTS(SELECT 1 FROM pg_namespace WHERE has_schema_privilege('recycler_preview_app',oid,'CREATE'))
       AND NOT EXISTS(SELECT 1 FROM pg_shdepend WHERE refclassid='pg_authid'::regclass AND refobjid=(SELECT oid FROM pg_roles WHERE rolname='recycler_preview_app') AND deptype='o')
-      AND NOT EXISTS(SELECT 1 FROM pg_class WHERE relkind='S' AND has_sequence_privilege('recycler_preview_app',oid,'USAGE,SELECT,UPDATE'))
+      AND NOT EXISTS(SELECT 1 FROM pg_class WHERE CASE WHEN relkind='S' THEN has_sequence_privilege('recycler_preview_app',oid,'USAGE,SELECT,UPDATE') ELSE false END)
       AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname NOT IN ('pg_catalog','information_schema')
       AND has_schema_privilege('recycler_preview_app',n.oid,'USAGE') AND has_function_privilege('recycler_preview_app',p.oid,'EXECUTE'))`],
   );

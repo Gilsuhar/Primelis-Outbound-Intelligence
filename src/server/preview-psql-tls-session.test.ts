@@ -2,7 +2,7 @@
 import { EventEmitter } from "node:events";
 import type { spawn } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runTlsSession, validateClientTlsReport } from "../../scripts/preview/psql-tls-session.mjs";
+import { runTlsSession, validateClientTlsReport, clientFailureCategory, clientDiagnostic } from "../../scripts/preview/psql-tls-session.mjs";
 import { connectionFiles } from "../../scripts/preview/provision-runtime-role.mjs";
 import { readFileSync } from "node:fs";
 
@@ -21,6 +21,50 @@ function transport() {
 afterEach(() => vi.useRealTimers());
 
 describe("same-connection libpq TLS evidence before releasing SQL", () => {
+  it.each([
+    ['server certificate for "private.invalid" does not match host name "other.invalid"', "TLS_HOSTNAME"],
+    ["SSL error: certificate verify failed", "TLS_CERTIFICATE"],
+    ["root certificate file private-path does not exist", "TLS_CERTIFICATE"],
+    ["self-signed certificate", "TLS_CERTIFICATE"],
+    ["could not translate host name private.invalid", "CONNECTION_DNS"],
+    ["connection timed out", "CONNECTION_TIMEOUT"],
+    ["Connection refused", "CONNECTION_TCP"],
+    ["password authentication failed for user private-user", "CONNECTION_AUTHENTICATION"],
+    ["SSL error: handshake failed", "TLS_HANDSHAKE"],
+    ['psql:<stdin>:80: ERROR:  42809: "private-relation" is not a sequence', "SQL_WRONG_OBJECT_TYPE"],
+    ["ERROR: 42501: permission denied private", "SQL_PERMISSION"],
+    ["ERROR: 25006: read-only transaction private", "SQL_READ_ONLY"],
+    ["ERROR: 42601: syntax error private", "SQL_SYNTAX"],
+    ["ERROR: P0001: private guard", "SQL_GUARD_REJECTED"],
+    ["FATAL: 08006: private", "CONNECTION_LOST"],
+    ["private unknown output", "CLIENT_EXIT"],
+  ])("classifies private errors without disclosing details %#", (stderr, category) => {
+    expect(clientFailureCategory(stderr)).toBe(category);
+  });
+  it("allows only fixed diagnostic fields at the log boundary", () => {
+    expect(clientDiagnostic({ category: "private", phase: "private", sqlReleased: "private", stderr: "private" }))
+      .toEqual({ category: "UNCLASSIFIED", phase: "BEFORE_SQL", sqlReleased: "UNKNOWN" });
+  });
+  it("classifies certificate rejection before SQL is released", async () => {
+    const t = transport(), pending = runTlsSession([], settings, sql, t.start).catch(e => e);
+    t.child.stderr.emit("data", Buffer.from("SSL error: certificate verify failed private"));
+    t.child.emit("close", 2, null);
+    expect(clientDiagnostic(await pending)).toEqual({ category: "TLS_CERTIFICATE", phase: "BEFORE_SQL", sqlReleased: false });
+    expect(t.child.stdin.end).not.toHaveBeenCalled();
+  });
+  it("retains uncertainty when a process error follows SQL release", async () => {
+    const t = transport(), pending = runTlsSession([], settings, sql, t.start).catch(e => e);
+    t.child.stdout.emit("data", Buffer.from(report + marker));
+    t.child.emit("error", new Error("private process failure"));
+    expect(clientDiagnostic(await pending)).toEqual({ category: "PROCESS_EXECUTION", phase: "BEFORE_SQL", sqlReleased: true });
+    expect(t.mock).toHaveBeenCalledOnce();
+  });
+  it("distinguishes client output parsing from connection failure", async () => {
+    const t = transport(), pending = runTlsSession([], settings, sql, t.start).catch(e => e);
+    t.child.stdout.emit("data", Buffer.from("malformed report" + marker));
+    expect(clientDiagnostic(await pending).category).toBe("TLS_OUTPUT_PARSING");
+    expect(t.child.stdin.end).not.toHaveBeenCalled();
+  });
   it.each(["TLSv1.2", "TLSv1.3"])("accepts pinned-client evidence for %s", protocol => {
     expect(validateClientTlsReport(report.replace("TLSv1.3", protocol), settings)).toBe("VERIFIED");
     expect(validateClientTlsReport(report.replace(' (address "192.0.2.1")', ""), settings)).toBe("VERIFIED");

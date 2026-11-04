@@ -5,6 +5,7 @@ import { clientImage, clientVersion, connectionFiles, dockerArguments, checkedRe
 import { runtimeAuditSql } from "../../scripts/preview/runtime-provisioning-sql.mjs";
 import { branchPrefix, repository, repositoryId, ownerId, workflow } from "../../scripts/preview/github-context.mjs";
 import { runtimeAccessQuery } from "../../scripts/preview/runtime-access.mjs";
+import { clientDiagnostic } from "../../scripts/preview/psql-tls-session.mjs";
 
 const ref = "txfxfrlhtvzwgluhnbpw", sha = "a".repeat(40);
 const env = () => ({ CI: "true", GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: repository, GITHUB_REPOSITORY_ID: repositoryId,
@@ -47,6 +48,7 @@ describe("owner-authorized runtime role transport", () => {
     expect(args).toContain("PGSSLMODE=verify-full"); expect(args).toContain("PGSSLROOTCERT=/run/preview/ca.crt");
     expect(args).toContain("PGGSSENCMODE=disable"); expect(args).toContain("--no-password");
     expect(args).toContain("--set=ON_ERROR_STOP=1"); expect(args).toContain("--pull=never");
+    expect(args).toContain("--set=VERBOSITY=verbose"); expect(args).toContain("--set=SHOW_CONTEXT=never");
     expect(args).toContain(clientImage); expect(args).toContain("/usr/lib/postgresql/17/bin/psql");
     expect(args).toContain("--read-only"); expect(args).toContain("--file=-");
   });
@@ -94,9 +96,36 @@ describe("owner-authorized runtime role transport", () => {
   it.each(["APPLY", "VERIFY"])("rejects missing actual-client evidence on %s even with otherwise valid output", phase => {
     expect(() => checkedResult({ ...output(phase === "APPLY" ? "PREFLIGHT_PASSED" : "POSTCHECK_PASSED"), clientTls: undefined }, phase)).toThrow("CLIENT_TLS_EVIDENCE");
   });
+  it.each(["APPLY", "VERIFY"])("reports SQLSTATE 42809 on %s without exposing relation or error text", phase => {
+    let caught;
+    try { checkedResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: 'ERROR: 42809: "private-object" is not a sequence' }, phase); }
+    catch (error) { caught = error; }
+    expect(caught).toMatchObject({ message: "PREVIEW_ROLE_CLIENT_FAILED" });
+    expect(clientDiagnostic(caught)).toEqual({ category: "SQL_WRONG_OBJECT_TYPE", phase, sqlReleased: true });
+    expect(JSON.stringify(caught)).not.toContain("private-object");
+  });
+  it.each(["PREVIEW_SETUP_TARGET_REJECTED", "PREVIEW_SETUP_MIGRATIONS_INCOMPLETE", "PREVIEW_RUNTIME_EFFECTIVE_PRIVILEGES_REJECTED"])
+    ("recognizes the reviewed transaction guard %s", code => {
+      expect(() => checkedResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: `ERROR: P0001: ${code} private` }, "APPLY"))
+        .toThrow("PREVIEW_ROLE_TRANSACTION_GUARD");
+    });
+  it("does not run postcheck or retry after the demonstrated SQL failure", async () => {
+    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion })
+      .mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: 'ERROR: 42809: "private" is not a sequence' });
+    await expect(provisionRuntimeRole(env(), true, d)).rejects.toMatchObject({ category: "SQL_WRONG_OBJECT_TYPE", sqlReleased: true });
+    expect(d.client.mock.calls.map(c => c[0])).toEqual(["VERSION", "APPLY"]);
+  });
 });
 
 describe("provisioning SQL boundaries", () => {
+  it("guards sequence OIDs with CASE in both the transaction and independent audit", () => {
+    for (const sql of [readFileSync("scripts/preview/runtime-role.sql", "utf8"), runtimeAuditSql(true)]) {
+      expect(sql).toMatch(/WHERE CASE WHEN (?:c\.)?relkind='S'\s+THEN has_sequence_privilege\('recycler_preview_app',(?:c\.)?oid,'USAGE,SELECT,UPDATE'\) ELSE false END/);
+      expect(sql).not.toMatch(/relkind='S'\s+AND has_sequence_privilege/);
+      // No sequence or schema exemption: every real sequence retains all three checks.
+      expect(sql.match(/has_sequence_privilege/g)).toHaveLength(1);
+    }
+  });
   it.each([false, true])("keeps every audit read-only with identity/TLS/history/RLS/count checks (%s)", after => {
     const sql = runtimeAuditSql(after);
     expect(sql.startsWith("BEGIN READ ONLY;")).toBe(true); expect(sql.endsWith("ROLLBACK;")).toBe(true);

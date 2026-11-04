@@ -9,7 +9,7 @@ import { verifiedCa } from "./tls-trust.mjs";
 import { probeTls } from "./tls-probe.mjs";
 import { sha256 } from "./verification.mjs";
 import { runtimeAuditSql } from "./runtime-provisioning-sql.mjs";
-import { runTlsSession } from "./psql-tls-session.mjs";
+import { runTlsSession, clientFailureCategory, clientDiagnostic } from "./psql-tls-session.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 // Official library/postgres 17.11-bookworm, linux/amd64 manifest read on 2026-11-04.
@@ -54,17 +54,23 @@ export function dockerArguments(directory, name, settings, version = false) {
   if (version) return [...args, "--network=none", clientImage, "--version"];
   return [...args, "--interactive", "--mount", `type=bind,source=${directory},target=/run/preview,readonly`,
     "--env", "LC_ALL=C", ...Object.entries(settings).flatMap(([k, v]) => ["--env", `${k}=${v}`]),
-    clientImage, "-X", "--no-password", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--file=-"];
+    clientImage, "-X", "--no-password", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1",
+    "--set=VERBOSITY=verbose", "--set=SHOW_CONTEXT=never", "--file=-"];
 }
 
 // Only pinned stdin SQL, never a shell. Both stdout and stderr stay private; fixed codes only.
 export function checkedResult(child, phase) {
-  if (child.clientTls !== "VERIFIED") throw Object.assign(new Error("PREVIEW_ROLE_CLIENT_TLS_EVIDENCE"), { phase });
+  if (child.clientTls !== "VERIFIED") throw Object.assign(new Error("PREVIEW_ROLE_CLIENT_TLS_EVIDENCE"), { phase, category: "TLS_EVIDENCE_MISSING" });
   if (child.error || child.signal || child.status !== 0) {
     const known = ["SCHEMA_BASELINE", "IDENTITY", "READ_ONLY", "TLS", "HISTORY", "TABLES", "RLS_API", "EMPTY_DATA", "POLICIES",
       "ROLE_EXISTS", "GRANT_AUTHORITY", "PASSWORD_AUDIT_AUTHORITY", "PUBLIC_ACCESS", "ATTRIBUTES", "MEMBERSHIPS", "PROFILE_COLUMNS", "EFFECTIVE_ACCESS"];
     const condition = known.find(c => new RegExp(`\\bPREVIEW_ROLE_${c}\\b`).test(child.stderr ?? ""));
-    throw Object.assign(new Error(`PREVIEW_ROLE_${condition ?? "CLIENT_FAILED"}`), { phase });
+    const transactionGuard = ["PREVIEW_SETUP_TARGET_REJECTED", "PREVIEW_SETUP_MIGRATIONS_INCOMPLETE", "PREVIEW_RUNTIME_EFFECTIVE_PRIVILEGES_REJECTED"]
+      .some(code => new RegExp(`\\b${code}\\b`).test(child.stderr ?? ""));
+    const category = child.error ? "PROCESS_EXECUTION" : child.signal ? "PROCESS_SIGNAL" :
+      condition || transactionGuard ? "SQL_GUARD_REJECTED" : clientFailureCategory(child.stderr);
+    throw Object.assign(new Error(`PREVIEW_ROLE_${condition ?? (transactionGuard ? "TRANSACTION_GUARD" : "CLIENT_FAILED")}`),
+      { phase, category, sqlReleased: true });
   }
   try {
     const rows = child.stdout.trim().split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
@@ -72,7 +78,7 @@ export function checkedResult(child, phase) {
     if (rows.length !== 1 || rows[0].status !== expected || !/^[a-f0-9]{64}$/.test(rows[0].schema) ||
         !["REPORTED_TLS", "REPORTED_NO_TLS", "UNKNOWN"].includes(rows[0].backendTls)) fail("OUTPUT");
     return rows[0];
-  } catch { throw Object.assign(new Error("PREVIEW_ROLE_OUTPUT"), { phase }); }
+  } catch { throw Object.assign(new Error("PREVIEW_ROLE_OUTPUT"), { phase, category: "SQL_OUTPUT_PARSING", sqlReleased: true }); }
 }
 
 export async function provisionRuntimeRole(env, execute, deps) {
@@ -121,6 +127,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           }) : await runTlsSession(args, connection.env, sql);
           if (phase === "APPLY" && !child.error && child.status === 0) completed = true;
           return child;
+        } catch (error) {
+          // Attach only the fixed execution phase; never retain/log raw child errors.
+          if (["APPLY", "VERIFY"].includes(phase) && error instanceof Error) error.phase = phase;
+          throw error;
         } finally {
           // A timed-out docker CLI must not leave a credentialed SQL container running.
           // This is cleanup, not a retry. A lost COMMIT acknowledgement remains UNKNOWN.
@@ -131,7 +141,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(JSON.stringify(result));
   } catch (error) {
     const code = /^PREVIEW_(?:ROLE|SETUP)_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "PREVIEW_ROLE_FAILED";
-    console.error(JSON.stringify({ status: completed ? "APPLIED_VERIFICATION_FAILED" : attempted ? "UNKNOWN_CHECK_BEFORE_RETRY" : "NOT_EXECUTED", code }));
+    console.error(JSON.stringify({ status: completed ? "APPLIED_VERIFICATION_FAILED" : attempted ? "UNKNOWN_CHECK_BEFORE_RETRY" : "NOT_EXECUTED",
+      code, ...clientDiagnostic(error) }));
     process.exitCode = 1;
   } finally { if (directory) rmSync(directory, { recursive: true, force: true }); }
 }
