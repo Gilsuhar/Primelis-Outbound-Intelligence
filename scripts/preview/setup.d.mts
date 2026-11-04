@@ -1,4 +1,4 @@
-export function setupPlan(env: Record<string, string | undefined>, migrations?: string[], operation?: "initialize" | "verify" | "verify-readonly" | "audit-admin" | "provision-runtime-role"): { projectRef: string; endpoint: string; migrations: string[] };
+export function setupPlan(env: Record<string, string | undefined>, migrations?: string[], operation?: "initialize" | "verify" | "verify-readonly" | "audit-admin" | "provision-runtime-role" | "bind-profile"): { projectRef: string; endpoint: string; migrations: string[] };
 export function initializePreview(env: Record<string, string | undefined>, execute: boolean, dependencies: {
   connect(url: string | undefined): Promise<{ $queryRawUnsafe(sql: string): Promise<unknown[]>; $disconnect(): Promise<void> }>;
   migrate(url: string | undefined): Promise<void>;

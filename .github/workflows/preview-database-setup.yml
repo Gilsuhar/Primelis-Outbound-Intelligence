@@ -1,8 +1,8 @@
-name: One-time Preview NOLOGIN runtime role
+name: One-time Preview SALES_USER profile binding
 
 on:
-  # Retain the deployment-excluded namespace; only the reviewed NOLOGIN role transaction.
-  # Only the owner's deliberate creation of the SHA-named branch may authorize this role transaction.
+  # Retain the deployment-excluded namespace; only the reviewed profile/policy transaction.
+  # Only the owner's deliberate creation of the SHA-named branch may authorize this binding.
   # Ordinary branch pushes, updates, tags, PRs, schedules and reruns cannot authorize this job.
   push:
     branches:
@@ -54,7 +54,7 @@ jobs:
       - name: Prepare digest-pinned PostgreSQL client without database credentials
         run: |
           docker pull --platform=linux/amd64 postgres@sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416
-      - name: Provision only the reviewed NOLOGIN role and independently verify
+      - name: Bind only the approved SALES_USER profile and independently verify
         env:
           PREVIEW_SETUP_DATABASE_URL: ${{ secrets.PREVIEW_SETUP_DATABASE_URL }}
           PREVIEW_SETUP_APPROVED_ENDPOINT: ${{ vars.PREVIEW_SETUP_APPROVED_ENDPOINT }}
@@ -66,12 +66,12 @@ jobs:
           PREVIEW_SETUP_ENVIRONMENT: agent-workforce-preview-setup
           PREVIEW_SETUP_PROJECT_NAME: agent-workforce-preview
           PREVIEW_SETUP_APPROVED_PROJECT_REF: txfxfrlhtvzwgluhnbpw
-          PREVIEW_SETUP_APPROVAL: provision-runtime-role:txfxfrlhtvzwgluhnbpw
+          PREVIEW_SETUP_APPROVAL: bind-profile:txfxfrlhtvzwgluhnbpw
           GITHUB_TOKEN: ${{ github.token }}
           ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
           ACTIONS_RUNNER_DEBUG: ${{ secrets.ACTIONS_RUNNER_DEBUG }}
           CHECKPOINT_DISABLE: '1'
           NEXT_TELEMETRY_DISABLED: '1'
         run: |
-          node scripts/preview/provision-runtime-role.mjs --plan
-          node scripts/preview/provision-runtime-role.mjs --provision-nologin-role
+          node scripts/preview/bind-profile.mjs --plan
+          node scripts/preview/bind-profile.mjs --bind-profile

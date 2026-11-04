@@ -8,6 +8,16 @@ const guard = (name, condition) => `IF (${condition}) IS DISTINCT FROM true THEN
 // Fixed, catalog/count-only checks. No caller SQL, identifiers or database values are interpolated.
 // The checks execute in READ ONLY transactions. The role transaction is a separate reviewed file.
 export function runtimeAuditSql(after = false) {
+  return auditSql(after, null);
+}
+
+// Separate expected-delta audit; never reuses the role-creation or zero-Auth-user path.
+export function bindingAuditSql(after = false) {
+  return auditSql(true, after);
+}
+
+function auditSql(after, bindingAfter) {
+  const binding = bindingAfter !== null;
   const files = reviewedFiles(target.migrations, path => Buffer.from(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n")));
   const history = target.migrations.map(name => `(${quote(name)},${quote(files.hashes[`prisma/migrations/${name}/migration.sql`])})`).join(",");
   const checks = [
@@ -83,7 +93,36 @@ export function runtimeAuditSql(after = false) {
   );
   const manifest = JSON.parse(readFileSync(new URL("./runtime-role-manifest.json", import.meta.url)));
   if (!/^[a-f0-9]{64}$/.test(manifest.schemaBaselineSha256)) throw new Error("PREVIEW_ROLE_REVIEWED_FILES_CHANGED");
-  checks.push(["SCHEMA_BASELINE", `(${schemaSnapshotQuery})=${quote(manifest.schemaBaselineSha256)}`]);
+  // The approved baseline had no temporary schemas. Subsequent read-only diagnosis
+  // proved that removing only pg_temp_/pg_toast_temp_ entries reproduces it exactly.
+  // No persistent schemas, grants, objects or application differences are filtered.
+  const snapshot = binding ? schemaSnapshotQuery.replace("WHERE n.nspname<>'public'",
+    "WHERE n.nspname<>'public' AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'") : schemaSnapshotQuery;
+  if (binding) {
+    const identity = JSON.parse(readFileSync(new URL("./profile-binding-manifest.json", import.meta.url)));
+    const id = quote(identity.authUserId), email = quote(identity.email);
+    const policy = quote(`preview_${identity.authUserId.replaceAll("-", "")}`);
+    const expression = quote(`(("authUserId" = ${id}::text) AND (email = ${email}::text) AND (role = 'SALES_USER'::public."UserRole"))`);
+    checks.splice(checks.findIndex(([name]) => name === "EMPTY_DATA"), 2,
+      ["AUTH_IDENTITY", `(SELECT count(*) FROM auth.users)=1 AND EXISTS(SELECT 1 FROM auth.users
+        WHERE id=${id}::uuid AND email=${email} AND email_confirmed_at IS NOT NULL AND is_anonymous IS FALSE
+        AND coalesce(length(encrypted_password)>0,false))
+        AND (SELECT count(*) FROM auth.identities)=1 AND EXISTS(SELECT 1 FROM auth.identities
+        WHERE user_id=${id}::uuid AND provider='email' AND lower(trim(identity_data->>'email'))=${email})`],
+      ["EMPTY_DATA", files.tables.filter(n => !["_prisma_migrations", "User"].includes(n)).map(n => `NOT EXISTS(SELECT 1 FROM public."${n}")`).join(" AND ")],
+      ["BINDING_PROFILE", bindingAfter ? `(SELECT count(*) FROM public."User")=1 AND EXISTS(SELECT 1 FROM public."User"
+        WHERE id=${quote(`preview-${identity.authUserId}`)} AND "authUserId"=${id} AND email=${email}
+        AND name='Preview reviewer' AND role='SALES_USER')` : `NOT EXISTS(SELECT 1 FROM public."User")`],
+      ["POLICIES", bindingAfter ? `(SELECT count(*) FROM pg_policies WHERE schemaname='public')=1
+        AND EXISTS(SELECT 1 FROM pg_policy WHERE polrelid='public."User"'::regclass AND polname=${policy}
+        AND polcmd='r' AND polpermissive AND polroles=ARRAY[(SELECT oid FROM pg_roles WHERE rolname='recycler_preview_app')]
+        AND polwithcheck IS NULL AND pg_get_expr(polqual,polrelid)=${expression})` : `NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public')`],
+      ["BINDING_TRIGGERS", `NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid IN ('public."User"'::regclass,'auth.users'::regclass) AND NOT tgisinternal)`],
+    );
+    if (!bindingAfter) checks.push(["BINDING_AUTHORITY", `has_table_privilege(current_user,'public."User"','INSERT')
+      AND (SELECT pg_has_role(current_user,relowner,'USAGE') FROM pg_class WHERE oid='public."User"'::regclass)`]);
+  }
+  checks.push(["SCHEMA_BASELINE", `(${snapshot})=${quote(manifest.schemaBaselineSha256)}`]);
   return `BEGIN READ ONLY;
 SET LOCAL default_transaction_read_only=on;
 SET LOCAL row_security=off;
@@ -91,11 +130,26 @@ SET LOCAL search_path=pg_catalog;
 DO $audit$ BEGIN
 ${checks.map(([name, condition]) => guard(name, condition)).join("\n")}
 END $audit$;
-SELECT json_build_object('status','${after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${schemaSnapshotQuery}),
+SELECT json_build_object('status','${binding ? bindingAfter ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED" : after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${snapshot}),
+  ${binding ? `'privileges', (${privilegeSnapshotQuery}),` : ""}
   'backendTls', (SELECT CASE WHEN count(*)<>1 THEN 'UNKNOWN' WHEN bool_and(ssl) THEN 'REPORTED_TLS'
     WHEN bool_and(NOT ssl) THEN 'REPORTED_NO_TLS' ELSE 'UNKNOWN' END FROM pg_stat_ssl WHERE pid=pg_backend_pid()));
 ROLLBACK;`;
 }
+
+// Compare effective grants and role settings before/after, including public ACLs
+// deliberately omitted by the original role-provisioning schema baseline.
+const privilegeSnapshotQuery = `SELECT encode(sha256(convert_to(coalesce(string_agg(value,E'\\n' ORDER BY value COLLATE "C"),''),'UTF8')),'hex') FROM (
+  SELECT row(n.oid,n.nspowner,n.nspacl)::text AS value FROM pg_namespace n WHERE n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
+  UNION ALL SELECT row(c.oid,c.relowner,c.relacl,a.attnum,a.attacl)::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    LEFT JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 WHERE n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
+  UNION ALL SELECT row(p.oid,p.proowner,p.proacl)::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
+  UNION ALL SELECT row(d.oid,d.datdba,d.datacl)::text FROM pg_database d
+  UNION ALL SELECT row(d.oid,d.defaclrole,d.defaclnamespace,d.defaclobjtype,d.defaclacl)::text FROM pg_default_acl d
+  UNION ALL SELECT row(r.oid,r.rolname,r.rolcanlogin,r.rolsuper,r.rolcreatedb,r.rolcreaterole,r.rolinherit,r.rolreplication,r.rolbypassrls)::text FROM pg_roles r
+  UNION ALL SELECT row(m.roleid,m.member,m.grantor,m.admin_option,m.inherit_option,m.set_option)::text FROM pg_auth_members m
+  UNION ALL SELECT row(s.setdatabase,s.setrole,s.setconfig)::text FROM pg_db_role_setting s
+) privileges`;
 
 const schemaSnapshotQuery = `
   SELECT encode(sha256(convert_to(coalesce(string_agg(value,E'\\n' ORDER BY value COLLATE "C"),''),'UTF8')),'hex') FROM (

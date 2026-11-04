@@ -324,8 +324,8 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
   }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
-    "node scripts/preview/provision-runtime-role.mjs --plan", "node scripts/preview/provision-runtime-role.mjs --provision-nologin-role"]);
-  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("provision-runtime-role:txfxfrlhtvzwgluhnbpw");
+    "node scripts/preview/bind-profile.mjs --plan", "node scripts/preview/bind-profile.mjs --bind-profile"]);
+  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("bind-profile:txfxfrlhtvzwgluhnbpw");
   expect(secretSteps[0].env.PREVIEW_ADMIN_DIFF_APPROVAL).toBeUndefined();
   // No dependency lifecycle script or database credential is present during client preparation.
   expect(steps[2].run.trim().split("\n")).toEqual([
