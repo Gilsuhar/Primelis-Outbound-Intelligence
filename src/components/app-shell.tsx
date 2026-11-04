@@ -126,10 +126,10 @@ export function AppShell({
   const role: UserRole = viewer.role;
   const navigation = getNavigationForRole(role);
   const workspaceNavigation = navigation.sales.filter(
-    (item) => item.href === "/" || item.href === "/sales-agent",
+    (item) => item.href === "/" || item.href.startsWith("/sales-agent"),
   );
   const legacyNavigation = navigation.sales.filter(
-    (item) => item.href !== "/" && item.href !== "/sales-agent",
+    (item) => item.href !== "/" && !item.href.startsWith("/sales-agent"),
   );
 
   return (

@@ -1,0 +1,411 @@
+{
+  "id": "[\"HUBSPOT\",\"synthetic-hubspot\"]",
+  "name": "Alex Example (fictional)",
+  "email": "alex@acme.example",
+  "employerDomain": "acme.example",
+  "providers": ["HUBSPOT"],
+  "identity": "VERIFIED",
+  "profiles": [],
+  "communications": [
+    {
+      "id": "synthetic-send",
+      "record": {
+        "system": "HUBSPOT",
+        "id": "synthetic-hubspot"
+      },
+      "at": "2024-06-30T09:00:00Z",
+      "scopeId": "recycler-all-outbound-email-v1",
+      "channel": "EMAIL",
+      "direction": "OUTBOUND",
+      "outcome": "SENT",
+      "relevance": "RELEVANT"
+    }
+  ],
+  "engagement": [],
+  "emailVerification": {
+    "record": {
+      "system": "HUBSPOT",
+      "id": "synthetic-hubspot"
+    },
+    "email": "alex@acme.example",
+    "employerDomain": "acme.example",
+    "providerId": "synthetic-independent",
+    "independent": true,
+    "checkedAt": "2026-11-03T09:00:00.000Z",
+    "expiresAt": "2026-11-04T09:00:00.000Z",
+    "evidenceId": "synthetic-verification",
+    "status": "VALID",
+    "businessEmail": true
+  },
+  "employmentVerification": {
+    "record": {
+      "system": "HUBSPOT",
+      "id": "synthetic-hubspot"
+    },
+    "email": "alex@acme.example",
+    "employerDomain": "acme.example",
+    "providerId": "synthetic-independent",
+    "independent": true,
+    "checkedAt": "2026-11-03T09:00:00.000Z",
+    "expiresAt": "2026-11-04T09:00:00.000Z",
+    "evidenceId": "synthetic-verification",
+    "current": true,
+    "status": "VERIFIED"
+  },
+  "hubspotId": "synthetic-hubspot",
+  "qualification": {
+    "ownership": {
+      "hubspotId": "synthetic-hubspot",
+      "employerDomain": "acme.example",
+      "evidenceId": "synthetic-qualification",
+      "source": "synthetic-receipt",
+      "authoritative": true,
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "ownerId": "1087915602"
+    },
+    "company": {
+      "hubspotId": "synthetic-hubspot",
+      "employerDomain": "acme.example",
+      "evidenceId": "synthetic-qualification",
+      "source": "synthetic-receipt",
+      "authoritative": true,
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "name": "Simulated Acme",
+      "employees": 80,
+      "annualRevenueUsd": 30000000
+    },
+    "responsibility": {
+      "hubspotId": "synthetic-hubspot",
+      "employerDomain": "acme.example",
+      "evidenceId": "synthetic-qualification",
+      "source": "synthetic-receipt",
+      "authoritative": true,
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "title": "Head of Paid Search",
+      "seniority": "DIRECTOR",
+      "searchResponsibility": true,
+      "paidSocialOnly": false
+    },
+    "opportunities": {
+      "hubspotId": "synthetic-hubspot",
+      "employerDomain": "acme.example",
+      "evidenceId": "synthetic-qualification",
+      "source": "synthetic-receipt",
+      "authoritative": true,
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "coverage": "COMPLETE",
+      "activeConflict": false
+    }
+  },
+  "decision": {
+    "candidateId": "[\"HUBSPOT\",\"synthetic-hubspot\"]",
+    "status": "ELIGIBLE",
+    "evaluatedAt": "2026-11-03T09:00:00.000Z",
+    "timezone": "Asia/Jerusalem",
+    "scopeId": "recycler-all-outbound-email-v1",
+    "reasons": [
+      {
+        "code": "ALL_CHECKS_PASSED",
+        "message": "Ownership, company, Search responsibility, opportunities and every outbound-safety and verification gate passed. Human approval is still required before any outbound action.",
+        "evidenceIds": [],
+        "status": "ELIGIBLE"
+      }
+    ],
+    "evidenceTimestamps": [
+      {
+        "kind": "HISTORY",
+        "source": "HUBSPOT",
+        "evidenceId": "synthetic-HUBSPOT",
+        "checkedAt": "2026-11-03T09:00:00.000Z",
+        "from": "2020-01-01T00:00:00Z",
+        "through": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "HISTORY",
+        "source": "OUTREACH",
+        "evidenceId": "synthetic-OUTREACH",
+        "checkedAt": "2026-11-03T09:00:00.000Z",
+        "from": "2020-01-01T00:00:00Z",
+        "through": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "COMMUNICATION",
+        "source": "HUBSPOT",
+        "evidenceId": "synthetic-send",
+        "occurredAt": "2024-06-30T09:00:00Z"
+      },
+      {
+        "kind": "EMAIL",
+        "source": "synthetic-independent",
+        "evidenceId": "synthetic-verification",
+        "checkedAt": "2026-11-03T09:00:00.000Z",
+        "expiresAt": "2026-11-04T09:00:00.000Z"
+      },
+      {
+        "kind": "EMPLOYMENT",
+        "source": "synthetic-independent",
+        "evidenceId": "synthetic-verification",
+        "checkedAt": "2026-11-03T09:00:00.000Z",
+        "expiresAt": "2026-11-04T09:00:00.000Z"
+      },
+      {
+        "kind": "SUPPRESSION",
+        "source": "HUBSPOT",
+        "evidenceId": "synthetic-HUBSPOT",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "SUPPRESSION",
+        "source": "OUTREACH",
+        "evidenceId": "synthetic-OUTREACH",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "SUPPRESSION",
+        "source": "LOCAL",
+        "evidenceId": "synthetic-local",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "SEQUENCE",
+        "source": "HUBSPOT",
+        "evidenceId": "synthetic-HUBSPOT",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "SEQUENCE",
+        "source": "OUTREACH",
+        "evidenceId": "synthetic-OUTREACH",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "QUALIFICATION",
+        "source": "synthetic-receipt",
+        "evidenceId": "synthetic-qualification",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "QUALIFICATION",
+        "source": "synthetic-receipt",
+        "evidenceId": "synthetic-qualification",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "QUALIFICATION",
+        "source": "synthetic-receipt",
+        "evidenceId": "synthetic-qualification",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      },
+      {
+        "kind": "QUALIFICATION",
+        "source": "synthetic-receipt",
+        "evidenceId": "synthetic-qualification",
+        "checkedAt": "2026-11-03T09:00:00.000Z"
+      }
+    ],
+    "latestRelevantOutbound": {
+      "id": "synthetic-send",
+      "record": {
+        "system": "HUBSPOT",
+        "id": "synthetic-hubspot"
+      },
+      "at": "2024-06-30T09:00:00Z",
+      "scopeId": "recycler-all-outbound-email-v1",
+      "channel": "EMAIL",
+      "direction": "OUTBOUND",
+      "outcome": "SENT",
+      "relevance": "RELEVANT"
+    },
+    "nextEligibleAt": "2024-10-30T10:00:00.000Z",
+    "nextEligibleDate": "2024-10-30"
+  },
+  "issues": [],
+  "history": [
+    {
+      "status": "COMPLETE",
+      "recordIds": ["synthetic-hubspot"],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-HUBSPOT",
+      "system": "HUBSPOT",
+      "scopeId": "recycler-all-outbound-email-v1",
+      "channels": ["EMAIL"],
+      "from": "2020-01-01T00:00:00Z",
+      "through": "2026-11-03T09:00:00.000Z",
+      "allUsers": true,
+      "retentionComplete": true
+    },
+    {
+      "status": "NOT_PRESENT",
+      "recordIds": [],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-OUTREACH",
+      "system": "OUTREACH",
+      "scopeId": "recycler-all-outbound-email-v1",
+      "channels": ["EMAIL"],
+      "from": "2020-01-01T00:00:00Z",
+      "through": "2026-11-03T09:00:00.000Z",
+      "allUsers": true,
+      "retentionComplete": true
+    }
+  ],
+  "suppressions": [
+    {
+      "status": "COMPLETE",
+      "recordIds": ["synthetic-hubspot"],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-HUBSPOT",
+      "source": "HUBSPOT",
+      "unsubscribed": false,
+      "complained": false,
+      "hardBounced": false,
+      "doNotContact": false
+    },
+    {
+      "status": "NOT_PRESENT",
+      "recordIds": [],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-OUTREACH",
+      "source": "OUTREACH",
+      "unsubscribed": false,
+      "complained": false,
+      "hardBounced": false,
+      "doNotContact": false
+    },
+    {
+      "status": "COMPLETE",
+      "recordIds": ["[\"HUBSPOT\",\"synthetic-hubspot\"]"],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-local",
+      "source": "LOCAL",
+      "unsubscribed": false,
+      "complained": false,
+      "hardBounced": false,
+      "doNotContact": false
+    }
+  ],
+  "sequences": [
+    {
+      "status": "COMPLETE",
+      "recordIds": ["synthetic-hubspot"],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-HUBSPOT",
+      "system": "HUBSPOT",
+      "states": []
+    },
+    {
+      "status": "NOT_PRESENT",
+      "recordIds": [],
+      "checkedAt": "2026-11-03T09:00:00.000Z",
+      "authoritative": true,
+      "evidenceId": "synthetic-OUTREACH",
+      "system": "OUTREACH",
+      "states": []
+    }
+  ],
+  "historyTraversal": [
+    {
+      "record": {
+        "system": "HUBSPOT",
+        "id": "synthetic-hubspot"
+      },
+      "status": "COMPLETE"
+    }
+  ],
+  "preparation": {
+    "version": "44e7521bd5783c77fc71031807550cc356c36e13c913e871b16e64d49ef666ea",
+    "evaluatedAt": "2026-11-03T09:00:00.000Z",
+    "mode": "SIMULATED",
+    "research": "COMPLETE",
+    "drafting": "READY_FOR_REVIEW",
+    "humanReview": "PENDING",
+    "canSend": false,
+    "canEnroll": false,
+    "reasons": [],
+    "brief": [
+      {
+        "topic": "Company overview",
+        "status": "MISSING",
+        "text": "A broader company overview is not included in this Search evidence packet.",
+        "sources": []
+      },
+      {
+        "topic": "Search responsibilities",
+        "status": "SUPPORTED",
+        "text": "Head of Paid Search; Search responsibility verified by synthetic-receipt.",
+        "sources": ["https://professional.example/simulated-verification"]
+      },
+      {
+        "topic": "Branded Search opportunity",
+        "status": "SUPPORTED",
+        "text": "acme.example: 62% estimated branded share of paid search visits; branded keyword \"Simulated Acme\"; US, desktop, 2026-10-03 to 2026-11-02.",
+        "sources": [
+          "https://exports.example/simulated-search",
+          "https://www.google.com/search?q=Simulated%20Acme"
+        ]
+      },
+      {
+        "topic": "SERP observations",
+        "status": "SUPPORTED",
+        "text": "For \"Simulated Acme\" in New York,New York,United States (US, desktop) at 2026-11-03T09:00:00.000Z, brand advertising was OBSERVED; other advertiser domains: other-advertiser.example. This single snapshot does not establish competitor identity, persistent absence, CPC, CTR, CVR or incrementality.",
+        "sources": ["https://www.google.com/search?q=Simulated%20Acme"]
+      },
+      {
+        "topic": "Branded CPC efficiency",
+        "status": "HYPOTHESIS",
+        "text": "Check whether branded bids could be lower when competitive pressure drops. CPC, spend and achievable savings are not established.",
+        "sources": []
+      },
+      {
+        "topic": "Similarweb insights",
+        "status": "SUPPORTED",
+        "text": "acme.example: 12000 estimated paid search visits; US, desktop, 2026-10-03 to 2026-11-02.",
+        "sources": ["https://exports.example/simulated-search"]
+      },
+      {
+        "topic": "Messaging angle",
+        "status": "HYPOTHESIS",
+        "text": "Hypothesis only: monitor this branded query across locations and times, then test whether pausing ads or reducing CPC when conditions permit preserves performance. First-party CTR, CVR and a controlled incrementality assessment are required; these observations prove no savings or unnecessary spend.",
+        "sources": []
+      },
+      {
+        "topic": "Evidence freshness",
+        "status": "SUPPORTED",
+        "text": "SERP observed 2026-11-03T09:00:00.000Z; search evidence retrieved 2026-11-03T09:00:00.000Z.",
+        "sources": [
+          "https://exports.example/simulated-search",
+          "https://www.google.com/search?q=Simulated%20Acme"
+        ]
+      }
+    ],
+    "emails": [
+      {
+        "subject": "Simulated Acme's brand bids",
+        "body": "Hi Alex,\n\nBased on search traffic data, branded keywords accounted for an estimated 62% of Simulated Acme's US desktop paid-search visits between 3 Oct and 2 Nov 2026.\n\nSignal can lower bids or pause ads where configured, then restore coverage when competition returns. When does your brand ad need to defend the click, and when could a lower bid do the same job?\n\nWorth checking where CPCs could be lower?\n\nGil",
+        "evidenceIds": ["account:signal-2"]
+      },
+      {
+        "subject": "Who else shows up?",
+        "body": "Hi Alex,\n\nOn 3 Nov 2026, a desktop search for \"Simulated Acme\" in New York showed your ad alongside another advertiser.\n\nThat's the picture I'd want over time: who shows up, and when your brand needs defending.\n\nSignal monitors branded Google search conditions and competitor presence.\n\nDo you already use that view to decide when to bid?\n\nGil",
+        "evidenceIds": ["account:signal-3"]
+      }
+    ],
+    "quality": {
+      "checksPassed": true,
+      "wordsPerEmail": [71, 58],
+      "concerns": [
+        "Human semantic and commercial review required; deterministic checks do not authorize sending."
+      ]
+    },
+    "screenshot": {
+      "status": "RECOMMENDED",
+      "sourceUrl": "https://www.google.com/search?q=Simulated%20Acme",
+      "instruction": "Capture Simulated Acme in New York,New York,United States on desktop, matching the observation at 2026-11-03T09:00:00.000Z. No screenshot is attached; this does not establish overspending."
+    }
+  }
+}

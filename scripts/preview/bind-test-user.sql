@@ -13,7 +13,7 @@ BEGIN
     RAISE EXCEPTION 'PREVIEW_SETUP_TARGET_REJECTED';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'recycler_preview_app'
-    AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolbypassrls AND NOT rolinherit)
+    AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolbypassrls AND NOT rolinherit AND NOT rolreplication)
     OR EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members WHERE member =
       (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'recycler_preview_app'))
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid = 'public."User"'::regclass AND relrowsecurity) THEN

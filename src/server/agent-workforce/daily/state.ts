@@ -12,7 +12,7 @@ export function dailyConfig(env: NodeJS.ProcessEnv = process.env) {
     timezone: "Asia/Jerusalem",
     dailyBudgetUsd: Number(env.WORKFORCE_DAILY_BUDGET_USD ?? 5),
     monthlyBudgetUsd: Number(env.WORKFORCE_MONTHLY_BUDGET_USD ?? 100),
-    maxContacts: Number(env.WORKFORCE_MAX_CONTACTS ?? 25),
+    maxContacts: Number(env.WORKFORCE_MAX_CONTACTS ?? 50),
     maxConcurrentCalls: Number(env.WORKFORCE_MAX_CONCURRENT_CALLS ?? 1),
     maxRetries: Number(env.WORKFORCE_MAX_RETRIES ?? 2),
   });

@@ -8,6 +8,8 @@ const buildInfo =
 if (buildInfo) console.info("[workforce-build]", JSON.stringify(buildInfo));
 
 const nextConfig: NextConfig = {
+  // Public trust anchor required by the isolated Preview Prisma connection.
+  outputFileTracingIncludes: { "/*": ["./scripts/preview/supabase-prod-ca-2021.crt"] },
   // Authorization grants arrive in callback query strings; never log incoming URLs.
   logging:
     process.env.LOCAL_OUTREACH_OAUTH_ENABLED === "true" ? { incomingRequests: false } : undefined,

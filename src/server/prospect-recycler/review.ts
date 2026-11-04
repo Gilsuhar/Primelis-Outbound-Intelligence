@@ -95,8 +95,16 @@ export async function loadRecyclerReview(options: {
       employerDomain: candidate.input.identity.employerDomain ?? null,
       providers: candidate.input.identity.records.map((r) => r.system),
       identity: candidate.input.identity.resolution,
-      hubspotId: candidate.input.identity.records.find(record => record.system === "HUBSPOT")?.id ?? null,
-      qualification: qualificationSchema.safeParse(options.evidence?.[candidate.input.candidateId]?.qualification).data,
+      profiles: candidate.profiles,
+      communications: candidate.input.communications,
+      engagement: candidate.engagement,
+      emailVerification: candidate.input.emailVerification,
+      employmentVerification: candidate.input.employmentVerification,
+      hubspotId:
+        candidate.input.identity.records.find((record) => record.system === "HUBSPOT")?.id ?? null,
+      qualification: qualificationSchema.safeParse(
+        options.evidence?.[candidate.input.candidateId]?.qualification,
+      ).data,
       decision: result.decisions[index],
       issues: candidate.issues,
       history: candidate.input.history,
@@ -109,11 +117,13 @@ export async function loadRecyclerReview(options: {
   // Keep the strongest negative decision; never combine evidence to manufacture clearance.
   const rank = { EXCLUDED: 0, HOLD: 1, ELIGIBLE: 2 };
   const seen = new Set<string>();
-  list.rows = list.rows.sort((a, b) => rank[a.decision.status] - rank[b.decision.status]).filter(row => {
-    if (!row.hubspotId) return true;
-    if (seen.has(row.hubspotId)) return false;
-    seen.add(row.hubspotId);
-    return true;
-  });
+  list.rows = list.rows
+    .sort((a, b) => rank[a.decision.status] - rank[b.decision.status])
+    .filter((row) => {
+      if (!row.hubspotId) return true;
+      if (seen.has(row.hubspotId)) return false;
+      seen.add(row.hubspotId);
+      return true;
+    });
   return list;
 }

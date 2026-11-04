@@ -4,6 +4,7 @@ import { SIGNAL_HUBSPOT_OWNER_ID } from "@/features/sales-agent/qualification";
 import type { EvidenceObservation, IntakeContact } from "@/features/sales-agent/evidence";
 import { HubSpotReadOnlyIntake, normalizeHubSpotNumber } from "@/server/sales-agent/hubspot-intake";
 import { IntegrationError, ReadTransport, type TransportOptions } from "./http";
+import { timestamp } from "@/features/prospect-recycler/calendar";
 const record = z.object({ id: z.string(), properties: z.record(z.string().nullable()) });
 const associations = z.object({
   results: z.array(
@@ -78,6 +79,9 @@ export class HubSpotConnector {
     );
   }
   async discover(since: string, until: string, cursor?: string) {
+    if (timestamp(since) === null || timestamp(until) === null || Date.parse(since) > Date.parse(until) ||
+        (cursor !== undefined && !/^\d{1,30}$/.test(cursor)))
+      throw new IntegrationError("CONFIGURATION");
     const filters = [
       { propertyName: "hubspot_owner_id", operator: "EQ", value: SIGNAL_HUBSPOT_OWNER_ID },
       {
@@ -110,6 +114,18 @@ export class HubSpotConnector {
       )
     )
       throw new IntegrationError("INVALID_RESPONSE");
+    // Never advance a persisted keyset cursor past an out-of-order page or an ownership conflict.
+    // Identical duplicate IDs are harmless; conflicting copies require a retry from the checkpoint.
+    const seen = new Map<string, string | null>();
+    let previous: bigint | undefined;
+    for (const item of data.results) {
+      const current = BigInt(item.id), owner = item.properties.hubspot_owner_id;
+      if ((previous !== undefined && current < previous) ||
+          (seen.has(item.id) && seen.get(item.id) !== owner))
+        throw new IntegrationError("INVALID_RESPONSE");
+      previous = current;
+      seen.set(item.id, owner);
+    }
     return { ids, next: data.results.length === 100 ? data.results.at(-1)!.id : undefined };
   }
   private async associated(

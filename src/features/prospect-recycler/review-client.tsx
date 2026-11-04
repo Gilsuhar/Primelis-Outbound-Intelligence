@@ -1,7 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WorkflowPage, WorkflowCard } from "@/features/workflow/workflow-layout";
-import { filterReviewRows, reviewCsv, reviewDate, reviewSections, type ReviewList, type ReviewRow } from "./review";
+import {
+  eligibilityLabel,
+  filterReviewRows,
+  sortReviewRows,
+  reviewCsv,
+  reviewDate,
+  reviewSections,
+  type ReviewSort,
+  type ReviewList,
+  type ReviewRow,
+} from "./review";
 
 const button =
   "rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink disabled:opacity-50";
@@ -23,13 +33,16 @@ function Candidate({ row }: { row: ReviewRow }) {
           <p className="text-muted text-xs">
             {row.providers.join(" + ")} · Identity: {row.identity}
           </p>
-          <p className="text-sm">{row.qualification?.company?.name ?? "Company not verified"} · {row.qualification?.responsibility?.title ?? "Role not verified"}</p>
+          <p className="text-sm">
+            {row.qualification?.company?.name ?? "Company not verified"} ·{" "}
+            {row.qualification?.responsibility?.title ?? "Role not verified"}
+          </p>
           <p className="text-muted text-xs">HubSpot ID: {row.hubspotId ?? "Not established"}</p>
         </div>
         <span
           className={"rounded-full px-3 py-1 text-xs font-bold " + statusStyle[row.decision.status]}
         >
-          {row.decision.status}
+          {eligibilityLabel(row.decision.status)}
         </span>
       </div>
       <p className="mt-3 text-sm">
@@ -42,8 +55,130 @@ function Candidate({ row }: { row: ReviewRow }) {
         Four-month cooldown anniversary: {row.decision.nextEligibleDate ?? "Unknown"}. This date
         alone does not establish eligibility.
       </p>
-      <p className="mt-2 text-sm">Draft readiness: {row.decision.status === "ELIGIBLE" ? "Eligible for human draft review; not approved to send." : "Eligibility evidence must be resolved before outreach approval."}</p>
-      <p className="text-muted text-xs">Screenshot recommendation: require a current SERP observation matching this employer and target brand; none attached to this review.</p>
+      <p className="mt-2 text-sm">
+        Draft readiness:{" "}
+        {row.decision.status === "ELIGIBLE"
+          ? "Eligible for human draft review; not approved to send."
+          : "Eligibility evidence must be resolved before outreach approval."}
+      </p>
+      <p className="text-muted text-xs">
+        Screenshot recommendation: require a current SERP observation matching this employer and
+        target brand; none attached to this review.
+      </p>
+      <p className="mt-2 text-sm">
+        Employment: {row.employmentVerification?.status ?? "UNKNOWN"} · Email verification:{" "}
+        {row.emailVerification?.status ?? "UNKNOWN"}. Human review: pending.
+      </p>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer font-semibold">
+          Company qualification and source observations
+        </summary>
+        <p>
+          Employees: {row.qualification?.company?.employees ?? "Unknown"} · Annual revenue (USD):{" "}
+          {row.qualification?.company?.annualRevenueUsd?.toLocaleString("en-US") ?? "Unknown"}
+        </p>
+        <p>
+          Both 80 employees and USD 30 million revenue are mandatory. CRM observations alone do not
+          verify employment or email.
+        </p>
+        <p>
+          HubSpot owner: {row.qualification?.ownership?.ownerId ?? "Unknown"} · Required owner:{" "}
+          1087915602. Source: {row.qualification?.ownership?.source ?? "Missing"}; checked{" "}
+          {reviewDate(row.qualification?.ownership?.checkedAt)}.
+        </p>
+        {row.profiles?.map((profile, i) => (
+          <p key={i}>
+            {profile.source}: owner {profile.ownerId ?? "Unknown"}; role{" "}
+            {profile.title ?? "Unknown"}; created {reviewDate(profile.createdAt)}; updated{" "}
+            {reviewDate(profile.updatedAt)}; observed {reviewDate(profile.observedAt)}.
+          </p>
+        ))}
+      </details>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer font-semibold">Activity timeline</summary>
+        {!row.communications?.length && !row.engagement?.length && (
+          <p>No activity observations available; this does not establish no contact.</p>
+        )}
+        {[
+          ...(row.communications ?? []).map((e) => ({
+            id: e.id,
+            at: e.at,
+            text: `${e.record.system} ${e.direction} ${e.outcome}`,
+          })),
+          ...(row.engagement ?? []).map((e) => ({
+            id: e.id,
+            at: e.at,
+            text: `${e.source} ${e.kind} (engagement only)`,
+          })),
+        ]
+          .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+          .map((e) => (
+            <p key={e.id}>
+              {reviewDate(e.at)} · {e.text}
+            </p>
+          ))}
+      </details>
+      <details className="mt-3 text-sm" open={!!row.preparation}>
+        <summary className="cursor-pointer font-semibold">Research and email drafts</summary>
+        {!row.preparation ? (
+          <p>
+            Research has not been attached to this candidate. No company claims, CPC values or
+            screenshots inferred.
+          </p>
+        ) : (
+          <>
+            <p>
+              {row.preparation.mode === "SIMULATED"
+                ? "Fictional research and drafts — offline demonstration only."
+                : "Source-backed draft awaiting human review."}
+            </p>
+            {row.preparation.brief.map((section) => (
+              <div className="mt-3" key={section.topic}>
+                <h4 className="font-semibold">
+                  {section.topic} · {section.status}
+                </h4>
+                <p>{section.text}</p>
+                {section.sources.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mr-3 underline"
+                  >
+                    Source
+                  </a>
+                ))}
+              </div>
+            ))}
+            <p className="mt-3">{row.preparation.screenshot.instruction}</p>
+            {row.preparation.emails.map((email, i) => (
+              <div key={i} className="mt-3 rounded border border-line p-3">
+                <p className="mb-2 text-sm font-semibold text-amber-900">
+                  Draft only · Pending human review · Not sent
+                </p>
+                <h4 className="font-semibold">
+                  {i ? "Optional follow-up" : "First email"}: {email.subject}
+                </h4>
+                <p className="whitespace-pre-line">{email.body}</p>
+                <p className="text-muted mt-2 text-xs">
+                  {row.preparation!.quality.wordsPerEmail[i]} words · Evidence:{" "}
+                  {email.evidenceIds.join(", ")}
+                </p>
+              </div>
+            ))}
+            <p className="mt-3">
+              Quality:{" "}
+              {row.preparation.quality.checksPassed ? "Deterministic checks passed" : "Incomplete"}.{" "}
+              {row.preparation.quality.concerns.join(" ")}
+            </p>
+            <p>
+              Research {row.preparation.research} · Draft {row.preparation.drafting} · Human review{" "}
+              {row.preparation.humanReview} · Sending not approved.
+            </p>
+          </>
+        )}
+      </details>
       <details className="mt-3" open={row.decision.status !== "ELIGIBLE"}>
         <summary className="cursor-pointer text-sm font-semibold">
           Decision reasons and evidence gaps
@@ -92,33 +227,18 @@ function Candidate({ row }: { row: ReviewRow }) {
             </li>
           ))}
           {row.decision.evidenceTimestamps
-            .filter((e) => e.kind === "EMAIL" || e.kind === "EMPLOYMENT" || e.kind === "QUALIFICATION")
+            .filter(
+              (e) => e.kind === "EMAIL" || e.kind === "EMPLOYMENT" || e.kind === "QUALIFICATION",
+            )
             .map((e, i) => (
               <li key={i}>
-                {e.kind}: {e.source} · {e.evidenceId}; checked {reviewDate(e.checkedAt)}; expires {reviewDate(e.expiresAt)}.
+                {e.kind}: {e.source} · {e.evidenceId}; checked {reviewDate(e.checkedAt)}; expires{" "}
+                {reviewDate(e.expiresAt)}.
               </li>
             ))}
         </ul>
       </details>
     </article>
-  );
-}
-function Group({ title, rows, empty }: { title: string; rows: ReviewRow[]; empty: string }) {
-  return (
-    <WorkflowCard>
-      <h2 className="mb-3 text-xl font-semibold text-ink">
-        {title} ({rows.length})
-      </h2>
-      {rows.length ? (
-        <div className="space-y-4">
-          {rows.map((row) => (
-            <Candidate key={row.id} row={row} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-muted text-sm">{empty}</p>
-      )}
-    </WorkflowCard>
   );
 }
 export function RecyclerReview({
@@ -134,8 +254,20 @@ export function RecyclerReview({
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [sort, setSort] = useState<ReviewSort>("OUTBOUND_OLDEST");
+  const [selected, setSelected] = useState<string | null>(null);
+  const detailsHeading = useRef<HTMLHeadingElement>(null);
+  const detailsTrigger = useRef<HTMLButtonElement | null>(null);
   const sections = reviewSections(list);
-  const visible = reviewSections({ ...list, rows: filterReviewRows(list.rows, query, status) });
+  const visible = sortReviewRows(filterReviewRows(list.rows, query, status), sort);
+  const candidate = visible.find((row) => row.id === selected);
+  const selectedCandidateId = candidate?.id;
+  useEffect(() => {
+    if (selectedCandidateId) {
+      detailsHeading.current?.focus();
+      detailsHeading.current?.scrollIntoView?.({ block: "start" });
+    }
+  }, [selectedCandidateId]);
   async function read() {
     if (busy) return;
     setBusy(true);
@@ -147,9 +279,14 @@ export function RecyclerReview({
         body: JSON.stringify({ action: "READ_FIVE", source }),
         cache: "no-store",
       });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || "Read failed.");
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok)
+        throw new Error(
+          result?.message ||
+            "Prospects could not be loaded. Try again when the connection is available.",
+        );
       setList(result.data);
+      setSelected(null);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Read failed. No automatic retry.");
     } finally {
@@ -169,13 +306,13 @@ export function RecyclerReview({
   return (
     <WorkflowPage
       eyebrow="Prospect review"
-      title="Daily Top 50"
-      description="Review candidates from HubSpot and Outreach. Only candidates that pass every evidence check appear in the eligible Top 50."
+      title="Daily prospect workspace"
+      description="Review 40–50 prospects per batch. Eligibility depends on evidence, never a quota. Research, drafts and human approval remain separate."
     >
       <WorkflowCard>
         <p className="font-semibold">
           {list.mode === "DEMO"
-            ? "Offline demonstration — five fictional candidates"
+            ? `Offline demonstration — ${list.rows.length} fictional candidates`
             : "Live read-only review — up to five provider records"}
         </p>
         <p className="text-muted mt-1 text-sm">
@@ -209,6 +346,10 @@ export function RecyclerReview({
             onClick={() => {
               setList(initial);
               setError(null);
+              setQuery("");
+              setStatus("ALL");
+              setSort("OUTBOUND_OLDEST");
+              setSelected(null);
             }}
             disabled={busy}
           >
@@ -235,6 +376,11 @@ export function RecyclerReview({
             Live reads require the existing local integration operator session.
           </p>
         )}
+        {busy && (
+          <p role="status" className="mt-3 text-sm">
+            Reading prospects… The previous evaluation remains visible until the read completes.
+          </p>
+        )}
         {error && (
           <p role="alert" className="mt-3 text-red-800">
             {error} The previous list remains displayed with its original evaluation time.
@@ -243,15 +389,95 @@ export function RecyclerReview({
         <p aria-live="polite" className="mt-3 text-sm">
           {list.rows.length} candidates reviewed · {sections.eligibleCount} eligible ·{" "}
           {sections.needsVerification.length + sections.otherHolds.length} on hold ·{" "}
-          {sections.excluded.length} excluded
+          {sections.excluded.length} disqualified
         </p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <label>Search candidates <input aria-label="Search candidates" className="rounded border p-2" value={query} onChange={event => setQuery(event.target.value)} placeholder="Name, company, ID or evidence gap" /></label>
-          <label>Status <select aria-label="Review status" className="rounded border p-2" value={status} onChange={event => setStatus(event.target.value)}>
-            <option value="ALL">All statuses</option><option value="ELIGIBLE">Eligible</option><option value="HOLD">Hold</option><option value="EXCLUDED">Excluded</option>
-          </select></label>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            [
+              "Missing evidence",
+              list.rows.filter((r) => r.decision.reasons.some((reason) => reason.status === "HOLD"))
+                .length,
+            ],
+            [
+              "Research completed",
+              list.rows.filter((r) => r.preparation?.research === "COMPLETE").length,
+            ],
+            [
+              "Drafts ready for review",
+              list.rows.filter((r) => r.preparation?.drafting === "READY_FOR_REVIEW").length,
+            ],
+            ["Human review pending", list.rows.length],
+          ].map(([label, count]) => (
+            <div className="rounded-lg bg-slate-50 p-3" key={label}>
+              <p className="text-muted text-xs">{label}</p>
+              <strong className="text-xl">{count}</strong>
+            </div>
+          ))}
         </div>
-        <p className="text-muted text-xs">Filters affect the displayed review. CSV exports retain the complete evaluation.</p>
+        <div className="mt-3 text-sm" aria-label="Integration status">
+          {list.discovery.map((integration) => (
+            <p key={integration.provider}>
+              {integration.provider}:{" "}
+              {list.mode === "DEMO" ? "Synthetic data only" : integration.status} · Last successful
+              synchronization: {reviewDate(integration.lastSuccessfulSync)}. Visible page completion
+              does not verify historical coverage.
+            </p>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <label>
+            Search candidates{" "}
+            <input
+              aria-label="Search candidates"
+              className="rounded border p-2"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, company, ID or evidence gap"
+            />
+          </label>
+          <label>
+            Status{" "}
+            <select
+              aria-label="Review status"
+              className="rounded border p-2"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="ALL">All statuses</option>
+              <option value="ELIGIBLE">Eligible</option>
+              <option value="HOLD">Hold</option>
+              <option value="EXCLUDED">Disqualified</option>
+            </select>
+          </label>
+          <label>
+            Sort{" "}
+            <select
+              aria-label="Sort candidates"
+              className="rounded border p-2"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as ReviewSort)}
+            >
+              <option value="OUTBOUND_OLDEST">Oldest outbound first</option>
+              <option value="OUTBOUND_NEWEST">Newest outbound first</option>
+              <option value="COMPANY">Company</option>
+              <option value="NAME">Contact name</option>
+            </select>
+          </label>
+        </div>
+        <p className="text-muted text-xs">
+          Filters affect the displayed review. CSV exports retain the complete evaluation.
+        </p>
+        {(query || status !== "ALL") && (
+          <button
+            className={button}
+            onClick={() => {
+              setQuery("");
+              setStatus("ALL");
+            }}
+          >
+            Clear filters
+          </button>
+        )}
         {!!list.issues.length && (
           <div role="status" className="mt-3 rounded bg-amber-50 p-3 text-sm">
             Collection incomplete:{" "}
@@ -260,22 +486,124 @@ export function RecyclerReview({
           </div>
         )}
       </WorkflowCard>
-      <Group
-        title="Eligible Top 50"
-        rows={visible.top50}
-        empty="No fully verified eligible candidates in this evaluation."
-      />
-      <Group
-        title="Needs Verification"
-        rows={visible.needsVerification}
-        empty="No candidates awaiting email or employment verification."
-      />
-      <Group title="Other holds" rows={visible.otherHolds} empty="No other held candidates." />
-      <Group
-        title="Excluded"
-        rows={visible.excluded}
-        empty="No exclusions observed in this evaluation."
-      />
+      <WorkflowCard>
+        <h2 className="mb-3 text-xl font-semibold">Prospect review ({visible.length})</h2>
+        {!visible.length ? (
+          <p>
+            {list.rows.length
+              ? "No candidates match these filters. Clear search or choose all statuses."
+              : "No prospects were returned. Check collection status and evidence coverage before trying again; an empty list is not clearance."}
+          </p>
+        ) : (
+          <div
+            className="overflow-x-auto"
+            role="region"
+            aria-label="Scrollable prospect table"
+            tabIndex={0}
+          >
+            <table className="w-full text-left text-sm" aria-label="Daily prospects">
+              <thead>
+                <tr>
+                  {[
+                    "Company / Contact",
+                    "Role / HubSpot ID",
+                    "Last outbound",
+                    "Email verification",
+                    "Eligibility / HOLD reasons",
+                    "Research / Draft",
+                  ].map((label) => (
+                    <th key={label} className="border-b border-line p-3">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((row) => (
+                  <tr key={row.id} className="border-b border-line align-top">
+                    <td className="p-3">
+                      <div>
+                        {row.qualification?.company?.name ??
+                          row.profiles?.find((p) => p.company)?.company?.name ??
+                          row.employerDomain ??
+                          "Company unknown"}
+                      </div>
+                      <button
+                        className="font-semibold underline"
+                        aria-label={`Inspect ${row.name}`}
+                        onClick={(event) => {
+                          detailsTrigger.current = event.currentTarget;
+                          setSelected(row.id);
+                        }}
+                      >
+                        {row.name}
+                      </button>
+                    </td>
+                    <td className="p-3">
+                      {row.qualification?.responsibility?.title ??
+                        row.profiles?.find((p) => p.title)?.title ??
+                        "Role unknown"}
+                      <div className="text-muted text-xs">
+                        {row.hubspotId ?? "No verified HubSpot ID"} · {row.providers.join(" + ")}
+                      </div>
+                    </td>
+                    <td className="p-3">{reviewDate(row.decision.latestRelevantOutbound?.at)}</td>
+                    <td className="p-3">
+                      {row.emailVerification?.status ?? "UNKNOWN"}
+                      <div className="text-muted text-xs">
+                        {reviewDate(row.emailVerification?.checkedAt)}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={
+                          "rounded px-2 py-1 font-semibold " + statusStyle[row.decision.status]
+                        }
+                      >
+                        {eligibilityLabel(row.decision.status)}
+                      </span>
+                      <p className="mt-2 max-w-sm">
+                        {row.decision.reasons
+                          .filter((r) => r.status !== "ELIGIBLE")
+                          .sort(
+                            (a, b) =>
+                              Number(b.status === "EXCLUDED") - Number(a.status === "EXCLUDED"),
+                          )
+                          .map((r) => r.message)
+                          .slice(0, 2)
+                          .join(" ")}
+                      </p>
+                    </td>
+                    <td className="p-3">
+                      {row.preparation?.research ?? "MISSING"}
+                      <div>{row.preparation?.drafting ?? "MISSING"}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </WorkflowCard>
+      {candidate && (
+        <WorkflowCard>
+          <div className="mb-3 flex justify-between">
+            <h2 ref={detailsHeading} tabIndex={-1} className="text-xl font-semibold">
+              Prospect details
+            </h2>
+            <button
+              className={button}
+              onClick={() => {
+                setSelected(null);
+                detailsTrigger.current?.focus();
+              }}
+            >
+              Close details
+            </button>
+          </div>
+          <Candidate row={candidate} />
+        </WorkflowCard>
+      )}
     </WorkflowPage>
   );
 }

@@ -6,6 +6,14 @@ import { getNavigationForRole } from "@/lib/navigation";
 import { getTrustedRoleContext, normalizeTrustedRole } from "@/lib/role-context";
 
 describe("role-based navigation", () => {
+  it("labels every navigation destination in each supported language and preserves unknown labels", () => {
+    const navigation = getNavigationForRole("KNOWLEDGE_ADMIN");
+    for (const language of ["ENGLISH", "FRENCH", "PORTUGUESE"] as const) {
+      for (const item of [...navigation.sales, ...navigation.admin])
+        expect(translateNavigationLabel(item.label, language)?.trim().length).toBeGreaterThan(0);
+      expect(translateNavigationLabel("Future destination", language)).toBe("Future destination");
+    }
+  });
   it("shows the simplified sales navigation for sales users", () => {
     const navigation = getNavigationForRole("SALES_USER");
 

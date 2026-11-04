@@ -1,6 +1,17 @@
 import { emptySnapshot } from "./shared";
 import { loadRecyclerReview } from "./review";
 import { EMAIL_SCOPE, type Reader, type Snapshot } from "./types";
+import productRow from "@/data/fixtures/recycler-product-row.json";
+import type { ReviewRow } from "@/features/prospect-recycler/review";
+
+/** Saved output of the fully mocked product evaluation. Page rendering never runs agents/providers. */
+export async function recyclerWorkspaceDemo() {
+  const row = structuredClone(productRow) as ReviewRow;
+  if (row.preparation?.mode !== "SIMULATED" || row.preparation.canSend || row.preparation.canEnroll)
+    throw new Error("INVALID_SYNTHETIC_REVIEW");
+  const list = await recyclerReviewDemo(row.decision.evaluatedAt);
+  return { ...list, rows: [row, ...list.rows] };
+}
 
 /** Fictional review fixtures only. No fabricated verification or authority receipts. */
 export async function recyclerReviewDemo(asOf = "2026-10-25T09:00:00.000Z") {

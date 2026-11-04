@@ -1,4 +1,4 @@
-import { configuredDatabaseUrl } from "./preview-isolation";
+import { runtimeDatabaseUrl } from "./preview-runtime-tls";
 import { isPreviewRestricted } from "./preview-policy.mjs";
 import { createRequire } from "node:module";
 
@@ -37,7 +37,7 @@ let clientUrl: string | undefined;
 let clientRestricted: boolean | undefined;
 export const prisma = new Proxy({} as MinimalPrismaClient, {
   get(_target, key) {
-    const url = configuredDatabaseUrl();
+    const url = runtimeDatabaseUrl();
     const restricted = isPreviewRestricted();
     // Never reuse a previously constructed client across configuration/security boundaries.
     if (clientUrl !== url || clientRestricted !== restricted) client = undefined;

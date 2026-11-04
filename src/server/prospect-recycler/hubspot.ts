@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { IntegrationError } from "../integrations/http";
 import { timestamp } from "../../features/prospect-recycler/calendar";
+import { SIGNAL_HUBSPOT_OWNER_ID } from "../../features/sales-agent/qualification";
+import { normalizeHubSpotNumber } from "../sales-agent/hubspot-intake";
 import {
   EMAIL_SCOPE,
   normalizeDomain,
@@ -48,7 +50,7 @@ export class HubSpotRecyclerReader implements Reader {
   ) {
     assertId(config.ownerId);
     if (
-      timestamp(config.asOf) === null ||
+      config.ownerId !== SIGNAL_HUBSPOT_OWNER_ID || timestamp(config.asOf) === null ||
       (config.outreachIdProperty &&
         !/^[A-Za-z][A-Za-z0-9_]{0,99}$/.test(config.outreachIdProperty)) ||
       (config.maxPages !== undefined &&
@@ -62,6 +64,7 @@ export class HubSpotRecyclerReader implements Reader {
       "lastname",
       "email",
       "hubspot_owner_id",
+      "jobtitle", "createdate", "lastmodifieddate", "hubspot_owner_assigneddate",
       "hs_email_optout",
       "hs_email_hard_bounce_reason",
       "hs_sequences_is_enrolled",
@@ -77,6 +80,9 @@ export class HubSpotRecyclerReader implements Reader {
     return {
       record: { system: this.system, id: item.id },
       fullName: [p.firstname, p.lastname].filter(Boolean).join(" "),
+      profile: { source: this.system, observedAt: this.config.asOf, ownerId: p.hubspot_owner_id ?? null,
+        title: p.jobtitle ?? null, createdAt: eventTime(p.createdate), updatedAt: eventTime(p.lastmodifieddate),
+        assignedAt: eventTime(p.hubspot_owner_assigneddate) },
       emails: email.safeParse(address).success ? [address] : [],
       ...(email.safeParse(address).success ? { email: address } : {}),
       ...(mapped && /^\d+$/.test(mapped) ? { mappedOutreachId: mapped } : {}),
@@ -163,11 +169,14 @@ export class HubSpotRecyclerReader implements Reader {
     if (companies.status === "COMPLETE" && companyIds.length === 1) {
       try {
         const company = hubRecord.parse(
-          await this.client.read(`/crm/v3/objects/companies/${companyIds[0]}?properties=domain`),
+          await this.client.read(`/crm/v3/objects/companies/${companyIds[0]}?properties=domain,name,numberofemployees,annualrevenue`),
         );
         if (company.id !== companyIds[0] || company.archived)
           throw new IntegrationError("INVALID_RESPONSE");
         const host = normalizeDomain(company.properties.domain ?? "");
+        snapshot.prospect.profile!.company = { id: company.id, name: company.properties.name ?? null,
+          employees: normalizeHubSpotNumber(company.properties.numberofemployees) ?? null,
+          annualRevenue: normalizeHubSpotNumber(company.properties.annualrevenue) ?? null, currency: "UNKNOWN" };
         if (domain.safeParse(host).success) snapshot.prospect.employerDomain = host;
         else snapshot.issues.push({ code: "EMPLOYER_UNKNOWN", resource: "company" });
       } catch (error) {

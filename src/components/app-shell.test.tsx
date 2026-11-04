@@ -47,7 +47,14 @@ describe("AppShell responsive navigation", () => {
       "/sales-agent",
     );
     expect(within(menu).getByRole("navigation", { name: "Legacy Signal tools" })).toBeTruthy();
-    expect(within(menu).getByRole("link", { name: "Agent Workforce" }).textContent).toContain("New");
+    expect(
+      within(within(menu).getByRole("navigation", { name: "Workspace" }))
+        .getByRole("link", { name: "Daily Prospect Recycler" })
+        .getAttribute("href"),
+    ).toBe("/sales-agent/recycler");
+    expect(within(menu).getByRole("link", { name: "Agent Workforce" }).textContent).toContain(
+      "New",
+    );
     expect(within(menu).getByRole("link", { name: "Build Sequence" }).getAttribute("href")).toBe(
       "/build-sequence",
     );

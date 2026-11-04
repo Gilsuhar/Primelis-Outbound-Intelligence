@@ -196,7 +196,25 @@ export class DailyEngine {
         if (result.syncJobId) run.syncJobId = result.syncJobId;
         if (result.discovered !== undefined) run.discovered = result.discovered;
         if (result.deferred !== undefined) run.deferred = result.deferred;
-        if (result.contacts) run.contacts = result.contacts;
+        if (result.contacts) {
+          // Retain completed reviews in their original run. A new manual key cannot silently
+          // reprocess the same HubSpot record or evade the daily review-volume limit.
+          const reviewed = new Set(state.runs.filter(r => r.id !== run.id && r.localDate === run.localDate)
+            .flatMap(r => r.contacts.filter(c => c.status === "COMPLETED" || c.status === "BLOCKED").map(c => c.id)));
+          const unique = new Map<string, DailyContact>();
+          for (const contact of result.contacts) {
+            if (reviewed.has(contact.id)) continue;
+            const prior = unique.get(contact.id);
+            if (prior && JSON.stringify(prior) !== JSON.stringify(contact)) {
+              unique.set(contact.id, { ...prior, status: "BLOCKED", decision: "HOLD", researchCompleted: false,
+                draftPrepared: false, reasons: ["Conflicting duplicate HubSpot record; resolve before processing"] });
+            } else if (!prior) unique.set(contact.id, contact);
+          }
+          const remaining = Math.max(0, Math.min(50, this.config.maxContacts) - reviewed.size);
+          run.contacts = [...unique.values()].slice(0, remaining);
+          run.deferred += Math.max(0, unique.size - remaining);
+          if (!run.contacts.some(c => c.status === "WAITING" || c.status === "RUNNING")) result.done = true;
+        }
         if (result.contact) {
           const index = run.contacts.findIndex((c) => c.id === result.contact!.id);
           if (index >= 0) run.contacts[index] = result.contact;

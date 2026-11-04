@@ -1,5 +1,7 @@
 import type { RecyclerDecision, RecyclerInput } from "./contracts";
 import type { QualificationEvidence } from "./qualification";
+import type { RecyclerPreparation } from "./preparation";
+import type { Prospect, Snapshot } from "@/server/prospect-recycler/types";
 
 export type ReviewRow = {
   id: string;
@@ -10,6 +12,12 @@ export type ReviewRow = {
   identity: RecyclerInput["identity"]["resolution"];
   hubspotId?: string | null;
   qualification?: QualificationEvidence;
+  preparation?: RecyclerPreparation;
+  profiles?: NonNullable<Prospect["profile"]>[];
+  communications?: RecyclerInput["communications"];
+  engagement?: Snapshot["engagement"];
+  emailVerification?: RecyclerInput["emailVerification"];
+  employmentVerification?: RecyclerInput["employmentVerification"];
   decision: RecyclerDecision;
   issues: { code: string; resource: string }[];
   history: RecyclerInput["history"];
@@ -22,14 +30,49 @@ export type ReviewList = {
   evaluatedAt: string;
   rows: ReviewRow[];
   issues: { code: string; resource: string }[];
-  discovery: { provider: string; status: string; count: number }[];
+  discovery: {
+    provider: string;
+    status: string;
+    count: number;
+    lastSuccessfulSync?: string | null;
+  }[];
 };
 export function filterReviewRows(rows: ReviewRow[], query: string, status: string) {
   const needle = query.trim().toLowerCase();
-  return rows.filter(row => (status === "ALL" || row.decision.status === status) &&
-    [row.name, row.email, row.employerDomain, row.hubspotId, row.qualification?.company?.name,
-      row.qualification?.responsibility?.title, ...row.providers, ...row.decision.reasons.map(r => r.code + " " + r.message)]
-      .some(value => value?.toLowerCase().includes(needle)));
+  return rows.filter(
+    (row) =>
+      (status === "ALL" || row.decision.status === status) &&
+      [
+        row.name,
+        row.email,
+        row.employerDomain,
+        row.hubspotId,
+        row.qualification?.company?.name,
+        row.qualification?.responsibility?.title,
+        ...row.providers,
+        ...row.decision.reasons.map((r) => r.code + " " + r.message),
+      ].some((value) => value?.toLowerCase().includes(needle)),
+  );
+}
+export const eligibilityLabel = (status: RecyclerDecision["status"]) =>
+  status === "EXCLUDED" ? "DISQUALIFIED" : status;
+export type ReviewSort = "OUTBOUND_OLDEST" | "OUTBOUND_NEWEST" | "COMPANY" | "NAME";
+export function sortReviewRows(rows: ReviewRow[], sort: ReviewSort) {
+  return [...rows].sort((a, b) => {
+    let delta = 0;
+    if (sort === "NAME") delta = a.name.localeCompare(b.name);
+    else if (sort === "COMPANY")
+      delta = (a.qualification?.company?.name ?? a.employerDomain ?? "~").localeCompare(
+        b.qualification?.company?.name ?? b.employerDomain ?? "~",
+      );
+    else {
+      const left = a.decision.latestRelevantOutbound?.at,
+        right = b.decision.latestRelevantOutbound?.at;
+      if (!left || !right) return left ? -1 : right ? 1 : a.id.localeCompare(b.id);
+      delta = (Date.parse(left) - Date.parse(right)) * (sort === "OUTBOUND_NEWEST" ? -1 : 1);
+    }
+    return delta || a.id.localeCompare(b.id);
+  });
 }
 export function reviewSections(list: ReviewList) {
   const rows = [...list.rows].sort((a, b) => {
@@ -86,7 +129,11 @@ export function reviewCsv(list: ReviewList, scope: "REVIEW" | "TOP50") {
     "Suppression coverage",
     "Sequence coverage",
     "Evidence timestamps",
-    "HubSpot record ID", "Company", "Current role", "Qualification receipts", "Draft readiness",
+    "HubSpot record ID",
+    "Company",
+    "Current role",
+    "Qualification receipts",
+    "Draft readiness",
   ];
   return (
     [
@@ -99,7 +146,7 @@ export function reviewCsv(list: ReviewList, scope: "REVIEW" | "TOP50") {
         row.employerDomain ?? "",
         row.providers.join("; "),
         row.identity,
-        row.decision.status,
+        eligibilityLabel(row.decision.status),
         row.decision.latestRelevantOutbound?.at ?? "",
         row.decision.latestRelevantOutbound?.outcome ?? "",
         row.decision.latestRelevantOutbound?.record.system ?? "",
@@ -116,9 +163,13 @@ export function reviewCsv(list: ReviewList, scope: "REVIEW" | "TOP50") {
           .map((s) => s.system + ": " + s.status + ", authoritative=" + s.authoritative)
           .join("; "),
         JSON.stringify(row.decision.evidenceTimestamps),
-        row.hubspotId ?? "", row.qualification?.company?.name ?? "Unknown",
-        row.qualification?.responsibility?.title ?? "Unknown", JSON.stringify(row.qualification ?? {}),
-        row.decision.status === "ELIGIBLE" ? "Eligible for human draft review; not approved to send" : "Blocked by eligibility evidence",
+        row.hubspotId ?? "",
+        row.qualification?.company?.name ?? "Unknown",
+        row.qualification?.responsibility?.title ?? "Unknown",
+        JSON.stringify(row.qualification ?? {}),
+        row.decision.status === "ELIGIBLE"
+          ? "Eligible for human draft review; not approved to send"
+          : "Blocked by eligibility evidence",
       ]),
     ]
       .map((values) => values.map(csvCell).join(","))
