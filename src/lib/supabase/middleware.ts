@@ -10,6 +10,7 @@ import type { CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
+import { authCookieOptions } from "@/lib/auth/cookie-persistence";
 import { isPublicRoute } from "@/lib/private-preview-auth";
 import { companyPilotConfig, pilotPathAllowed } from "@/lib/company-pilot-isolation";
 import { isPreviewRestricted, previewApiDenied } from "@/lib/preview-policy.mjs";
@@ -59,10 +60,24 @@ export async function updateSession(request: NextRequest) {
 
   if (isPreviewRestricted()) {
     if (pathname.startsWith("/api/")) return previewApiDenied()!;
-    if (pathname === "/local-login") return new NextResponse(null, { status: 403 });
+    if (["GET", "HEAD"].includes(request.method) && ["/", "/sales-agent"].includes(pathname))
+      return NextResponse.redirect(new URL("/sales-agent/recycler", request.url));
+    if (
+      ![
+        "/login",
+        "/auth/callback",
+        "/auth/signout",
+        "/sales-agent/recycler",
+        "/favicon.ico",
+      ].includes(pathname)
+    )
+      return new NextResponse(null, { status: 403 });
     // Server actions have their own guards; this rejects unrelated POST entry points too.
-    if (!["GET", "HEAD"].includes(request.method) &&
-        pathname !== "/login" && !pathname.startsWith("/auth/"))
+    if (
+      !["GET", "HEAD"].includes(request.method) &&
+      pathname !== "/login" &&
+      pathname !== "/auth/signout"
+    )
       return NextResponse.json({ ok: false, code: "PREVIEW_OPERATION_DENIED" }, { status: 403 });
   }
 
@@ -162,7 +177,7 @@ export async function updateSession(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
+          response.cookies.set(name, value, authCookieOptions(options));
         });
         Object.entries(headersToSet).forEach(([key, value]) => {
           response.headers.set(key, value);

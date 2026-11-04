@@ -1,4 +1,12 @@
 import type { CookieOptions } from "@supabase/ssr";
+import { isPreviewRestricted } from "@/lib/preview-policy.mjs";
+
+// Preview Auth is server-mediated over HTTPS; Production cookie behavior is preserved.
+export function authCookieOptions(options: CookieOptions): CookieOptions {
+  return isPreviewRestricted()
+    ? { ...options, secure: true, httpOnly: true, sameSite: "lax", path: "/", domain: undefined }
+    : options;
+}
 
 export type SupabaseCookieToSet = {
   name: string;
@@ -23,7 +31,7 @@ export function persistSupabaseCookies(
 ) {
   try {
     cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
-      cookieStore.set(name, value, cookieOptions);
+      cookieStore.set(name, value, authCookieOptions(cookieOptions));
     });
     if (
       cookiesToSet.some(({ name, value }) => name.includes("-code-verifier") && value.length > 0)

@@ -18,6 +18,22 @@ vi.mock("@/app/auth/actions", () => ({
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 describe("AppShell responsive navigation", () => {
+  it("uses the dedicated logout POST and only Recycler navigation in Preview", () => {
+    const { container } = render(
+      <AppShell
+        previewRestricted
+        viewer={{ email: "reviewer@example.invalid", role: "SALES_USER" }}
+      >
+        Synthetic
+      </AppShell>,
+    );
+    for (const form of container.querySelectorAll("form")) {
+      expect(form.getAttribute("action")).toBe("/auth/signout");
+      expect(form.getAttribute("method")).toBe("post");
+    }
+    expect(container.querySelector('a[href="/account-research"]')).toBeNull();
+    expect(container.querySelector('a[href="/sales-agent/recycler"]')).not.toBeNull();
+  });
   it("keeps user context and sign out available in the mobile menu", () => {
     render(
       <AppShell viewer={{ email: "viewer@example.invalid", role: "SALES_USER" }}>

@@ -27,6 +27,7 @@ function NavigationSection({
   language: ReturnType<typeof useOutputLanguage>;
 }) {
   const pathname = usePathname();
+  if (items.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -79,10 +80,12 @@ function ViewerAccountPanel({
   role,
   email,
   language,
+  previewRestricted,
 }: {
   role: UserRole;
   email: string;
   language: ReturnType<typeof useOutputLanguage>;
+  previewRestricted: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -96,7 +99,10 @@ function ViewerAccountPanel({
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-[#6f6d5f]">
         <span className="min-w-0 truncate">{email}</span>
-        <form action={signOutAction}>
+        <form
+          action={previewRestricted ? "/auth/signout" : signOutAction}
+          method={previewRestricted ? "post" : undefined}
+        >
           <button
             aria-label="Sign out"
             className="rounded-full p-1 text-olive transition hover:bg-cream hover:text-ink"
@@ -113,9 +119,11 @@ function ViewerAccountPanel({
 export function AppShell({
   children,
   viewer,
+  previewRestricted = false,
 }: {
   children: React.ReactNode;
   viewer: PublicUser | null;
+  previewRestricted?: boolean;
 }) {
   const language = useOutputLanguage();
 
@@ -124,7 +132,13 @@ export function AppShell({
   }
 
   const role: UserRole = viewer.role;
-  const navigation = getNavigationForRole(role);
+  const allNavigation = getNavigationForRole(role);
+  const navigation = previewRestricted
+    ? {
+        sales: allNavigation.sales.filter((item) => item.href === "/sales-agent/recycler"),
+        admin: [],
+      }
+    : allNavigation;
   const workspaceNavigation = navigation.sales.filter(
     (item) => item.href === "/" || item.href.startsWith("/sales-agent"),
   );
@@ -153,7 +167,12 @@ export function AppShell({
             </span>
           </Link>
           <div className="hidden sm:flex lg:mt-5">
-            <ViewerAccountPanel role={role} email={viewer.email} language={language} />
+            <ViewerAccountPanel
+              role={role}
+              email={viewer.email}
+              language={language}
+              previewRestricted={previewRestricted}
+            />
           </div>
         </div>
 
@@ -188,7 +207,12 @@ export function AppShell({
               />
             ) : null}
             <div className="border-t border-line pt-4 sm:hidden">
-              <ViewerAccountPanel role={role} email={viewer.email} language={language} />
+              <ViewerAccountPanel
+                role={role}
+                email={viewer.email}
+                language={language}
+                previewRestricted={previewRestricted}
+              />
             </div>
           </div>
         </details>

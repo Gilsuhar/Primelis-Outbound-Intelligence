@@ -30,10 +30,12 @@ export function PrivatePasswordLogin({
   nextPath = "/sales-agent",
   accessPending = false,
   loginError,
+  previewRestricted = false,
 }: {
   nextPath?: string;
   accessPending?: boolean;
   loginError?: LoginErrorCode;
+  previewRestricted?: boolean;
 }) {
   const [state, action] = useActionState(signInWithPassword, initialState);
   const [recoveryState, recoveryAction, recoveryPending] = useActionState(
@@ -48,7 +50,9 @@ export function PrivatePasswordLogin({
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-ink">Private Sales Copilot</h1>
         <p className="mt-3 text-sm text-gray-600">
-          Sign in with your approved account. Use Google or your existing account password.
+          {previewRestricted
+            ? "Sign in with your approved Preview account password."
+            : "Sign in with your approved account. Use Google or your existing account password."}
         </p>
         {loginError && (
           <p
@@ -72,16 +76,20 @@ export function PrivatePasswordLogin({
           </form>
         ) : (
           <>
-            <form action={continueWithGoogle} className="mt-6">
-              <input type="hidden" name="next" value={nextPath} />
-              <button
-                type="submit"
-                className="w-full rounded-full border border-line bg-white px-4 py-3 font-semibold text-ink hover:bg-gray-50"
-              >
-                Continue with Google
-              </button>
-            </form>
-            <div className="my-4 text-center text-xs text-gray-500">or sign in with password</div>
+            {!previewRestricted && (
+              <form action={continueWithGoogle} className="mt-6">
+                <input type="hidden" name="next" value={nextPath} />
+                <button
+                  type="submit"
+                  className="w-full rounded-full border border-line bg-white px-4 py-3 font-semibold text-ink hover:bg-gray-50"
+                >
+                  Continue with Google
+                </button>
+              </form>
+            )}
+            {!previewRestricted && (
+              <div className="my-4 text-center text-xs text-gray-500">or sign in with password</div>
+            )}
             <form action={action} className="space-y-4">
               <input type="hidden" name="next" value={nextPath} />
               <label className="block text-sm font-medium">
@@ -111,28 +119,30 @@ export function PrivatePasswordLogin({
                 </p>
               )}
             </form>
-            <form action={recoveryAction} className="mt-5 space-y-2 border-t pt-4">
-              <p className="text-sm font-medium">Forgot your password?</p>
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="Your account email"
-                className="w-full rounded-xl border p-3"
-              />
-              <button
-                type="submit"
-                disabled={recoveryPending}
-                className="text-sm font-semibold underline disabled:opacity-60"
-              >
-                Email me a password reset link
-              </button>
-              {recoveryState.message && (
-                <p role="status" className="text-sm">
-                  {recoveryState.message}
-                </p>
-              )}
-            </form>
+            {!previewRestricted && (
+              <form action={recoveryAction} className="mt-5 space-y-2 border-t pt-4">
+                <p className="text-sm font-medium">Forgot your password?</p>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="Your account email"
+                  className="w-full rounded-xl border p-3"
+                />
+                <button
+                  type="submit"
+                  disabled={recoveryPending}
+                  className="text-sm font-semibold underline disabled:opacity-60"
+                >
+                  Email me a password reset link
+                </button>
+                {recoveryState.message && (
+                  <p role="status" className="text-sm">
+                    {recoveryState.message}
+                  </p>
+                )}
+              </form>
+            )}
           </>
         )}
       </section>

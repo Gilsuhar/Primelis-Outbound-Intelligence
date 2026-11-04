@@ -1,6 +1,5 @@
 "use server";
-import { assertPreviewOperation } from "@/lib/preview-policy.mjs";
-
+import { assertPreviewOperation, isPreviewRestricted } from "@/lib/preview-policy.mjs";
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -86,6 +85,7 @@ export async function requestLoginLink(
 }
 
 export async function continueWithGoogle(formData: FormData) {
+  if (isPreviewRestricted()) redirect("/login?error=access_denied");
   const config = getSupabaseAuthConfig();
   if (!config) {
     logAuthDiagnostic("warn", {
@@ -231,13 +231,22 @@ export async function updateRecoveredPassword(
   _state: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  if (isPreviewRestricted())
+    return {
+      ok: false,
+      message: "Preview credentials are managed by your workspace administrator.",
+    };
   const password = formData.get("password");
   if (typeof password !== "string" || password.length < 12 || password.length > 128)
     return { ok: false, message: "Use a password of at least 12 characters." };
   const supabase = await createSupabaseServerClient({ requireCookieWrites: true });
   if (!supabase) return { ok: false, message: "Authentication is unavailable." };
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return { ok: false, message: "Your reset link has expired. Request another one." };
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user)
+    return { ok: false, message: "Your reset link has expired. Request another one." };
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { ok: false, message: "Password update failed. Request a new link." };
   redirect("/sales-agent");

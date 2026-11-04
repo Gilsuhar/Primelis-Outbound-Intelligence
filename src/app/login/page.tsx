@@ -1,6 +1,7 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { parseLoginError } from "@/lib/auth/login-errors";
+import { isPreviewRestricted } from "@/lib/preview-policy.mjs";
 
 import { getCurrentUser, getSupabaseAuthUser } from "@/lib/auth/server";
 import { getSafeInternalPath, resolveLoginScreenState } from "@/lib/private-preview-auth";
@@ -31,6 +32,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <PrivatePasswordLogin
+      previewRestricted={isPreviewRestricted()}
       loginError={parseLoginError(getSingleParam(params.error))}
       accessPending={state === "ACCESS_PENDING"}
       nextPath={getSafeInternalPath(getSingleParam(params.next) ?? "/sales-agent")}

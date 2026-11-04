@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/components/app-shell";
 import { getPublicUser } from "@/lib/auth/server";
+import { isPreviewRestricted } from "@/lib/preview-policy.mjs";
 
 import "./globals.css";
 
@@ -22,7 +23,9 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AppShell viewer={viewer}>{children}</AppShell>
+        <AppShell viewer={viewer} previewRestricted={isPreviewRestricted()}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

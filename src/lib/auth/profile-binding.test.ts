@@ -6,12 +6,16 @@ import { resolveApplicationUser } from "./server";
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.unstubAllEnvs());
 describe("Preview binding is explicit and read-only", () => {
-  const identity = { id: "synthetic-auth", email: "reviewer@example.invalid", email_confirmed_at: "2026-10-17T00:00:00Z" };
+  const identity = {
+    id: "synthetic-auth",
+    email: "reviewer@example.invalid",
+    email_confirmed_at: "2026-10-17T00:00:00Z",
+  };
   it.each([
     { authUserId: null, email: identity.email },
     { authUserId: "different-auth", email: identity.email },
     { authUserId: identity.id, email: "Reviewer@example.invalid" },
-  ])("rejects unbound or mismatched profile %j without writes", async binding => {
+  ])("rejects unbound or mismatched profile %j without writes", async (binding) => {
     vi.stubEnv("VERCEL_ENV", "preview");
     db.findFirst.mockResolvedValue({ id: "synthetic", role: "SALES_USER", ...binding });
     expect(await resolveApplicationUser(identity)).toBeNull();
@@ -19,9 +23,19 @@ describe("Preview binding is explicit and read-only", () => {
   });
   it("accepts a confirmed, pre-bound authorized profile without writes", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
-    const profile = { id: "synthetic", authUserId: identity.id, email: identity.email, role: "SALES_USER" };
+    const profile = {
+      id: "synthetic",
+      authUserId: identity.id,
+      email: identity.email,
+      role: "SALES_USER",
+    };
     db.findFirst.mockResolvedValue(profile);
     expect(await resolveApplicationUser(identity)).toEqual(profile);
+    expect(db.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { id: true, authUserId: true, email: true, name: true, role: true },
+      }),
+    );
     expect(db.update).not.toHaveBeenCalled();
   });
   it("preserves Production first-login binding", async () => {

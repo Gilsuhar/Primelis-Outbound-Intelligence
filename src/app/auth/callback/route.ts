@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
 import { getSupabaseAuthConfig } from "@/lib/auth/env";
+import { authCookieOptions } from "@/lib/auth/cookie-persistence";
 import { profileLookupError } from "@/lib/auth/login-errors";
 import type { LoginErrorCode } from "@/lib/private-preview-auth";
 import {
@@ -36,7 +37,7 @@ function getLoginErrorUrl(request: NextRequest, error: LoginErrorCode) {
 function redirectWithCookies(url: URL, cookiesToSet: CookieToSet[], headersToSet: HeadersToSet) {
   const response = NextResponse.redirect(url);
   cookiesToSet.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
+    response.cookies.set(name, value, authCookieOptions(options));
   });
   Object.entries(headersToSet).forEach(([key, value]) => {
     response.headers.set(key, value);
