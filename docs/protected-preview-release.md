@@ -26,6 +26,11 @@ workflow only admits its SHA-named migration namespace and cannot run on this re
 
 ## Runtime role: smallest separately approvable action
 
+**Phase 5B supersedes the transport instructions below:** use
+[runtime-role-preflight.md](runtime-role-preflight.md). The management SQL connector/SQL Editor is
+not sufficient evidence of database certificate validation. The corrected guard combines effective
+schema USAGE with object ACLs and leaves extension-owned routine permissions unchanged.
+
 Target only `txfxfrlhtvzwgluhnbpw`, Primelis, us-west-2. Use the trusted operator connection with the
 existing strict Supabase CA/hostname checks and independently pinned cluster fingerprint. Do not put
 its administrator credential in Vercel. The application never falls back to administrator credentials.

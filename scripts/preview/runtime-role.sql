@@ -25,9 +25,21 @@ ALTER ROLE recycler_preview_app SET default_transaction_read_only = on;
 -- PUBLIC privileges are inherited even by NOINHERIT roles. Dedicated-project change only.
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE TEMPORARY ON DATABASE postgres FROM PUBLIC;
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM recycler_preview_app;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM recycler_preview_app;
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, recycler_preview_app;
+-- CREATE ROLE fails if the name exists. A fresh role has no direct object grants;
+-- the final effective-access guard rejects any unexpected PUBLIC/inherited access.
+-- Never change extension-owned routines, even if an extension is installed in public.
+DO $routines$
+DECLARE routine record;
+BEGIN
+  FOR routine IN SELECT p.oid::regprocedure AS signature FROM pg_proc p
+    JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.prokind IN ('f','w')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass
+        AND d.objid=p.oid AND d.deptype='e')
+  LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, recycler_preview_app', routine.signature);
+  END LOOP;
+END $routines$;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 GRANT CONNECT ON DATABASE postgres TO recycler_preview_app;
 GRANT USAGE ON SCHEMA public TO recycler_preview_app;
@@ -45,17 +57,23 @@ BEGIN
     OR EXISTS (SELECT 1 FROM pg_namespace WHERE nspowner=app_oid OR has_schema_privilege('recycler_preview_app',oid,'CREATE'))
     OR EXISTS (SELECT 1 FROM pg_class WHERE relowner=app_oid)
     OR NOT EXISTS (SELECT 1 FROM pg_class WHERE oid='public."User"'::regclass AND relrowsecurity)
+    -- has_* checks include PUBLIC and inherited privileges for this exact role.
+    -- Object ACLs alone do not permit access without effective schema USAGE.
+    -- Memberships remain independently forbidden above, even with NOINHERIT.
     OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f')
-        AND (has_table_privilege('recycler_preview_app',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+        AND has_schema_privilege('recycler_preview_app',n.oid,'USAGE')
+        AND (has_table_privilege('recycler_preview_app',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
           OR has_any_column_privilege('recycler_preview_app',c.oid,'INSERT,UPDATE,REFERENCES')))
     OR EXISTS (SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f')
+        AND has_schema_privilege('recycler_preview_app',n.oid,'USAGE')
         AND a.attnum>0 AND NOT a.attisdropped AND has_column_privilege('recycler_preview_app',c.oid,a.attnum,'SELECT')
         AND NOT (c.oid='public."User"'::regclass AND a.attname IN ('id','authUserId','email','name','role')))
     OR EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid='public."User"'::regclass
       AND a.attnum>0 AND NOT a.attisdropped
       AND has_column_privilege('recycler_preview_app',a.attrelid,a.attnum,'SELECT WITH GRANT OPTION'))
+    -- Sequence functions can take regclass/OID arguments; reject sequence ACLs unconditionally.
     OR EXISTS (SELECT 1 FROM pg_class c WHERE c.relkind='S'
       AND has_sequence_privilege('recycler_preview_app',c.oid,'USAGE,SELECT,UPDATE'))
     OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
