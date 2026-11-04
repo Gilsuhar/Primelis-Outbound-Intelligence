@@ -1,5 +1,8 @@
 # Runtime role correction and strict transport — Phase 5B
 
+Historical Phase 5B record. The current execution procedure and PostgreSQL 17 creator-grant
+correction are documented in [runtime-role-execution.md](runtime-role-execution.md).
+
 Target remains `txfxfrlhtvzwgluhnbpw` (Primelis, us-west-2). No provisioning is performed by this change.
 The previous read-only preflight found PUBLIC SELECT on extensions.pg_stat_statements and
 extensions.pg_stat_statements_info, but no PUBLIC USAGE on their schema. No role was created.

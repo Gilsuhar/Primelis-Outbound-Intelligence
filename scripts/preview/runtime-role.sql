@@ -20,6 +20,8 @@ BEGIN
   END IF;
 END $target$;
 -- Existing role or unexpected PUBLIC grants must never be silently adopted.
+-- Disable optional creator SET/INHERIT grants; PostgreSQL still creates an ADMIN-only grant.
+SET LOCAL createrole_self_grant = '';
 CREATE ROLE recycler_preview_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOREPLICATION;
 ALTER ROLE recycler_preview_app SET default_transaction_read_only = on;
 -- PUBLIC privileges are inherited even by NOINHERIT roles. Dedicated-project change only.
@@ -50,7 +52,8 @@ DECLARE app_oid oid := (SELECT oid FROM pg_roles WHERE rolname='recycler_preview
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE oid=app_oid AND
       (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolbypassrls OR rolreplication))
-    OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member=app_oid OR roleid=app_oid)
+    OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member=app_oid OR (roleid=app_oid AND NOT (member=(SELECT oid FROM pg_roles WHERE rolname='postgres')
+      AND grantor=10 AND admin_option AND NOT inherit_option AND NOT set_option)))
     OR EXISTS (SELECT 1 FROM pg_database WHERE datdba=app_oid)
     OR has_database_privilege('recycler_preview_app','postgres','CREATE,TEMPORARY')
     OR has_database_privilege('recycler_preview_app','postgres','CONNECT WITH GRANT OPTION')
@@ -59,7 +62,7 @@ BEGIN
     OR NOT EXISTS (SELECT 1 FROM pg_class WHERE oid='public."User"'::regclass AND relrowsecurity)
     -- has_* checks include PUBLIC and inherited privileges for this exact role.
     -- Object ACLs alone do not permit access without effective schema USAGE.
-    -- Memberships remain independently forbidden above, even with NOINHERIT.
+    -- Outgoing memberships remain forbidden. Only the bootstrap-created ADMIN-only creator grant is allowed.
     OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f')
         AND has_schema_privilege('recycler_preview_app',n.oid,'USAGE')

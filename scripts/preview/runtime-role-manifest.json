@@ -1,0 +1,7 @@
+{
+  "sqlSha256": "ff98add50593f74a942afd1d802987d092b61150d4e39a6541ebeb0959c858b4",
+  "clientImage": "postgres@sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416",
+  "clientVersion": "psql (PostgreSQL) 17.11 (Debian 17.11-1.pgdg12+2)",
+  "schemaBaselineSha256": "b08103acdaa0e2dfacaeaa61f83e54b2399201f809f90a5eff3c71ec3c69e341",
+  "schemaBaselineVerifiedAt": "2026-11-04"
+}

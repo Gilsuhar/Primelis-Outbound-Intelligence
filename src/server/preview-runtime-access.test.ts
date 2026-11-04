@@ -14,7 +14,7 @@ describe("effective runtime access from PostgreSQL catalog evidence", () => {
     expect(runtimeAccessFailures([profileOnly(), view, view])).toEqual([]);
     expect(runtimeAccessFailures([{ ...view, schema_usage: true }])).toEqual(["UNEXPECTED_EFFECTIVE_READ"]);
   });
-  it.each([false, true])("rejects memberships even when effective schema usage is %s", schema_usage => {
+  it.each([false, true])("rejects unexpected memberships even when effective schema usage is %s", schema_usage => {
     expect(runtimeAccessFailures([{ ...profileOnly(), schema_usage, memberships: true }])).toEqual(["ROLE_MEMBERSHIPS"]);
   });
   it.each(["table_read", "unexpected_column_read"])("rejects unexpected accessible extension grants: %s", flag => {
@@ -45,7 +45,7 @@ describe("effective runtime access from PostgreSQL catalog evidence", () => {
       expect(part, fn).toContain("has_schema_privilege('recycler_preview_app',n.oid,'USAGE')");
     }
     expect(sql).not.toMatch(/NOT IN \([^)]*'extensions'|nspname\s*<>\s*'extensions'/);
-    expect(sql).toContain("member=app_oid OR roleid=app_oid");
+    expect(sql).toContain("member=app_oid OR (roleid=app_oid");
     expect(sql).toContain("MAINTAIN");
     // Sequence operations can use OIDs without resolving a schema-qualified name.
     expect(guards.find(p => p.includes("has_sequence_privilege"))).not.toContain("has_schema_privilege");

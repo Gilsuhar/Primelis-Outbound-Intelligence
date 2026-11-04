@@ -10,7 +10,8 @@ export const runtimeAccessQuery = "SELECT " +
   "AND has_column_privilege('recycler_preview_app',c.oid,a.attnum,'SELECT') " +
   "AND NOT(c.oid='public.\"User\"'::regclass AND a.attname IN ('id','authUserId','email','name','role'))) AS unexpected_column_read, " +
   "EXISTS(SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='recycler_preview_app') " +
-  "OR roleid=(SELECT oid FROM pg_roles WHERE rolname='recycler_preview_app')) AS memberships " +
+  "OR (roleid=(SELECT oid FROM pg_roles WHERE rolname='recycler_preview_app') AND NOT (member=(SELECT oid FROM pg_roles WHERE rolname='postgres') " +
+  "AND grantor=10 AND admin_option AND NOT inherit_option AND NOT set_option))) AS memberships " +
   "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace " +
   "WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f')";
 

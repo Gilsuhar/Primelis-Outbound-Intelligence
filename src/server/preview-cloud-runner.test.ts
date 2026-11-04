@@ -324,16 +324,12 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
   }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
-    "node scripts/preview/audit-admin.mjs --plan", "node scripts/preview/audit-admin.mjs --audit-with-prisma-diff"]);
-  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("audit-admin:txfxfrlhtvzwgluhnbpw");
-  expect(secretSteps[0].env.PREVIEW_ADMIN_DIFF_APPROVAL).toBe("privileged-read-only-prisma-diff");
-  expect(steps[2].run).toContain("pnpm install --frozen-lockfile --ignore-scripts");
-  // Dependency preparation has no database secret and cannot invoke a database operation.
+    "node scripts/preview/provision-runtime-role.mjs --plan", "node scripts/preview/provision-runtime-role.mjs --provision-nologin-role"]);
+  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("provision-runtime-role:txfxfrlhtvzwgluhnbpw");
+  expect(secretSteps[0].env.PREVIEW_ADMIN_DIFF_APPROVAL).toBeUndefined();
+  // No dependency lifecycle script or database credential is present during client preparation.
   expect(steps[2].run.trim().split("\n")).toEqual([
-    "node --input-type=module -e \"import {readFileSync} from 'node:fs'; import {reviewedFiles} from './scripts/preview/verification.mjs'; reviewedFiles(JSON.parse(readFileSync('scripts/preview/verified-target.json')).migrations);\"",
-    "npm install --global pnpm@9.12.0 --ignore-scripts",
-    "pnpm install --frozen-lockfile --ignore-scripts",
-    "node node_modules/prisma/build/index.js generate",
+    "docker pull --platform=linux/amd64 postgres@sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416",
   ]);
   expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|verify-only\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
 });

@@ -25,6 +25,7 @@ if ($Task -in @('build','prisma','generate','types')) {
 }
 $log=Join-Path $PSScriptRoot ($Task + '.log')
 switch ($Task) {
+  'role-runner' { & node node_modules/vitest/vitest.mjs run src/server/preview-runtime-provisioning.test.ts src/server/preview-runtime-access.test.ts src/server/preview-runtime-role.test.ts src/server/preview-cloud-runner.test.ts src/server/preview-tls.test.ts src/server/preview-identity.test.ts src/server/preview-setup.test.ts src/lib/preview-runtime-tls.test.ts --maxWorkers=4 --minWorkers=1 *> $log }
   'runtime-role' { & node node_modules/vitest/vitest.mjs run src/server/preview-runtime-access.test.ts src/server/preview-runtime-role.test.ts src/server/preview-tls.test.ts src/server/preview-identity.test.ts src/server/preview-setup.test.ts src/lib/preview-runtime-tls.test.ts --maxWorkers=4 --minWorkers=1 *> $log }
   'focused' { & node node_modules/vitest/vitest.mjs run src/features/prospect-recycler src/server/prospect-recycler src/server/integrations src/server/agent-workforce/daily --maxWorkers=4 --minWorkers=1 *> $log }
   'drafting' { & node node_modules/vitest/vitest.mjs run src/server/prospect-recycler/preparation.test.ts src/server/agent-workforce/signal-opportunity/drafting.test.ts --maxWorkers=1 --minWorkers=1 *> $log }
