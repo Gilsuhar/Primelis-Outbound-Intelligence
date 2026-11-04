@@ -1,6 +1,7 @@
-# One-time Preview runtime role — Phase 5C
+# One-time Preview runtime role — Phase 5D
 
-Prepared locally only. No role, workflow, secret or cloud configuration has been changed.
+Phase 5D correction prepared locally only. Previous run 41856706050 stopped before role creation;
+the role remained absent and the independently checked database state was unchanged.
 This supersedes the execution proposal in runtime-role-preflight.md; the application remains
 unchanged. Target: txfxfrlhtvzwgluhnbpw / Primelis (ernouvntcojrxlahtbcr), us-west-2.
 
@@ -45,6 +46,16 @@ probe checks certificate chain and hostname. Independently, **every actual psql 
 so it cannot silently replace TLS. No hostaddr, service, client-selected options or Docker context
 is inherited. The child receives no GitHub token or unrelated provider credentials.
 
+Before releasing any SQL, `psql-tls-session.mjs` sends only `\conninfo` and a fixed `\echo`
+marker to the actual pinned psql process. It validates its live libpq connection report against
+the approved database/user/host/port and requires TLS 1.2/1.3, a cipher, compression off and
+strict transport settings. LC_ALL=C fixes the reviewed PostgreSQL 17 output format. Unknown,
+missing, duplicate or malformed evidence, process errors and timeout fail closed. Only then is
+the fixed SQL released to that same process/connection. Both APPLY and independent VERIFY use
+this gate. Raw connection identity and stderr remain private; only fixed outcomes are logged.
+The existing independent CA/hostname probe remains mandatory. Successful libpq verify-full
+enforces chain and hostname validation; conninfo additionally proves TLS is active on that client.
+
 The decoded database password is held in a private 0600 temporary PGPASSFILE inside a 0700
 directory, mounted read-only into the client. It is never a command argument, Docker environment
 value, console output or artifact. Password-file escaping and newline/NUL rejection are enforced.
@@ -59,7 +70,8 @@ manifest. No caller-provided SQL is accepted. Preflight runs in BEGIN READ ONLY 
 read-only settings and row_security=off (error on filtered counts; not a bypass). It requires:
 
 - The independently pinned cluster fingerprint, database, session and effective operator identity.
-- TLS active on this backend, PostgreSQL 17 and exact 11 completed migration names/checksums.
+- Independently verified client-to-pooler TLS (before SQL), PostgreSQL 17 and exact 11 completed
+  migration names/checksums. Backend TLS is reported separately, as described below.
 - The 50 expected public tables, RLS enabled, zero anon/authenticated table/column access,
   zero application rows/Auth users/public policies and no existing runtime role.
 - Actual grant authority for the role transaction, prospective effective PUBLIC access (including
@@ -120,6 +132,39 @@ specific correction with the execution commit; do not silently relax it at execu
 
 ## Validation limits and decision
 
+### Corrected TLS assertion and remaining trust boundary
+
+The old `pg_stat_ssl.ssl` guard intended to establish secure transport for the provisioning
+client. PostgreSQL documents that view as per-backend SSL state. Supabase documents that
+Supavisor sits between clients and PostgreSQL and maintains separate backend connections.
+Consequently the SQL boolean measures the pooler-to-PostgreSQL leg, not the client's libpq
+connection to the pooler. Run 41856706050 proved this assertion did not return true; the old
+error did not distinguish false from a missing/null row. It is not evidence of a failed client
+certificate check. No new remote probe has been run during Phase 5D.
+
+The replacement is a fail-closed same-client conninfo gate plus unchanged verify-full/CA trust,
+not an unconditional true assertion. SQL still observes backend TLS independently as
+REPORTED_TLS, REPORTED_NO_TLS or UNKNOWN (including missing/ambiguous rows), in each audit result.
+A false value means PostgreSQL reports no native SSL on that backend; it does not establish
+whether an infrastructure tunnel protects the intermediate network. No such tunnel is assumed.
+Even a true backend flag alone does not prove pooler certificate or hostname validation.
+
+This patch intentionally stops using backend SSL as a client-TLS requirement. Backend transport
+assurance remains a separate provider/configuration question. Review this distinction explicitly
+before authorizing a new provisioning attempt; if independently verified encryption on both legs
+is required, provisioning remains blocked until Supabase supplies that evidence or an approved
+verified direct connection is available. Do not silently interpret the new client proof as
+end-to-end TLS. No role SQL, system permissions or remote configuration changes are proposed.
+
+Official references:
+- [PostgreSQL backend SSL statistics](https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-SSL-VIEW)
+- [Supabase client and backend connections](https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits)
+- [libpq verify-full](https://www.postgresql.org/docs/17/libpq-ssl.html)
+- [psql conninfo](https://www.postgresql.org/docs/17/app-psql.html)
+- [PostgreSQL 17 conninfo implementation](https://github.com/postgres/postgres/blob/REL_17_STABLE/src/bin/psql/command.c)
+
+The following Phase 5C observations are historical, not new Phase 5D executions:
+
 Local tests mock provider/process responses and statically check SQL contracts. Two read-only
 management-connector operations ran on 2026-11-04: a boolean-only identity/permission query and
 the prepared preflight in BEGIN READ ONLY / ROLLBACK. Identity, role absence, grant authority,
@@ -128,9 +173,9 @@ RLS/API denial and empty application/Auth data all passed. Its catalog digest su
 baseline. No password value was selected; no role SQL was executed. This connector evidence does
 not prove certificate validation for the future psql connection.
 
-No psql connection or PostgreSQL role transaction ran here. The Linux client image has not run on
-this Windows host; Docker availability, its exact version and actual runner connectivity remain
-execution-time prerequisites. Live privileges and the baseline must still be rechecked on the
+The Linux client image has not run on this Windows host. The previous Actions run did validate
+its version and reach SQL preflight, but the new same-connection gate has only local mocked tests.
+Live privileges and the baseline must still be rechecked on the
 strict-TLS psql connection immediately before provisioning. This is ready for final preflight,
 not a claim of completed or authorized provisioning. No new system grants are authorized if a
 prerequisite fails.
@@ -139,7 +184,7 @@ Sources: [PostgreSQL 17 creator grant behavior](https://www.postgresql.org/docs/
 [libpq strict TLS](https://www.postgresql.org/docs/17/libpq-ssl.html),
 [official PostgreSQL client image source](https://github.com/docker-library/postgres/blob/master/17/bookworm/Dockerfile).
 
-## Recorded local validation
+## Recorded Phase 5C local validation (before this correction)
 
 - Focused runtime-role/owner/workflow/TLS/identity suites: 308 passed, 0 failed, 0 skipped.
 - Security suite: 190 passed, 0 failed, 0 skipped.
@@ -147,3 +192,18 @@ Sources: [PostgreSQL 17 creator grant behavior](https://www.postgresql.org/docs/
 - Gitleaks 8.30.1: zero findings in the 16 reviewed publication files.
 - The 11 migrations, Prisma schema, dependency lockfile and Vercel configuration are unchanged.
 - The role transaction and Linux client were not executed; post-provisioning checks are mocked/static until approval.
+
+## Phase 5D local validation
+
+- Focused role/client-TLS/owner/workflow/identity suites: 336 passed, 0 failed, 0 skipped (9 files).
+- Security suite: 190 passed, 0 failed, 0 skipped (12 files).
+- TypeScript, ESLint, Prisma validation and actionlint passed.
+- Gitleaks and provider-pattern scanning: zero findings in the nine changed/new publication files.
+- All 11 migrations, Prisma schema, lockfile, role SQL/hash manifest, workflow and vercel.json unchanged.
+- Initial validation caught unsupported test matcher syntax and a test type error; both were
+  corrected and affected checks rerun successfully without weakening assertions.
+- No new live connection, workflow, publication or database operation. Same-client gating is
+  mocked locally; live pooler/backend transport remains an execution-time observation.
+- GO for fresh read-only preflight. New publication/provisioning needs separate approval of
+  the exact commit and documented backend-transport boundary, with fresh environment SHA/branch
+  metadata. Never rerun 41856706050 or update its published execution branch.

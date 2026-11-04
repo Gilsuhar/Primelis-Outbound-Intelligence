@@ -16,7 +16,7 @@ const env = () => ({ CI: "true", GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: repo
   PREVIEW_SETUP_APPROVED_ENDPOINT: "aws-1-us-west-2.pooler.supabase.com:5432", PREVIEW_SETUP_APPROVED_SHA: sha,
   PREVIEW_SETUP_PUSH_CREATED: "true", PREVIEW_SETUP_PUSH_DELETED: "false", PREVIEW_SETUP_PUSH_FORCED: "false", PREVIEW_SETUP_PUSH_BEFORE: "0".repeat(40),
   PREVIEW_SETUP_DATABASE_URL: `postgresql://postgres.${ref}:synthetic-only@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&sslaccept=strict` });
-const output = (status: string, schema = "a".repeat(64)) => ({ status: 0, stdout: JSON.stringify({ status, schema }) + "\n" });
+const output = (status: string, schema = "a".repeat(64)) => ({ status: 0, clientTls: "VERIFIED", stdout: JSON.stringify({ status, schema, backendTls: "REPORTED_NO_TLS" }) + "\n" });
 const deps = () => ({ testing: true, authorize: vi.fn().mockResolvedValue(undefined), probe: vi.fn().mockResolvedValue(undefined),
   client: vi.fn().mockResolvedValueOnce({ status: 0, stdout: clientVersion + "\n" })
     .mockResolvedValueOnce(output("PREFLIGHT_PASSED")).mockResolvedValueOnce(output("POSTCHECK_PASSED")) });
@@ -54,7 +54,8 @@ describe("owner-authorized runtime role transport", () => {
     expect(() => runtimeRolePlan({ ...env(), PREVIEW_SETUP_DATABASE_URL: env().PREVIEW_SETUP_DATABASE_URL.replace("synthetic-only", `synthetic${encoding}only`) })).toThrow();
   });
   it("runs one guarded transaction and a separate read-only postcheck", async () => {
-    const d = deps(); expect(await provisionRuntimeRole(env(), true, d)).toMatchObject({ status: "ROLE_APPLIED_AND_VERIFIED", login: false, migrationCount: 11 });
+    const d = deps(); expect(await provisionRuntimeRole(env(), true, d)).toMatchObject({ status: "ROLE_APPLIED_AND_VERIFIED", login: false, migrationCount: 11,
+      clientTls: "VERIFIED", backendTlsBefore: "REPORTED_NO_TLS", backendTlsAfter: "REPORTED_NO_TLS" });
     expect(d.client.mock.calls.map(c => c[0])).toEqual(["VERSION", "APPLY", "VERIFY"]);
     const apply = d.client.mock.calls[1][1] as string, verify = d.client.mock.calls[2][1] as string;
     expect(apply.indexOf("PREVIEW_ROLE_PUBLIC_ACCESS")).toBeLessThan(apply.indexOf("CREATE ROLE"));
@@ -72,7 +73,7 @@ describe("owner-authorized runtime role transport", () => {
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toThrow("CLIENT_VERSION"); expect(d.client).toHaveBeenCalledTimes(1);
   });
   it.each(["IDENTITY", "HISTORY", "TABLES", "ROLE_EXISTS", "PUBLIC_ACCESS", "PASSWORD_AUDIT_AUTHORITY", "GRANT_AUTHORITY", "SCHEMA_BASELINE"])("stops without retry on %s", async condition => {
-    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion }).mockResolvedValueOnce({ status: 3, stderr: `PREVIEW_ROLE_${condition} sensitive-details`, stdout: "" });
+    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion }).mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stderr: `PREVIEW_ROLE_${condition} sensitive-details`, stdout: "" });
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toThrow(`PREVIEW_ROLE_${condition}`); expect(d.client).toHaveBeenCalledTimes(2);
   });
   it("rejects schema changes after commit without recovery or retry", async () => {
@@ -83,12 +84,15 @@ describe("owner-authorized runtime role transport", () => {
   it.each(["ATTRIBUTES", "MEMBERSHIPS", "PROFILE_COLUMNS", "EFFECTIVE_ACCESS", "HISTORY", "RLS_API", "EMPTY_DATA"])("stops after independent postcheck %s failure without replay", async condition => {
     const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion })
       .mockResolvedValueOnce(output("PREFLIGHT_PASSED"))
-      .mockResolvedValueOnce({ status: 3, stdout: "", stderr: `PREVIEW_ROLE_${condition}` });
+      .mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: `PREVIEW_ROLE_${condition}` });
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toMatchObject({ message: `PREVIEW_ROLE_${condition}`, phase: "VERIFY" });
     expect(d.client.mock.calls.map(c => c[0])).toEqual(["VERSION", "APPLY", "VERIFY"]);
   });
   it.each([{ status: null, stdout: "", error: new Error("private") }, { status: 0, stdout: "private" }, { status: 0, stdout: "{}" }])("sanitizes malformed/process output %#", child => {
-    try { checkedResult(child, "APPLY"); throw new Error("should fail"); } catch (e) { expect((e as Error).message).toMatch(/^PREVIEW_ROLE_(?:CLIENT_FAILED|OUTPUT)$/); }
+    try { checkedResult({ ...child, clientTls: "VERIFIED" }, "APPLY"); throw new Error("should fail"); } catch (e) { expect((e as Error).message).toMatch(/^PREVIEW_ROLE_(?:CLIENT_FAILED|OUTPUT)$/); }
+  });
+  it.each(["APPLY", "VERIFY"])("rejects missing actual-client evidence on %s even with otherwise valid output", phase => {
+    expect(() => checkedResult({ ...output(phase === "APPLY" ? "PREFLIGHT_PASSED" : "POSTCHECK_PASSED"), clientTls: undefined }, phase)).toThrow("CLIENT_TLS_EVIDENCE");
   });
 });
 
@@ -96,7 +100,10 @@ describe("provisioning SQL boundaries", () => {
   it.each([false, true])("keeps every audit read-only with identity/TLS/history/RLS/count checks (%s)", after => {
     const sql = runtimeAuditSql(after);
     expect(sql.startsWith("BEGIN READ ONLY;")).toBe(true); expect(sql.endsWith("ROLLBACK;")).toBe(true);
-    for (const condition of ["IDENTITY", "READ_ONLY", "TLS", "HISTORY", "TABLES", "RLS_API", "EMPTY_DATA", "POLICIES", "SCHEMA_BASELINE"]) expect(sql).toContain(`PREVIEW_ROLE_${condition}`);
+    for (const condition of ["IDENTITY", "READ_ONLY", "HISTORY", "TABLES", "RLS_API", "EMPTY_DATA", "POLICIES", "SCHEMA_BASELINE"]) expect(sql).toContain(`PREVIEW_ROLE_${condition}`);
+    expect(sql).not.toContain("PREVIEW_ROLE_TLS");
+    expect(sql).toContain("FROM pg_stat_ssl WHERE pid=pg_backend_pid()");
+    for (const state of ["REPORTED_TLS", "REPORTED_NO_TLS", "UNKNOWN"]) expect(sql).toContain(state);
     const syntax = sql.replace(/'(?:[^']|'')*'/g, "''");
     expect(syntax).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|COPY|CALL)\b/i);
     expect(sql).toContain("pg_control_system()"); expect(sql).toContain("m.checksum IS DISTINCT FROM expected.checksum");

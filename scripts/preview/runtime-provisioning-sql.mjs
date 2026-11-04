@@ -15,7 +15,8 @@ export function runtimeAuditSql(after = false) {
       AND (SELECT NOT rolsuper FROM pg_roles WHERE rolname=current_user)
       AND (SELECT encode(sha256(convert_to(system_identifier::text,'UTF8')),'hex') FROM pg_control_system())=${quote(target.clusterFingerprint)}`],
     ["READ_ONLY", "current_setting('transaction_read_only')='on' AND current_setting('default_transaction_read_only')='on' AND current_setting('row_security')='off'"],
-    ["TLS", "(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid())"],
+    // pg_stat_ssl describes the pooler-to-backend leg, not the libpq-to-pooler leg.
+    // Actual client TLS is gated by psql's local conninfo before any SQL is released.
     ["HISTORY", `(SELECT count(*) FROM public._prisma_migrations)=11 AND NOT EXISTS (
       SELECT 1 FROM public._prisma_migrations m FULL JOIN (VALUES ${history}) expected(name,checksum)
       ON m.migration_name=expected.name WHERE m.migration_name IS NULL OR expected.name IS NULL OR m.checksum IS DISTINCT FROM expected.checksum
@@ -90,7 +91,9 @@ SET LOCAL search_path=pg_catalog;
 DO $audit$ BEGIN
 ${checks.map(([name, condition]) => guard(name, condition)).join("\n")}
 END $audit$;
-SELECT json_build_object('status','${after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${schemaSnapshotQuery}));
+SELECT json_build_object('status','${after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${schemaSnapshotQuery}),
+  'backendTls', (SELECT CASE WHEN count(*)<>1 THEN 'UNKNOWN' WHEN bool_and(ssl) THEN 'REPORTED_TLS'
+    WHEN bool_and(NOT ssl) THEN 'REPORTED_NO_TLS' ELSE 'UNKNOWN' END FROM pg_stat_ssl WHERE pid=pg_backend_pid()));
 ROLLBACK;`;
 }
 
