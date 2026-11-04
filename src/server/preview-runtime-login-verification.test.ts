@@ -71,6 +71,20 @@ describe("prepared real-runtime Prisma acceptance (mocked here; no live compatib
     await expect(verifyRuntimePrisma(f.client)).rejects.toThrow("PREVIEW_RUNTIME_VERIFY_CONNECTION_OR_QUERY");
     expect(f.client.$transaction).toHaveBeenCalledTimes(2);
   });
+  it("does not count a session-query permission error as the intended denial probe", async () => {
+    const f = fixture(); let sessionCount = 0;
+    f.tx.$queryRawUnsafe.mockImplementation(async q => {
+      if (q === runtimeSessionQuery) {
+        if (++sessionCount > 1) throw { code: "P2010", meta: { code: "42501" } };
+        return [f.evidence];
+      }
+      if (q === runtimeAccessQuery) return [f.access];
+      throw new Error("INTENDED_PROBE_MUST_NOT_RUN");
+    });
+    await expect(verifyRuntimePrisma(f.client)).rejects.toThrow("CONNECTION_OR_QUERY");
+    expect(f.client.$transaction).toHaveBeenCalledTimes(2);
+    expect(f.tx.$queryRawUnsafe.mock.calls.some(([q]) => deniedRuntimeReads.includes(q))).toBe(false);
+  });
   it("rejects successful access to an unauthorized column/table", async () => {
     const f = fixture(); f.tx.$queryRawUnsafe.mockImplementation(async q => q === runtimeSessionQuery ? [f.evidence] : q === runtimeAccessQuery ? [f.access] : []);
     await expect(verifyRuntimePrisma(f.client)).rejects.toThrow("DENIED_READ_SUCCEEDED");

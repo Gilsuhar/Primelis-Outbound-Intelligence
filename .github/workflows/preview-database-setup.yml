@@ -1,8 +1,8 @@
-name: One-time Preview restricted runtime LOGIN activation
+name: One-time Preview restricted runtime Prisma acceptance
 
 on:
-  # Retain the deployment-excluded namespace; only the reviewed password/LOGIN transaction.
-  # Only the owner's deliberate creation of the SHA-named branch may authorize this activation.
+  # Retain the deployment-excluded namespace; fixed read-only acceptance only.
+  # Only the owner's deliberate creation of the SHA-named branch may authorize acceptance.
   # Ordinary branch pushes, updates, tags, PRs, schedules and reruns cannot authorize this job.
   push:
     branches:
@@ -54,7 +54,14 @@ jobs:
       - name: Prepare digest-pinned PostgreSQL client without database credentials
         run: |
           docker pull --platform=linux/amd64 postgres@sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416
-      - name: Activate only the restricted runtime role and independently verify
+      - name: Prepare frozen Prisma and application guard without database credentials
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.12.0 --activate
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec prisma generate
+          node scripts/preview/build-runtime-acceptance.mjs
+      - name: Read-only restricted runtime Prisma acceptance
         env:
           PREVIEW_SETUP_DATABASE_URL: ${{ secrets.PREVIEW_SETUP_DATABASE_URL }}
           PREVIEW_RUNTIME_DATABASE_URL: ${{ secrets.PREVIEW_RUNTIME_DATABASE_URL }}
@@ -68,12 +75,12 @@ jobs:
           PREVIEW_SETUP_ENVIRONMENT: agent-workforce-preview-setup
           PREVIEW_SETUP_PROJECT_NAME: agent-workforce-preview
           PREVIEW_SETUP_APPROVED_PROJECT_REF: txfxfrlhtvzwgluhnbpw
-          PREVIEW_SETUP_APPROVAL: activate-runtime-login:txfxfrlhtvzwgluhnbpw
+          PREVIEW_SETUP_APPROVAL: accept-runtime-prisma:txfxfrlhtvzwgluhnbpw
           GITHUB_TOKEN: ${{ github.token }}
           ACTIONS_STEP_DEBUG: ${{ secrets.ACTIONS_STEP_DEBUG }}
           ACTIONS_RUNNER_DEBUG: ${{ secrets.ACTIONS_RUNNER_DEBUG }}
           CHECKPOINT_DISABLE: '1'
           NEXT_TELEMETRY_DISABLED: '1'
         run: |
-          node scripts/preview/activate-runtime-login.mjs --plan
-          node scripts/preview/activate-runtime-login.mjs --activate-runtime-login
+          node scripts/preview/accept-runtime-prisma.mjs --plan
+          node scripts/preview/accept-runtime-prisma.mjs --accept-runtime-prisma

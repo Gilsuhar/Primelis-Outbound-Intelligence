@@ -313,7 +313,7 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     `github.event.sender.id == ${ownerId}`, "github.event.sender.type == 'User'",
   ]) expect(job.if).toContain(predicate);
   const steps = job.steps;
-  expect(steps).toHaveLength(4);
+  expect(steps).toHaveLength(5);
   expect(doc.env).toBeUndefined(); expect(job.env).toBeUndefined();
   for (const step of steps.filter((value: { uses?: string }) => value.uses)) expect(step.uses).toMatch(/@[a-f0-9]{40}$/);
   expect(steps[0].with["persist-credentials"]).toBe(false);
@@ -324,8 +324,8 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
     expect(secretSteps[0].env[`PREVIEW_SETUP_PUSH_${field.toUpperCase()}`]).toBe("${{ github.event." + field + " }}");
   }
   expect(secretSteps[0].run.trim().split("\n")).toEqual([
-    "node scripts/preview/activate-runtime-login.mjs --plan", "node scripts/preview/activate-runtime-login.mjs --activate-runtime-login"]);
-  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("activate-runtime-login:txfxfrlhtvzwgluhnbpw");
+    "node scripts/preview/accept-runtime-prisma.mjs --plan", "node scripts/preview/accept-runtime-prisma.mjs --accept-runtime-prisma"]);
+  expect(secretSteps[0].env.PREVIEW_SETUP_APPROVAL).toBe("accept-runtime-prisma:txfxfrlhtvzwgluhnbpw");
   expect(secretSteps[0].env.PREVIEW_RUNTIME_DATABASE_URL).toBe("${{ secrets.PREVIEW_RUNTIME_DATABASE_URL }}");
   expect(secretSteps[0].env.PREVIEW_RUNTIME_CREDENTIAL_ATTESTATION).toBe("${{ vars.PREVIEW_RUNTIME_CREDENTIAL_ATTESTATION }}");
   expect(secretSteps[0].env.PREVIEW_ADMIN_DIFF_APPROVAL).toBeUndefined();
@@ -333,6 +333,12 @@ it("workflow accepts only setup-branch creation, is environment-gated, SHA-pinne
   expect(steps[2].run.trim().split("\n")).toEqual([
     "docker pull --platform=linux/amd64 postgres@sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416",
   ]);
+  expect(steps[3].env).toBeUndefined();
+  expect(steps[3].run.trim().split("\n")).toEqual([
+    "corepack enable", "corepack prepare pnpm@9.12.0 --activate", "pnpm install --frozen-lockfile --ignore-scripts",
+    "pnpm exec prisma generate", "node scripts/preview/build-runtime-acceptance.mjs",
+  ]);
+  expect(readFileSync(workflow, "utf8")).not.toMatch(/activate-runtime-login|bind-profile|provision-runtime-role/);
   expect(readFileSync(workflow, "utf8")).not.toMatch(/setup\.mjs|verify-only\.mjs|initialize:|migrate deploy|migrate reset|migrate resolve|db push|prisma:seed|upload-artifact|continue-on-error|cancel-in-progress: true/);
 });
 

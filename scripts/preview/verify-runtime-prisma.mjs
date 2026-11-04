@@ -68,14 +68,16 @@ export async function verifyRuntimePrisma(client) {
     // Each permission-denied SELECT aborts its transaction. Never continue in it.
     for (const query of deniedRuntimeReads) {
       let denied = false;
+      let probeStarted = false;
       try {
         await client.$transaction(async tx => {
           const rows = await tx.$queryRawUnsafe(runtimeSessionQuery);
           if (!Array.isArray(rows) || rows.length !== 1 || fields.some(field => rows[0]?.[field] !== true)) fail("SESSION");
+          probeStarted = true;
           await tx.$queryRawUnsafe(query);
         }, { timeout: 15000, maxWait: 5000 });
       } catch (error) {
-        if (error?.code === "P2010" && error?.meta?.code === "42501") denied = true;
+        if (probeStarted && error?.code === "P2010" && error?.meta?.code === "42501") denied = true;
         else throw error;
       }
       if (!denied) fail("DENIED_READ_SUCCEEDED");
