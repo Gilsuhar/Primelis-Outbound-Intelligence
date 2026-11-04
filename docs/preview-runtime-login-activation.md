@@ -254,7 +254,11 @@ Sources: [psql password handling and transactions](https://www.postgresql.org/do
 [Vercel branch environment scoping](https://vercel.com/docs/environment-variables/manage-across-environments),
 [Vercel sensitive variables](https://vercel.com/docs/environment-variables/sensitive-environment-variables).
 
-## Validation performed locally
+## Historical preparation validation (e77a29b)
+
+The final activation candidate review and staging procedure are recorded separately
+in [runtime-login-final-candidate.md](runtime-login-final-candidate.md). The table below
+records the earlier acceptance-component preparation, not the current activation run.
 
 | Suite/check | Result |
 | --- | --- |
