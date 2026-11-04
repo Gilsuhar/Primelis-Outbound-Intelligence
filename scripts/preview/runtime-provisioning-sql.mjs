@@ -16,7 +16,16 @@ export function bindingAuditSql(after = false) {
   return auditSql(true, after);
 }
 
-function auditSql(after, bindingAfter) {
+// Fixed activation phases. Preserve the existing binding/role audit outputs unchanged.
+export function activationAuditSql(phase) {
+  if (!["preflight", "before-password", "before-commit", "postcheck"].includes(phase))
+    throw new Error("PREVIEW_ACTIVATION_PHASE");
+  return auditSql(true, true, phase);
+}
+
+function auditSql(after, bindingAfter, activation = null) {
+  const active = activation === "before-commit" || activation === "postcheck";
+  const writable = activation === "before-password" || activation === "before-commit";
   const binding = bindingAfter !== null;
   const files = reviewedFiles(target.migrations, path => Buffer.from(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n")));
   const history = target.migrations.map(name => `(${quote(name)},${quote(files.hashes[`prisma/migrations/${name}/migration.sql`])})`).join(",");
@@ -24,7 +33,9 @@ function auditSql(after, bindingAfter) {
     ["IDENTITY", `current_database()='postgres' AND session_user='postgres' AND current_user='postgres'
       AND (SELECT NOT rolsuper FROM pg_roles WHERE rolname=current_user)
       AND (SELECT encode(sha256(convert_to(system_identifier::text,'UTF8')),'hex') FROM pg_control_system())=${quote(target.clusterFingerprint)}`],
-    ["READ_ONLY", "current_setting('transaction_read_only')='on' AND current_setting('default_transaction_read_only')='on' AND current_setting('row_security')='off'"],
+    [writable ? "ACTIVATION_TRANSACTION" : "READ_ONLY", writable
+      ? "current_setting('transaction_read_only')='off' AND current_setting('row_security')='off'"
+      : "current_setting('transaction_read_only')='on' AND current_setting('default_transaction_read_only')='on' AND current_setting('row_security')='off'"],
     // pg_stat_ssl describes the pooler-to-backend leg, not the libpq-to-pooler leg.
     // Actual client TLS is gated by psql's local conninfo before any SQL is released.
     ["HISTORY", `(SELECT count(*) FROM public._prisma_migrations)=11 AND NOT EXISTS (
@@ -69,8 +80,8 @@ function auditSql(after, bindingAfter) {
   );
   else checks.push(
     ["ATTRIBUTES", `EXISTS(SELECT 1 FROM pg_roles r WHERE rolname='recycler_preview_app' AND NOT
-      (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls))
-      AND (SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='recycler_preview_app')
+      (${active ? "NOT rolcanlogin" : "rolcanlogin"} OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls))
+      AND (SELECT ${active ? "rolpassword IS NOT NULL AND split_part(rolpassword,'$',1)='SCRAM-SHA-256'" : "rolpassword IS NULL"} FROM pg_authid WHERE rolname='recycler_preview_app')
       AND EXISTS(SELECT 1 FROM pg_db_role_setting s JOIN pg_roles r ON r.oid=s.setrole WHERE r.rolname='recycler_preview_app'
       AND s.setdatabase=0 AND s.setconfig=ARRAY['default_transaction_read_only=on'])
       AND NOT EXISTS(SELECT 1 FROM pg_db_role_setting s JOIN pg_roles r ON r.oid=s.setrole WHERE r.rolname='recycler_preview_app' AND s.setdatabase<>0)`],
@@ -124,18 +135,22 @@ function auditSql(after, bindingAfter) {
       AND (SELECT pg_has_role(current_user,relowner,'USAGE') FROM pg_class WHERE oid='public."User"'::regclass)`]);
   }
   checks.push(["SCHEMA_BASELINE", `(${snapshot})=${quote(manifest.schemaBaselineSha256)}`]);
-  return `BEGIN READ ONLY;
-SET LOCAL default_transaction_read_only=on;
-SET LOCAL row_security=off;
+  if (activation) checks.push(["ACTIVATION_AUTHORITY", "(SELECT rolcreaterole FROM pg_roles WHERE rolname=current_user)"]);
+  // Normalize only the explicitly authorized LOGIN bit. ATTRIBUTES independently
+  // requires its phase-specific value; every other grant/role setting stays hashed.
+  const privileges = activation ? privilegeSnapshotQuery.replace("r.rolname,r.rolcanlogin,",
+    () => "r.rolname,CASE WHEN r.rolname='recycler_preview_app' THEN false ELSE r.rolcanlogin END,") : privilegeSnapshotQuery;
+  const begin = activation === "before-commit" ? "" : writable ? "BEGIN;\n" : "BEGIN READ ONLY;\nSET LOCAL default_transaction_read_only=on;\n";
+  const evidence = activation === "before-password" ? "" : `
+SELECT json_build_object('status','${activation ? active ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED" : binding ? bindingAfter ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED" : after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${snapshot}),
+  ${binding ? `'privileges', (${privileges}),` : ""}
+  'backendTls', (SELECT CASE WHEN count(*)<>1 THEN 'UNKNOWN' WHEN bool_and(ssl) THEN 'REPORTED_TLS'
+    WHEN bool_and(NOT ssl) THEN 'REPORTED_NO_TLS' ELSE 'UNKNOWN' END FROM pg_stat_ssl WHERE pid=pg_backend_pid()));`;
+  return `${begin}SET LOCAL row_security=off;
 SET LOCAL search_path=pg_catalog;
 DO $audit$ BEGIN
 ${checks.map(([name, condition]) => guard(name, condition)).join("\n")}
-END $audit$;
-SELECT json_build_object('status','${binding ? bindingAfter ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED" : after ? "POSTCHECK_PASSED" : "PREFLIGHT_PASSED"}', 'schema', (${snapshot}),
-  ${binding ? `'privileges', (${privilegeSnapshotQuery}),` : ""}
-  'backendTls', (SELECT CASE WHEN count(*)<>1 THEN 'UNKNOWN' WHEN bool_and(ssl) THEN 'REPORTED_TLS'
-    WHEN bool_and(NOT ssl) THEN 'REPORTED_NO_TLS' ELSE 'UNKNOWN' END FROM pg_stat_ssl WHERE pid=pg_backend_pid()));
-ROLLBACK;`;
+END $audit$;${evidence}${writable ? "" : "\nROLLBACK;"}`;
 }
 
 // Compare effective grants and role settings before/after, including public ACLs

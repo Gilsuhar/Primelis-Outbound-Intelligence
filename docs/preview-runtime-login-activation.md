@@ -45,7 +45,10 @@ Runtime connection fields (never a populated URL in documentation):
 - Host aws-1-us-west-2.pooler.supabase.com; port 5432; database postgres.
 - Username recycler_preview_app.txfxfrlhtvzwgluhnbpw, never postgres.
 - Query sslmode=require&sslaccept=strict&connection_limit=1.
-- Password URL-encoded once; verify decoded value matches the retained credential.
+- Password is canonical unpadded base64url of exactly 32 random bytes (43 characters).
+  Those characters need no percent encoding; reject encoded aliases or padding.
+  Shape checks do not prove entropy or uniqueness: the owner's generation and retention
+  attestation is mandatory. Never use the deliberately sequential unit-test fixture.
 - The application guard validates the role/project/endpoint and adds the bundled,
   pinned Supabase CA as an absolute sslcert path. No operator-supplied CA override.
 
@@ -55,15 +58,16 @@ only to the activation/acceptance step, never dependency installation, build or
 artifact steps. Use private ephemeral files where a client requires them, with
 cleanup on every outcome; keep the environment token out of database containers.
 
-## Guarded activation protocol (not executed; transport adapter still required)
+## Implemented guarded activation protocol (not executed)
 
 1. Reconfirm the exact project/owner/commit/branch/environment approval, management
    health and SSL Enforcement. Verify administrator authority without broader grants.
 2. Validate the runtime URL against the fixed fields above, secret presence and
    credential retention/delivery approval before opening a write-capable session.
 3. Use the pinned client and actual-connection conninfo gate with verify-full, CA,
-   hostname, TLS >=1.2 and approved endpoint. Run bindingAuditSql(true) as the fresh
-   read-only preflight on that same connection, including all 15 existing checks.
+   hostname, TLS >=1.2 and approved endpoint. Run activationAuditSql("preflight") as
+   the fresh read-only preflight on that same connection, preserving all 15 existing
+   binding checks and adding role-alteration authority (16 checks).
 4. In one explicit transaction, recheck target identity, NOLOGIN/password absence
    and exact grants/binding. Set transaction-local password_encryption=scram-sha-256.
    Use psql's supported `\password recycler_preview_app` facility so libpq encrypts
@@ -77,16 +81,48 @@ cleanup on every outcome; keep the environment token out of database containers.
    bit and password presence may differ; schema, history, profiles, policy, ACLs,
    memberships and all other role attributes must match. Do not run the old NOLOGIN
    postcheck unchanged and mistake the authorized state change for drift.
-7. Connect using ONLY the runtime credential and run the prepared Prisma acceptance
+7. In a separately approved subsequent read-only acceptance operation, connect using
+   ONLY the runtime credential and run the prepared Prisma acceptance
    component. No administrator fallback, SET ROLE impersonation or new grants.
    Failure leaves readiness NO-GO; rollback/deactivation requires owner approval.
 
-The existing runTlsSession feeds SQL through stdin, so blindly appending password
-lines to it is unsafe. The activation-only adapter must keep fixed SQL input separate
-from the private password prompt stream, retain the actual-client TLS gate, and test
-prompt/EOF/error/rollback handling with the pinned psql before publication. This
-adapter and activation-only workflow are not yet implemented or claimed executable.
-Do not implement new SCRAM cryptography merely to avoid this supported client path.
+`activate-runtime-login.mjs` now implements plan/activation modes. It invokes the
+existing GitHub authorization, endpoint, pinned CA and preliminary TLS checks. It
+requires the digest-pinned PostgreSQL 17.11 client before any SQL session. Only
+`activation-session.mjs` receives the private runtime password.
+
+The fixed SQL file contains no password. With no TTY, stdin carries only three
+explicit gate responses and the two C-locale native password prompt responses.
+The empty-text `\prompt` in file mode flushes stdout and reads stdin separately
+from the command file. The first gate releases SQL only after actual-client TLS;
+the second follows the complete live preflight; the third permits COMMIT only
+after repeated in-transaction guards and matching schema/privilege digests.
+PostgreSQL's native `\password` encrypts client-side; there is no custom SCRAM code.
+Password and LOGIN changes share one transaction. The fixed file cannot reach
+COMMIT following ON_ERROR_STOP, missing input or failed gates. A disconnected
+uncommitted transaction rolls back. A lost COMMIT acknowledgement remains UNKNOWN;
+do not replay it. Cleanup removes the container and private temporary directory.
+
+The administrator pgpass and public CA are private 0600 files in a 0700 ephemeral
+directory mounted read-only. The runtime password is never put in a file, argument,
+Docker environment, output, artifact or cache. Raw process output is kept private,
+bounded, classified and discarded. Debug output remains prohibited. The trusted
+GitHub runner necessarily holds the environment secret and password in memory;
+JavaScript strings do not provide guaranteed zeroization. Treat runner/admin access
+as privileged. This preparation has used synthetic inputs only, not a live password.
+
+Before COMMIT, all 16 checks run again; after COMMIT a separate actual-client-TLS
+connection runs the fixed read-only postcheck. Only the approved role's LOGIN bit
+is normalized for digest comparison, with the actual expected bit and SCRAM presence
+independently required in every phase. Other roles, memberships, ACLs, role defaults,
+profile/policy identity, RLS, fingerprint, baseline and 11 checksums remain guarded.
+This does not prove successful runtime password login or real Prisma compatibility;
+those remain the subsequent acceptance step, not a reason to broaden permissions.
+Local validation covers deterministic mocked process transcripts and fixed SQL,
+including fragmented/incorrect prompts, EOF, TLS failures and withheld COMMIT.
+The Windows preparation host has no Docker/psql executable available; it has not
+executed the pinned Linux client. Its first live use remains subject to the exact
+version check, strict transcript gates and fail-closed timeout, with no retry.
 
 ## Real Prisma acceptance, prepared but not executed
 
@@ -176,13 +212,42 @@ no wildcard or invented redirect URL. No browser/login readiness is claimed yet.
 
 ## Decision and smallest next action
 
-Current database state is ready for guarded activation preparation. Actual LOGIN
-activation remains NO-GO until the retained runtime credential/destinations are
-approved and staged, and the small activation-only psql adapter/workflow described
-above is implemented and validated. Do not activate merely because local tests pass.
-The next owner approval should cover runtime-only credential staging in the existing
-GitHub environment and the exact Vercel Preview branch configuration, not deployment.
-No Production bindings, Auth users or schema changes are needed.
+The activation-only implementation is ready for a separately approved execution
+candidate after local validation. Actual activation/publication remains unauthorized.
+No Production bindings, Auth users, migrations or schema changes are needed.
+
+### Manual secret staging and publication prerequisites (not performed)
+
+1. After separate credential-staging approval, the owner uses the existing trusted
+   password manager's cryptographic generator to create 32 random bytes, encoded
+   as 43-character unpadded base64url. Retain the credential and complete runtime URL
+   privately there, distinct from administrator and Auth passwords. Do not put it
+   in terminal arguments, history, screenshots, chat or repository files.
+2. In repository Settings → Environments → agent-workforce-preview-setup, add only
+   the environment Secret `PREVIEW_RUNTIME_DATABASE_URL` through the masked secret
+   entry interface. Construct it privately from the fields above. Leave the existing
+   `PREVIEW_SETUP_DATABASE_URL` and endpoint unchanged. GitHub cannot read it back.
+3. Set environment Variable `PREVIEW_RUNTIME_CREDENTIAL_ATTESTATION` to exactly
+   `unique-random-32-bytes-retained` only after generation, uniqueness and retention
+   are confirmed. This attestation is nonsecret; it cannot mathematically prove
+   entropy. Do not stage test fixtures. No runner generates or rotates a credential.
+4. For the finally reviewed execution commit, replace `PREVIEW_SETUP_APPROVED_SHA`
+   with its full SHA and retain exactly one Branch rule named
+   `codex/preview-migration-txfxfrlhtvzwgluhnbpw-<full-reviewed-SHA>`.
+   Keep administrator bypass disabled, owner-only creation guards, first attempt,
+   and the setup-branch Vercel exclusion. Do not update/recreate a published branch.
+5. Obtain final metadata/readiness preflight and explicit publication/activation
+   approval. The workflow executes only `activate-runtime-login.mjs --plan` then
+   `activate-runtime-login.mjs --activate-runtime-login`. No ordinary branch push,
+   tag, update, force push, rerun, dispatch or schedule authorizes activation.
+6. After successful activation and real runtime/Prisma acceptance, separately approve
+   copying the retained runtime URL into the exact application branch's sensitive
+   Vercel Preview `PREVIEW_DATABASE_URL`. Resolve inherited secrets first. Never put
+   the administrator URL in Vercel. No Vercel write credential is needed by this job.
+
+No automatic retry, credential replacement, NOLOGIN recovery or other database
+change follows a failure. An uncertain commit or failed postcheck requires a new
+read-only diagnosis and separate owner approval for any remediation.
 
 Sources: [psql password handling and transactions](https://www.postgresql.org/docs/17/app-psql.html),
 [PostgreSQL password authentication](https://www.postgresql.org/docs/17/auth-password.html),

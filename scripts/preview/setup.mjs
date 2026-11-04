@@ -16,7 +16,7 @@ const fail = () => { throw new Error("PREVIEW_SETUP_CONFIGURATION_REJECTED"); };
 
 /** Separate operator-only credentials: never consumed by Next.js or installation hooks. */
 export function setupPlan(env, migrations = readdirSync(resolve(root, "prisma/migrations")), operation = "initialize") {
-  if (!["initialize", "verify", "verify-readonly", "audit-admin", "provision-runtime-role", "bind-profile"].includes(operation)) fail();
+  if (!["initialize", "verify", "verify-readonly", "audit-admin", "provision-runtime-role", "bind-profile", "activate-runtime-login"].includes(operation)) fail();
   const ref = env.PREVIEW_SETUP_APPROVED_PROJECT_REF;
   if (env.CI || env.GITHUB_ACTIONS) validateGitHubContext(env);
   if (env.VERCEL || env.VERCEL_ENV || env.DATABASE_URL || env.DIRECT_URL ||
