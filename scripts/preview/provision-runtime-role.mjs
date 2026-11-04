@@ -9,7 +9,7 @@ import { verifiedCa } from "./tls-trust.mjs";
 import { probeTls } from "./tls-probe.mjs";
 import { sha256 } from "./verification.mjs";
 import { runtimeAuditSql } from "./runtime-provisioning-sql.mjs";
-import { runTlsSession, clientFailureCategory, clientDiagnostic } from "./psql-tls-session.mjs";
+import { runTlsSession, clientFailureCategory, clientDiagnostic, clientGuardCode } from "./psql-tls-session.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 // Official library/postgres 17.11-bookworm, linux/amd64 manifest read on 2026-11-04.
@@ -64,9 +64,10 @@ export function checkedResult(child, phase) {
   if (child.error || child.signal || child.status !== 0) {
     const known = ["SCHEMA_BASELINE", "IDENTITY", "READ_ONLY", "TLS", "HISTORY", "TABLES", "RLS_API", "EMPTY_DATA", "POLICIES",
       "ROLE_EXISTS", "GRANT_AUTHORITY", "PASSWORD_AUDIT_AUTHORITY", "PUBLIC_ACCESS", "ATTRIBUTES", "MEMBERSHIPS", "PROFILE_COLUMNS", "EFFECTIVE_ACCESS"];
-    const condition = known.find(c => new RegExp(`\\bPREVIEW_ROLE_${c}\\b`).test(child.stderr ?? ""));
+    const raised = child.error || child.signal ? undefined : clientGuardCode(child.stderr);
+    const condition = known.find(c => raised === `PREVIEW_ROLE_${c}`);
     const transactionGuard = ["PREVIEW_SETUP_TARGET_REJECTED", "PREVIEW_SETUP_MIGRATIONS_INCOMPLETE", "PREVIEW_RUNTIME_EFFECTIVE_PRIVILEGES_REJECTED"]
-      .some(code => new RegExp(`\\b${code}\\b`).test(child.stderr ?? ""));
+      .includes(raised);
     const category = child.error ? "PROCESS_EXECUTION" : child.signal ? "PROCESS_SIGNAL" :
       condition || transactionGuard ? "SQL_GUARD_REJECTED" : clientFailureCategory(child.stderr);
     throw Object.assign(new Error(`PREVIEW_ROLE_${condition ?? (transactionGuard ? "TRANSACTION_GUARD" : "CLIENT_FAILED")}`),

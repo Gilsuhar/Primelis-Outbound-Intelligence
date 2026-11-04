@@ -97,7 +97,8 @@ function auditSql(after, bindingAfter) {
   // proved that removing only pg_temp_/pg_toast_temp_ entries reproduces it exactly.
   // No persistent schemas, grants, objects or application differences are filtered.
   const snapshot = binding ? schemaSnapshotQuery.replace("WHERE n.nspname<>'public'",
-    "WHERE n.nspname<>'public' AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'") : schemaSnapshotQuery;
+    // A string replacement interprets $' as the source suffix, corrupting SQL.
+    () => "WHERE n.nspname<>'public' AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'") : schemaSnapshotQuery;
   if (binding) {
     const identity = JSON.parse(readFileSync(new URL("./profile-binding-manifest.json", import.meta.url)));
     const id = quote(identity.authUserId), email = quote(identity.email);

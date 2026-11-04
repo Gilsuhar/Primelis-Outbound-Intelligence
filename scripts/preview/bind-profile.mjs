@@ -9,7 +9,7 @@ import { verifiedCa } from "./tls-trust.mjs";
 import { probeTls } from "./tls-probe.mjs";
 import { sha256 } from "./verification.mjs";
 import { bindingAuditSql } from "./runtime-provisioning-sql.mjs";
-import { runTlsSession, clientDiagnostic } from "./psql-tls-session.mjs";
+import { runTlsSession, clientDiagnostic, clientGuardCode } from "./psql-tls-session.mjs";
 import { clientImage, clientVersion, connectionFiles, dockerArguments, checkedResult } from "./provision-runtime-role.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -58,11 +58,12 @@ export function bindingResult(child, phase) {
     return result;
   } catch (error) {
     // Extend fixed diagnostic identifiers without ever returning raw SQL/client output.
+    const raised = child.error || child.signal ? undefined : clientGuardCode(child.stderr);
     const condition = ["AUTH_IDENTITY", "BINDING_PROFILE", "BINDING_TRIGGERS", "BINDING_AUTHORITY"]
-      .find(c => new RegExp("\\bPREVIEW_ROLE_" + c + "\\b").test(child.stderr ?? ""));
+      .find(c => raised === "PREVIEW_ROLE_" + c);
     if (child.clientTls === "VERIFIED" && condition)
       throw Object.assign(new Error("PREVIEW_BINDING_" + condition), { phase, category: "SQL_GUARD_REJECTED", sqlReleased: true });
-    if (child.clientTls === "VERIFIED" && /\b(?:PREVIEW_AUTH_BINDING_REJECTED|PREVIEW_SETUP_ROLE_NOT_READY)\b/.test(child.stderr ?? ""))
+    if (child.clientTls === "VERIFIED" && ["PREVIEW_AUTH_BINDING_REJECTED", "PREVIEW_SETUP_ROLE_NOT_READY"].includes(raised))
       throw Object.assign(new Error("PREVIEW_BINDING_TRANSACTION_GUARD"), { phase, category: "SQL_GUARD_REJECTED", sqlReleased: true });
     if (error?.message === "PREVIEW_BINDING_OUTPUT")
       throw Object.assign(error, { phase, category: "SQL_OUTPUT_PARSING", sqlReleased: true });

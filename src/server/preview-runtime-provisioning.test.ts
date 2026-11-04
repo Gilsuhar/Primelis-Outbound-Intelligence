@@ -75,7 +75,7 @@ describe("owner-authorized runtime role transport", () => {
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toThrow("CLIENT_VERSION"); expect(d.client).toHaveBeenCalledTimes(1);
   });
   it.each(["IDENTITY", "HISTORY", "TABLES", "ROLE_EXISTS", "PUBLIC_ACCESS", "PASSWORD_AUDIT_AUTHORITY", "GRANT_AUTHORITY", "SCHEMA_BASELINE"])("stops without retry on %s", async condition => {
-    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion }).mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stderr: `PREVIEW_ROLE_${condition} sensitive-details`, stdout: "" });
+    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion }).mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stderr: `ERROR: P0001: PREVIEW_ROLE_${condition} sensitive-details`, stdout: "" });
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toThrow(`PREVIEW_ROLE_${condition}`); expect(d.client).toHaveBeenCalledTimes(2);
   });
   it("rejects schema changes after commit without recovery or retry", async () => {
@@ -86,7 +86,7 @@ describe("owner-authorized runtime role transport", () => {
   it.each(["ATTRIBUTES", "MEMBERSHIPS", "PROFILE_COLUMNS", "EFFECTIVE_ACCESS", "HISTORY", "RLS_API", "EMPTY_DATA"])("stops after independent postcheck %s failure without replay", async condition => {
     const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion })
       .mockResolvedValueOnce(output("PREFLIGHT_PASSED"))
-      .mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: `PREVIEW_ROLE_${condition}` });
+      .mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: `ERROR: P0001: PREVIEW_ROLE_${condition}` });
     await expect(provisionRuntimeRole(env(), true, d)).rejects.toMatchObject({ message: `PREVIEW_ROLE_${condition}`, phase: "VERIFY" });
     expect(d.client.mock.calls.map(c => c[0])).toEqual(["VERSION", "APPLY", "VERIFY"]);
   });

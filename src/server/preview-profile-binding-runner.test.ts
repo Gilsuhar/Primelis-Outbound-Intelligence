@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { approvedAuthUserId, approvedEmail, reviewedBindingSql, bindingParameters, bindingResult, bindProfile } from "../../scripts/preview/bind-profile.mjs";
 import { bindingAuditSql, runtimeAuditSql } from "../../scripts/preview/runtime-provisioning-sql.mjs";
-import { clientVersion } from "../../scripts/preview/provision-runtime-role.mjs";
+import { checkedResult, clientVersion } from "../../scripts/preview/provision-runtime-role.mjs";
 import { branchPrefix, repository, repositoryId, ownerId, workflow } from "../../scripts/preview/github-context.mjs";
 import { sha256 } from "../../scripts/preview/verification.mjs";
 import { clientDiagnostic } from "../../scripts/preview/psql-tls-session.mjs";
@@ -123,7 +123,7 @@ describe("binding-only owner authorization and transport", () => {
     expect(JSON.stringify(clientDiagnostic(caught))).not.toContain("must-not-leak");
   });
   it.each(["PREVIEW_AUTH_BINDING_REJECTED", "PREVIEW_SETUP_ROLE_NOT_READY"])("sanitizes unchanged transaction guard %s", code => {
-    expect(() => bindingResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: code + " private" }, "APPLY"))
+    expect(() => bindingResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: "ERROR: P0001: " + code + " private" }, "APPLY"))
       .toThrow("PREVIEW_BINDING_TRANSACTION_GUARD");
   });
 });
@@ -212,5 +212,57 @@ describe("reviewed binding SQL and exact expected database delta", () => {
     expect(sql.match(/CREATE POLICY/g)).toHaveLength(1);
     expect(sql).not.toMatch(/ON CONFLICT|UPDATE public|UPDATE auth|INSERT INTO auth|ALTER ROLE|GRANT |DROP |DELETE |TRUNCATE /);
     expect(sql).toContain("FOR SELECT TO recycler_preview_app");
+  });
+});
+
+describe("literal baseline rendering and primary PostgreSQL errors", () => {
+  it.each([false, true])("preserves every baseline field with one literal temporary-schema filter (%s)", after => {
+    const original = runtimeAuditSql(true).match(/IF \(\((\n\s+SELECT encode[\s\S]*?)\)='[a-f0-9]{64}'\) IS DISTINCT/)!;
+    expect(original).not.toBeNull();
+    const intended = original[1].replace("WHERE n.nspname<>'public'",
+      () => "WHERE n.nspname<>'public' AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'");
+    const audit = bindingAuditSql(after);
+    const actual = audit.match(/IF \(\((\n\s+SELECT encode[\s\S]*?)\)='[a-f0-9]{64}'\) IS DISTINCT/)!;
+    expect(actual).not.toBeNull(); expect(actual[1]).toBe(intended);
+    // Once in the guard and once in the evidence SELECT; no duplicated source suffix.
+    expect(audit.match(/\) metadata/g)).toHaveLength(2);
+    expect(audit.split(intended)).toHaveLength(3);
+    const corrupted = original[1].replace("WHERE n.nspname<>'public'",
+      "WHERE n.nspname<>'public' AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'");
+    expect(corrupted).not.toBe(intended); expect(audit).not.toContain(corrupted);
+    expect(audit).toContain('ORDER BY value COLLATE "C"');
+    expect(audit).toContain('SET LOCAL search_path=pg_catalog;');
+    expect(audit).toContain("WHERE r.rolname<>'recycler_preview_app'");
+    for (const check of ["ATTRIBUTES", "MEMBERSHIPS", "EFFECTIVE_ACCESS", "POLICIES", "RLS_API", "HISTORY"])
+      expect(audit).toContain("PREVIEW_ROLE_" + check);
+  });
+  it.each(["pg_temp_1", "pg_toast_temp_42", "pg_temp_business", "pg_temp_1_extra", "public", "extensions"])
+    ("keeps the existing namespace exclusion strictly numeric: %s", name => {
+      const pattern = bindingAuditSql(false).match(/n\.nspname !~ '([^']+)'/)![1];
+      expect(new RegExp(pattern).test(name)).toBe(["pg_temp_1", "pg_toast_temp_42"].includes(name));
+    });
+  it.each(["42601", "42501", "42809"])("preserves SQLSTATE %s despite guard names in the query echo", state => {
+    const category = { "42601": "SQL_SYNTAX", "42501": "SQL_PERMISSION", "42809": "SQL_WRONG_OBJECT_TYPE" }[state];
+    const stderr = `psql:<stdin>:100: ERROR:  ${state}: private database detail\nQUERY: ${bindingAuditSql(false)}\n`;
+    for (const check of [checkedResult, bindingResult]) {
+      let caught;
+      try { check({ status: 3, clientTls: "VERIFIED", stdout: "", stderr }, "APPLY"); } catch (error) { caught = error; }
+      expect(caught).toMatchObject({ message: "PREVIEW_ROLE_CLIENT_FAILED", category, phase: "APPLY" });
+      expect(JSON.stringify(clientDiagnostic(caught))).not.toContain("private");
+    }
+  });
+  it("uses the actual raised guard, not an earlier guard in the query echo", () => {
+    const stderr = "psql:<stdin>:100: ERROR: P0001: PREVIEW_ROLE_HISTORY\nQUERY: " + bindingAuditSql(false);
+    expect(() => bindingResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr }, "APPLY")).toThrow("PREVIEW_ROLE_HISTORY");
+  });
+  it("never treats bare or query-echoed guard names as proof of a raised guard", () => {
+    expect(() => bindingResult({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: bindingAuditSql(false) }, "APPLY"))
+      .toThrow("PREVIEW_ROLE_CLIENT_FAILED");
+  });
+  it("stops after the reproduced SQL parser failure without postchecks or retry", async () => {
+    const d = deps(); d.client.mockReset().mockResolvedValueOnce({ status: 0, stdout: clientVersion })
+      .mockResolvedValueOnce({ status: 3, clientTls: "VERIFIED", stdout: "", stderr: 'ERROR: 42601: private syntax\nQUERY: ' + bindingAuditSql(false) });
+    await expect(bindProfile(env(), true, d)).rejects.toMatchObject({ category: "SQL_SYNTAX", phase: "APPLY" });
+    expect(d.client.mock.calls.map(c => c[0])).toEqual(["VERSION", "APPLY"]);
   });
 });
